@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import {
   DollarSign, Users, Car, CalendarCheck, TrendingUp, TrendingDown,
-  Star, AlertCircle, ArrowLeft, Bell, Clock
+  Star, AlertCircle, ArrowLeft, Bell, Clock, CreditCard
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
