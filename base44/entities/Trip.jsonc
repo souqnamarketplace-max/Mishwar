@@ -1,0 +1,100 @@
+{
+  "name": "Trip",
+  "type": "object",
+  "properties": {
+    "driver_name": {
+      "type": "string"
+    },
+    "driver_avatar": {
+      "type": "string"
+    },
+    "driver_rating": {
+      "type": "number"
+    },
+    "driver_reviews_count": {
+      "type": "number"
+    },
+    "driver_trips_count": {
+      "type": "number"
+    },
+    "from_city": {
+      "type": "string"
+    },
+    "to_city": {
+      "type": "string"
+    },
+    "from_location": {
+      "type": "string"
+    },
+    "to_location": {
+      "type": "string"
+    },
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "time": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    },
+    "available_seats": {
+      "type": "number"
+    },
+    "total_seats": {
+      "type": "number"
+    },
+    "car_model": {
+      "type": "string"
+    },
+    "car_year": {
+      "type": "string"
+    },
+    "car_color": {
+      "type": "string"
+    },
+    "car_plate": {
+      "type": "string"
+    },
+    "car_image": {
+      "type": "string"
+    },
+    "distance": {
+      "type": "string"
+    },
+    "duration": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "in_progress",
+        "completed",
+        "cancelled"
+      ],
+      "default": "confirmed"
+    },
+    "amenities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "is_direct": {
+      "type": "boolean",
+      "default": true
+    },
+    "driver_note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "from_city",
+    "to_city",
+    "date",
+    "time",
+    "price"
+  ]
+}

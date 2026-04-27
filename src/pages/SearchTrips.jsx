@@ -1,0 +1,107 @@
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { MapPin, Calendar, Search, SlidersHorizontal, ArrowLeft } from "lucide-react";
+import TripCard from "../components/shared/TripCard";
+
+const CITIES = ["رام الله", "نابلس", "الخليل", "بيت لحم", "غزة", "جنين", "طولكرم", "قلقيلية"];
+
+export default function SearchTrips() {
+  const [searchParams] = useSearchParams();
+  const [from, setFrom] = useState(searchParams.get("from") || "");
+  const [to, setTo] = useState(searchParams.get("to") || "");
+  const [date, setDate] = useState(searchParams.get("date") || "");
+
+  const { data: trips = [], isLoading } = useQuery({
+    queryKey: ["trips"],
+    queryFn: () => base44.entities.Trip.list("-created_date", 50),
+  });
+
+  const filtered = trips.filter((t) => {
+    if (from && t.from_city !== from) return false;
+    if (to && t.to_city !== to) return false;
+    return true;
+  });
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      {/* Search Bar */}
+      <div className="bg-card rounded-2xl border border-border p-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div className="relative">
+            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+            <select
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="w-full h-11 pr-10 pl-4 rounded-xl bg-muted/50 border-0 text-sm"
+            >
+              <option value="">من أين؟</option>
+              {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="relative">
+            <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
+            <select
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="w-full h-11 pr-10 pl-4 rounded-xl bg-muted/50 border-0 text-sm"
+            >
+              <option value="">إلى أين؟</option>
+              {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="relative">
+            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="h-11 pr-10 rounded-xl bg-muted/50 border-0"
+            />
+          </div>
+          <Button className="h-11 bg-primary text-primary-foreground rounded-xl gap-2">
+            <Search className="w-4 h-4" />
+            بحث
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold text-foreground">
+          {filtered.length} رحلة متاحة
+        </h2>
+        <Button variant="outline" size="sm" className="rounded-lg gap-2">
+          <SlidersHorizontal className="w-4 h-4" />
+          تصفية
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card rounded-2xl border border-border p-6 animate-pulse">
+              <div className="h-5 bg-muted rounded w-48 mb-3" />
+              <div className="h-4 bg-muted rounded w-32 mb-3" />
+              <div className="h-10 bg-muted rounded w-full" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length > 0 ? (
+        <div className="space-y-4">
+          {filtered.map((trip) => (
+            <TripCard key={trip.id} trip={trip} />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20">
+          <Search className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-foreground mb-2">لا توجد رحلات متاحة</h3>
+          <p className="text-muted-foreground text-sm">جرّب تغيير معايير البحث أو أنشئ رحلة جديدة</p>
+        </div>
+      )}
+    </div>
+  );
+}
