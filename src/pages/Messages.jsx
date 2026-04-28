@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Search, Send, Phone, Video, MoreVertical, Paperclip,
-  Smile, MapPin, ArrowLeft, Star, Clock, MessageCircle, Headphones
+  Search, Send, Phone, Video, Trash2, Paperclip,
+  Smile, MapPin, ArrowLeft, Star, Clock, MessageCircle, Headphones, AlertCircle
 } from "lucide-react";
 
 const conversations = [
@@ -63,12 +63,45 @@ export default function Messages() {
   const [message, setMessage] = useState("");
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [localMessages, setLocalMessages] = useState(chatMessages);
+  const [localConversations, setLocalConversations] = useState(conversations);
+  const [undoable, setUndoable] = useState(null);
+  const [phoneError, setPhoneError] = useState(null);
+
+  const phoneRegex = /\b(?:\+?966|0)?[5-9]\d{8}\b|(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/;
 
   const handleSend = () => {
-    if (!message.trim()) return;
-    const newMsg = { id: String(Date.now()), sender: "me", text: message, time: new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" }) };
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    
+    // Check for phone numbers
+    if (phoneRegex.test(trimmed)) {
+      setPhoneError("لا يمكن مشاركة أرقام الهاتف في المحادثة");
+      setTimeout(() => setPhoneError(null), 3000);
+      return;
+    }
+
+    const newMsg = { id: String(Date.now()), sender: "me", text: trimmed, time: new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" }) };
     setLocalMessages((prev) => [...prev, newMsg]);
     setMessage("");
+    setPhoneError(null);
+    
+    // Enable undo for 30 seconds
+    setUndoable(newMsg.id);
+    setTimeout(() => setUndoable(null), 30000);
+  };
+
+  const handleUndo = () => {
+    if (!undoable) return;
+    setLocalMessages((prev) => prev.filter((m) => m.id !== undoable));
+    setUndoable(null);
+  };
+
+  const handleDeleteChat = (convId) => {
+    setLocalConversations((prev) => prev.filter((c) => c.id !== convId));
+    if (selectedChat?.id === convId) {
+      setSelectedChat(null);
+      setShowMobileChat(false);
+    }
   };
 
   return (
@@ -90,11 +123,11 @@ export default function Messages() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto">
-              {conversations.map((conv) => (
+              {localConversations.map((conv) => (
                 <button
                   key={conv.id}
                   onClick={() => { setSelectedChat(conv); setShowMobileChat(true); }}
-                  className={`w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 ${
+                  className={`w-full p-4 flex items-start gap-3 hover:bg-muted/50 transition-colors border-b border-border/50 group ${
                     selectedChat?.id === conv.id ? "bg-primary/5" : ""
                   }`}
                 >
@@ -121,6 +154,16 @@ export default function Messages() {
                       {conv.unread}
                     </span>
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteChat(conv.id);
+                    }}
+                    className="p-1 rounded-lg hover:bg-destructive/10 text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    title="حذف المحادثة"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </button>
               ))}
             </div>
@@ -163,7 +206,7 @@ export default function Messages() {
                   <div className="flex items-center gap-1">
                     <button onClick={() => alert(`اتصال مع ${selectedChat.name}`)} className="p-2 rounded-lg hover:bg-muted" title="مكالمة صوتية"><Phone className="w-4 h-4 text-muted-foreground" /></button>
                     <button onClick={() => alert(`مكالمة فيديو مع ${selectedChat.name}`)} className="p-2 rounded-lg hover:bg-muted" title="مكالمة فيديو"><Video className="w-4 h-4 text-muted-foreground" /></button>
-                    <button onClick={() => alert("خيارات المحادثة")} className="p-2 rounded-lg hover:bg-muted" title="خيارات"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
+                    <button onClick={() => { if (confirm("هل تريد حذف هذه المحادثة؟")) { handleDeleteChat(selectedChat.id); } }} className="p-2 rounded-lg hover:bg-destructive/10 text-destructive" title="حذف المحادثة"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
 
@@ -196,6 +239,27 @@ export default function Messages() {
                     </div>
                   ))}
                 </div>
+
+                {/* Undo notification */}
+                {undoable && (
+                  <div className="px-3 py-2 bg-primary/10 border-t border-primary/20 flex items-center justify-between">
+                    <span className="text-xs text-primary">آخر رسالة أرسلتها</span>
+                    <button
+                      onClick={handleUndo}
+                      className="text-xs text-primary font-medium hover:underline"
+                    >
+                      تراجع (30 ثانية)
+                    </button>
+                  </div>
+                )}
+
+                {/* Phone error */}
+                {phoneError && (
+                  <div className="px-3 py-2 bg-destructive/10 border-t border-destructive/20 text-xs text-destructive flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {phoneError}
+                  </div>
+                )}
 
                 {/* Input */}
                 <div className="p-3 border-t border-border bg-card">
