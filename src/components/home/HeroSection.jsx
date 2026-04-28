@@ -12,7 +12,7 @@ export default function HeroSection() {
       {/* Background image */}
       <div className="absolute inset-0">
         <img
-          src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1800&h=700&fit=crop&q=85"
+          src="https://media.base44.com/images/public/69eff402dbb517e4d7d3c1cf/0c6ab4112_image.png"
           alt=""
           className="w-full h-full object-cover object-center"
         />
