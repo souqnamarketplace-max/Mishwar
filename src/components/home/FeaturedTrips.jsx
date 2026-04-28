@@ -1,10 +1,10 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, MapPin, Users, ArrowLeft, Zap, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const fallbackTrips = [
   {
@@ -31,10 +31,21 @@ const fallbackTrips = [
 ];
 
 export default function FeaturedTrips() {
+  const qc = useQueryClient();
   const { data: liveTrips = [] } = useQuery({
     queryKey: ["featured-trips"],
     queryFn: () => base44.entities.Trip.filter({ status: "confirmed" }, "-created_date", 3),
   });
+
+  // Real-time subscription for new trips
+  useEffect(() => {
+    const unsubscribe = base44.entities.Trip.subscribe((event) => {
+      if (event.type === "create" || event.type === "update") {
+        qc.invalidateQueries({ queryKey: ["featured-trips"] });
+      }
+    });
+    return () => unsubscribe();
+  }, [qc]);
 
   const trips = liveTrips.length >= 3
     ? liveTrips.slice(0, 3).map(t => ({ ...t, from_city: t.from_city, to_city: t.to_city, urgent: t.available_seats <= 2 }))

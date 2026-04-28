@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
@@ -28,6 +28,7 @@ const statusConfig = {
 export default function MyTrips() {
   const [activeTab, setActiveTab] = useState("all");
   const [reviewingTrip, setReviewingTrip] = useState(null);
+  const qc = useQueryClient();
 
   const { data: user } = useQuery({
     queryKey: ["me"],
@@ -38,6 +39,17 @@ export default function MyTrips() {
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 50),
   });
+
+  // Real-time subscription for trip & review updates
+  useEffect(() => {
+    const unsubTrips = base44.entities.Trip.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+    });
+    const unsubReviews = base44.entities.Review.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["my-reviews"] });
+    });
+    return () => { unsubTrips(); unsubReviews(); };
+  }, [qc]);
 
   const filtered = activeTab === "all" ? trips : trips.filter((t) => t.status === activeTab);
   const { data: myReviews = [] } = useQuery({

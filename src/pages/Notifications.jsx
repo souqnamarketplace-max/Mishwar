@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft, ToggleRight, Check } from "lucide-react";
@@ -23,6 +23,17 @@ export default function Notifications() {
   const [activeTab, setActiveTab] = useState("preferences");
   const qc = useQueryClient();
 
+  // Real-time subscriptions
+  useEffect(() => {
+    const unsubNotif = base44.entities.Notification.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    });
+    const unsubPref = base44.entities.TripPreference.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["preferences"] });
+    });
+    return () => { unsubNotif(); unsubPref(); };
+  }, [qc]);
+
   // Fetch user
   const { data: user } = useQuery({
     queryKey: ["me"],
@@ -44,6 +55,18 @@ export default function Notifications() {
         : [],
     enabled: !!user?.email,
   });
+
+  // Real-time subscription for notifications & preferences
+  useEffect(() => {
+    if (!user?.email) return;
+    const unsubNotif = base44.entities.Notification.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["notifications", user.email] });
+    });
+    const unsubPref = base44.entities.TripPreference.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["preferences"] });
+    });
+    return () => { unsubNotif(); unsubPref(); };
+  }, [user?.email, qc]);
 
   const createPref = useMutation({
     mutationFn: (data) => base44.entities.TripPreference.create({

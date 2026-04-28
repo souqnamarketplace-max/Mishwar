@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Search, SlidersHorizontal, ArrowLeft } from "lucide-react";
@@ -20,10 +20,19 @@ export default function SearchTrips() {
     date: searchParams.get("date") || "",
   });
 
+  const qc = useQueryClient();
   const { data: trips = [], isLoading } = useQuery({
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 50),
   });
+
+  // Real-time subscription for trip updates
+  useEffect(() => {
+    const unsubscribe = base44.entities.Trip.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+    });
+    return () => unsubscribe();
+  }, [qc]);
 
   const handleSearch = () => setActiveFilters({ from, to, date });
 

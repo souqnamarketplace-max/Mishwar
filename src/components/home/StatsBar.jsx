@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, Car, MapPin, Star } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
 export default function StatsBar() {
+  const qc = useQueryClient();
   const { data: trips = [] } = useQuery({
     queryKey: ["stats-trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 1000),
@@ -17,6 +18,17 @@ export default function StatsBar() {
     queryKey: ["stats-reviews"],
     queryFn: () => base44.entities.Review.filter({ review_type: "passenger_rates_driver" }),
   });
+
+  // Real-time subscriptions
+  useEffect(() => {
+    const unsubTrips = base44.entities.Trip.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["stats-trips"] });
+    });
+    const unsubReviews = base44.entities.Review.subscribe((event) => {
+      qc.invalidateQueries({ queryKey: ["stats-reviews"] });
+    });
+    return () => { unsubTrips(); unsubReviews(); };
+  }, [qc]);
 
   const completedTrips = trips.filter((t) => t.status === "completed").length;
   const cities = new Set(trips.map((t) => t.from_city).concat(trips.map((t) => t.to_city))).size;
