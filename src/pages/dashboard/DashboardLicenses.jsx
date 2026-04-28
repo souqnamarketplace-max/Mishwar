@@ -1,0 +1,265 @@
+import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, XCircle, Clock, Search, Filter, Eye, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+export default function DashboardLicenses() {
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedLicense, setSelectedLicense] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const qc = useQueryClient();
+
+  const { data: licenses = [], isLoading } = useQuery({
+    queryKey: ["all-licenses"],
+    queryFn: () => base44.entities.DriverLicense.list("-created_date", 100),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (licenseId) =>
+      base44.entities.DriverLicense.update(licenseId, {
+        status: "approved",
+        approved_at: new Date().toISOString(),
+        approved_by: "admin",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-licenses"] });
+      toast.success("✓ تم الموافقة على الرخصة");
+      setSelectedLicense(null);
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (licenseId) =>
+      base44.entities.DriverLicense.update(licenseId, {
+        status: "rejected",
+        rejection_reason: rejectionReason || "لم يتم توفير سبب",
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["all-licenses"] });
+      toast.success("✗ تم رفض الرخصة");
+      setSelectedLicense(null);
+      setRejectionReason("");
+    },
+  });
+
+  const filteredLicenses = licenses.filter((l) => {
+    const matchStatus = filterStatus === "all" || l.status === filterStatus;
+    const matchSearch = l.driver_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       l.driver_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                       l.license_number?.includes(searchTerm);
+    return matchStatus && matchSearch;
+  });
+
+  const statusConfig = {
+    pending: { bg: "bg-yellow-500/10", text: "text-yellow-700", label: "قيد الانتظار", icon: Clock },
+    approved: { bg: "bg-green-500/10", text: "text-green-700", label: "موافق عليه", icon: CheckCircle },
+    rejected: { bg: "bg-destructive/10", text: "text-destructive", label: "مرفوض", icon: XCircle },
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="ابحث بالاسم أو البريد أو رقم الرخصة..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pr-10 rounded-xl"
+          />
+        </div>
+        <div className="flex gap-2">
+          {[
+            { value: "all", label: "الكل" },
+            { value: "pending", label: "قيد الانتظار" },
+            { value: "approved", label: "موافق" },
+            { value: "rejected", label: "مرفوض" },
+          ].map((filter) => (
+            <Button
+              key={filter.value}
+              variant={filterStatus === filter.value ? "default" : "outline"}
+              size="sm"
+              className="rounded-lg"
+              onClick={() => setFilterStatus(filter.value)}
+            >
+              {filter.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "قيد الانتظار", count: licenses.filter((l) => l.status === "pending").length, color: "bg-yellow-500/10" },
+          { label: "موافق عليه", count: licenses.filter((l) => l.status === "approved").length, color: "bg-green-500/10" },
+          { label: "مرفوض", count: licenses.filter((l) => l.status === "rejected").length, color: "bg-destructive/10" },
+        ].map((stat) => (
+          <div key={stat.label} className={`${stat.color} rounded-xl p-4 text-center`}>
+            <p className="text-2xl font-bold text-foreground">{stat.count}</p>
+            <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Table */}
+      <div className="bg-card rounded-xl border border-border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-right text-xs text-muted-foreground border-b border-border bg-muted/50">
+                <th className="p-3">السائق</th>
+                <th className="p-3">البريد</th>
+                <th className="p-3">رقم الرخصة</th>
+                <th className="p-3">انتهاء الصلاحية</th>
+                <th className="p-3">الحالة</th>
+                <th className="p-3">التاريخ</th>
+                <th className="p-3">الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan="7" className="p-6 text-center text-muted-foreground">جاري التحميل...</td></tr>
+              ) : filteredLicenses.length === 0 ? (
+                <tr><td colSpan="7" className="p-6 text-center text-muted-foreground">لم يتم العثور على رخص</td></tr>
+              ) : (
+                filteredLicenses.map((license) => {
+                  const config = statusConfig[license.status];
+                  const Icon = config.icon;
+                  return (
+                    <tr key={license.id} className="border-b border-border/50 hover:bg-muted/30">
+                      <td className="p-3 font-medium">{license.driver_name}</td>
+                      <td className="p-3 text-xs text-muted-foreground">{license.driver_email}</td>
+                      <td className="p-3 font-mono text-xs">{license.license_number}</td>
+                      <td className="p-3">{new Date(license.expiry_date).toLocaleDateString("ar")}</td>
+                      <td className="p-3">
+                        <Badge className={`${config.bg} ${config.text} text-xs gap-1`}>
+                          <Icon className="w-3 h-3" />
+                          {config.label}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-xs text-muted-foreground">
+                        {new Date(license.submitted_at).toLocaleDateString("ar")}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 px-2 rounded-lg"
+                            onClick={() => setSelectedLicense(license)}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* License Detail Modal */}
+      {selectedLicense && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">{selectedLicense.driver_name}</h2>
+
+            <div className="space-y-4 mb-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">البريد</p>
+                  <p className="text-sm font-medium">{selectedLicense.driver_email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">رقم الرخصة</p>
+                  <p className="text-sm font-medium">{selectedLicense.license_number}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">تاريخ الانتهاء</p>
+                  <p className="text-sm font-medium">{new Date(selectedLicense.expiry_date).toLocaleDateString("ar")}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">تاريخ التقديم</p>
+                  <p className="text-sm font-medium">{new Date(selectedLicense.submitted_at).toLocaleDateString("ar")}</p>
+                </div>
+              </div>
+
+              {/* License Image */}
+              {selectedLicense.license_image_url && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-2">صورة الرخصة</p>
+                  <img src={selectedLicense.license_image_url} alt="رخصة" className="rounded-lg border border-border max-h-48 object-cover w-full" />
+                </div>
+              )}
+
+              {/* Status */}
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">الحالة الحالية</p>
+                <Badge className={`${statusConfig[selectedLicense.status].bg} ${statusConfig[selectedLicense.status].text}`}>
+                  {statusConfig[selectedLicense.status].label}
+                </Badge>
+              </div>
+
+              {/* Rejection Reason */}
+              {selectedLicense.status === "rejected" && selectedLicense.rejection_reason && (
+                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <p className="text-xs text-destructive font-medium">سبب الرفض:</p>
+                  <p className="text-sm text-destructive mt-1">{selectedLicense.rejection_reason}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            {selectedLicense.status === "pending" && (
+              <div className="space-y-3">
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  onClick={() => approveMutation.mutate(selectedLicense.id)}
+                  disabled={approveMutation.isPending}
+                >
+                  ✓ الموافقة
+                </Button>
+                <div className="space-y-2">
+                  <textarea
+                    placeholder="سبب الرفض (إن وجد)..."
+                    value={rejectionReason}
+                    onChange={(e) => setRejectionReason(e.target.value)}
+                    className="w-full h-20 p-2 rounded-lg border border-input bg-background text-sm resize-none"
+                  />
+                  <Button
+                    className="w-full bg-destructive hover:bg-destructive/90 text-white rounded-lg"
+                    onClick={() => rejectMutation.mutate(selectedLicense.id)}
+                    disabled={rejectMutation.isPending}
+                  >
+                    ✗ الرفض
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <Button
+              variant="outline"
+              className="w-full rounded-lg mt-4"
+              onClick={() => {
+                setSelectedLicense(null);
+                setRejectionReason("");
+              }}
+            >
+              إغلاق
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

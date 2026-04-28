@@ -14,6 +14,7 @@ import DashboardContent from "./dashboard/DashboardContent";
 import DashboardOffers from "./dashboard/DashboardOffers";
 import DashboardSettings from "./dashboard/DashboardSettings";
 import DashboardLogs from "./dashboard/DashboardLogs";
+import DashboardLicenses from "./dashboard/DashboardLicenses";
 import {
   DollarSign, Users, Car, CalendarCheck, TrendingUp, TrendingDown,
   Star, AlertCircle, Bell, Clock, CreditCard
@@ -238,6 +239,7 @@ const pageTitles = {
   reports: { title: "التقارير والإحصائيات", subtitle: "تحليل بيانات المنصة" },
   notifications: { title: "الإشعارات", subtitle: "سجل أحداث المنصة" },
   support: { title: "الدعم والشكاوى", subtitle: "إدارة تذاكر الدعم الفني" },
+  licenses: { title: "التحقق من الرخص", subtitle: "مراجعة والموافقة على رخص القيادة" },
   content: { title: "إدارة المحتوى", subtitle: "إعلانات التطبيق والمدن المدعومة" },
   offers: { title: "إدارة العروض والكوبونات", subtitle: "إنشاء وإدارة كوبونات الخصم" },
   settings: { title: "إعدادات النظام", subtitle: "إعدادات التطبيق العامة" },
@@ -282,6 +284,7 @@ export default function Dashboard() {
         {activePage === "reports" && <DashboardReports />}
         {activePage === "notifications" && <DashboardNotifications />}
         {activePage === "support" && <DashboardSupport />}
+        {activePage === "licenses" && <DashboardLicenses />}
         {activePage === "content" && <DashboardContent />}
         {activePage === "offers" && <DashboardOffers />}
         {activePage === "settings" && <DashboardSettings />}
