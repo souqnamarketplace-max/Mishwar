@@ -1,18 +1,20 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Car, Users, DollarSign, TrendingUp, Plus, BarChart2 } from "lucide-react";
+import { Car, Users, DollarSign, TrendingUp, Plus, BarChart2, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import DriverStats from "../components/driver/DriverStats";
 import DriverTripsList from "../components/driver/DriverTripsList";
 import DriverPassengers from "../components/driver/DriverPassengers";
 import DriverVehicleEditor from "../components/driver/DriverVehicleEditor";
+import DriverRatePassengers from "../components/driver/DriverRatePassengers";
 
 const tabs = [
   { id: "trips", label: "رحلاتي", icon: Car },
   { id: "passengers", label: "الركاب", icon: Users },
   { id: "earnings", label: "الأرباح", icon: DollarSign },
+  { id: "ratings", label: "التقييمات", icon: Star },
   { id: "vehicle", label: "مركبتي", icon: Car },
 ];
 
@@ -101,6 +103,10 @@ export default function DriverDashboard() {
 
       {activeTab === "earnings" && (
         <EarningsTab bookings={bookings} trips={trips} totalEarnings={totalEarnings} />
+      )}
+
+      {activeTab === "ratings" && (
+        <DriverRatePassengers trips={trips} bookings={bookings} />
       )}
 
       {activeTab === "vehicle" && (
