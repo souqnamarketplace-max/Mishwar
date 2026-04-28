@@ -347,21 +347,55 @@ export default function TripDetails() {
           {/* Share */}
           <div className="bg-card rounded-2xl border border-border p-5">
             <p className="text-sm font-medium mb-3">شارك الرحلة مع أصدقائك!</p>
-            <div className="flex items-center justify-center gap-3">
-              {[
-                { label: "واتساب", bg: "bg-green-500", color: "text-white" },
-                { label: "فيسبوك", bg: "bg-blue-600", color: "text-white" },
-                { label: "نسخ الرابط", bg: "bg-muted", color: "text-foreground" },
-                { label: "مشاركة", bg: "bg-muted", color: "text-foreground" },
-              ].map((s) => (
-                <button
-                  key={s.label}
-                  className={`${s.bg} ${s.color} px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity`}
-                  onClick={() => toast("تم النسخ!")}
-                >
-                  {s.label}
-                </button>
-              ))}
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <button
+                className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  const url = `https://wa.me/?text=انضم معي في رحلة من ${trip.from_city} إلى ${trip.to_city} بسعر ₪${trip.price}`;
+                  window.open(url, "_blank");
+                }}
+              >
+                واتساب
+              </button>
+              <button
+                className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`;
+                  window.open(url, "_blank");
+                }}
+              >
+                فيسبوك
+              </button>
+              <button
+                className="bg-muted text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  toast.success("تم نسخ الرابط! 📋");
+                }}
+              >
+                نسخ الرابط
+              </button>
+              <button
+                className="bg-muted text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                onClick={async () => {
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({
+                        title: `رحلة من ${trip.from_city} إلى ${trip.to_city}`,
+                        text: `انضم معي في رحلة بسعر ₪${trip.price}`,
+                        url: window.location.href,
+                      });
+                    } catch (err) {
+                      if (err.name !== "AbortError") toast.error("فشلت المشاركة");
+                    }
+                  } else {
+                    navigator.clipboard.writeText(window.location.href);
+                    toast.success("تم نسخ الرابط! 📋");
+                  }
+                }}
+              >
+                مشاركة
+              </button>
             </div>
           </div>
         </div>
