@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search, LogOut } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -26,6 +26,7 @@ const getNavLinks = (user) => {
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const location = useLocation();
 
   const { data: user } = useQuery({
@@ -77,14 +78,41 @@ export default function Navbar() {
               <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
             </Link>
             <NotificationBell userEmail={user?.email} />
-            <button
-              onClick={() => base44.auth.logout()}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              title="تسجيل الخروج"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>خروج</span>
-            </button>
+            
+            {/* Profile Menu */}
+            <div className="relative hidden lg:block">
+              <button
+                onClick={() => setProfileOpen(!profileOpen)}
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                title="ملفي الشخصي"
+              >
+                {user?.avatar_url ? (
+                  <img src={user.avatar_url} alt="" className="w-full h-full object-cover rounded-xl" />
+                ) : (
+                  <span className="font-bold text-sm">{user?.full_name?.[0] || "م"}</span>
+                )}
+              </button>
+              
+              {profileOpen && (
+                <div className="absolute left-0 mt-2 w-48 bg-card rounded-xl border border-border shadow-lg overflow-hidden z-50">
+                  <Link
+                    to={`/profile?email=${user?.email}`}
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                  >
+                    <Settings className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">ملفي الشخصي</span>
+                  </Link>
+                  <button
+                    onClick={() => { base44.auth.logout(); setProfileOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>تسجيل الخروج</span>
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               className="lg:hidden p-2 rounded-lg hover:bg-muted"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -124,8 +152,16 @@ export default function Navbar() {
                   أنشر رحلة
                 </Button>
               </Link>
+              <Link
+                to={`/profile?email=${user?.email}`}
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                ملفي الشخصي
+              </Link>
               <button
-                onClick={() => base44.auth.logout()}
+                onClick={() => { base44.auth.logout(); setMobileOpen(false); }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
