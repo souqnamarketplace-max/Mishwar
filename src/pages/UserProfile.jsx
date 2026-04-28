@@ -102,6 +102,14 @@ export default function UserProfile() {
               </div>
             </div>
             <div className="flex gap-2">
+              {isOwnProfile && (
+                <Link to="/settings">
+                  <Button variant="outline" className="rounded-xl gap-2 h-9">
+                    <Settings className="w-4 h-4" />
+                    الإعدادات
+                  </Button>
+                </Link>
+              )}
               <Link to={`/messages`}>
                 <Button variant="outline" className="rounded-xl gap-2 h-9">
                   <MessageCircle className="w-4 h-4" />
