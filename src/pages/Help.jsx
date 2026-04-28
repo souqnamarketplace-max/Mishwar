@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import { Headphones, Search, ChevronDown, ChevronUp, MessageCircle, Phone, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,15 @@ const faqs = [
 
 export default function Help() {
   const [openIndex, setOpenIndex] = useState(null);
+
+  const { data: settingsArr = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+  });
+
+  const settings = settingsArr[0] || {};
+  const supportPhone = settings.support_phone || "+970 59 123 4567";
+  const supportEmail = settings.support_email || "support@sayartna.ps";
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -70,11 +81,11 @@ export default function Help() {
           </Button>
           <Button variant="outline" className="rounded-xl gap-2">
             <Phone className="w-4 h-4" />
-            +970 59 123 4567
+            {supportPhone}
           </Button>
           <Button variant="outline" className="rounded-xl gap-2">
             <Mail className="w-4 h-4" />
-            support@sayartna.ps
+            {supportEmail}
           </Button>
         </div>
       </div>
