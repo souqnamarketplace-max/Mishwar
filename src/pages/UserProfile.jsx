@@ -27,13 +27,12 @@ export default function UserProfile() {
     enabled: !!email,
   });
 
-  const avgRating = reviews.length
-    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
-    : 0;
-
-  const completedTrips = trips.filter((t) => t.status === "completed").length;
-  const driverName = trips[0]?.driver_name || email?.split("@")[0] || "سائق";
-  const driverAvatar = trips[0]?.driver_avatar;
+  const { data: bookings = [] } = useQuery({
+    queryKey: ["bookings", email],
+    queryFn: () =>
+      email ? base44.entities.Booking.filter({ passenger_email: email }, "-created_date", 50) : [],
+    enabled: !!email,
+  });
 
   if (!email) {
     return (
@@ -44,12 +43,13 @@ export default function UserProfile() {
     );
   }
 
-  const { data: bookings = [] } = useQuery({
-    queryKey: ["bookings", email],
-    queryFn: () =>
-      email ? base44.entities.Booking.filter({ passenger_email: email }, "-created_date", 50) : [],
-    enabled: !!email,
-  });
+  const avgRating = reviews.length
+    ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length
+    : 0;
+
+  const completedTrips = trips.filter((t) => t.status === "completed").length;
+  const driverName = trips[0]?.driver_name || email?.split("@")[0] || "سائق";
+  const driverAvatar = trips[0]?.driver_avatar;
 
   const confirmedWithUser = bookings.some((b) => b.status === "confirmed");
 
