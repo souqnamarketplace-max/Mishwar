@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Heart, Car, Users, MapPin, Star, ArrowLeft, Bell, TrendingDown, Clock, ChevronLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import TripCard from "../components/shared/TripCard";
@@ -37,6 +37,7 @@ const sidebarItems = [
 export default function Favorites() {
   const [activeTab, setActiveTab] = useState("all");
   const [favorites, setFavorites] = useState(new Set());
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const { data: trips = [] } = useQuery({
@@ -51,6 +52,17 @@ export default function Favorites() {
       return newSet;
     });
     toast.success("تم إزالة من المفضلة");
+  };
+
+  const handleSidebarAction = (action) => {
+    if (action === "prices") {
+      toast.info("سيتم إخطارك بتحديثات الأسعار على مساراتك المفضلة");
+    } else if (action === "trips") {
+      toast.info("سيتم إخطارك بالرحلات الجديدة على مساراتك المفضلة");
+    } else if (action === "recent") {
+      setActiveTab("all");
+      toast.success("عرض المفضلة الأخيرة");
+    }
   };
 
   return (
@@ -205,18 +217,45 @@ export default function Favorites() {
               <h3 className="font-bold text-foreground mb-4">إدارة المفضلة</h3>
               <p className="text-sm text-muted-foreground mb-3">نظّم مفضلتك بسهولة</p>
               <div className="space-y-3">
-                {sidebarItems.map((item) => (
-                  <button key={item.title} className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                      <item.icon className="w-4 h-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{item.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{item.desc}</p>
-                    </div>
-                    <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
-                  </button>
-                ))}
+                <button 
+                  onClick={() => handleSidebarAction("prices")}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <TrendingDown className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">تحديثات الأسعار</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">تحصل على إشعارات عند انخفاض أسعار الرحلات في مساراتك المفضلة</p>
+                  </div>
+                  <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+                </button>
+                <button 
+                  onClick={() => handleSidebarAction("trips")}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Bell className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">إشعارات الرحلات</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">تلقّ إشعارات فورية عند إضافة رحلات جديدة لمساراتك المفضلة</p>
+                  </div>
+                  <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+                </button>
+                <button 
+                  onClick={() => handleSidebarAction("recent")}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Clock className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">المفضلة مؤخراً</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">عرض آخر العناصر التي أضفتها لقائمة المفضلة لديك</p>
+                  </div>
+                  <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
+                </button>
               </div>
             </div>
 
