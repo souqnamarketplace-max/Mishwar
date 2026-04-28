@@ -16,8 +16,9 @@ export default function HeroSection() {
           alt=""
           className="w-full h-full object-cover object-center"
         />
-        {/* subtle dark gradient left-to-right so text is readable on the right */}
-        <div className="absolute inset-0 bg-gradient-to-l from-black/65 via-black/30 to-transparent" />
+        {/* gradient overlay fading into the image */}
+        <div className="absolute inset-0 bg-gradient-to-l from-black/75 via-black/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
       </div>
 
       {/* Content */}
@@ -27,8 +28,11 @@ export default function HeroSection() {
           initial={{ opacity: 0, x: 30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.55 }}
-          className="mr-auto ml-0 max-w-md text-right py-16"
+          className="mr-auto ml-0 max-w-md text-right py-16 relative"
         >
+          {/* Blurred glass backdrop behind text */}
+          <div className="absolute inset-0 -inset-x-6 -inset-y-4 rounded-2xl backdrop-blur-md bg-black/20" style={{zIndex: -1}} />
+
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl font-black text-white leading-tight mb-3">
             سيرتنا..<br />
