@@ -94,7 +94,7 @@ export default function Navbar() {
               </button>
               
               {profileOpen && (
-                <div className="absolute left-0 mt-2 w-48 bg-card rounded-xl border border-border shadow-lg overflow-hidden z-50">
+                <div className="absolute right-0 mt-2 w-48 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]">
                   <Link
                     to={`/profile?email=${user?.email}`}
                     onClick={() => setProfileOpen(false)}
