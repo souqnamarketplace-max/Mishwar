@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Heart, Car, Users, MapPin, Star, ArrowLeft, Bell, TrendingDown, Clock, ChevronLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import TripCard from "../components/shared/TripCard";
 
 const tabs = [
@@ -35,11 +36,22 @@ const sidebarItems = [
 
 export default function Favorites() {
   const [activeTab, setActiveTab] = useState("all");
+  const [favorites, setFavorites] = useState(new Set());
+  const qc = useQueryClient();
 
   const { data: trips = [] } = useQuery({
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 20),
   });
+
+  const removeFavorite = (id) => {
+    setFavorites(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(id);
+      return newSet;
+    });
+    toast.success("تم إزالة من المفضلة");
+  };
 
   return (
     <div>
@@ -104,9 +116,12 @@ export default function Favorites() {
                     { id: "3", from_city: "الخليل", to_city: "بيت لحم", date: "الأحد 30 يونيو 2024", time: "12:00 صباحاً", price: 35, driver_name: "سامي أبو أحمد", driver_rating: 4.7, available_seats: 4, car_model: "فولكس واغن بولو 2019", status: "confirmed" },
                   ]).slice(0, 3).map((trip) => (
                     <div key={trip.id} className="relative">
-                      <div className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-destructive flex items-center justify-center">
+                      <button 
+                        onClick={() => removeFavorite(trip.id)}
+                        className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-destructive flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                      >
                         <Heart className="w-3.5 h-3.5 text-white fill-white" />
-                      </div>
+                      </button>
                       <TripCard trip={trip} />
                     </div>
                   ))}
@@ -128,7 +143,10 @@ export default function Favorites() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {sampleDrivers.map((driver) => (
                     <div key={driver.name} className="bg-card rounded-2xl border border-border p-4 text-center hover:shadow-md transition-all relative">
-                      <button className="absolute top-2 left-2 w-6 h-6 rounded-full bg-destructive/10 flex items-center justify-center">
+                      <button 
+                        onClick={() => removeFavorite(driver.name)}
+                        className="absolute top-2 left-2 w-6 h-6 rounded-full bg-destructive/10 flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                      >
                         <Heart className="w-3 h-3 text-destructive fill-destructive" />
                       </button>
                       <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary mx-auto mb-2 overflow-hidden">
