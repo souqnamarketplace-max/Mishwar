@@ -72,8 +72,11 @@ export default function ReviewForm({ trip, reviewerUser, targetEmail, targetName
       />
 
       <Button
-        onClick={() => submit.mutate()}
-        disabled={rating === 0 || submit.isPending}
+        onClick={() => {
+          if (rating === 0) { toast.error("يرجى اختيار تقييم بالنجوم ⚠️"); return; }
+          submit.mutate();
+        }}
+        disabled={submit.isPending}
         className="w-full bg-primary text-primary-foreground rounded-xl gap-2"
       >
         <Send className="w-4 h-4" />

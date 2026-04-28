@@ -61,10 +61,18 @@ export default function Onboarding() {
   const steps = isDriver ? STEPS_DRIVER : STEPS_PASSENGER;
   const totalSteps = steps.length;
 
-  const canNext = () => {
-    if (step === 0) return !!accountType;
-    if (step === 1) return !!form.phone && !!form.city;
-    if (step === 2) return !!form.car_model && !!form.car_plate;
+  const canNext = () => true;
+
+  const validateStep = () => {
+    if (step === 0 && !accountType) { toast.error("يرجى اختيار نوع الحساب ⚠️"); return false; }
+    if (step === 1) {
+      if (!form.phone) { toast.error("يرجى إدخال رقم الهاتف ⚠️"); return false; }
+      if (!form.city) { toast.error("يرجى اختيار مدينتك ⚠️"); return false; }
+    }
+    if (step === 2 && isDriver) {
+      if (!form.car_model) { toast.error("يرجى إدخال موديل السيارة ⚠️"); return false; }
+      if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
+    }
     return true;
   };
 
@@ -172,7 +180,7 @@ export default function Onboarding() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium mb-1 block">رقم الهاتف *</label>
+                    <label className="text-sm font-medium mb-1 block">رقم الهاتف <span className="text-destructive">*</span></label>
                     <div className="relative">
                       <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
@@ -186,7 +194,7 @@ export default function Onboarding() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1 block">مدينتك *</label>
+                    <label className="text-sm font-medium mb-1 block">مدينتك <span className="text-destructive">*</span></label>
                     <div className="relative">
                       <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                       <select
@@ -223,7 +231,7 @@ export default function Onboarding() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium mb-1 block">موديل السيارة *</label>
+                      <label className="text-sm font-medium mb-1 block">موديل السيارة <span className="text-destructive">*</span></label>
                       <Input placeholder="مثال: كيا سبورتاج" value={form.car_model} onChange={(e) => setForm({ ...form, car_model: e.target.value })} className="rounded-xl" />
                     </div>
                     <div>
@@ -237,7 +245,7 @@ export default function Onboarding() {
                       <Input placeholder="مثال: فضي" value={form.car_color} onChange={(e) => setForm({ ...form, car_color: e.target.value })} className="rounded-xl" />
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1 block">رقم اللوحة *</label>
+                      <label className="text-sm font-medium mb-1 block">رقم اللوحة <span className="text-destructive">*</span></label>
                       <Input placeholder="مثال: 6-1234-95" value={form.car_plate} onChange={(e) => setForm({ ...form, car_plate: e.target.value })} className="rounded-xl" dir="ltr" />
                     </div>
                   </div>
@@ -265,8 +273,9 @@ export default function Onboarding() {
           )}
           <Button
             className="flex-1 bg-primary text-primary-foreground rounded-xl gap-2"
-            disabled={!canNext() || save.isPending}
+            disabled={save.isPending}
             onClick={() => {
+              if (!validateStep()) return;
               if (step < totalSteps - 1) {
                 setStep(step + 1);
               } else {

@@ -80,6 +80,21 @@ export default function CreateTrip() {
     }));
   };
 
+  const validateStep = (currentStep) => {
+    if (currentStep === 1) {
+      if (!form.from_city) { toast.error("يرجى اختيار مدينة الانطلاق ⚠️"); return false; }
+      if (!form.to_city) { toast.error("يرجى اختيار مدينة الوصول ⚠️"); return false; }
+      if (form.from_city === form.to_city) { toast.error("مدينة الانطلاق والوصول لا يمكن أن تكونا نفس المدينة ⚠️"); return false; }
+      if (!form.date) { toast.error("يرجى تحديد تاريخ المغادرة ⚠️"); return false; }
+      if (!form.time) { toast.error("يرجى تحديد وقت المغادرة ⚠️"); return false; }
+    }
+    if (currentStep === 3) {
+      if (!form.car_model) { toast.error("يرجى إدخال نوع السيارة ⚠️"); return false; }
+      if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
+    }
+    return true;
+  };
+
   const handleSubmit = async () => {
     const tripData = {
       ...form,
@@ -133,7 +148,7 @@ export default function CreateTrip() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>من</Label>
+                <Label>من <span className="text-destructive">*</span></Label>
                 <select
                   value={form.from_city}
                   onChange={(e) => updateField("from_city", e.target.value)}
@@ -144,7 +159,7 @@ export default function CreateTrip() {
                 </select>
               </div>
               <div>
-                <Label>إلى</Label>
+                <Label>إلى <span className="text-destructive">*</span></Label>
                 <select
                   value={form.to_city}
                   onChange={(e) => updateField("to_city", e.target.value)}
@@ -155,7 +170,7 @@ export default function CreateTrip() {
                 </select>
               </div>
               <div>
-                <Label>تاريخ المغادرة</Label>
+                <Label>تاريخ المغادرة <span className="text-destructive">*</span></Label>
                 <Input
                   type="date"
                   value={form.date}
@@ -164,7 +179,7 @@ export default function CreateTrip() {
                 />
               </div>
               <div>
-                <Label>وقت المغادرة</Label>
+                <Label>وقت المغادرة <span className="text-destructive">*</span></Label>
                 <Input
                   type="time"
                   value={form.time}
@@ -227,7 +242,7 @@ export default function CreateTrip() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>نوع السيارة</Label>
+                <Label>نوع السيارة <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.car_model}
                   onChange={(e) => updateField("car_model", e.target.value)}
@@ -254,7 +269,7 @@ export default function CreateTrip() {
                 />
               </div>
               <div>
-                <Label>رقم اللوحة</Label>
+                <Label>رقم اللوحة <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.car_plate}
                   onChange={(e) => updateField("car_plate", e.target.value)}
@@ -334,7 +349,7 @@ export default function CreateTrip() {
         {step < 4 ? (
           <Button
             className="rounded-xl bg-primary text-primary-foreground gap-2"
-            onClick={() => setStep(step + 1)}
+            onClick={() => { if (validateStep(step)) setStep(step + 1); }}
           >
             التالي
             <ArrowLeft className="w-4 h-4" />
