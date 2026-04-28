@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Car, Save, Camera } from "lucide-react";
+import { Car, Save, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -23,6 +23,23 @@ export default function DriverVehicleEditor({ trips }) {
   });
 
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      set("car_image", file_url);
+      toast.success("تم رفع الصورة بنجاح ✅");
+    } catch {
+      toast.error("فشل رفع الصورة، حاول مجدداً");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!lastTrip) return toast.error("أنشئ رحلة أولاً لحفظ بيانات المركبة");
@@ -53,18 +70,26 @@ export default function DriverVehicleEditor({ trips }) {
           )}
         </div>
         <div className="p-4">
-          <label className="block text-sm font-medium mb-1">رابط صورة المركبة</label>
-          <div className="flex gap-2">
-            <Input
-              placeholder="https://..."
-              value={form.car_image}
-              onChange={(e) => set("car_image", e.target.value)}
-              className="rounded-xl"
-            />
-            <Button variant="outline" size="icon" className="rounded-xl shrink-0">
-              <Camera className="w-4 h-4" />
-            </Button>
-          </div>
+          <label className="block text-sm font-medium mb-2">صورة المركبة</label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          <Button
+            variant="outline"
+            className="w-full rounded-xl gap-2"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> جاري الرفع...</>
+            ) : (
+              <><Camera className="w-4 h-4" /> رفع صورة المركبة</>
+            )}
+          </Button>
         </div>
       </div>
 
