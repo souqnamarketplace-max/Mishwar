@@ -32,6 +32,25 @@ export default function AccountSettings() {
   const [avatarLoading, setAvatarLoading] = useState(false);
 
   // Sync form with user data
+  // Driver License query
+  const { data: license } = useQuery({
+    queryKey: ["driver-license", user?.email],
+    queryFn: () =>
+      user?.email
+        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+        : [],
+    enabled: !!user?.email,
+  });
+
+  const driverLicense = license?.[0];
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [licenseExpiry, setLicenseExpiry] = useState("");
+  const [licenseImageUrl, setLicenseImageUrl] = useState("");
+  const [licenseLoading, setLicenseLoading] = useState(false);
+
+  // Delete account
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   useEffect(() => {
     if (user) {
       setEmail(user.email || "");
@@ -47,25 +66,6 @@ export default function AccountSettings() {
       setLicenseImageUrl(driverLicense.license_image_url || "");
     }
   }, [driverLicense]);
-
-  // Delete account
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  // Driver License
-  const { data: license } = useQuery({
-    queryKey: ["driver-license", user?.email],
-    queryFn: () =>
-      user?.email
-        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
-        : [],
-    enabled: !!user?.email,
-  });
-
-  const driverLicense = license?.[0];
-  const [licenseNumber, setLicenseNumber] = useState("");
-  const [licenseExpiry, setLicenseExpiry] = useState("");
-  const [licenseImageUrl, setLicenseImageUrl] = useState("");
-  const [licenseLoading, setLicenseLoading] = useState(false);
 
   const updateEmail = async () => {
     if (!email || email === user?.email) {
