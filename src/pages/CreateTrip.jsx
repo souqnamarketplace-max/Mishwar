@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -37,6 +37,7 @@ export default function CreateTrip() {
     queryKey: ["me"],
     queryFn: () => base44.auth.me(),
   });
+  const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
     from_city: "",
     to_city: "",
@@ -52,6 +53,21 @@ export default function CreateTrip() {
     driver_note: "",
     is_direct: true,
   });
+
+  // Pre-fill car details from user profile once loaded
+  useEffect(() => {
+    if (user && !formInitialized) {
+      setForm((prev) => ({
+        ...prev,
+        car_model: user.car_model || "",
+        car_year: user.car_year || "",
+        car_color: user.car_color || "",
+        car_plate: user.car_plate || "",
+        driver_note: user.driver_note || "",
+      }));
+      setFormInitialized(true);
+    }
+  }, [user, formInitialized]);
 
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
