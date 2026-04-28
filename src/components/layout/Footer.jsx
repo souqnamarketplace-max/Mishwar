@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 
 const quickLinks = [
   { label: "الرئيسية", path: "/" },
@@ -24,9 +25,58 @@ const socialLinks = [
 ];
 
 export default function Footer() {
+  const [showStory, setShowStory] = useState(false);
+
   return (
     <footer className="bg-primary text-primary-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
+        {/* Our Story Section */}
+        <div className="mb-12 bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
+          <button
+            onClick={() => setShowStory(!showStory)}
+            className="w-full flex items-center justify-between hover:opacity-90 transition-opacity"
+          >
+            <h3 className="text-xl font-bold">📖 قصتنا</h3>
+            <ChevronDown className={`w-5 h-5 transition-transform ${showStory ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showStory && (
+            <div className="mt-4 space-y-4 text-sm text-white/80 leading-relaxed max-h-96 overflow-y-auto">
+              <p>
+                في أوائل عام 2026، لم يكن أحمد خليل يفكر في إطلاق شركة أو بناء منصة—بل كان يحاول فقط التعامل مع تفاصيل الحياة اليومية في فلسطين. بين العمل والتنقل، كان يقضي ساعات طويلة في الانتظار على الحواجز أو في البحث عن وسيلة نقل توصله من مدينة إلى أخرى.
+              </p>
+              
+              <p>
+                في كل مرة كان يسافر من رام الله إلى نابلس أو بيت لحم، كان يلاحظ نفس المشهد: سيارات تمر بمقاعد فارغة، وفي المقابل أشخاص ينتظرون لساعات على جانب الطريق. كانت المشكلة واضحة، لكنها بدت وكأنها جزء طبيعي من الواقع.
+              </p>
+              
+              <p>
+                في أحد الأيام، تعطلت وسيلة النقل التي كان يعتمد عليها. بعد انتظار طويل، قرر أن يطلب من أحد السائقين المارين توصيلة. وافق السائق، وخلال الطريق بدأ الحديث بينهما. اكتشف أحمد أن السائق يقوم بنفس الرحلة يوميًا تقريبًا، وغالبًا ما تكون سيارته نصف فارغة. في تلك اللحظة، بدأت الفكرة تتشكل.
+              </p>
+              
+              <p className="text-white/60 italic">
+                "كم عدد الأشخاص الذين يقومون بنفس الرحلات يوميًا؟ وكم عدد المقاعد الفارغة التي يمكن أن تُستغل؟ ولماذا لا توجد طريقة منظمة لربط هؤلاء ببعضهم؟"
+              </p>
+              
+              <p>
+                شارك أحمد هذه الملاحظات مع صديقه يوسف حداد، مهندس البرمجيات. بدأ الاثنان يتخيلان حلًا بسيطًا: منصة تجمع بين السائقين والركاب، مبنية على الثقة، وسهلة الاستخدام، وتناسب طبيعة الحياة في فلسطين.
+              </p>
+              
+              <p>
+                في البداية، كانت هناك شكوك. لكن رغم ذلك، قررا البدء. بدأوا بشكل بسيط جدًا—مجموعة صغيرة على وسائل التواصل، تنسيق يدوي للرحلات، وتجربة الفكرة مع الأصدقاء والمعارف. ومع كل رحلة ناجحة، كان الإيمان يكبر.
+              </p>
+              
+              <p>
+                ما بدأ كتجربة بسيطة، تحول إلى شيء أكبر بكثير مما توقعوه. لم تعد الفكرة مجرد حل لمشكلة تنقل—بل أصبحت بداية رحلة لبناء مجتمع جديد، حيث يساعد الناس بعضهم البعض، ويعيدون تعريف معنى السفر والتنقل في فلسطين.
+              </p>
+              
+              <p className="text-white font-semibold">
+                هذه كانت الشرارة الأولى… والقصة ما زالت تُكتب. 🇵🇸
+              </p>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
 
           {/* Brand */}
