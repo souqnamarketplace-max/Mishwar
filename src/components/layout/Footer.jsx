@@ -10,10 +10,10 @@ const quickLinks = [
 ];
 
 const aboutLinks = [
-  { label: "من نحن", path: "#" },
-  { label: "مدونة سيرتنا", path: "#" },
+  { label: "من نحن", path: "/about" },
+  { label: "مدونة سيرتنا", path: "/blog" },
   { label: "الأسئلة الشائعة", path: "/help" },
-  { label: "الأمان", path: "#" },
+  { label: "الأمان", path: "/safety" },
 ];
 
 const socialLinks = [

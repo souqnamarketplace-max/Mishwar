@@ -22,6 +22,9 @@ import DriverDashboard from './pages/DriverDashboard';
 import Notifications from './pages/Notifications';
 import UserProfile from './pages/UserProfile';
 import Onboarding from './pages/Onboarding';
+import AboutUs from './pages/AboutUs';
+import Blog from './pages/Blog';
+import Safety from './pages/Safety';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
@@ -72,6 +75,9 @@ const AuthenticatedApp = () => {
         <Route path="/driver" element={<DriverDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<UserProfile />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/safety" element={<Safety />} />
       </Route>
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/onboarding" element={<Onboarding />} />
