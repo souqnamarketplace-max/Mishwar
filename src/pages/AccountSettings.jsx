@@ -145,6 +145,8 @@ export default function AccountSettings() {
       
       qc.invalidateQueries({ queryKey: ["me"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["featured-trips"] });
       toast.success("تم تحديث الصورة!");
     } catch {
       toast.error("خطأ في رفع الصورة");
