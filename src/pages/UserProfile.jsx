@@ -2,16 +2,24 @@ import React, { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { Star, Car, MapPin, Calendar, Shield, Award, MessageCircle, ArrowLeft, Phone } from "lucide-react";
+import { Star, Car, MapPin, Calendar, Shield, Award, MessageCircle, ArrowLeft, Phone, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import RatingSummary from "../components/reviews/RatingSummary";
 import ReviewsList from "../components/reviews/ReviewsList";
+import PassengerPaymentSetup from "../components/user/PassengerPaymentSetup";
 
 export default function UserProfile() {
   const [searchParams] = useSearchParams();
   const email = searchParams.get("email");
   const [tab, setTab] = useState("reviews");
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
+
+  const isOwnProfile = !email || currentUser?.email === email;
 
   const { data: trips = [] } = useQuery({
     queryKey: ["driver-trips", email],
@@ -128,10 +136,11 @@ export default function UserProfile() {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted/40 p-1 rounded-xl mb-6">
-        {[
-          { id: "reviews", label: `التقييمات (${reviews.length})` },
-          { id: "trips", label: `الرحلات (${trips.length})` },
-        ].map((t) => (
+       {[
+         { id: "reviews", label: `التقييمات (${reviews.length})` },
+         { id: "trips", label: `الرحلات (${trips.length})` },
+         ...(isOwnProfile ? [{ id: "payments", label: "الدفع", icon: "💳" }] : []),
+       ].map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
@@ -153,16 +162,16 @@ export default function UserProfile() {
 
       {tab === "trips" && (
         <div className="space-y-3">
-          {trips.length === 0 ? (
+           {trips.length === 0 ? (
             <div className="bg-card rounded-2xl border border-border p-10 text-center text-muted-foreground">
               <Car className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">لا توجد رحلات</p>
             </div>
-          ) : (
+           ) : (
             trips.map((trip) => (
               <Link key={trip.id} to={`/trip/${trip.id}`}>
                 <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all">
-                  <div className="flex items-center justify-between">
+                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-medium text-foreground">
                       <MapPin className="w-4 h-4 text-primary" />
                       <span>{trip.from_city}</span>
@@ -178,8 +187,12 @@ export default function UserProfile() {
                 </div>
               </Link>
             ))
-          )}
+           )}
         </div>
+       )}
+
+      {isOwnProfile && tab === "payments" && currentUser && (
+        <PassengerPaymentSetup user={currentUser} />
       )}
     </div>
   );
