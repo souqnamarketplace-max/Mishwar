@@ -9,6 +9,7 @@ import DriverTripsList from "../components/driver/DriverTripsList";
 import DriverPassengers from "../components/driver/DriverPassengers";
 import DriverVehicleEditor from "../components/driver/DriverVehicleEditor";
 import DriverRatePassengers from "../components/driver/DriverRatePassengers";
+import DriverPaymentSetup from "../components/driver/DriverPaymentSetup";
 
 const tabs = [
   { id: "trips", label: "رحلاتي", icon: Car },
@@ -16,6 +17,7 @@ const tabs = [
   { id: "earnings", label: "الأرباح", icon: DollarSign },
   { id: "ratings", label: "التقييمات", icon: Star },
   { id: "vehicle", label: "مركبتي", icon: Car },
+  { id: "payments", label: "الدفع", icon: DollarSign },
 ];
 
 export default function DriverDashboard() {
@@ -30,6 +32,11 @@ export default function DriverDashboard() {
   const { data: bookings = [] } = useQuery({
     queryKey: ["bookings"],
     queryFn: () => base44.entities.Booking.list("-created_date", 100),
+  });
+
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
   });
 
   // Stats
@@ -111,6 +118,10 @@ export default function DriverDashboard() {
 
       {activeTab === "vehicle" && (
         <DriverVehicleEditor />
+      )}
+
+      {activeTab === "payments" && user && (
+        <DriverPaymentSetup user={user} />
       )}
     </div>
   );

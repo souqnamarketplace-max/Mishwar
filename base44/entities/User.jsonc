@@ -51,6 +51,37 @@
     },
     "driver_note": {
       "type": "string"
+    },
+    "bank_account_name": {
+      "type": "string"
+    },
+    "bank_account_number": {
+      "type": "string"
+    },
+    "bank_name": {
+      "type": "string"
+    },
+    "bank_iban": {
+      "type": "string"
+    },
+    "card_holder_name": {
+      "type": "string"
+    },
+    "card_last_four": {
+      "type": "string"
     }
-  }
+  },
+  "required": [
+    "account_type",
+    "phone",
+    "city",
+    "bio",
+    "avatar_url",
+    "car_model",
+    "car_year",
+    "car_color",
+    "car_plate",
+    "car_image",
+    "driver_note"
+  ]
 }
