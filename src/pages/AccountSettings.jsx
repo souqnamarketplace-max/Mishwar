@@ -167,7 +167,10 @@ export default function AccountSettings() {
           status: "pending",
           rejection_reason: null,
           submitted_at: new Date().toISOString(),
+          approved_at: null,
+          approved_by: null,
         });
+        toast.success("تم تحديث الرخصة وإرسالها للمراجعة");
       } else {
         await base44.entities.DriverLicense.create({
           driver_email: user?.email,
@@ -178,10 +181,11 @@ export default function AccountSettings() {
           status: "pending",
           submitted_at: new Date().toISOString(),
         });
+        toast.success("تم إرسال رخصة القيادة للمراجعة ✓");
       }
       qc.invalidateQueries({ queryKey: ["driver-license", user?.email] });
-      toast.success("تم تحديث رخصة القيادة للمراجعة");
-    } catch {
+    } catch (err) {
+      console.error("License update error:", err);
       toast.error("خطأ في تحديث الرخصة");
     }
     setLicenseLoading(false);
@@ -191,12 +195,18 @@ export default function AccountSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
     
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("حجم الصورة يجب أن يكون أقل من 5 MB");
+      return;
+    }
+
     setLicenseLoading(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       setLicenseImageUrl(file_url);
-      toast.success("تم رفع صورة الرخصة");
-    } catch {
+      toast.success("تم رفع صورة الرخصة بنجاح");
+    } catch (err) {
+      console.error("Upload error:", err);
       toast.error("خطأ في رفع الصورة");
     }
     setLicenseLoading(false);
