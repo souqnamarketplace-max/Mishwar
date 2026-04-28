@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -78,6 +78,14 @@ export default function Navbar() {
             </Link>
             <NotificationBell userEmail={user?.email} />
             <button
+              onClick={() => base44.auth.logout()}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="تسجيل الخروج"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>خروج</span>
+            </button>
+            <button
               className="lg:hidden p-2 rounded-lg hover:bg-muted"
               onClick={() => setMobileOpen(!mobileOpen)}
             >
@@ -116,6 +124,13 @@ export default function Navbar() {
                   أنشر رحلة
                 </Button>
               </Link>
+              <button
+                onClick={() => base44.auth.logout()}
+                className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                تسجيل الخروج
+              </button>
             </div>
           </motion.div>
         )}
