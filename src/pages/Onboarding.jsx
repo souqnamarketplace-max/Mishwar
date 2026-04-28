@@ -11,13 +11,24 @@ import { toast } from "sonner";
 const CITIES = ["رام الله", "نابلس", "الخليل", "بيت لحم", "غزة", "جنين", "طولكرم", "قلقيلية"];
 
 const STEPS_PASSENGER = ["اختيار الدور", "معلوماتك"];
-const STEPS_DRIVER = ["اختيار الدور", "معلوماتك", "بيانات السيارة"];
+const STEPS_DRIVER = ["اختيار الدور", "معلوماتك", "بيانات السيارة", "رخصة القيادة"];
 
 export default function Onboarding() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState(null); // "passenger" | "driver" | "both"
-  const [form, setForm] = useState({ phone: "", city: "", bio: "", car_model: "", car_year: "", car_color: "", car_plate: "" });
+  const [form, setForm] = useState({ 
+    phone: "", 
+    city: "", 
+    bio: "", 
+    car_model: "", 
+    car_year: "", 
+    car_color: "", 
+    car_plate: "",
+    license_number: "",
+    license_expiry: "",
+    license_image_url: ""
+  });
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
 
@@ -27,8 +38,8 @@ export default function Onboarding() {
   });
 
   const save = useMutation({
-    mutationFn: () =>
-      base44.auth.updateMe({
+    mutationFn: async () => {
+      await base44.auth.updateMe({
         account_type: accountType,
         phone: form.phone,
         city: form.city,
@@ -41,10 +52,39 @@ export default function Onboarding() {
           car_plate: form.car_plate,
         } : {}),
         onboarding_completed: true,
-      }),
+      });
+
+      // Create driver license for drivers
+      if (accountType === "driver" || accountType === "both") {
+        if (!form.license_number || !form.license_expiry || !form.license_image_url) {
+          throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
+        }
+        await base44.entities.DriverLicense.create({
+          driver_email: user?.email,
+          driver_name: user?.full_name,
+          license_number: form.license_number,
+          expiry_date: form.license_expiry,
+          license_image_url: form.license_image_url,
+          status: "pending",
+          submitted_at: new Date().toISOString(),
+        });
+
+        // Create notification for admin
+        await base44.entities.Notification.create({
+          user_email: "admin@sirtana.com",
+          title: "طلب تحقق من رخصة قيادة جديد",
+          message: `${user?.full_name} قدّم طلب للتحقق من رخصة القيادة الخاصة به`,
+          type: "system",
+          is_read: false,
+        });
+      }
+    },
     onSuccess: () => {
       toast.success("مرحباً بك في سيرتنا! 🎉");
       navigate(accountType === "driver" || accountType === "both" ? "/driver" : "/");
+    },
+    onError: (err) => {
+      toast.error(err.message || "حدث خطأ في الإعداد");
     },
   });
 
@@ -72,6 +112,11 @@ export default function Onboarding() {
     if (step === 2 && isDriver) {
       if (!form.car_model) { toast.error("يرجى إدخال موديل السيارة ⚠️"); return false; }
       if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
+    }
+    if (step === 3 && isDriver) {
+      if (!form.license_number) { toast.error("يرجى إدخال رقم الرخصة ⚠️"); return false; }
+      if (!form.license_expiry) { toast.error("يرجى تحديد تاريخ انتهاء الرخصة ⚠️"); return false; }
+      if (!form.license_image_url) { toast.error("يرجى رفع صورة الرخصة ⚠️"); return false; }
     }
     return true;
   };
@@ -257,6 +302,66 @@ export default function Onboarding() {
                     كل شيء جاهز!
                   </p>
                   <p className="text-xs text-muted-foreground">بعد الإنشاء يمكنك تحديث بياناتك في أي وقت من لوحة السائق.</p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Step 3: Driver License */}
+          {step === 3 && isDriver && (
+            <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <h2 className="text-lg font-bold text-foreground mb-2">رخصة القيادة</h2>
+                <p className="text-sm text-muted-foreground mb-6">يجب التحقق من رخصة القيادة قبل نشر الرحلات</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">رقم الرخصة <span className="text-destructive">*</span></label>
+                    <Input
+                      value={form.license_number}
+                      onChange={(e) => setForm({ ...form, license_number: e.target.value })}
+                      placeholder="مثال: 123456789"
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">تاريخ انتهاء الرخصة <span className="text-destructive">*</span></label>
+                    <Input
+                      type="date"
+                      value={form.license_expiry}
+                      onChange={(e) => setForm({ ...form, license_expiry: e.target.value })}
+                      className="rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">صورة الرخصة <span className="text-destructive">*</span></label>
+                    <label htmlFor="license-upload" className="cursor-pointer block">
+                      <Button variant="outline" className="rounded-xl gap-2 w-full" type="button">
+                        <Upload className="w-4 h-4" />
+                        {form.license_image_url ? "تم اختيار صورة" : "اختر صورة الرخصة"}
+                      </Button>
+                    </label>
+                    <input
+                      id="license-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setUploading(true);
+                          const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                          setForm({ ...form, license_image_url: file_url });
+                          setUploading(false);
+                        }
+                      }}
+                    />
+                    {form.license_image_url && <p className="text-xs text-accent mt-1">✓ تم اختيار الصورة</p>}
+                  </div>
+                </div>
+
+                <div className="mt-5 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+                  <p className="text-sm text-yellow-700 font-medium">⏳ في انتظار التحقق</p>
+                  <p className="text-xs text-yellow-600 mt-1">سيتم التحقق من رخصتك خلال 24 ساعة. لن تتمكن من نشر رحلات قبل الموافقة.</p>
                 </div>
               </div>
             </motion.div>

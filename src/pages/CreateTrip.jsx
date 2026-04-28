@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Link } from "react-router-dom";
 import {
   MapPin, Calendar, Clock, Car, Users, CreditCard, CheckCircle,
-  ArrowLeft, ArrowRight, Wifi, Music, Snowflake, Cigarette, Briefcase
+  ArrowLeft, ArrowRight, Wifi, Music, Snowflake, Cigarette, Briefcase, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +38,18 @@ export default function CreateTrip() {
     queryKey: ["me"],
     queryFn: () => base44.auth.me(),
   });
+
+  const { data: license } = useQuery({
+    queryKey: ["driver-license", user?.email],
+    queryFn: () =>
+      user?.email
+        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+        : [],
+    enabled: !!user?.email,
+  });
+
+  const driverLicense = license?.[0];
+  const isLicenseApproved = driverLicense?.status === "approved";
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
     from_city: "",
@@ -118,6 +131,33 @@ export default function CreateTrip() {
     toast.success("تم نشر الرحلة بنجاح!");
     navigate("/my-trips");
   };
+
+  if (!isLicenseApproved) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
+        <div className="bg-card rounded-2xl border border-border p-8 text-center">
+          <div className="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">⏳</span>
+          </div>
+          <h2 className="text-xl font-bold text-foreground mb-2">انتظر موافقة رخصة القيادة</h2>
+          <p className="text-muted-foreground mb-4">
+            {driverLicense?.status === "pending"
+              ? "رخصتك قيد المراجعة. سيتم إخطارك بمجرد الموافقة عليها."
+              : driverLicense?.status === "rejected"
+              ? `تم رفض رخصتك: ${driverLicense.rejection_reason}. يمكنك تحديثها من الإعدادات.`
+              : "لم تقدم رخصة قيادة بعد. يرجى إكمال الإعداد أولاً."}
+          </p>
+          {driverLicense?.status === "rejected" && (
+            <a href="/settings">
+              <Button className="bg-primary text-primary-foreground rounded-xl mt-4">
+                تحديث الرخصة
+              </Button>
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">

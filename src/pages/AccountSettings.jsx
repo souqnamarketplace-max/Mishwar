@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -32,7 +32,7 @@ export default function AccountSettings() {
   const [avatarLoading, setAvatarLoading] = useState(false);
 
   // Sync form with user data
-  React.useEffect(() => {
+  useEffect(() => {
     if (user) {
       setEmail(user.email || "");
       setPhone(user.phone || "");
@@ -40,8 +40,32 @@ export default function AccountSettings() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (driverLicense) {
+      setLicenseNumber(driverLicense.license_number || "");
+      setLicenseExpiry(driverLicense.expiry_date || "");
+      setLicenseImageUrl(driverLicense.license_image_url || "");
+    }
+  }, [driverLicense]);
+
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Driver License
+  const { data: license } = useQuery({
+    queryKey: ["driver-license", user?.email],
+    queryFn: () =>
+      user?.email
+        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+        : [],
+    enabled: !!user?.email,
+  });
+
+  const driverLicense = license?.[0];
+  const [licenseNumber, setLicenseNumber] = useState(driverLicense?.license_number || "");
+  const [licenseExpiry, setLicenseExpiry] = useState(driverLicense?.expiry_date || "");
+  const [licenseImageUrl, setLicenseImageUrl] = useState(driverLicense?.license_image_url || "");
+  const [licenseLoading, setLicenseLoading] = useState(false);
 
   const updateEmail = async () => {
     if (!email || email === user?.email) {
@@ -126,6 +150,56 @@ export default function AccountSettings() {
       toast.error("خطأ في رفع الصورة");
     }
     setAvatarLoading(false);
+  };
+
+  const updateLicense = async () => {
+    if (!licenseNumber || !licenseExpiry || !licenseImageUrl) {
+      toast.error("يرجى ملء جميع بيانات الرخصة");
+      return;
+    }
+    setLicenseLoading(true);
+    try {
+      if (driverLicense) {
+        await base44.entities.DriverLicense.update(driverLicense.id, {
+          license_number: licenseNumber,
+          expiry_date: licenseExpiry,
+          license_image_url: licenseImageUrl,
+          status: "pending",
+          rejection_reason: null,
+          submitted_at: new Date().toISOString(),
+        });
+      } else {
+        await base44.entities.DriverLicense.create({
+          driver_email: user?.email,
+          driver_name: user?.full_name,
+          license_number: licenseNumber,
+          expiry_date: licenseExpiry,
+          license_image_url: licenseImageUrl,
+          status: "pending",
+          submitted_at: new Date().toISOString(),
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["driver-license", user?.email] });
+      toast.success("تم تحديث رخصة القيادة للمراجعة");
+    } catch {
+      toast.error("خطأ في تحديث الرخصة");
+    }
+    setLicenseLoading(false);
+  };
+
+  const uploadLicenseImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setLicenseLoading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setLicenseImageUrl(file_url);
+      toast.success("تم رفع صورة الرخصة");
+    } catch {
+      toast.error("خطأ في رفع الصورة");
+    }
+    setLicenseLoading(false);
   };
 
   const deleteAccount = async () => {
@@ -287,6 +361,83 @@ export default function AccountSettings() {
             </Button>
           </div>
         </div>
+
+        {/* Driver License Section */}
+        {user?.account_type && (user.account_type === "driver" || user.account_type === "both") && (
+          <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+            <h3 className="font-bold text-foreground flex items-center gap-2">
+              <Shield className="w-4 h-4 text-primary" />
+              رخصة القيادة
+            </h3>
+            
+            {driverLicense && (
+              <div className={`p-3 rounded-xl flex items-center gap-2 ${
+                driverLicense.status === "approved" ? "bg-green-500/10 border border-green-500/20" :
+                driverLicense.status === "pending" ? "bg-yellow-500/10 border border-yellow-500/20" :
+                "bg-destructive/10 border border-destructive/20"
+              }`}>
+                <span className={driverLicense.status === "approved" ? "text-green-600" : driverLicense.status === "pending" ? "text-yellow-600" : "text-destructive"}>
+                  {driverLicense.status === "approved" ? "✓" : driverLicense.status === "pending" ? "⏳" : "✕"}
+                </span>
+                <div>
+                  <p className="text-sm font-medium">
+                    {driverLicense.status === "approved" ? "تم الموافقة على رخصتك" :
+                     driverLicense.status === "pending" ? "رخصتك قيد المراجعة" :
+                     "تم رفض رخصتك"}
+                  </p>
+                  {driverLicense.rejection_reason && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{driverLicense.rejection_reason}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <Label>رقم الرخصة</Label>
+                <Input
+                  value={licenseNumber}
+                  onChange={(e) => setLicenseNumber(e.target.value)}
+                  placeholder="مثال: 123456789"
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <div>
+                <Label>تاريخ الانتهاء</Label>
+                <Input
+                  type="date"
+                  value={licenseExpiry}
+                  onChange={(e) => setLicenseExpiry(e.target.value)}
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <div>
+                <Label>صورة الرخصة</Label>
+                <label htmlFor="license-file" className="cursor-pointer block mt-1">
+                  <Button variant="outline" className="rounded-xl gap-2 w-full" disabled={licenseLoading}>
+                    <Image className="w-4 h-4" />
+                    {licenseLoading ? "جاري الرفع..." : licenseImageUrl ? "تغيير الصورة" : "اختر صورة"}
+                  </Button>
+                </label>
+                <input
+                  id="license-file"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={uploadLicenseImage}
+                  disabled={licenseLoading}
+                />
+              </div>
+              <Button
+                onClick={updateLicense}
+                disabled={licenseLoading}
+                className="w-full bg-primary text-primary-foreground rounded-xl"
+              >
+                {licenseLoading ? "جاري التحديث..." : "تحديث الرخصة"}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div className="bg-destructive/5 rounded-2xl border border-destructive/20 p-6">
