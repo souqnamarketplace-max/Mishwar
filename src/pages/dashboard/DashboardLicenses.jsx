@@ -20,27 +20,50 @@ export default function DashboardLicenses() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: (licenseId) =>
-      base44.entities.DriverLicense.update(licenseId, {
+    mutationFn: async (licenseId) => {
+      const license = licenses.find((l) => l.id === licenseId);
+      await base44.entities.DriverLicense.update(licenseId, {
         status: "approved",
         approved_at: new Date().toISOString(),
         approved_by: "admin",
-      }),
+      });
+      // Notify driver
+      await base44.entities.Notification.create({
+        user_email: license.driver_email,
+        title: "تم الموافقة على رخصة القيادة ✓",
+        message: `تم الموافقة على رخصتك برقم ${license.license_number}. يمكنك الآن نشر الرحلات.`,
+        type: "system",
+        is_read: false,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["all-licenses"] });
+      qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("✓ تم الموافقة على الرخصة");
       setSelectedLicense(null);
     },
   });
 
   const rejectMutation = useMutation({
-    mutationFn: (licenseId) =>
-      base44.entities.DriverLicense.update(licenseId, {
+    mutationFn: async (licenseId) => {
+      const license = licenses.find((l) => l.id === licenseId);
+      const reason = rejectionReason || "لم يتم توفير سبب";
+      await base44.entities.DriverLicense.update(licenseId, {
         status: "rejected",
-        rejection_reason: rejectionReason || "لم يتم توفير سبب",
-      }),
+        rejection_reason: reason,
+      });
+      // Notify driver
+      await base44.entities.Notification.create({
+        user_email: license.driver_email,
+        title: "تم رفض رخصة القيادة ✗",
+        message: `تم رفض رخصتك برقم ${license.license_number}. السبب: ${reason}`,
+        type: "system",
+        is_read: false,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["all-licenses"] });
+      qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("✗ تم رفض الرخصة");
       setSelectedLicense(null);
       setRejectionReason("");
