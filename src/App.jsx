@@ -24,7 +24,8 @@ import UserProfile from './pages/UserProfile';
 import Onboarding from './pages/Onboarding';
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin, user } = useAuth();
+  const location = useLocation();
 
   if (isLoadingPublicSettings || isLoadingAuth) {
     return (
@@ -48,12 +49,8 @@ const AuthenticatedApp = () => {
     }
   }
 
-  // Redirect to onboarding if not completed
-  const { user } = useAuth();
-  const location = useLocation();
-  const onboardingDone = user?.onboarding_completed;
   const onboardingPaths = ["/onboarding", "/dashboard"];
-  const needsOnboarding = user && !onboardingDone && !onboardingPaths.includes(location.pathname);
+  const needsOnboarding = user && !user.onboarding_completed && !onboardingPaths.includes(location.pathname);
 
   if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
