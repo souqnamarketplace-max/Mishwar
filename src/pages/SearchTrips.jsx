@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Search, SlidersHorizontal, ArrowLeft } from "lucide-react";
+import SelectDrawer from "@/components/ui/select-drawer";
 import TripCard from "../components/shared/TripCard";
 
 const CITIES = [
@@ -79,7 +80,7 @@ export default function SearchTrips() {
       {/* Search Bar */}
       <div className="bg-card rounded-2xl border border-border p-4 mb-8">
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="relative">
+          <div className="hidden sm:block relative">
             <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
             <select
               value={from}
@@ -90,7 +91,15 @@ export default function SearchTrips() {
               {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
-          <div className="relative">
+          <div className="sm:hidden">
+            <SelectDrawer
+              value={from}
+              onChange={setFrom}
+              options={CITIES.map(c => ({ value: c, label: c }))}
+              placeholder="من أين؟"
+            />
+          </div>
+          <div className="hidden sm:block relative">
             <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent" />
             <select
               value={to}
@@ -100,6 +109,14 @@ export default function SearchTrips() {
               <option value="">إلى أين؟</option>
               {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+          <div className="sm:hidden">
+            <SelectDrawer
+              value={to}
+              onChange={setTo}
+              options={CITIES.map(c => ({ value: c, label: c }))}
+              placeholder="إلى أين؟"
+            />
           </div>
           <div className="relative">
             <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

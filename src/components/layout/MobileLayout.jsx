@@ -122,11 +122,19 @@ export default function MobileLayout({ children, user, showHeader = true, header
             const isActive = location.pathname.startsWith(tab.path.split("?")[0]);
             const href = tab.id === "profile" ? `${tab.path}${user?.email}` : tab.path;
             
+            const handleTabClick = (e) => {
+              if (isActive && location.pathname !== tab.path.split("?")[0]) {
+                e.preventDefault();
+                window.location.href = tab.path.split("?")[0];
+              }
+              setShowMobileMenu(false);
+            };
+            
             return (
               <Link
                 key={tab.id}
                 to={href}
-                onClick={() => setShowMobileMenu(false)}
+                onClick={handleTabClick}
                 className={`flex flex-col items-center justify-center flex-1 h-full rounded-lg transition-colors ${
                   isActive
                     ? "text-primary"

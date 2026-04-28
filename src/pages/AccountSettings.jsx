@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield } from "lucide-react";
+import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -50,6 +50,8 @@ export default function AccountSettings() {
 
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletionLoading, setDeletionLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -215,8 +217,17 @@ export default function AccountSettings() {
   };
 
   const deleteAccount = async () => {
-    setShowDeleteConfirm(false);
-    toast.error("يرجى الاتصال بالدعم لحذف الحساب");
+    setDeletionLoading(true);
+    try {
+      await base44.auth.deleteMe?.();
+      toast.success("تم حذف حسابك بنجاح");
+      setTimeout(() => base44.auth.logout?.("/"), 1500);
+    } catch (err) {
+      console.error("Delete error:", err);
+      toast.error("فشل حذف الحساب. يرجى الاتصال بالدعم");
+    }
+    setDeletionLoading(false);
+    setShowDeleteModal(false);
   };
 
   if (!user) {
@@ -463,37 +474,71 @@ export default function AccountSettings() {
             <AlertCircle className="w-4 h-4" />
             منطقة الخطر
           </h3>
-          {showDeleteConfirm ? (
-            <div className="space-y-3">
-              <p className="text-sm text-destructive">هل أنت متأكد من حذف حسابك؟ هذا الإجراء لا يمكن التراجع عنه.</p>
-              <div className="flex gap-2">
-                <Button
-                  onClick={deleteAccount}
-                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl flex-1"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  نعم، احذف الحساب
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="rounded-xl flex-1"
-                >
-                  إلغاء
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              variant="outline"
-              className="border-destructive text-destructive hover:bg-destructive/10 rounded-xl gap-2 w-full"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <Trash2 className="w-4 h-4" />
-              حذف الحساب
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            className="border-destructive text-destructive hover:bg-destructive/10 rounded-xl gap-2 w-full"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 className="w-4 h-4" />
+            حذف الحساب
+          </Button>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-card rounded-2xl border border-border p-6 max-w-sm mx-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-foreground">حذف الحساب</h3>
+                <button onClick={() => setShowDeleteConfirm(false)} className="p-1 hover:bg-muted rounded-lg">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-medium text-destructive flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  تحذير
+                </p>
+                <p className="text-sm text-destructive/80">
+                  سيتم حذف حسابك وجميع بيانات المرتبطة به بشكل دائم. لا يمكن التراجع عن هذا الإجراء.
+                </p>
+              </div>
+
+              {!showDeleteModal ? (
+                <Button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl"
+                >
+                  فهمت، متابعة الحذف
+                </Button>
+              ) : (
+                <div className="space-y-3 bg-destructive/5 p-4 rounded-xl border border-destructive/20">
+                  <p className="text-sm font-medium text-destructive">
+                    تأكيد أخير: اكتب "حذف حسابي" للمتابعة
+                  </p>
+                  <div className="space-y-2">
+                    <Button
+                      onClick={deleteAccount}
+                      disabled={deletionLoading}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl"
+                    >
+                      {deletionLoading ? "جاري الحذف..." : "حذف الحساب نهائياً"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => { setShowDeleteConfirm(false); setShowDeleteModal(false); }}
+                      className="w-full rounded-xl"
+                      disabled={deletionLoading}
+                    >
+                      إلغاء
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
