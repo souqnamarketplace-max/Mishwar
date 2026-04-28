@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ export default function AccountSettings() {
   const qc = useQueryClient();
 
   // Email
-  const [email, setEmail] = useState(user?.email || "");
+  const [email, setEmail] = useState("");
   const [emailLoading, setEmailLoading] = useState(false);
 
   // Password
@@ -24,11 +24,21 @@ export default function AccountSettings() {
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   // Phone
-  const [phone, setPhone] = useState(user?.phone || "");
+  const [phone, setPhone] = useState("");
   const [phoneLoading, setPhoneLoading] = useState(false);
 
   // Avatar
+  const [avatar, setAvatar] = useState(user?.avatar_url || "");
   const [avatarLoading, setAvatarLoading] = useState(false);
+
+  // Sync form with user data
+  React.useEffect(() => {
+    if (user) {
+      setEmail(user.email || "");
+      setPhone(user.phone || "");
+      setAvatar(user.avatar_url || "");
+    }
+  }, [user]);
 
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -99,7 +109,18 @@ export default function AccountSettings() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await base44.auth.updateMe({ avatar_url: file_url });
+      setAvatar(file_url);
+      
+      // Update all user's trips with new avatar
+      if (user?.email) {
+        const userTrips = await base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 100);
+        await Promise.all(
+          userTrips.map(trip => base44.entities.Trip.update(trip.id, { driver_avatar: file_url }))
+        );
+      }
+      
       qc.invalidateQueries({ queryKey: ["me"] });
+      qc.invalidateQueries({ queryKey: ["trips"] });
       toast.success("تم تحديث الصورة!");
     } catch {
       toast.error("خطأ في رفع الصورة");
@@ -137,8 +158,8 @@ export default function AccountSettings() {
           {/* Avatar */}
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-xl bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary overflow-hidden shrink-0">
-              {user.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+              {avatar ? (
+                <img src={avatar} alt="" className="w-full h-full object-cover" />
               ) : (
                 user.full_name?.[0] || "م"
               )}
