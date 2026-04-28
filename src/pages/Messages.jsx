@@ -161,9 +161,9 @@ export default function Messages() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button className="p-2 rounded-lg hover:bg-muted"><Phone className="w-4 h-4 text-muted-foreground" /></button>
-                    <button className="p-2 rounded-lg hover:bg-muted"><Video className="w-4 h-4 text-muted-foreground" /></button>
-                    <button className="p-2 rounded-lg hover:bg-muted"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
+                    <button onClick={() => alert(`اتصال مع ${selectedChat.name}`)} className="p-2 rounded-lg hover:bg-muted" title="مكالمة صوتية"><Phone className="w-4 h-4 text-muted-foreground" /></button>
+                    <button onClick={() => alert(`مكالمة فيديو مع ${selectedChat.name}`)} className="p-2 rounded-lg hover:bg-muted" title="مكالمة فيديو"><Video className="w-4 h-4 text-muted-foreground" /></button>
+                    <button onClick={() => alert("خيارات المحادثة")} className="p-2 rounded-lg hover:bg-muted" title="خيارات"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
                   </div>
                 </div>
 
