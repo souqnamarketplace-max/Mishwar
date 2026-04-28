@@ -40,9 +40,64 @@ export default function Favorites() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
+
   const { data: trips = [] } = useQuery({
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 20),
+  });
+
+  const { data: userPreferences = [] } = useQuery({
+    queryKey: ["preferences", user?.email],
+    queryFn: () => user?.email ? base44.entities.TripPreference.filter({ user_email: user.email }) : [],
+    enabled: !!user?.email,
+  });
+
+  const enablePriceMutation = useMutation({
+    mutationFn: async () => {
+      if (userPreferences.length > 0) {
+        const prefs = userPreferences[0];
+        await base44.entities.TripPreference.update(prefs.id, { notify_on_price: true });
+      } else {
+        await base44.entities.TripPreference.create({
+          user_email: user?.email,
+          user_name: user?.full_name,
+          from_city: "",
+          to_city: "",
+          notify_on_price: true,
+          notify_on_date: false,
+        });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["preferences", user?.email] });
+      toast.success("تم تفعيل تحديثات الأسعار ✓");
+    },
+  });
+
+  const enableTripMutation = useMutation({
+    mutationFn: async () => {
+      if (userPreferences.length > 0) {
+        const prefs = userPreferences[0];
+        await base44.entities.TripPreference.update(prefs.id, { notify_on_date: true });
+      } else {
+        await base44.entities.TripPreference.create({
+          user_email: user?.email,
+          user_name: user?.full_name,
+          from_city: "",
+          to_city: "",
+          notify_on_price: false,
+          notify_on_date: true,
+        });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["preferences", user?.email] });
+      toast.success("تم تفعيل إشعارات الرحلات ✓");
+    },
   });
 
   const removeFavorite = (id) => {
@@ -56,12 +111,11 @@ export default function Favorites() {
 
   const handleSidebarAction = (action) => {
     if (action === "prices") {
-      toast.info("سيتم إخطارك بتحديثات الأسعار على مساراتك المفضلة");
+      enablePriceMutation.mutate();
     } else if (action === "trips") {
-      toast.info("سيتم إخطارك بالرحلات الجديدة على مساراتك المفضلة");
+      enableTripMutation.mutate();
     } else if (action === "recent") {
       setActiveTab("all");
-      toast.success("عرض المفضلة الأخيرة");
     }
   };
 
@@ -219,27 +273,29 @@ export default function Favorites() {
               <div className="space-y-3">
                 <button 
                   onClick={() => handleSidebarAction("prices")}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right"
+                  disabled={enablePriceMutation.isPending}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right disabled:opacity-50"
                 >
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                     <TrendingDown className="w-4 h-4 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">تحديثات الأسعار</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">تحصل على إشعارات عند انخفاض أسعار الرحلات في مساراتك المفضلة</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{userPreferences[0]?.notify_on_price ? "✓ مفعّل" : "تحصل على إشعارات عند انخفاض أسعار الرحلات"}</p>
                   </div>
                   <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
                 </button>
                 <button 
                   onClick={() => handleSidebarAction("trips")}
-                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right"
+                  disabled={enableTripMutation.isPending}
+                  className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors text-right disabled:opacity-50"
                 >
                   <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
                     <Bell className="w-4 h-4 text-primary" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">إشعارات الرحلات</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">تلقّ إشعارات فورية عند إضافة رحلات جديدة لمساراتك المفضلة</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{userPreferences[0]?.notify_on_date ? "✓ مفعّل" : "تلقّ إشعارات فورية عند إضافة رحلات جديدة"}</p>
                   </div>
                   <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0 mt-1" />
                 </button>
