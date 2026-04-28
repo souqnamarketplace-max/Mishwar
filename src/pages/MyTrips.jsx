@@ -8,6 +8,7 @@ import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
   Search, CheckCircle, AlertCircle, XCircle, Navigation
 } from "lucide-react";
+import ReviewForm from "../components/reviews/ReviewForm";
 
 const tabs = [
   { id: "all", label: "الكل", icon: Car },
@@ -26,6 +27,12 @@ const statusConfig = {
 
 export default function MyTrips() {
   const [activeTab, setActiveTab] = useState("all");
+  const [reviewingTrip, setReviewingTrip] = useState(null);
+
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
 
   const { data: trips = [], isLoading } = useQuery({
     queryKey: ["trips"],
@@ -33,6 +40,12 @@ export default function MyTrips() {
   });
 
   const filtered = activeTab === "all" ? trips : trips.filter((t) => t.status === activeTab);
+  const { data: myReviews = [] } = useQuery({
+    queryKey: ["my-reviews", user?.email],
+    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email }),
+    enabled: !!user?.email,
+  });
+  const reviewedTripIds = new Set(myReviews.map((r) => r.trip_id));
 
   const grouped = {
     confirmed: filtered.filter((t) => t.status === "confirmed"),
@@ -101,46 +114,70 @@ export default function MyTrips() {
                 </h3>
                 <div className="space-y-3">
                   {statusTrips.map((trip) => (
-                    <Link key={trip.id} to={`/trip/${trip.id}`}>
-                      <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all">
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                          {/* Date */}
-                          <div className="text-center bg-muted/50 rounded-xl px-4 py-3 shrink-0">
-                            <p className="text-xs text-muted-foreground">{trip.date?.split(" ")[0] || "السبت"}</p>
-                            <p className="text-2xl font-bold text-foreground">{trip.date?.split(" ")[1] || "25"}</p>
-                            <p className="text-xs text-muted-foreground">{trip.time || "08:30"}</p>
-                          </div>
-
-                          {/* Route */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 font-bold text-foreground mb-1">
-                              <MapPin className="w-4 h-4 text-primary" />
-                              <span>{trip.from_city}</span>
-                              <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                              <span>{trip.to_city}</span>
+                    <div key={trip.id}>
+                      <Link to={`/trip/${trip.id}`}>
+                        <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            <div className="text-center bg-muted/50 rounded-xl px-4 py-3 shrink-0">
+                              <p className="text-xs text-muted-foreground">{trip.date?.split(" ")[0] || "السبت"}</p>
+                              <p className="text-2xl font-bold text-foreground">{trip.date?.split(" ")[1] || "25"}</p>
+                              <p className="text-xs text-muted-foreground">{trip.time || "08:30"}</p>
                             </div>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3.5 h-3.5" />
-                                {trip.available_seats} مقاعد
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Star className="w-3.5 h-3.5 text-yellow-500" />
-                                {trip.driver_rating || "4.5"}
-                              </span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 font-bold text-foreground mb-1">
+                                <MapPin className="w-4 h-4 text-primary" />
+                                <span>{trip.from_city}</span>
+                                <ArrowLeft className="w-4 h-4 text-muted-foreground" />
+                                <span>{trip.to_city}</span>
+                              </div>
+                              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Users className="w-3.5 h-3.5" />
+                                  {trip.available_seats} مقاعد
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Star className="w-3.5 h-3.5 text-yellow-500" />
+                                  {trip.driver_rating || "4.5"}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-
-                          {/* Price + Status */}
-                          <div className="flex items-center gap-3">
-                            <Badge className={config?.color}>
-                              {config?.label}
-                            </Badge>
-                            <span className="text-xl font-bold text-primary">₪{trip.price}</span>
+                            <div className="flex items-center gap-3">
+                              <Badge className={config?.color}>{config?.label}</Badge>
+                              <span className="text-xl font-bold text-primary">₪{trip.price}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </Link>
+                      </Link>
+
+                      {/* Review Button for completed trips */}
+                      {status === "completed" && !reviewedTripIds.has(trip.id) && (
+                        <div className="mt-2 px-1">
+                          {reviewingTrip === trip.id ? (
+                            <ReviewForm
+                              trip={trip}
+                              reviewerUser={user}
+                              targetEmail={trip.driver_email || trip.created_by}
+                              targetName={trip.driver_name || "السائق"}
+                              onClose={() => setReviewingTrip(null)}
+                            />
+                          ) : (
+                            <button
+                              onClick={() => setReviewingTrip(trip.id)}
+                              className="flex items-center gap-2 text-sm text-primary hover:underline px-4 py-1"
+                            >
+                              <Star className="w-4 h-4 text-yellow-500" />
+                              قيّم هذه الرحلة
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {status === "completed" && reviewedTripIds.has(trip.id) && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 px-5 mt-1">
+                          <CheckCircle className="w-3 h-3 text-accent" />
+                          تم تقييم هذه الرحلة
+                        </p>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>

@@ -20,6 +20,7 @@ import Help from './pages/Help';
 import Dashboard from './pages/Dashboard';
 import DriverDashboard from './pages/DriverDashboard';
 import Notifications from './pages/Notifications';
+import UserProfile from './pages/UserProfile';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -61,6 +62,7 @@ const AuthenticatedApp = () => {
         <Route path="/help" element={<Help />} />
         <Route path="/driver" element={<DriverDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/profile" element={<UserProfile />} />
       </Route>
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="*" element={<PageNotFound />} />

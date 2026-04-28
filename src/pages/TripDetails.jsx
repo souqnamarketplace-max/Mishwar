@@ -235,7 +235,7 @@ export default function TripDetails() {
                   trip.driver_name?.[0] || "م"
                 )}
               </div>
-              <div>
+              <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <h4 className="font-bold">{trip.driver_name || "محمد درويش"}</h4>
                   <Badge className="bg-accent/10 text-accent text-xs">موثق</Badge>
@@ -246,6 +246,9 @@ export default function TripDetails() {
                   <span className="text-xs text-muted-foreground">({trip.driver_reviews_count || 89} تقييم)</span>
                 </div>
               </div>
+              <Link to={`/profile?email=${trip.created_by || ""}`} className="text-xs text-primary hover:underline">
+                عرض الملف ←
+              </Link>
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">
