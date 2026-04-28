@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
@@ -14,15 +14,22 @@ export default function SearchTrips() {
   const [from, setFrom] = useState(searchParams.get("from") || "");
   const [to, setTo] = useState(searchParams.get("to") || "");
   const [date, setDate] = useState(searchParams.get("date") || "");
+  const [activeFilters, setActiveFilters] = useState({
+    from: searchParams.get("from") || "",
+    to: searchParams.get("to") || "",
+    date: searchParams.get("date") || "",
+  });
 
   const { data: trips = [], isLoading } = useQuery({
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 50),
   });
 
+  const handleSearch = () => setActiveFilters({ from, to, date });
+
   const filtered = trips.filter((t) => {
-    if (from && t.from_city !== from) return false;
-    if (to && t.to_city !== to) return false;
+    if (activeFilters.from && t.from_city !== activeFilters.from) return false;
+    if (activeFilters.to && t.to_city !== activeFilters.to) return false;
     return true;
   });
 
@@ -62,7 +69,7 @@ export default function SearchTrips() {
               className="h-11 pr-10 rounded-xl bg-muted/50 border-0"
             />
           </div>
-          <Button className="h-11 bg-primary text-primary-foreground rounded-xl gap-2">
+          <Button className="h-11 bg-primary text-primary-foreground rounded-xl gap-2" onClick={handleSearch}>
             <Search className="w-4 h-4" />
             بحث
           </Button>

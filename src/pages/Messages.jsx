@@ -62,6 +62,14 @@ export default function Messages() {
   const [selectedChat, setSelectedChat] = useState(conversations[0]);
   const [message, setMessage] = useState("");
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [localMessages, setLocalMessages] = useState(chatMessages);
+
+  const handleSend = () => {
+    if (!message.trim()) return;
+    const newMsg = { id: String(Date.now()), sender: "me", text: message, time: new Date().toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" }) };
+    setLocalMessages((prev) => [...prev, newMsg]);
+    setMessage("");
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-0 sm:px-6 py-0 sm:py-6">
@@ -173,7 +181,7 @@ export default function Messages() {
                   <div className="text-center">
                     <span className="bg-muted text-muted-foreground text-xs px-3 py-1 rounded-full">24 مايو</span>
                   </div>
-                  {chatMessages.map((msg) => (
+                  {localMessages.map((msg) => (
                     <div key={msg.id} className={`flex ${msg.sender === "me" ? "justify-start" : "justify-end"}`}>
                       <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
                         msg.sender === "me"
@@ -198,13 +206,11 @@ export default function Messages() {
                     <Input
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSend()}
                       placeholder="اكتب رسالة..."
                       className="flex-1 rounded-xl bg-muted/50 border-0 h-10"
                     />
-                    <button className="p-2 rounded-lg hover:bg-muted">
-                      <Smile className="w-5 h-5 text-muted-foreground" />
-                    </button>
-                    <Button size="icon" className="rounded-xl bg-primary text-primary-foreground h-10 w-10 shrink-0">
+                    <Button size="icon" className="rounded-xl bg-primary text-primary-foreground h-10 w-10 shrink-0" onClick={handleSend}>
                       <Send className="w-4 h-4" />
                     </Button>
                   </div>

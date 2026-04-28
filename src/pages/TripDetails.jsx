@@ -1,14 +1,15 @@
-import React from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowRight, MapPin, Clock, Calendar, Users, Star, Car,
   Shield, Phone, MessageCircle, Heart, Share2, Navigation,
-  Snowflake, Music, Cigarette, Briefcase, ChevronLeft
+  Snowflake, Music, Cigarette, Briefcase, ChevronLeft, CheckCircle
 } from "lucide-react";
+import { toast } from "sonner";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -20,10 +21,28 @@ const amenityIcons = {
 
 export default function TripDetails() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [booked, setBooked] = useState(false);
+  const [favorited, setFavorited] = useState(false);
 
   const { data: trips = [] } = useQuery({
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 50),
+  });
+
+  const bookingMutation = useMutation({
+    mutationFn: (tripData) => base44.entities.Booking.create({
+      trip_id: tripData.id,
+      seats_booked: 1,
+      total_price: tripData.price,
+      status: "confirmed",
+    }),
+    onSuccess: () => {
+      setBooked(true);
+      toast.success("تم الحجز بنجاح! 🎉");
+      qc.invalidateQueries({ queryKey: ["trips"] });
+    },
   });
 
   const trip = trips.find((t) => t.id === id) || trips[0];
@@ -194,14 +213,22 @@ export default function TripDetails() {
               </div>
             </div>
 
-            <Button className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl text-lg font-bold mb-3">
-              احجز الآن
+            <Button
+              className={`w-full h-12 rounded-xl text-lg font-bold mb-3 gap-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
+              onClick={() => !booked && bookingMutation.mutate(trip)}
+              disabled={bookingMutation.isPending}
+            >
+              {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
             </Button>
 
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 rounded-xl gap-2">
-                <Heart className="w-4 h-4" />
-                إضافة للمفضلة
+              <Button
+                variant="outline"
+                className={`flex-1 rounded-xl gap-2 ${favorited ? "border-destructive text-destructive" : ""}`}
+                onClick={() => { setFavorited(!favorited); toast(favorited ? "تمت الإزالة من المفضلة" : "تمت الإضافة للمفضلة ❤️"); }}
+              >
+                <Heart className={`w-4 h-4 ${favorited ? "fill-destructive text-destructive" : ""}`} />
+                {favorited ? "في المفضلة" : "إضافة للمفضلة"}
               </Button>
               <Button variant="outline" className="rounded-xl">
                 <Share2 className="w-4 h-4" />
@@ -212,7 +239,7 @@ export default function TripDetails() {
             <div className="mt-6 pt-4 border-t border-border">
               <h4 className="font-medium mb-3">تواصل مع السائق</h4>
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="rounded-xl gap-2 text-sm">
+                <Button variant="outline" className="rounded-xl gap-2 text-sm" onClick={() => navigate("/messages")}>
                   <MessageCircle className="w-4 h-4" />
                   محادثة
                 </Button>
