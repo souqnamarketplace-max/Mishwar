@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function SelectDrawer({ options, value, onChange, placeholder = "اختر خيارًا", className = "" }) {
+function SelectDrawer({ options, value, onChange, placeholder = "اختر خيارًا", className = "" }) {
   const [open, setOpen] = useState(false);
   const selectedOption = options.find(opt => opt.value === value);
 
@@ -67,3 +67,5 @@ export function SelectDrawer({ options, value, onChange, placeholder = "اختر
     </>
   );
 }
+
+export default SelectDrawer;

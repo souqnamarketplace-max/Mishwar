@@ -23,12 +23,10 @@ export default function MobileLayout({ children, user, showHeader = true, header
   
   // Detect if viewport is mobile
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
-  
-  if (!isMobile) return children;
 
   const currentTab = MOBILE_TABS.find(tab => location.pathname.startsWith(tab.path.split("?")[0]));
 
-  // Track tab history/stacks
+  // Track tab history/stacks (unconditional)
   useEffect(() => {
     if (currentTab?.id && !tabHistoryRef.current[currentTab.id]) {
       tabHistoryRef.current[currentTab.id] = [];
@@ -40,6 +38,8 @@ export default function MobileLayout({ children, user, showHeader = true, header
       }
     }
   }, [currentTab?.id, location.pathname]);
+
+  if (!isMobile) return children;
 
   // Pull-to-refresh handler
   const handleTouchStart = (e) => {
