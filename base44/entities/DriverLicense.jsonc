@@ -18,6 +18,18 @@
     "license_image_url": {
       "type": "string"
     },
+    "car_registration_url": {
+      "type": "string"
+    },
+    "insurance_url": {
+      "type": "string"
+    },
+    "selfie_1_url": {
+      "type": "string"
+    },
+    "selfie_2_url": {
+      "type": "string"
+    },
     "status": {
       "type": "string",
       "enum": [
@@ -46,6 +58,10 @@
     "driver_email",
     "license_number",
     "expiry_date",
-    "license_image_url"
+    "license_image_url",
+    "car_registration_url",
+    "insurance_url",
+    "selfie_1_url",
+    "selfie_2_url"
   ]
 }

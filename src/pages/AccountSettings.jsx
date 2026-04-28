@@ -46,6 +46,10 @@ export default function AccountSettings() {
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [licenseImageUrl, setLicenseImageUrl] = useState("");
+  const [carRegistrationUrl, setCarRegistrationUrl] = useState("");
+  const [insuranceUrl, setInsuranceUrl] = useState("");
+  const [selfie1Url, setSelfie1Url] = useState("");
+  const [selfie2Url, setSelfie2Url] = useState("");
   const [licenseLoading, setLicenseLoading] = useState(false);
 
   // Delete account
@@ -66,6 +70,10 @@ export default function AccountSettings() {
       setLicenseNumber(driverLicense.license_number || "");
       setLicenseExpiry(driverLicense.expiry_date || "");
       setLicenseImageUrl(driverLicense.license_image_url || "");
+      setCarRegistrationUrl(driverLicense.car_registration_url || "");
+      setInsuranceUrl(driverLicense.insurance_url || "");
+      setSelfie1Url(driverLicense.selfie_1_url || "");
+      setSelfie2Url(driverLicense.selfie_2_url || "");
     }
   }, [driverLicense]);
 
@@ -157,8 +165,8 @@ export default function AccountSettings() {
   };
 
   const updateLicense = async () => {
-    if (!licenseNumber || !licenseExpiry || !licenseImageUrl) {
-      toast.error("يرجى ملء جميع بيانات الرخصة");
+    if (!licenseNumber || !licenseExpiry || !licenseImageUrl || !carRegistrationUrl || !insuranceUrl || !selfie1Url || !selfie2Url) {
+      toast.error("يرجى ملء جميع البيانات والمستندات المطلوبة");
       return;
     }
     setLicenseLoading(true);
@@ -168,13 +176,17 @@ export default function AccountSettings() {
           license_number: licenseNumber,
           expiry_date: licenseExpiry,
           license_image_url: licenseImageUrl,
+          car_registration_url: carRegistrationUrl,
+          insurance_url: insuranceUrl,
+          selfie_1_url: selfie1Url,
+          selfie_2_url: selfie2Url,
           status: "pending",
           rejection_reason: null,
           submitted_at: new Date().toISOString(),
           approved_at: null,
           approved_by: null,
         });
-        toast.success("تم تحديث الرخصة وإرسالها للمراجعة");
+        toast.success("تم تحديث المستندات وإرسالها للمراجعة");
       } else {
         await base44.entities.DriverLicense.create({
           driver_email: user?.email,
@@ -182,36 +194,40 @@ export default function AccountSettings() {
           license_number: licenseNumber,
           expiry_date: licenseExpiry,
           license_image_url: licenseImageUrl,
+          car_registration_url: carRegistrationUrl,
+          insurance_url: insuranceUrl,
+          selfie_1_url: selfie1Url,
+          selfie_2_url: selfie2Url,
           status: "pending",
           submitted_at: new Date().toISOString(),
         });
-        toast.success("تم إرسال رخصة القيادة للمراجعة ✓");
+        toast.success("تم إرسال جميع المستندات للمراجعة ✓");
       }
       qc.invalidateQueries({ queryKey: ["driver-license", user?.email] });
     } catch (err) {
       console.error("License update error:", err);
-      toast.error("خطأ في تحديث الرخصة");
+      toast.error("خطأ في تحديث المستندات");
     }
     setLicenseLoading(false);
   };
 
-  const uploadLicenseImage = async (e) => {
+  const uploadFile = async (e, setUrl, fileType = "صورة") => {
     const file = e.target.files?.[0];
     if (!file) return;
     
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("حجم الصورة يجب أن يكون أقل من 5 MB");
+      toast.error("حجم الملف يجب أن يكون أقل من 5 MB");
       return;
     }
 
     setLicenseLoading(true);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setLicenseImageUrl(file_url);
-      toast.success("تم رفع صورة الرخصة بنجاح");
+      setUrl(file_url);
+      toast.success(`تم رفع ${fileType} بنجاح`);
     } catch (err) {
       console.error("Upload error:", err);
-      toast.error("خطأ في رفع الصورة");
+      toast.error(`خطأ في رفع ${fileType}`);
     }
     setLicenseLoading(false);
   };
@@ -437,32 +453,128 @@ export default function AccountSettings() {
                   className="rounded-xl h-10 mt-1"
                 />
               </div>
-              <div>
-                <Label>صورة الرخصة</Label>
-                <input
-                  id="license-file"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={uploadLicenseImage}
-                  disabled={licenseLoading}
-                />
-                <Button 
-                  variant="outline" 
-                  className="rounded-xl gap-2 w-full" 
-                  disabled={licenseLoading}
-                  onClick={() => document.getElementById("license-file").click()}
-                >
-                  <Image className="w-4 h-4" />
-                  {licenseLoading ? "جاري الرفع..." : licenseImageUrl ? "تغيير الصورة" : "اختر صورة"}
-                </Button>
+
+              {/* Document Uploads */}
+              <div className="border-t border-border pt-3">
+                <p className="text-xs font-medium text-muted-foreground mb-3">المستندات المطلوبة</p>
+                
+                {/* License */}
+                <div className="mb-3">
+                  <Label className="text-xs">1️⃣ صورة رخصة القيادة</Label>
+                  <input
+                    id="license-file"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => uploadFile(e, setLicenseImageUrl, "رخصة القيادة")}
+                    disabled={licenseLoading}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl gap-2 w-full mt-1" 
+                    disabled={licenseLoading}
+                    onClick={() => document.getElementById("license-file").click()}
+                  >
+                    <Image className="w-4 h-4" />
+                    {licenseImageUrl ? "✓ تم الرفع" : "اختر صورة"}
+                  </Button>
+                </div>
+
+                {/* Car Registration */}
+                <div className="mb-3">
+                  <Label className="text-xs">2️⃣ صورة تسجيل المركبة</Label>
+                  <input
+                    id="registration-file"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => uploadFile(e, setCarRegistrationUrl, "تسجيل المركبة")}
+                    disabled={licenseLoading}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl gap-2 w-full mt-1" 
+                    disabled={licenseLoading}
+                    onClick={() => document.getElementById("registration-file").click()}
+                  >
+                    <Image className="w-4 h-4" />
+                    {carRegistrationUrl ? "✓ تم الرفع" : "اختر صورة"}
+                  </Button>
+                </div>
+
+                {/* Insurance */}
+                <div className="mb-3">
+                  <Label className="text-xs">3️⃣ صورة التأمين</Label>
+                  <input
+                    id="insurance-file"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => uploadFile(e, setInsuranceUrl, "التأمين")}
+                    disabled={licenseLoading}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl gap-2 w-full mt-1" 
+                    disabled={licenseLoading}
+                    onClick={() => document.getElementById("insurance-file").click()}
+                  >
+                    <Image className="w-4 h-4" />
+                    {insuranceUrl ? "✓ تم الرفع" : "اختر صورة"}
+                  </Button>
+                </div>
+
+                {/* Selfie 1 */}
+                <div className="mb-3">
+                  <Label className="text-xs">4️⃣ سيلفي الهوية (الوجه مع الهوية)</Label>
+                  <input
+                    id="selfie1-file"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => uploadFile(e, setSelfie1Url, "السيلفي الأول")}
+                    disabled={licenseLoading}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl gap-2 w-full mt-1" 
+                    disabled={licenseLoading}
+                    onClick={() => document.getElementById("selfie1-file").click()}
+                  >
+                    <Image className="w-4 h-4" />
+                    {selfie1Url ? "✓ تم الرفع" : "اختر صورة"}
+                  </Button>
+                </div>
+
+                {/* Selfie 2 */}
+                <div className="mb-3">
+                  <Label className="text-xs">5️⃣ سيلفي إضافي (الوجه الواضح)</Label>
+                  <input
+                    id="selfie2-file"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => uploadFile(e, setSelfie2Url, "السيلفي الثاني")}
+                    disabled={licenseLoading}
+                  />
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl gap-2 w-full mt-1" 
+                    disabled={licenseLoading}
+                    onClick={() => document.getElementById("selfie2-file").click()}
+                  >
+                    <Image className="w-4 h-4" />
+                    {selfie2Url ? "✓ تم الرفع" : "اختر صورة"}
+                  </Button>
+                </div>
               </div>
+
               <Button
                 onClick={updateLicense}
                 disabled={licenseLoading}
                 className="w-full bg-primary text-primary-foreground rounded-xl"
               >
-                {licenseLoading ? "جاري التحديث..." : "تحديث الرخصة"}
+                {licenseLoading ? "جاري التحديث..." : "إرسال المستندات للمراجعة"}
               </Button>
             </div>
           </div>
