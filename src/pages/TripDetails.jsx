@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import {
   ArrowRight, MapPin, Clock, Calendar, Users, Star, Car,
   Shield, Phone, MessageCircle, Heart, Share2, Navigation,
-  Snowflake, Music, Cigarette, Briefcase, ChevronLeft, CheckCircle
+  Snowflake, Music, Cigarette, Briefcase, ChevronLeft, CheckCircle,
+  Headphones, X, Check
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -17,7 +18,15 @@ const amenityIcons = {
   "مسموح بالتدخين": Cigarette,
   "متاح للأمتعة": Briefcase,
   "رحلة مباشرة": Navigation,
+  "wifi": Shield,
 };
+
+const whyChoose = [
+  "سائق موثوق ومشهور عالٍ",
+  "أقل سعر متوفر في هذا الوقت",
+  "رحلة مباشرة بدون توقف",
+  "تقييمات ممتازة من الركاب",
+];
 
 export default function TripDetails() {
   const { id } = useParams();
@@ -64,207 +73,302 @@ export default function TripDetails() {
       </Link>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Route Header */}
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3 text-2xl font-bold text-foreground">
-                <span>{trip.from_city}</span>
-                <ArrowRight className="w-6 h-6 text-primary" />
-                <span>{trip.to_city}</span>
-              </div>
-              <Badge className="bg-accent/10 text-accent border-accent/20">مؤكدة</Badge>
-            </div>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              <span>{trip.date}</span>
-              <span className="mx-1">•</span>
-              <Clock className="w-4 h-4" />
-              <span>{trip.time}</span>
+
+        {/* ===== LEFT SIDEBAR (Booking) ===== */}
+        <div className="lg:order-first order-last space-y-4">
+          <div className="bg-card rounded-2xl border border-border overflow-hidden sticky top-24">
+            {/* Price header */}
+            <div className="bg-primary p-4 text-primary-foreground">
+              <p className="text-3xl font-bold">₪{trip.price}</p>
+              <p className="text-sm text-primary-foreground/80">للمقعد الواحد</p>
             </div>
 
-            {/* Map placeholder */}
-            <div className="mt-6 rounded-xl overflow-hidden bg-muted h-64 flex items-center justify-center">
-              <div className="text-center">
-                <MapPin className="w-8 h-8 text-primary mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">خريطة المسار</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {trip.from_city} ({trip.from_location || "نقطة الانطلاق"}) → {trip.to_city} ({trip.to_location || "نقطة الوصول"})
-                </p>
-              </div>
-            </div>
-
-            {/* Trip Stats */}
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-4 mt-6 pt-4 border-t border-border">
-              {[
-                { icon: Navigation, label: "المسافة", value: trip.distance || "45 كم" },
-                { icon: Clock, label: "المدة", value: trip.duration || "55 دقيقة" },
-                { icon: MapPin, label: "نقطة الانطلاق", value: trip.from_location || "دوار المنارة" },
-                { icon: MapPin, label: "نقطة الوصول", value: trip.to_location || "دوار الشهداء" },
-              ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <stat.icon className="w-5 h-5 text-primary mx-auto mb-1" />
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                  <p className="text-sm font-medium">{stat.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Amenities */}
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <h3 className="font-bold text-foreground mb-4">مميزات الرحلة</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(trip.amenities || ["رحلة مباشرة", "متاح للأمتعة", "تكييف", "موسيقى"]).map((amenity) => {
-                const Icon = amenityIcons[amenity] || Shield;
-                return (
-                  <div key={amenity} className="flex items-center gap-2 p-3 rounded-xl bg-muted/50">
-                    <Icon className="w-4 h-4 text-primary" />
-                    <span className="text-sm">{amenity}</span>
+            <div className="p-4 space-y-3">
+              {/* Seat & amenity highlights */}
+              <div className="space-y-2 text-sm">
+                {[
+                  { icon: Users, text: `${trip.available_seats || 3} مقاعد متاحة` },
+                  { icon: Briefcase, text: "متاح حقيبة متوسطة" },
+                  { icon: Snowflake, text: "تكييف" },
+                  { icon: Music, text: "موسيقى" },
+                  { icon: Cigarette, text: "مسموح بالتدخين" },
+                ].map((item) => (
+                  <div key={item.text} className="flex items-center gap-2 text-foreground">
+                    <item.icon className="w-4 h-4 text-primary shrink-0" />
+                    <span>{item.text}</span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Driver Info */}
-          <div className="bg-card rounded-2xl border border-border p-6">
-            <h3 className="font-bold text-foreground mb-4">عن السائق</h3>
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary shrink-0">
-                {trip.driver_name?.[0] || "م"}
+                ))}
               </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className="font-bold text-lg">{trip.driver_name || "محمد درويش"}</h4>
-                  <Badge className="bg-accent/10 text-accent text-xs">موثق</Badge>
-                </div>
-                <div className="flex items-center gap-1 mb-3">
-                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="font-medium">{trip.driver_rating || 4.6}</span>
-                  <span className="text-muted-foreground text-sm">({trip.driver_reviews_count || 89} تقييم)</span>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-2 bg-muted/50 rounded-lg">
-                    <p className="text-lg font-bold text-primary">92%</p>
-                    <p className="text-xs text-muted-foreground">معدل القبول</p>
-                  </div>
-                  <div className="text-center p-2 bg-muted/50 rounded-lg">
-                    <p className="text-lg font-bold text-primary">150+</p>
-                    <p className="text-xs text-muted-foreground">رحلة مكتملة</p>
-                  </div>
-                  <div className="text-center p-2 bg-muted/50 rounded-lg">
-                    <p className="text-lg font-bold text-primary">سنتان</p>
-                    <p className="text-xs text-muted-foreground">خبرة في سيرتنا</p>
-                  </div>
-                </div>
-              </div>
-            </div>
 
-            {/* Car */}
-            <div className="mt-6 pt-4 border-t border-border">
-              <h4 className="font-medium text-sm text-muted-foreground mb-3">السيارة</h4>
-              <div className="flex items-center gap-4">
-                <div className="w-24 h-16 rounded-lg bg-muted flex items-center justify-center">
-                  <Car className="w-8 h-8 text-muted-foreground/40" />
-                </div>
-                <div>
-                  <p className="font-bold">{trip.car_model || "كيا سيراتو 2020"}</p>
-                  <p className="text-sm text-muted-foreground">لون {trip.car_color || "فضي"} • {trip.car_plate || "6-1234-95"}</p>
-                </div>
-              </div>
-            </div>
+              {/* Book button */}
+              <Button
+                className={`w-full h-11 rounded-xl font-bold gap-2 mt-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
+                onClick={() => !booked && bookingMutation.mutate(trip)}
+                disabled={bookingMutation.isPending}
+              >
+                {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
+              </Button>
 
-            {/* Driver Note */}
-            {(trip.driver_note || true) && (
-              <div className="mt-4 p-4 bg-primary/5 rounded-xl">
-                <p className="text-sm">
-                  <span className="font-medium">ملاحظة من السائق: </span>
-                  {trip.driver_note || "مرحباً بالجميع 😊 الرحلة مريحة وآمنة إن شاء الله. يرجى التواصل معي لأي استفسار."}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Sidebar - Booking */}
-        <div className="space-y-4">
-          <div className="bg-card rounded-2xl border border-border p-6 sticky top-24">
-            <div className="text-center mb-6">
-              <p className="text-3xl font-bold text-primary">₪{trip.price}</p>
-              <p className="text-sm text-muted-foreground">للمقعد الواحد</p>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  المقاعد المتاحة
-                </span>
-                <span className="font-medium">{trip.available_seats || 3} من {trip.total_seats || 3}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Briefcase className="w-4 h-4" />
-                  حقيبة متوسطة
-                </span>
-                <span className="font-medium">متاح</span>
-              </div>
-            </div>
-
-            <Button
-              className={`w-full h-12 rounded-xl text-lg font-bold mb-3 gap-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
-              onClick={() => !booked && bookingMutation.mutate(trip)}
-              disabled={bookingMutation.isPending}
-            >
-              {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
-            </Button>
-
-            <div className="flex gap-2">
+              {/* Favorite */}
               <Button
                 variant="outline"
-                className={`flex-1 rounded-xl gap-2 ${favorited ? "border-destructive text-destructive" : ""}`}
+                className={`w-full rounded-xl gap-2 ${favorited ? "border-destructive text-destructive" : ""}`}
                 onClick={() => { setFavorited(!favorited); toast(favorited ? "تمت الإزالة من المفضلة" : "تمت الإضافة للمفضلة ❤️"); }}
               >
                 <Heart className={`w-4 h-4 ${favorited ? "fill-destructive text-destructive" : ""}`} />
                 {favorited ? "في المفضلة" : "إضافة للمفضلة"}
               </Button>
-              <Button variant="outline" className="rounded-xl">
-                <Share2 className="w-4 h-4" />
-              </Button>
             </div>
 
-            {/* Contact */}
-            <div className="mt-6 pt-4 border-t border-border">
-              <h4 className="font-medium mb-3">تواصل مع السائق</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="rounded-xl gap-2 text-sm" onClick={() => navigate("/messages")}>
-                  <MessageCircle className="w-4 h-4" />
-                  محادثة
-                </Button>
-                <Button variant="outline" className="rounded-xl gap-2 text-sm">
-                  <Phone className="w-4 h-4" />
-                  اتصال
-                </Button>
+            {/* Trust info */}
+            <div className="border-t border-border divide-y divide-border">
+              <div className="flex items-start gap-3 p-4">
+                <Shield className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">رحلة آمنة</p>
+                  <p className="text-xs text-muted-foreground">جميع السائقين موثقين وندعم مدار الساعة</p>
+                  <button className="text-xs text-primary mt-1 hover:underline">تعرف على المزيد</button>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-4">
+                <X className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium">سياسة الإلغاء</p>
+                  <p className="text-xs text-muted-foreground">إلغاء مجاني حتى موعد الرحلة بساعتين</p>
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* Trust badges */}
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: Shield, title: "رحلة آمنة", desc: "جميع السائقين موثقين" },
-              { icon: Clock, title: "دعم 24/7", desc: "فريق دعم جاهز لمساعدتك" },
-            ].map((badge) => (
-              <div key={badge.title} className="bg-card rounded-xl border border-border p-3 text-center">
-                <badge.icon className="w-5 h-5 text-primary mx-auto mb-1" />
-                <p className="text-xs font-medium">{badge.title}</p>
-                <p className="text-[10px] text-muted-foreground">{badge.desc}</p>
-              </div>
-            ))}
           </div>
         </div>
+
+        {/* ===== MAIN CONTENT (Middle) ===== */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Route Header */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 text-2xl font-bold text-foreground">
+                <span>{trip.from_city}</span>
+                <ArrowRight className="w-5 h-5 text-primary" />
+                <span>{trip.to_city}</span>
+              </div>
+              <Badge className="bg-accent/10 text-accent border-accent/20">مؤكدة</Badge>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+              <Calendar className="w-4 h-4" />
+              <span>{trip.date}</span>
+              <span>•</span>
+              <Clock className="w-4 h-4" />
+              <span>{trip.time} صباحاً</span>
+            </div>
+
+            {/* Map */}
+            <div className="rounded-xl overflow-hidden h-52 relative bg-muted">
+              <img
+                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&h=400&fit=crop"
+                alt="خريطة المسار"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black/10" />
+              {/* From pin */}
+              <div className="absolute bottom-6 right-6 bg-white rounded-lg px-2 py-1 shadow text-xs font-bold text-foreground flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                {trip.from_city}
+              </div>
+              {/* To pin */}
+              <div className="absolute top-6 left-6 bg-white rounded-lg px-2 py-1 shadow text-xs font-bold text-foreground flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-destructive" />
+                {trip.to_city}
+              </div>
+            </div>
+
+            {/* Route stats */}
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border text-center">
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <MapPin className="w-3 h-3" /> {trip.to_city}
+                </p>
+                <p className="text-xs font-medium">{trip.to_location || "دوار الشهداء"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">المسافة</p>
+                <p className="text-xs font-medium">{trip.distance || "45 كم"}</p>
+                <p className="text-xs text-muted-foreground">المدة</p>
+                <p className="text-xs font-medium">{trip.duration || "55 د"} تقريباً</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <MapPin className="w-3 h-3" /> {trip.from_city}
+                </p>
+                <p className="text-xs font-medium">{trip.from_location || "دوار المنارة"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Trip Details */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h3 className="font-bold text-foreground mb-4">تفاصيل الرحلة</h3>
+            <div className="space-y-3 text-sm">
+              {[
+                { icon: Calendar, label: `${trip.date} • 08:30 – 09:30 صباحاً` },
+                { icon: MapPin, label: `${trip.from_city} – ${trip.from_location || "دوار المنارة"}` },
+                { icon: MapPin, label: `${trip.to_city} – ${trip.to_location || "دوار الشهداء"}` },
+                { icon: Navigation, label: "فوق نوع الرحلة" },
+                { icon: Users, label: `عدد المقاعد المتاحة: ${trip.available_seats || 3}` },
+                { icon: Briefcase, label: "أدنية متوسطة واحدة" },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-3 text-foreground">
+                  <item.icon className="w-4 h-4 text-primary shrink-0" />
+                  <span>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Driver */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h3 className="font-bold text-foreground mb-4">عن السائق</h3>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary shrink-0 overflow-hidden">
+                {trip.driver_avatar ? (
+                  <img src={trip.driver_avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  trip.driver_name?.[0] || "م"
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="font-bold">{trip.driver_name || "محمد درويش"}</h4>
+                  <Badge className="bg-accent/10 text-accent text-xs">موثق</Badge>
+                </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+                  <span className="text-sm font-medium">{trip.driver_rating || 4.6}</span>
+                  <span className="text-xs text-muted-foreground">({trip.driver_reviews_count || 89} تقييم)</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="text-center p-2 bg-muted/50 rounded-lg">
+                <p className="text-base font-bold text-primary">92%</p>
+                <p className="text-xs text-muted-foreground">معدل القبول</p>
+              </div>
+              <div className="text-center p-2 bg-muted/50 rounded-lg">
+                <p className="text-base font-bold text-primary">150+</p>
+                <p className="text-xs text-muted-foreground">رحلة مكتملة</p>
+              </div>
+              <div className="text-center p-2 bg-muted/50 rounded-lg">
+                <p className="text-base font-bold text-primary">سنتان</p>
+                <p className="text-xs text-muted-foreground">خبرة في سيرتنا</p>
+              </div>
+            </div>
+
+            {/* Car */}
+            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+              <div className="w-20 h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                {trip.car_image ? (
+                  <img src={trip.car_image} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <img src="https://images.unsplash.com/photo-1541443131876-44b03de101c5?w=200&h=120&fit=crop" alt="سيارة" className="w-full h-full object-cover" />
+                )}
+              </div>
+              <div>
+                <p className="font-bold text-sm">{trip.car_model || "كيا سيراتو 2020"}</p>
+                <p className="text-xs text-muted-foreground">لون {trip.car_color || "فضي"}</p>
+                <p className="text-xs text-muted-foreground">🔢 {trip.car_plate || "6-1234-95"}</p>
+              </div>
+            </div>
+
+            {/* Driver note */}
+            <div className="mt-3 p-3 bg-primary/5 rounded-xl">
+              <p className="text-sm">
+                😊 {trip.driver_note || "مرحباً بالجميع الرحلة مريحة وآمنة إن شاء الله، يرجى التواصل معي في أي استفسار."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== RIGHT SIDEBAR ===== */}
+        <div className="space-y-4">
+          {/* Why choose */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h3 className="font-bold text-foreground mb-3">لماذا تختار هذه الرحلة؟</h3>
+            <div className="space-y-2">
+              {whyChoose.map((reason) => (
+                <div key={reason} className="flex items-center gap-2 text-sm">
+                  <div className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 text-accent" />
+                  </div>
+                  <span>{reason}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Driver note (right column) */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h3 className="font-bold text-foreground mb-3">ملاحظة من السائق</h3>
+            <p className="text-sm text-muted-foreground">
+              😊 {trip.driver_note || "مرحباً بالجميع الرحلة مريحة وآمنة إن شاء الله. يرجى التواصل معي في أي استفسار."}
+            </p>
+          </div>
+
+          {/* Contact */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <h3 className="font-bold text-foreground mb-3">تواصل مع السائق</h3>
+            <div className="space-y-2">
+              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => navigate("/messages")}>
+                <MessageCircle className="w-4 h-4" />
+                محادثة
+              </Button>
+              <Button variant="outline" className="w-full rounded-xl gap-2">
+                <Phone className="w-4 h-4" />
+                اتصال
+              </Button>
+            </div>
+          </div>
+
+          {/* Share */}
+          <div className="bg-card rounded-2xl border border-border p-5">
+            <p className="text-sm font-medium mb-3">شارك الرحلة مع أصدقائك!</p>
+            <div className="flex items-center justify-center gap-3">
+              {[
+                { label: "واتساب", bg: "bg-green-500", color: "text-white" },
+                { label: "فيسبوك", bg: "bg-blue-600", color: "text-white" },
+                { label: "نسخ الرابط", bg: "bg-muted", color: "text-foreground" },
+                { label: "مشاركة", bg: "bg-muted", color: "text-foreground" },
+              ].map((s) => (
+                <button
+                  key={s.label}
+                  className={`${s.bg} ${s.color} px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity`}
+                  onClick={() => toast("تم النسخ!")}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom trust badges */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border">
+        {[
+          { icon: Headphones, title: "دعم على مدار الساعة", desc: "فريق الدعم جاهز لمساعدتك في أي وقت" },
+          { icon: Shield, title: "طرق دفع آمنة", desc: "حماية كاملة لبياناتك ومعاملاتك المالية" },
+          { icon: X, title: "إلغاء مجاني", desc: "إلغاء مجاني حتى موعد الرحلة بساعتين" },
+          { icon: Users, title: "مجتمع موثوق", desc: "آلاف المستخدمين يثقون في سيرتنا كل يوم" },
+        ].map((b) => (
+          <div key={b.title} className="flex items-start gap-3 p-4 bg-card rounded-xl border border-border">
+            <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <b.icon className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-bold">{b.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{b.desc}</p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
