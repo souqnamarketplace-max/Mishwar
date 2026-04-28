@@ -12,8 +12,8 @@ export default function ReviewForm({ trip, reviewerUser, targetEmail, targetName
   const qc = useQueryClient();
 
   const submit = useMutation({
-    mutationFn: () =>
-      base44.entities.Review.create({
+    mutationFn: async () => {
+      await base44.entities.Review.create({
         trip_id: trip.id,
         reviewer_name: reviewerUser?.full_name || "مجهول",
         reviewer_email: reviewerUser?.email,
@@ -22,9 +22,20 @@ export default function ReviewForm({ trip, reviewerUser, targetEmail, targetName
         review_type: "passenger_rates_driver",
         rating,
         comment,
-      }),
+      });
+      // Notify driver of review
+      await base44.entities.Notification.create({
+        user_email: targetEmail,
+        title: `تقييم جديد من ${reviewerUser?.full_name || "راكب"}`,
+        message: `حصلت على تقييم ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${comment ? `: "${comment}"` : ""}`,
+        type: "system",
+        trip_id: trip.id,
+        is_read: false,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reviews"] });
+      qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("شكراً! تم إرسال تقييمك ✅");
       onClose?.();
     },
