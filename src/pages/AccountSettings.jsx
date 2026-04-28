@@ -249,12 +249,6 @@ export default function AccountSettings() {
               )}
             </div>
             <div>
-              <label htmlFor="avatar-input" className="cursor-pointer">
-                <Button variant="outline" className="rounded-xl gap-2" disabled={avatarLoading}>
-                  <Image className="w-4 h-4" />
-                  {avatarLoading ? "جاري الرفع..." : "تغيير الصورة"}
-                </Button>
-              </label>
               <input
                 id="avatar-input"
                 type="file"
@@ -263,6 +257,15 @@ export default function AccountSettings() {
                 onChange={uploadAvatar}
                 disabled={avatarLoading}
               />
+              <Button 
+                variant="outline" 
+                className="rounded-xl gap-2" 
+                disabled={avatarLoading}
+                onClick={() => document.getElementById("avatar-input").click()}
+              >
+                <Image className="w-4 h-4" />
+                {avatarLoading ? "جاري الرفع..." : "تغيير الصورة"}
+              </Button>
               <p className="text-xs text-muted-foreground mt-1">JPG, PNG (Max 5MB)</p>
             </div>
           </div>
