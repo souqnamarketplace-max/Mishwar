@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast as sonnerToast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -35,6 +36,11 @@ export default function TripDetails() {
   const [booked, setBooked] = useState(false);
   const [favorited, setFavorited] = useState(false);
 
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
+
   const { data: trips = [] } = useQuery({
     queryKey: ["trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 50),
@@ -43,9 +49,12 @@ export default function TripDetails() {
   const bookingMutation = useMutation({
     mutationFn: (tripData) => base44.entities.Booking.create({
       trip_id: tripData.id,
+      passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
+      passenger_email: user?.email || "",
       seats_booked: 1,
       total_price: tripData.price,
-      status: "confirmed",
+      status: "pending",
+      payment_method: "نقداً",
     }),
     onSuccess: () => {
       setBooked(true);

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +32,11 @@ const amenitiesList = [
 export default function CreateTrip() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
   const [form, setForm] = useState({
     from_city: "",
     to_city: "",
@@ -63,9 +69,9 @@ export default function CreateTrip() {
       ...form,
       status: "confirmed",
       total_seats: form.available_seats,
-      driver_name: "أحمد أبو الخير",
-      driver_rating: 4.8,
-      driver_reviews_count: 89,
+      driver_name: user?.full_name || user?.email?.split("@")[0] || "سائق",
+      driver_avatar: user?.avatar_url || "",
+      driver_email: user?.email || "",
     };
     await base44.entities.Trip.create(tripData);
     toast.success("تم نشر الرحلة بنجاح!");

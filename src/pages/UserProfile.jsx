@@ -17,7 +17,7 @@ export default function UserProfile() {
   const { data: trips = [] } = useQuery({
     queryKey: ["driver-trips", email],
     queryFn: () =>
-      email ? base44.entities.Trip.filter({ driver_email: email }, "-created_date", 50) : [],
+      email ? base44.entities.Trip.filter({ created_by: email }, "-created_date", 50) : [],
     enabled: !!email,
   });
 

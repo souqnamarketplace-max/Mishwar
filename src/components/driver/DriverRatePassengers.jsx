@@ -40,11 +40,11 @@ export default function DriverRatePassengers({ trips, bookings }) {
 
   const { data: myReviews = [] } = useQuery({
     queryKey: ["driver-given-reviews", user?.email],
-    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email }),
+    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email, review_type: "driver_rates_passenger" }),
     enabled: !!user?.email,
   });
 
-  const reviewedIds = new Set(myReviews.map((r) => r.trip_id + "_" + r.driver_email));
+  const reviewedIds = new Set(myReviews.map((r) => r.trip_id + "_" + r.rated_user_email));
 
   const submitReview = useMutation({
     mutationFn: (data) => base44.entities.Review.create(data),
@@ -77,7 +77,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
       <p className="text-sm text-muted-foreground mb-2">قيّم ركابك بعد اكتمال الرحلة لتعزيز الثقة في المجتمع</p>
       {passengerBookings.map((booking) => {
         const trip = completedTrips.find((t) => t.id === booking.trip_id);
-        const key = booking.trip_id + "_" + booking.passenger_email;
+        const key = booking.trip_id + "_" + (booking.passenger_email || booking.created_by);
         const alreadyRated = reviewedIds.has(key);
 
         return (
@@ -122,7 +122,8 @@ export default function DriverRatePassengers({ trips, bookings }) {
                       trip_id: booking.trip_id,
                       reviewer_name: user?.full_name,
                       reviewer_email: user?.email,
-                      driver_email: booking.passenger_email, // storing passenger email in driver_email field for reverse lookup
+                      rated_user_email: booking.passenger_email || booking.created_by,
+                      review_type: "driver_rates_passenger",
                       rating: ratings[booking.id],
                       comment: comments[booking.id] || "",
                     })
@@ -134,7 +135,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
             ) : (
               <div className="flex gap-1 mt-1">
                 {[1, 2, 3, 4, 5].map((s) => {
-                  const rev = myReviews.find((r) => r.trip_id === booking.trip_id && r.driver_email === booking.passenger_email);
+                  const rev = myReviews.find((r) => r.trip_id === booking.trip_id && r.rated_user_email === (booking.passenger_email || booking.created_by));
                   return (
                     <Star
                       key={s}

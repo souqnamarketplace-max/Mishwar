@@ -8,7 +8,7 @@
         "admin",
         "user"
       ],
-      "description": "The role of the user in the app"
+      "default": "user"
     },
     "account_type": {
       "type": "string",
@@ -16,8 +16,7 @@
         "passenger",
         "driver",
         "both"
-      ],
-      "description": "Whether the user is a passenger, driver, or both"
+      ]
     },
     "phone": {
       "type": "string"
@@ -30,6 +29,10 @@
     },
     "avatar_url": {
       "type": "string"
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false
     },
     "car_model": {
       "type": "string"
@@ -46,16 +49,8 @@
     "car_image": {
       "type": "string"
     },
-    "id_verified": {
-      "type": "boolean",
-      "default": false
-    },
-    "onboarding_completed": {
-      "type": "boolean",
-      "default": false
+    "driver_note": {
+      "type": "string"
     }
-  },
-  "required": [
-    "role"
-  ]
+  }
 }

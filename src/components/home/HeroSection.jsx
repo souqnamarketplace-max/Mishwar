@@ -139,12 +139,18 @@ export default function HeroSection() {
 
           {/* Quick Routes */}
           <div className="flex flex-wrap justify-center gap-2 mt-5">
-            {["رام الله ← نابلس", "الخليل ← بيت لحم", "غزة ← رام الله", "جنين ← نابلس"].map((route) => (
+            {[
+              { label: "رام الله ← نابلس", from: "رام الله", to: "نابلس" },
+              { label: "الخليل ← بيت لحم", from: "الخليل", to: "بيت لحم" },
+              { label: "غزة ← رام الله", from: "غزة", to: "رام الله" },
+              { label: "جنين ← نابلس", from: "جنين", to: "نابلس" },
+            ].map((route) => (
               <button
-                key={route}
+                key={route.label}
+                onClick={() => navigate(`/search?from=${route.from}&to=${route.to}`)}
                 className="px-4 py-1.5 rounded-full bg-white/15 backdrop-blur border border-white/30 text-sm text-white hover:bg-white/25 transition-all"
               >
-                {route}
+                {route.label}
               </button>
             ))}
           </div>

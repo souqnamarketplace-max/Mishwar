@@ -8,7 +8,7 @@ export default function RatingSummary({ driverEmail }) {
   const { data: reviews = [] } = useQuery({
     queryKey: ["reviews", driverEmail],
     queryFn: () =>
-      base44.entities.Review.filter({ driver_email: driverEmail }, "-created_date", 100),
+      base44.entities.Review.filter({ driver_email: driverEmail, review_type: "passenger_rates_driver" }, "-created_date", 100),
     enabled: !!driverEmail,
   });
 

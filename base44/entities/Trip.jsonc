@@ -5,6 +5,9 @@
     "driver_name": {
       "type": "string"
     },
+    "driver_email": {
+      "type": "string"
+    },
     "driver_avatar": {
       "type": "string"
     },

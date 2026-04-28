@@ -110,7 +110,7 @@ export default function DriverDashboard() {
       )}
 
       {activeTab === "vehicle" && (
-        <DriverVehicleEditor trips={trips} />
+        <DriverVehicleEditor />
       )}
     </div>
   );

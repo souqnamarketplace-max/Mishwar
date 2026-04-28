@@ -154,13 +154,13 @@ export default function MyTrips() {
                         <div className="mt-2 px-1">
                           {reviewingTrip === trip.id ? (
                             <ReviewForm
-                              trip={trip}
-                              reviewerUser={user}
-                              targetEmail={trip.driver_email || trip.created_by}
-                              targetName={trip.driver_name || "السائق"}
-                              onClose={() => setReviewingTrip(null)}
-                            />
-                          ) : (
+                            trip={trip}
+                            reviewerUser={user}
+                            targetEmail={trip.driver_email || trip.created_by}
+                            targetName={trip.driver_name || "السائق"}
+                            onClose={() => setReviewingTrip(null)}
+                          />
+                        ) : (
                             <button
                               onClick={() => setReviewingTrip(trip.id)}
                               className="flex items-center gap-2 text-sm text-primary hover:underline px-4 py-1"

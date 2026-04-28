@@ -18,6 +18,8 @@ export default function ReviewForm({ trip, reviewerUser, targetEmail, targetName
         reviewer_name: reviewerUser?.full_name || "مجهول",
         reviewer_email: reviewerUser?.email,
         driver_email: targetEmail,
+        rated_user_email: targetEmail,
+        review_type: "passenger_rates_driver",
         rating,
         comment,
       }),

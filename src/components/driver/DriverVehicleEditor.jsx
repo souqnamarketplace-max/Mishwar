@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Car, Save, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,23 +8,41 @@ import { toast } from "sonner";
 
 const COLORS = ["أبيض", "أسود", "فضي", "رمادي", "أحمر", "أزرق", "بيج"];
 
-export default function DriverVehicleEditor({ trips }) {
+export default function DriverVehicleEditor() {
   const qc = useQueryClient();
-  const lastTrip = trips[0];
 
-  const [form, setForm] = useState({
-    car_model: lastTrip?.car_model || "",
-    car_year: lastTrip?.car_year || "",
-    car_color: lastTrip?.car_color || "",
-    car_plate: lastTrip?.car_plate || "",
-    car_image: lastTrip?.car_image || "",
-    driver_name: lastTrip?.driver_name || "",
-    driver_note: lastTrip?.driver_note || "",
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
   });
 
+  const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Initialize form once user loads
+  const currentForm = form || {
+    car_model: user?.car_model || "",
+    car_year: user?.car_year || "",
+    car_color: user?.car_color || "",
+    car_plate: user?.car_plate || "",
+    car_image: user?.car_image || "",
+    driver_note: user?.driver_note || "",
+  };
+
+  const set = (key, val) => setForm((prev) => ({ ...(prev || currentForm), [key]: val }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await base44.auth.updateMe(currentForm);
+      qc.invalidateQueries({ queryKey: ["me"] });
+      toast.success("تم حفظ بيانات المركبة بنجاح ✅");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
@@ -41,27 +59,13 @@ export default function DriverVehicleEditor({ trips }) {
     }
   };
 
-  const handleSave = async () => {
-    if (!lastTrip) return toast.error("أنشئ رحلة أولاً لحفظ بيانات المركبة");
-    setSaving(true);
-    try {
-      await base44.entities.Trip.update(lastTrip.id, form);
-      qc.invalidateQueries({ queryKey: ["trips"] });
-      toast.success("تم حفظ بيانات المركبة بنجاح ✅");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
-
   return (
     <div className="max-w-2xl space-y-6">
       {/* Car preview */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         <div className="relative h-44 bg-muted flex items-center justify-center">
-          {form.car_image ? (
-            <img src={form.car_image} alt="المركبة" className="w-full h-full object-cover" />
+          {currentForm.car_image ? (
+            <img src={currentForm.car_image} alt="المركبة" className="w-full h-full object-cover" />
           ) : (
             <div className="text-center text-muted-foreground">
               <Car className="w-12 h-12 mx-auto mb-2 opacity-30" />
@@ -104,7 +108,7 @@ export default function DriverVehicleEditor({ trips }) {
             <label className="block text-sm font-medium text-foreground mb-1">موديل السيارة</label>
             <Input
               placeholder="مثال: كيا سيراتو"
-              value={form.car_model}
+              value={currentForm.car_model}
               onChange={(e) => set("car_model", e.target.value)}
               className="rounded-xl"
             />
@@ -113,7 +117,7 @@ export default function DriverVehicleEditor({ trips }) {
             <label className="block text-sm font-medium text-foreground mb-1">سنة الصنع</label>
             <Input
               placeholder="مثال: 2020"
-              value={form.car_year}
+              value={currentForm.car_year}
               onChange={(e) => set("car_year", e.target.value)}
               className="rounded-xl"
             />
@@ -121,7 +125,7 @@ export default function DriverVehicleEditor({ trips }) {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">لون السيارة</label>
             <select
-              value={form.car_color}
+              value={currentForm.car_color}
               onChange={(e) => set("car_color", e.target.value)}
               className="w-full h-9 px-3 rounded-xl bg-muted/50 border border-input text-sm"
             >
@@ -133,7 +137,7 @@ export default function DriverVehicleEditor({ trips }) {
             <label className="block text-sm font-medium text-foreground mb-1">رقم اللوحة</label>
             <Input
               placeholder="مثال: 6-1234-95"
-              value={form.car_plate}
+              value={currentForm.car_plate}
               onChange={(e) => set("car_plate", e.target.value)}
               className="rounded-xl"
             />
@@ -141,30 +145,16 @@ export default function DriverVehicleEditor({ trips }) {
         </div>
       </div>
 
-      {/* Driver Info */}
+      {/* Driver Note */}
       <div className="bg-card rounded-2xl border border-border p-5">
-        <h3 className="font-bold text-foreground mb-4">معلومات السائق</h3>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">الاسم</label>
-            <Input
-              placeholder="اسمك الكامل"
-              value={form.driver_name}
-              onChange={(e) => set("driver_name", e.target.value)}
-              className="rounded-xl"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1">ملاحظة للركاب</label>
-            <textarea
-              rows={3}
-              placeholder="اكتب ملاحظة للركاب..."
-              value={form.driver_note}
-              onChange={(e) => set("driver_note", e.target.value)}
-              className="w-full px-3 py-2 rounded-xl border border-input bg-transparent text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-          </div>
-        </div>
+        <h3 className="font-bold text-foreground mb-4">ملاحظة للركاب</h3>
+        <textarea
+          rows={3}
+          placeholder="اكتب ملاحظة للركاب..."
+          value={currentForm.driver_note}
+          onChange={(e) => set("driver_note", e.target.value)}
+          className="w-full px-3 py-2 rounded-xl border border-input bg-transparent text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+        />
       </div>
 
       <Button
