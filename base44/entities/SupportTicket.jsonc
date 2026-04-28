@@ -1,0 +1,30 @@
+{
+  "name": "SupportTicket",
+  "type": "object",
+  "properties": {
+    "subject": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "user_name": {
+      "type": "string"
+    },
+    "user_email": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "open",
+        "in_progress",
+        "resolved"
+      ],
+      "default": "open"
+    }
+  },
+  "required": [
+    "subject"
+  ]
+}

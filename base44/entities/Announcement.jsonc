@@ -1,0 +1,16 @@
+{
+  "name": "Announcement",
+  "type": "object",
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "text"
+  ]
+}

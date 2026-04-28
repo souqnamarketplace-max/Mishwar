@@ -6,6 +6,14 @@ import DashboardUsers from "./dashboard/DashboardUsers";
 import DashboardTrips from "./dashboard/DashboardTrips";
 import DashboardBookings from "./dashboard/DashboardBookings";
 import DashboardReviews from "./dashboard/DashboardReviews";
+import DashboardPayments from "./dashboard/DashboardPayments";
+import DashboardReports from "./dashboard/DashboardReports";
+import DashboardNotifications from "./dashboard/DashboardNotifications";
+import DashboardSupport from "./dashboard/DashboardSupport";
+import DashboardContent from "./dashboard/DashboardContent";
+import DashboardOffers from "./dashboard/DashboardOffers";
+import DashboardSettings from "./dashboard/DashboardSettings";
+import DashboardLogs from "./dashboard/DashboardLogs";
 import {
   DollarSign, Users, Car, CalendarCheck, TrendingUp, TrendingDown,
   Star, AlertCircle, Bell, Clock, CreditCard
@@ -226,6 +234,14 @@ const pageTitles = {
   trips: { title: "إدارة الرحلات", subtitle: "عرض وإدارة جميع الرحلات" },
   bookings: { title: "إدارة الحجوزات", subtitle: "عرض وإدارة جميع الحجوزات" },
   reviews: { title: "التقييمات والمراجعات", subtitle: "إدارة تقييمات المستخدمين" },
+  payments: { title: "المعاملات والمدفوعات", subtitle: "تتبع الإيرادات والمعاملات المالية" },
+  reports: { title: "التقارير والإحصائيات", subtitle: "تحليل بيانات المنصة" },
+  notifications: { title: "الإشعارات", subtitle: "سجل أحداث المنصة" },
+  support: { title: "الدعم والشكاوى", subtitle: "إدارة تذاكر الدعم الفني" },
+  content: { title: "إدارة المحتوى", subtitle: "إعلانات التطبيق والمدن المدعومة" },
+  offers: { title: "إدارة العروض والكوبونات", subtitle: "إنشاء وإدارة كوبونات الخصم" },
+  settings: { title: "إعدادات النظام", subtitle: "إعدادات التطبيق العامة" },
+  logs: { title: "سجل النشاطات", subtitle: "جميع أحداث المنصة" },
 };
 
 export default function Dashboard() {
@@ -262,6 +278,14 @@ export default function Dashboard() {
         {activePage === "trips" && <DashboardTrips />}
         {activePage === "bookings" && <DashboardBookings />}
         {activePage === "reviews" && <DashboardReviews />}
+        {activePage === "payments" && <DashboardPayments />}
+        {activePage === "reports" && <DashboardReports />}
+        {activePage === "notifications" && <DashboardNotifications />}
+        {activePage === "support" && <DashboardSupport />}
+        {activePage === "content" && <DashboardContent />}
+        {activePage === "offers" && <DashboardOffers />}
+        {activePage === "settings" && <DashboardSettings />}
+        {activePage === "logs" && <DashboardLogs />}
       </div>
     </div>
   );
