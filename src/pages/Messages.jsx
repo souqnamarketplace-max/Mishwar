@@ -67,14 +67,25 @@ export default function Messages() {
   const [undoable, setUndoable] = useState(null);
   const [phoneError, setPhoneError] = useState(null);
 
-  const phoneRegex = /\b(?:\+?966|0)?[5-9]\d{8}\b|(\d{3}[-.\s]?\d{3}[-.\s]?\d{4})/;
+  const hasPhoneNumber = (text) => {
+    // Remove all non-digit characters to catch tricks like 599&7272))569 or 5997272__658
+    const digitsOnly = text.replace(/\D/g, '');
+    
+    // Check for 9-10 digit sequences (Palestinian/Saudi numbers)
+    // 0591234567 (10 digits starting with 0) or 966591234567 (12 digits with country code)
+    if (/^(966)?[0]?[5-9]\d{7,8}$/.test(digitsOnly)) {
+      return true;
+    }
+    
+    return false;
+  };
 
   const handleSend = () => {
     const trimmed = message.trim();
     if (!trimmed) return;
     
-    // Check for phone numbers
-    if (phoneRegex.test(trimmed)) {
+    // Check for phone numbers (catches variations with separators, underscores, parentheses, etc.)
+    if (hasPhoneNumber(trimmed)) {
       setPhoneError("لا يمكن مشاركة أرقام الهاتف في المحادثة");
       setTimeout(() => setPhoneError(null), 3000);
       return;
