@@ -20,39 +20,67 @@ export default function HeroSection() {
 
   return (
     <section className="relative overflow-hidden">
-      {/* Background */}
-      <div className="absolute inset-0 bg-gradient-to-bl from-primary/5 via-background to-accent/5" />
-      <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-accent/5 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+      {/* Background image */}
+      <div className="absolute inset-0">
+        <img
+          src="https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1600&fit=crop"
+          alt=""
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-l from-primary/80 via-primary/60 to-primary/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent" />
+      </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 md:py-24">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 md:py-28">
         <div className="text-center max-w-3xl mx-auto mb-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-sm font-medium mb-6">
-              🇵🇸 منصة فلسطينية لمشاركة الرحلات
-            </div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 leading-tight">
-              شارك الطريق،<br />
-              <span className="text-primary">وفّر المال</span>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight drop-shadow-lg">
+              كيف تحجز رحلة ؟
             </h1>
-            <p className="text-lg text-muted-foreground max-w-xl mx-auto">
-              احجز مقعدك بسهولة أو شارك مقاعدك الفارغة. ساهم في تخفيف الازدحام وحماية البيئة.
+            <p className="text-lg text-white/90 max-w-xl mx-auto drop-shadow">
+              خطوات بسيطة لتحجز مقعدك وتصل لوجهتك بأمان وراحة
             </p>
           </motion.div>
         </div>
+
+        {/* Steps flow */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="flex flex-wrap justify-center items-center gap-2 mb-10"
+        >
+          {[
+            { num: "١", label: "ابحث عن رحلة", icon: Search },
+            { num: "٢", label: "اختر الرحلة", icon: MapPin },
+            { num: "٣", label: "راجع التفاصيل", icon: Calendar },
+            { num: "٤", label: "ادفع بأمان", icon: ArrowLeft },
+            { num: "٥", label: "تم الحجز", icon: ArrowLeft },
+          ].map((step, i) => (
+            <React.Fragment key={step.num}>
+              <div className="flex flex-col items-center gap-1">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur border-2 border-white/40 flex items-center justify-center text-white font-bold text-lg shadow">
+                  {step.num}
+                </div>
+                <span className="text-white/90 text-xs font-medium whitespace-nowrap">{step.label}</span>
+              </div>
+              {i < 4 && <div className="w-8 h-0.5 bg-white/40 mb-4 hidden sm:block" />}
+            </React.Fragment>
+          ))}
+        </motion.div>
 
         {/* Search Box */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
           className="max-w-4xl mx-auto"
         >
-          <form onSubmit={handleSearch} className="bg-card rounded-2xl shadow-xl border border-border p-4 md:p-6">
+          <form onSubmit={handleSearch} className="bg-card/95 backdrop-blur-md rounded-2xl shadow-2xl border border-border p-4 md:p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div className="relative">
                 <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
@@ -93,11 +121,11 @@ export default function HeroSection() {
           </form>
 
           {/* Quick Routes */}
-          <div className="flex flex-wrap justify-center gap-2 mt-6">
+          <div className="flex flex-wrap justify-center gap-2 mt-5">
             {["رام الله → نابلس", "الخليل → بيت لحم", "غزة → رام الله", "جنين → نابلس"].map((route) => (
               <button
                 key={route}
-                className="px-4 py-2 rounded-full bg-card border border-border text-sm text-muted-foreground hover:border-primary/30 hover:text-primary transition-all"
+                className="px-4 py-2 rounded-full bg-white/10 backdrop-blur border border-white/30 text-sm text-white hover:bg-white/20 transition-all"
               >
                 {route}
               </button>
