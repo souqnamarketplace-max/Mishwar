@@ -332,10 +332,15 @@ export default function TripDetails() {
                 <MessageCircle className="w-4 h-4" />
                 محادثة
               </Button>
-              <Button variant="outline" className="w-full rounded-xl gap-2">
-                <Phone className="w-4 h-4" />
-                اتصال
-              </Button>
+              {trip.status === "confirmed" && trip.driver_phone && (
+                <Button variant="outline" className="w-full rounded-xl gap-2">
+                  <Phone className="w-4 h-4" />
+                  {trip.driver_phone}
+                </Button>
+              )}
+              {trip.status !== "confirmed" && (
+                <p className="text-xs text-muted-foreground text-center py-2">رقم الهاتف متاح بعد تأكيد الحجز</p>
+              )}
             </div>
           </div>
 

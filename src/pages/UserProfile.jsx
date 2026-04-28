@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
-import { Star, Car, MapPin, Calendar, Shield, Award, MessageCircle, ArrowLeft } from "lucide-react";
+import { Star, Car, MapPin, Calendar, Shield, Award, MessageCircle, ArrowLeft, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import RatingSummary from "../components/reviews/RatingSummary";
@@ -44,6 +44,15 @@ export default function UserProfile() {
     );
   }
 
+  const { data: bookings = [] } = useQuery({
+    queryKey: ["bookings", email],
+    queryFn: () =>
+      email ? base44.entities.Booking.filter({ passenger_email: email }, "-created_date", 50) : [],
+    enabled: !!email,
+  });
+
+  const confirmedWithUser = bookings.some((b) => b.status === "confirmed");
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       {/* Back */}
@@ -84,12 +93,20 @@ export default function UserProfile() {
                 </span>
               </div>
             </div>
-            <Link to={`/messages`}>
-              <Button variant="outline" className="rounded-xl gap-2 h-9">
-                <MessageCircle className="w-4 h-4" />
-                تواصل
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link to={`/messages`}>
+                <Button variant="outline" className="rounded-xl gap-2 h-9">
+                  <MessageCircle className="w-4 h-4" />
+                  تواصل
+                </Button>
+              </Link>
+              {confirmedWithUser && trips.length > 0 && trips[0].driver_phone && (
+                <Button variant="outline" className="rounded-xl gap-2 h-9">
+                  <Phone className="w-4 h-4" />
+                  {trips[0].driver_phone}
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Stats Row */}

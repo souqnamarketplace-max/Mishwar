@@ -8,6 +8,9 @@
     "driver_email": {
       "type": "string"
     },
+    "driver_phone": {
+      "type": "string"
+    },
     "driver_avatar": {
       "type": "string"
     },
