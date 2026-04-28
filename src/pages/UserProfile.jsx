@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import React, { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
@@ -7,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import RatingSummary from "../components/reviews/RatingSummary";
 import ReviewsList from "../components/reviews/ReviewsList";
-import StarRating from "../components/reviews/StarRating";
 
 export default function UserProfile() {
   const [searchParams] = useSearchParams();
@@ -24,7 +24,7 @@ export default function UserProfile() {
   const { data: reviews = [] } = useQuery({
     queryKey: ["reviews", email],
     queryFn: () =>
-      email ? base44.entities.Review.filter({ driver_email: email }, "-created_date", 100) : [],
+      email ? base44.entities.Review.filter({ driver_email: email, review_type: "passenger_rates_driver" }, "-created_date", 100) : [],
     enabled: !!email,
   });
 

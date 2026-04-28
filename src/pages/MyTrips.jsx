@@ -42,7 +42,7 @@ export default function MyTrips() {
   const filtered = activeTab === "all" ? trips : trips.filter((t) => t.status === activeTab);
   const { data: myReviews = [] } = useQuery({
     queryKey: ["my-reviews", user?.email],
-    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email }),
+    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email, review_type: "passenger_rates_driver" }),
     enabled: !!user?.email,
   });
   const reviewedTripIds = new Set(myReviews.map((r) => r.trip_id));

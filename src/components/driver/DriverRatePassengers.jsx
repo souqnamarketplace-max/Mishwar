@@ -77,7 +77,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
       <p className="text-sm text-muted-foreground mb-2">قيّم ركابك بعد اكتمال الرحلة لتعزيز الثقة في المجتمع</p>
       {passengerBookings.map((booking) => {
         const trip = completedTrips.find((t) => t.id === booking.trip_id);
-        const key = booking.trip_id + "_" + (booking.passenger_email || booking.created_by);
+        const key = booking.trip_id + "_" + booking.passenger_email;
         const alreadyRated = reviewedIds.has(key);
 
         return (
@@ -122,7 +122,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
                       trip_id: booking.trip_id,
                       reviewer_name: user?.full_name,
                       reviewer_email: user?.email,
-                      rated_user_email: booking.passenger_email || booking.created_by,
+                      rated_user_email: booking.passenger_email,
                       review_type: "driver_rates_passenger",
                       rating: ratings[booking.id],
                       comment: comments[booking.id] || "",
@@ -135,7 +135,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
             ) : (
               <div className="flex gap-1 mt-1">
                 {[1, 2, 3, 4, 5].map((s) => {
-                  const rev = myReviews.find((r) => r.trip_id === booking.trip_id && r.rated_user_email === (booking.passenger_email || booking.created_by));
+                  const rev = myReviews.find((r) => r.trip_id === booking.trip_id && r.rated_user_email === booking.passenger_email);
                   return (
                     <Star
                       key={s}
