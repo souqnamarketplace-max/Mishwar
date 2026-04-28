@@ -10,7 +10,7 @@ const features = [
   { icon: Headphones, title: "دعم على مدار الساعة", desc: "فريق دعم جاهز لمساعدتك في أي وقت" },
   { icon: Users, title: "مجتمع موثوق", desc: "آلاف المستخدمين يثقون بسيرتنا كل يوم" },
   { icon: Heart, title: "تقييمات ومراجعات", desc: "بناء مجتمع ثقة من خلال سجلات موثقة ومحدثة" },
-  { icon: Clock, title: "إلغاء مرن", desc: "يمكنك إلغاء الحجز سهولة قبل موعد الرحلة" },
+  { icon: Clock, title: "سياسة إلغاء مرنة", desc: "إلغاء مجاني للدفع الإلكتروني قبل 24 ساعة، والنقد قبل ساعتين" },
 ];
 
 const tips = [
@@ -65,6 +65,40 @@ export default function HowItWorks() {
                 <p className="text-sm font-medium">{tip}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Cancellation Policy */}
+      <section className="py-16 bg-muted/30">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <div className="bg-card rounded-2xl border border-border p-8">
+            <h2 className="text-2xl font-bold text-foreground mb-6">سياسة الإلغاء</h2>
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                  الحجوزات برسم الدفع الإلكتروني (بطاقة / تحويل)
+                </h3>
+                <p className="text-muted-foreground">
+                  يمكن إلغاء الحجز مجاناً قبل 24 ساعة من موعد الرحلة. بعد هذا الوقت، قد تطبق رسوم إلغاء.
+                </p>
+              </div>
+              <div>
+                <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-accent" />
+                  حجوزات الدفع النقدي
+                </h3>
+                <p className="text-muted-foreground">
+                  يمكن إلغاء الحجز مجاناً قبل ساعتين من موعد الرحلة.
+                </p>
+              </div>
+              <div className="p-4 bg-primary/5 rounded-xl border border-primary/20">
+                <p className="text-sm text-primary font-medium">
+                  💡 يتم إخطار السائق والراكب تلقائياً عند إلغاء أي حجز
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
