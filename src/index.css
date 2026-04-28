@@ -120,7 +120,7 @@
 
   /* Touch-friendly targets (44px minimum) */
   button, a, [role="button"] {
-    @apply user-select-none;
+    @apply select-none;
     min-height: 2.75rem;
   }
 
