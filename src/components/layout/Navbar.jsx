@@ -3,6 +3,9 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, Menu, X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import NotificationBell from "../notifications/NotificationBell";
 
 const LOGO_URL = "https://media.base44.com/images/public/user_69994c756ca2186c5598c809/a83e759cf_ChatGPTImageApr27202601_01_06PM.png";
 
@@ -18,6 +21,11 @@ const navLinks = [
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
 
   return (
     <nav className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b border-border">
@@ -62,10 +70,7 @@ export default function Navbar() {
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
             </Link>
-            <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
-              <Bell className="w-5 h-5 text-muted-foreground" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full"></span>
-            </button>
+            <NotificationBell userEmail={user?.email} />
             <button
               className="lg:hidden p-2 rounded-lg hover:bg-muted"
               onClick={() => setMobileOpen(!mobileOpen)}
