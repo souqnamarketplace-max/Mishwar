@@ -16,23 +16,25 @@
         "passenger",
         "driver",
         "both"
-      ]
+      ],
+      "default": "passenger"
     },
     "phone": {
-      "type": "string"
-    },
-    "city": {
-      "type": "string"
-    },
-    "bio": {
       "type": "string"
     },
     "avatar_url": {
       "type": "string"
     },
-    "onboarding_completed": {
-      "type": "boolean",
-      "default": false
+    "gender": {
+      "type": "string",
+      "enum": [
+        "male",
+        "female"
+      ],
+      "description": "Driver gender for passenger preference"
+    },
+    "bio": {
+      "type": "string"
     },
     "car_model": {
       "type": "string"
@@ -46,42 +48,22 @@
     "car_plate": {
       "type": "string"
     },
-    "car_image": {
-      "type": "string"
-    },
     "driver_note": {
       "type": "string"
     },
-    "bank_account_name": {
-      "type": "string"
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false
     },
-    "bank_account_number": {
-      "type": "string"
+    "verification_pending": {
+      "type": "boolean",
+      "default": false
     },
-    "bank_name": {
-      "type": "string"
+    "total_rating": {
+      "type": "number"
     },
-    "bank_iban": {
-      "type": "string"
-    },
-    "card_holder_name": {
-      "type": "string"
-    },
-    "card_last_four": {
-      "type": "string"
+    "total_reviews": {
+      "type": "number"
     }
-  },
-  "required": [
-    "account_type",
-    "phone",
-    "city",
-    "bio",
-    "avatar_url",
-    "car_model",
-    "car_year",
-    "car_color",
-    "car_plate",
-    "car_image",
-    "driver_note"
-  ]
+  }
 }

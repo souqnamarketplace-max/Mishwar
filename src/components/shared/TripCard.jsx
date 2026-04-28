@@ -36,20 +36,28 @@ export default function TripCard({ trip, compact = false }) {
               {trip.driver_name?.[0] || "؟"}
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">{trip.driver_name || "سائق"}</p>
-              <div className="flex items-center gap-1">
-                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                <span className="text-xs text-muted-foreground">{trip.driver_rating || "4.5"}</span>
-                {trip.car_model && (
-                  <>
-                    <span className="text-xs text-muted-foreground">•</span>
-                    <span className="text-xs text-muted-foreground flex items-center gap-0.5">
-                      <Car className="w-3 h-3" />
-                      {trip.car_model}
-                    </span>
-                  </>
-                )}
-              </div>
+            <p className="text-sm font-medium text-foreground">{trip.driver_name || "سائق"}</p>
+            <div className="flex items-center gap-1 flex-wrap">
+              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+              <span className="text-xs text-muted-foreground">{trip.driver_rating || "4.5"}</span>
+              {trip.driver_gender && (
+                <>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs text-muted-foreground">
+                    {trip.driver_gender === "male" ? "👨 رجل" : "👩 امرأة"}
+                  </span>
+                </>
+              )}
+              {trip.car_model && (
+                <>
+                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-0.5">
+                    <Car className="w-3 h-3" />
+                    {trip.car_model}
+                  </span>
+                </>
+              )}
+            </div>
             </div>
           </div>
           <div className="text-left">

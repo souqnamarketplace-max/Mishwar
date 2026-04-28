@@ -306,6 +306,18 @@ export default function Onboarding() {
                 <h2 className="text-lg font-bold text-foreground mb-2">بيانات سيارتك</h2>
                 <p className="text-sm text-muted-foreground mb-6">هذه المعلومات تظهر للركاب في رحلاتك</p>
                 <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">الجنس <span className="text-destructive">*</span></label>
+                    <select
+                      value={form.gender || ""}
+                      onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"
+                    >
+                      <option value="">اختر الجنس</option>
+                      <option value="male">👨 رجل</option>
+                      <option value="female">👩 امرأة</option>
+                    </select>
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-sm font-medium mb-1 block">موديل السيارة <span className="text-destructive">*</span></label>

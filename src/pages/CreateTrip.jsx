@@ -95,6 +95,7 @@ export default function CreateTrip() {
     car_year: "",
     car_color: "",
     car_plate: "",
+    gender: "",
     amenities: [],
     driver_note: "",
     is_direct: true,
@@ -110,6 +111,7 @@ export default function CreateTrip() {
         car_year: user.car_year || "",
         car_color: user.car_color || "",
         car_plate: user.car_plate || "",
+        gender: user.gender || "",
         driver_note: user.driver_note || "",
       }));
       setFormInitialized(true);
@@ -159,6 +161,7 @@ export default function CreateTrip() {
       driver_name: user?.full_name || user?.email?.split("@")[0] || "سائق",
       driver_avatar: user?.avatar_url || "",
       driver_email: user?.email || "",
+      driver_gender: form.gender || "",
     };
     await base44.entities.Trip.create(tripData);
     toast.success("تم نشر الرحلة بنجاح!");
@@ -350,6 +353,18 @@ export default function CreateTrip() {
                   placeholder="مثال: كيا سيراتو"
                   className="h-11 rounded-xl mt-1"
                 />
+              </div>
+              <div>
+                <Label>الجنس</Label>
+                <select
+                  value={form.gender}
+                  onChange={(e) => updateField("gender", e.target.value)}
+                  className="w-full h-11 px-4 rounded-xl bg-muted/50 border border-border text-sm mt-1"
+                >
+                  <option value="">اختر الجنس</option>
+                  <option value="male">👨 رجل</option>
+                  <option value="female">👩 امرأة</option>
+                </select>
               </div>
               <div>
                 <Label>سنة الصنع</Label>

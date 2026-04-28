@@ -23,6 +23,14 @@
     "driver_trips_count": {
       "type": "number"
     },
+    "driver_gender": {
+      "type": "string",
+      "enum": [
+        "male",
+        "female"
+      ],
+      "description": "Driver gender for passenger preference filtering"
+    },
     "from_city": {
       "type": "string"
     },
