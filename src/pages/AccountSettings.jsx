@@ -423,12 +423,6 @@ export default function AccountSettings() {
               </div>
               <div>
                 <Label>صورة الرخصة</Label>
-                <label htmlFor="license-file" className="cursor-pointer block mt-1">
-                  <Button variant="outline" className="rounded-xl gap-2 w-full" disabled={licenseLoading}>
-                    <Image className="w-4 h-4" />
-                    {licenseLoading ? "جاري الرفع..." : licenseImageUrl ? "تغيير الصورة" : "اختر صورة"}
-                  </Button>
-                </label>
                 <input
                   id="license-file"
                   type="file"
@@ -437,6 +431,15 @@ export default function AccountSettings() {
                   onChange={uploadLicenseImage}
                   disabled={licenseLoading}
                 />
+                <Button 
+                  variant="outline" 
+                  className="rounded-xl gap-2 w-full" 
+                  disabled={licenseLoading}
+                  onClick={() => document.getElementById("license-file").click()}
+                >
+                  <Image className="w-4 h-4" />
+                  {licenseLoading ? "جاري الرفع..." : licenseImageUrl ? "تغيير الصورة" : "اختر صورة"}
+                </Button>
               </div>
               <Button
                 onClick={updateLicense}
