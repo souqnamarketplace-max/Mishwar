@@ -62,9 +62,9 @@ export default function AccountSettings() {
   });
 
   const driverLicense = license?.[0];
-  const [licenseNumber, setLicenseNumber] = useState(driverLicense?.license_number || "");
-  const [licenseExpiry, setLicenseExpiry] = useState(driverLicense?.expiry_date || "");
-  const [licenseImageUrl, setLicenseImageUrl] = useState(driverLicense?.license_image_url || "");
+  const [licenseNumber, setLicenseNumber] = useState("");
+  const [licenseExpiry, setLicenseExpiry] = useState("");
+  const [licenseImageUrl, setLicenseImageUrl] = useState("");
   const [licenseLoading, setLicenseLoading] = useState(false);
 
   const updateEmail = async () => {
