@@ -290,6 +290,25 @@ export default function TripDetails() {
               </div>
             </div>
 
+            {/* Payment Methods */}
+            <div className="mt-3">
+              <p className="text-xs text-muted-foreground mb-2">طرق الدفع المقبولة</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "cash", label: "نقداً", icon: "💵" },
+                  { id: "bank_transfer", label: "تحويل بنكي", icon: "🏦" },
+                  { id: "card", label: "بطاقة ائتمان", icon: "💳" },
+                ].map((m) => (
+                  (trip.payment_methods?.includes(m.id) || (trip.payment_methods?.length === 0 && m.id === "cash")) && (
+                    <span key={m.id} className="flex items-center gap-1 text-xs bg-accent/10 text-accent px-2 py-1 rounded-lg">
+                      <span>{m.icon}</span>
+                      {m.label}
+                    </span>
+                  )
+                ))}
+              </div>
+            </div>
+
             {/* Driver note */}
             <div className="mt-3 p-3 bg-primary/5 rounded-xl">
               <p className="text-sm">

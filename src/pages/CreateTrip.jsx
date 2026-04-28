@@ -52,6 +52,7 @@ export default function CreateTrip() {
     amenities: [],
     driver_note: "",
     is_direct: true,
+    payment_methods: ["cash"],
   });
 
   // Pre-fill car details from user profile once loaded
@@ -77,6 +78,15 @@ export default function CreateTrip() {
       amenities: prev.amenities.includes(id)
         ? prev.amenities.filter((a) => a !== id)
         : [...prev.amenities, id],
+    }));
+  };
+
+  const togglePaymentMethod = (method) => {
+    setForm((prev) => ({
+      ...prev,
+      payment_methods: prev.payment_methods.includes(method)
+        ? prev.payment_methods.filter((m) => m !== method)
+        : [...prev.payment_methods, method],
     }));
   };
 
@@ -293,6 +303,29 @@ export default function CreateTrip() {
                   >
                     <a.icon className="w-4 h-4" />
                     {a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="mb-3 block">طرق الدفع المقبولة</Label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: "cash", label: "نقداً", icon: "💵" },
+                  { id: "bank_transfer", label: "تحويل بنكي", icon: "🏦" },
+                  { id: "card", label: "بطاقة ائتمان", icon: "💳" },
+                ].map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => togglePaymentMethod(m.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm transition-all border ${
+                      form.payment_methods.includes(m.id)
+                        ? "bg-accent/10 border-accent text-accent"
+                        : "bg-card border-border text-muted-foreground hover:border-accent/30"
+                    }`}
+                  >
+                    <span>{m.icon}</span>
+                    {m.label}
                   </button>
                 ))}
               </div>

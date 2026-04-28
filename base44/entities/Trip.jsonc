@@ -94,6 +94,20 @@
     },
     "driver_note": {
       "type": "string"
+    },
+    "payment_methods": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "cash",
+          "bank_transfer",
+          "card"
+        ]
+      },
+      "default": [
+        "cash"
+      ]
     }
   },
   "required": [
