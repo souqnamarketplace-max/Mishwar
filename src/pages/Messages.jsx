@@ -264,7 +264,19 @@ export default function Messages() {
                 {/* Input */}
                 <div className="p-3 border-t border-border bg-card">
                   <div className="flex items-center gap-2">
-                    <button className="p-2 rounded-lg hover:bg-muted">
+                    <input
+                      type="file"
+                      id="file-input"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) alert(`تم تحديد الملف: ${file.name}`);
+                      }}
+                    />
+                    <button
+                      onClick={() => document.getElementById("file-input")?.click()}
+                      className="p-2 rounded-lg hover:bg-muted transition-colors"
+                    >
                       <Paperclip className="w-5 h-5 text-muted-foreground" />
                     </button>
                     <Input
