@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -21,6 +21,7 @@ import Dashboard from './pages/Dashboard';
 import DriverDashboard from './pages/DriverDashboard';
 import Notifications from './pages/Notifications';
 import UserProfile from './pages/UserProfile';
+import Onboarding from './pages/Onboarding';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -47,6 +48,17 @@ const AuthenticatedApp = () => {
     }
   }
 
+  // Redirect to onboarding if not completed
+  const { user } = useAuth();
+  const location = useLocation();
+  const onboardingDone = user?.onboarding_completed;
+  const onboardingPaths = ["/onboarding", "/dashboard"];
+  const needsOnboarding = user && !onboardingDone && !onboardingPaths.includes(location.pathname);
+
+  if (needsOnboarding) {
+    return <Navigate to="/onboarding" replace />;
+  }
+
   return (
     <Routes>
       <Route element={<AppLayout />}>
@@ -65,6 +77,7 @@ const AuthenticatedApp = () => {
         <Route path="/profile" element={<UserProfile />} />
       </Route>
       <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/onboarding" element={<Onboarding />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

@@ -9,14 +9,20 @@ import NotificationBell from "../notifications/NotificationBell";
 
 const LOGO_URL = "https://media.base44.com/images/public/user_69994c756ca2186c5598c809/a83e759cf_ChatGPTImageApr27202601_01_06PM.png";
 
-const navLinks = [
-  { label: "الرئيسية", path: "/" },
-  { label: "رحلاتي", path: "/my-trips" },
-  { label: "المفضلة", path: "/favorites" },
-  { label: "كيف تعمل؟", path: "/how-it-works" },
-  { label: "مجتمع سيرتنا", path: "/community" },
-  { label: "المساعدة", path: "/help" },
-];
+const getNavLinks = (user) => {
+  const links = [
+    { label: "الرئيسية", path: "/" },
+    { label: "رحلاتي", path: "/my-trips" },
+    { label: "المفضلة", path: "/favorites" },
+    { label: "كيف تعمل؟", path: "/how-it-works" },
+    { label: "مجتمع سيرتنا", path: "/community" },
+    { label: "المساعدة", path: "/help" },
+  ];
+  if (user?.account_type === "driver" || user?.account_type === "both") {
+    links.splice(1, 0, { label: "لوحة السائق", path: "/driver" });
+  }
+  return links;
+};
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -44,7 +50,7 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
+            {getNavLinks(user).map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -91,7 +97,7 @@ export default function Navbar() {
             className="lg:hidden border-t border-border overflow-hidden bg-card"
           >
             <div className="px-4 py-3 space-y-1">
-              {navLinks.map((link) => (
+              {getNavLinks(user).map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}

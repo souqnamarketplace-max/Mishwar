@@ -1,0 +1,61 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "user"
+      ],
+      "description": "The role of the user in the app"
+    },
+    "account_type": {
+      "type": "string",
+      "enum": [
+        "passenger",
+        "driver",
+        "both"
+      ],
+      "description": "Whether the user is a passenger, driver, or both"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "bio": {
+      "type": "string"
+    },
+    "avatar_url": {
+      "type": "string"
+    },
+    "car_model": {
+      "type": "string"
+    },
+    "car_year": {
+      "type": "string"
+    },
+    "car_color": {
+      "type": "string"
+    },
+    "car_plate": {
+      "type": "string"
+    },
+    "car_image": {
+      "type": "string"
+    },
+    "id_verified": {
+      "type": "boolean",
+      "default": false
+    },
+    "onboarding_completed": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": [
+    "role"
+  ]
+}
