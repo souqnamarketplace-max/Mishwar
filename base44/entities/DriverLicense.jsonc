@@ -15,6 +15,14 @@
       "type": "string",
       "format": "date"
     },
+    "car_registration_expiry_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "insurance_expiry_date": {
+      "type": "string",
+      "format": "date"
+    },
     "license_image_url": {
       "type": "string"
     },

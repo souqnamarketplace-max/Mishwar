@@ -45,6 +45,8 @@ export default function AccountSettings() {
   const driverLicense = license?.[0];
   const [licenseNumber, setLicenseNumber] = useState("");
   const [licenseExpiry, setLicenseExpiry] = useState("");
+  const [carRegistrationExpiry, setCarRegistrationExpiry] = useState("");
+  const [insuranceExpiry, setInsuranceExpiry] = useState("");
   const [licenseImageUrl, setLicenseImageUrl] = useState("");
   const [carRegistrationUrl, setCarRegistrationUrl] = useState("");
   const [insuranceUrl, setInsuranceUrl] = useState("");
@@ -69,6 +71,8 @@ export default function AccountSettings() {
     if (driverLicense) {
       setLicenseNumber(driverLicense.license_number || "");
       setLicenseExpiry(driverLicense.expiry_date || "");
+      setCarRegistrationExpiry(driverLicense.car_registration_expiry_date || "");
+      setInsuranceExpiry(driverLicense.insurance_expiry_date || "");
       setLicenseImageUrl(driverLicense.license_image_url || "");
       setCarRegistrationUrl(driverLicense.car_registration_url || "");
       setInsuranceUrl(driverLicense.insurance_url || "");
@@ -165,7 +169,7 @@ export default function AccountSettings() {
   };
 
   const updateLicense = async () => {
-    if (!licenseNumber || !licenseExpiry || !licenseImageUrl || !carRegistrationUrl || !insuranceUrl || !selfie1Url || !selfie2Url) {
+    if (!licenseNumber || !licenseExpiry || !carRegistrationExpiry || !insuranceExpiry || !licenseImageUrl || !carRegistrationUrl || !insuranceUrl || !selfie1Url || !selfie2Url) {
       toast.error("يرجى ملء جميع البيانات والمستندات المطلوبة");
       return;
     }
@@ -175,6 +179,8 @@ export default function AccountSettings() {
         await base44.entities.DriverLicense.update(driverLicense.id, {
           license_number: licenseNumber,
           expiry_date: licenseExpiry,
+          car_registration_expiry_date: carRegistrationExpiry,
+          insurance_expiry_date: insuranceExpiry,
           license_image_url: licenseImageUrl,
           car_registration_url: carRegistrationUrl,
           insurance_url: insuranceUrl,
@@ -193,6 +199,8 @@ export default function AccountSettings() {
           driver_name: user?.full_name,
           license_number: licenseNumber,
           expiry_date: licenseExpiry,
+          car_registration_expiry_date: carRegistrationExpiry,
+          insurance_expiry_date: insuranceExpiry,
           license_image_url: licenseImageUrl,
           car_registration_url: carRegistrationUrl,
           insurance_url: insuranceUrl,
@@ -445,11 +453,29 @@ export default function AccountSettings() {
                 />
               </div>
               <div>
-                <Label>تاريخ الانتهاء</Label>
+                <Label>تاريخ انتهاء الرخصة</Label>
                 <Input
                   type="date"
                   value={licenseExpiry}
                   onChange={(e) => setLicenseExpiry(e.target.value)}
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <div>
+                <Label>تاريخ انتهاء تسجيل المركبة</Label>
+                <Input
+                  type="date"
+                  value={carRegistrationExpiry}
+                  onChange={(e) => setCarRegistrationExpiry(e.target.value)}
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <div>
+                <Label>تاريخ انتهاء التأمين</Label>
+                <Input
+                  type="date"
+                  value={insuranceExpiry}
+                  onChange={(e) => setInsuranceExpiry(e.target.value)}
                   className="rounded-xl h-10 mt-1"
                 />
               </div>

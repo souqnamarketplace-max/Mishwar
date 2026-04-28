@@ -168,28 +168,39 @@ export default function CreateTrip() {
     navigate("/my-trips");
   };
 
-  if (!isLicenseApproved) {
+  const hasExpiredDocuments = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return (
+      (driverLicense?.expiry_date && driverLicense.expiry_date < today) ||
+      (driverLicense?.car_registration_expiry_date && driverLicense.car_registration_expiry_date < today) ||
+      (driverLicense?.insurance_expiry_date && driverLicense.insurance_expiry_date < today)
+    );
+  };
+
+  if (!isLicenseApproved || hasExpiredDocuments()) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
         <div className="bg-card rounded-2xl border border-border p-8 text-center">
           <div className="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">⏳</span>
+            <span className="text-2xl">{hasExpiredDocuments() ? "⚠️" : "⏳"}</span>
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">انتظر موافقة رخصة القيادة</h2>
+          <h2 className="text-xl font-bold text-foreground mb-2">
+            {hasExpiredDocuments() ? "انتهت صلاحية المستندات" : "انتظر موافقة رخصة القيادة"}
+          </h2>
           <p className="text-muted-foreground mb-4">
-            {driverLicense?.status === "pending"
+            {hasExpiredDocuments()
+              ? "صلاحية المستندات الخاصة بك انتهت. يرجى تحديثها من الإعدادات لتتمكن من نشر الرحلات."
+              : driverLicense?.status === "pending"
               ? "رخصتك قيد المراجعة. سيتم إخطارك بمجرد الموافقة عليها."
               : driverLicense?.status === "rejected"
               ? `تم رفض رخصتك: ${driverLicense.rejection_reason}. يمكنك تحديثها من الإعدادات.`
               : "لم تقدم رخصة قيادة بعد. يرجى إكمال الإعداد أولاً."}
           </p>
-          {driverLicense?.status === "rejected" && (
-            <a href="/settings">
-              <Button className="bg-primary text-primary-foreground rounded-xl mt-4">
-                تحديث الرخصة
-              </Button>
-            </a>
-          )}
+          <a href="/settings">
+            <Button className="bg-primary text-primary-foreground rounded-xl mt-4">
+              {hasExpiredDocuments() ? "تحديث المستندات" : "تحديث الرخصة"}
+            </Button>
+          </a>
         </div>
       </div>
     );
