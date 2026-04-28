@@ -18,7 +18,22 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
 
   const updateBooking = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Booking.update(id, { status }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["bookings"] }); toast.success("تم تحديث الحجز"); },
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: ["bookings"] });
+      const prev = qc.getQueryData(["bookings"]);
+      qc.setQueryData(["bookings"], old => 
+        old?.map(b => b.id === id ? { ...b, status } : b) || []
+      );
+      return prev;
+    },
+    onError: (err, vars, ctx) => {
+      qc.setQueryData(["bookings"], ctx);
+      toast.error("فشل التحديث");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success("تم تحديث الحجز");
+    },
   });
 
   const selectedTrip = trips.find((t) => t.id === selectedTripId) || trips[0];

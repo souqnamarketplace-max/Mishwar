@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
   { id: "home", label: "الرئيسية", icon: Home, path: "/" },
@@ -13,7 +14,12 @@ const MOBILE_TABS = [
 
 export default function MobileLayout({ children, user, showHeader = true, headerTitle = "" }) {
   const location = useLocation();
+  const qc = useQueryClient();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const contentRef = useRef(null);
+  const pullStartRef = useRef(0);
+  const tabHistoryRef = useRef({});
   
   // Detect if viewport is mobile
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
@@ -21,6 +27,44 @@ export default function MobileLayout({ children, user, showHeader = true, header
   if (!isMobile) return children;
 
   const currentTab = MOBILE_TABS.find(tab => location.pathname.startsWith(tab.path.split("?")[0]));
+
+  // Track tab history/stacks
+  useEffect(() => {
+    if (currentTab?.id && !tabHistoryRef.current[currentTab.id]) {
+      tabHistoryRef.current[currentTab.id] = [];
+    }
+    if (currentTab?.id) {
+      const stack = tabHistoryRef.current[currentTab.id];
+      if (stack[stack.length - 1] !== location.pathname) {
+        stack.push(location.pathname);
+      }
+    }
+  }, [currentTab?.id, location.pathname]);
+
+  // Pull-to-refresh handler
+  const handleTouchStart = (e) => {
+    if (contentRef.current?.scrollTop === 0) {
+      pullStartRef.current = e.touches[0].clientY;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (contentRef.current?.scrollTop === 0 && pullStartRef.current > 0) {
+      const pullDistance = e.touches[0].clientY - pullStartRef.current;
+      if (pullDistance > 60 && !isRefreshing) {
+        setIsRefreshing(true);
+        pullStartRef.current = 0;
+      }
+    }
+  };
+
+  const handleTouchEnd = async () => {
+    if (isRefreshing) {
+      await qc.refetchQueries();
+      setIsRefreshing(false);
+    }
+    pullStartRef.current = 0;
+  };
 
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
@@ -55,7 +99,18 @@ export default function MobileLayout({ children, user, showHeader = true, header
       )}
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div
+        ref={contentRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="flex-1 overflow-y-auto pb-20 relative"
+      >
+        {isRefreshing && (
+          <div className="sticky top-0 left-0 right-0 z-20 bg-primary/10 border-b border-primary/20 px-4 py-2 text-center text-xs text-primary font-medium">
+            🔄 جاري التحديث...
+          </div>
+        )}
         {children}
       </div>
 

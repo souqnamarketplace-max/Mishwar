@@ -19,12 +19,40 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["trips"] }); toast.success("تم تحديث الحالة"); },
+    onMutate: async ({ id, data }) => {
+      await qc.cancelQueries({ queryKey: ["trips"] });
+      const prev = qc.getQueryData(["trips"]);
+      qc.setQueryData(["trips"], old => 
+        old?.map(t => t.id === id ? { ...t, ...data } : t) || []
+      );
+      return prev;
+    },
+    onError: (err, vars, ctx) => {
+      qc.setQueryData(["trips"], ctx);
+      toast.error("فشل التحديث");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      toast.success("تم تحديث الحالة");
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Trip.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["trips"] }); toast.success("تم حذف الرحلة"); },
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["trips"] });
+      const prev = qc.getQueryData(["trips"]);
+      qc.setQueryData(["trips"], old => old?.filter(t => t.id !== id) || []);
+      return prev;
+    },
+    onError: (err, vars, ctx) => {
+      qc.setQueryData(["trips"], ctx);
+      toast.error("فشل الحذف");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      toast.success("تم حذف الرحلة");
+    },
   });
 
   const filters = [

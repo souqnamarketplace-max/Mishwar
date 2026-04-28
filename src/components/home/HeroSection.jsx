@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Search, MapPin, Star } from "lucide-react";
 import { motion } from "framer-motion";
+import SelectDrawer from "@/components/ui/select-drawer";
 
 const CITIES = [
   // محافظة رام الله والبيرة
@@ -88,7 +89,7 @@ export default function HeroSection() {
           {/* Search Bar */}
           <form onSubmit={handleSearch} className="mb-5">
             <div className="bg-white rounded-2xl shadow-2xl p-1.5 flex flex-col sm:flex-row gap-1">
-              <div className="relative flex-1">
+              <div className="relative flex-1 hidden sm:block">
                 <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
                 <select
                   value={from}
@@ -99,8 +100,16 @@ export default function HeroSection() {
                   {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
+              <div className="sm:hidden flex-1">
+                <SelectDrawer
+                  value={from}
+                  onChange={setFrom}
+                  options={CITIES.map(c => ({ value: c, label: c }))}
+                  placeholder="من أين؟"
+                />
+              </div>
               <div className="w-px bg-border hidden sm:block self-stretch my-2" />
-              <div className="relative flex-1">
+              <div className="relative flex-1 hidden sm:block">
                 <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent pointer-events-none" />
                 <select
                   value={to}
@@ -110,6 +119,14 @@ export default function HeroSection() {
                   <option value="">إلى أين؟</option>
                   {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+              </div>
+              <div className="sm:hidden flex-1">
+                <SelectDrawer
+                  value={to}
+                  onChange={setTo}
+                  options={CITIES.map(c => ({ value: c, label: c }))}
+                  placeholder="إلى أين؟"
+                />
               </div>
               <Button
                 type="submit"

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import SelectDrawer from "@/components/ui/select-drawer";
 import { Link } from "react-router-dom";
 import {
   MapPin, Calendar, Clock, Car, Users, CreditCard, CheckCircle,
@@ -229,7 +230,7 @@ export default function CreateTrip() {
               تفاصيل الرحلة
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div className="hidden sm:block">
                 <Label>من <span className="text-destructive">*</span></Label>
                 <select
                   value={form.from_city}
@@ -240,7 +241,16 @@ export default function CreateTrip() {
                   {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="sm:hidden">
+                <Label>من <span className="text-destructive">*</span></Label>
+                <SelectDrawer
+                  value={form.from_city}
+                  onChange={(v) => updateField("from_city", v)}
+                  options={CITIES.map(c => ({ value: c, label: c }))}
+                  placeholder="اختر المدينة"
+                />
+              </div>
+              <div className="hidden sm:block">
                 <Label>إلى <span className="text-destructive">*</span></Label>
                 <select
                   value={form.to_city}
@@ -250,6 +260,15 @@ export default function CreateTrip() {
                   <option value="">اختر المدينة</option>
                   {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+              </div>
+              <div className="sm:hidden">
+                <Label>إلى <span className="text-destructive">*</span></Label>
+                <SelectDrawer
+                  value={form.to_city}
+                  onChange={(v) => updateField("to_city", v)}
+                  options={CITIES.map(c => ({ value: c, label: c }))}
+                  placeholder="اختر المدينة"
+                />
               </div>
               <div>
                 <Label>تاريخ المغادرة <span className="text-destructive">*</span></Label>

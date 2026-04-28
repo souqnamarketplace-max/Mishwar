@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -55,8 +55,15 @@ export default function TripDetails() {
       status: "pending",
       payment_method: "نقداً",
     }),
-    onSuccess: () => {
+    onMutate: () => {
       setBooked(true);
+      return null;
+    },
+    onError: () => {
+      setBooked(false);
+      toast.error("فشل الحجز");
+    },
+    onSuccess: () => {
       toast.success("تم الحجز بنجاح! 🎉");
       qc.invalidateQueries({ queryKey: ["trips"] });
     },
