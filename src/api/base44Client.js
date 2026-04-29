@@ -20,9 +20,9 @@ function parseSortField(sort) {
 }
 
 async function getCurrentUserEmail() {
-  const { data: { session } } = await supabase.auth.getSession();
-  const user = session?.user;
-  return user?.email ?? null;
+  // Direct from localStorage — avoids supabase.auth.getSession() hang
+  const session = readLocalSession();
+  return session?.user?.email ?? null;
 }
 
 
@@ -95,6 +95,23 @@ function buildQs({ select = '*', orderBy, ascending = false, limit, filters = {}
     parts.push(`${encodeURIComponent(key)}=eq.${encodeURIComponent(val)}`);
   });
   return parts.length ? `?${parts.join('&')}` : '';
+}
+
+
+
+// Read session directly from localStorage — bypasses supabase.auth.getSession() which can hang
+function readLocalSession() {
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
+  try {
+    const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed?.expires_at && parsed.expires_at * 1000 < Date.now()) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 function createEntityClient(tableName) {
@@ -212,25 +229,18 @@ function createEntityClient(tableName) {
 
 const auth = {
   me: async () => {
-    // Use getSession() (reads localStorage instantly) instead of getUser() (hits network)
-    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    // Read session directly from localStorage (avoids supabase.auth.getSession hang)
+    const session = readLocalSession();
     const user = session?.user;
-    if (authError || !user) throw authError ?? new Error('Not authenticated');
+    if (!user) throw new Error('Not authenticated');
 
-    // 5s timeout on profile fetch — if supabase-js hangs, return basic info
+    // Fetch profile via direct REST (avoids supabase-js client hang)
     let profile = null;
     try {
-      const result = await withTimeout(
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-        5000,
-        'auth.me profile'
-      );
-      if (result?.error && result.error.code !== 'PGRST116') {
-        console.warn('[auth.me] profile fetch warning:', result.error.message);
-      }
-      profile = result?.data;
+      const rows = await restFetch(`/profiles?select=*&id=eq.${encodeURIComponent(user.id)}&limit=1`);
+      profile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     } catch (e) {
-      console.warn('[auth.me] profile fetch timeout, using session-only data:', e.message);
+      console.warn('[auth.me] profile fetch error, using session-only data:', e.message);
     }
 
     return {
@@ -258,7 +268,8 @@ const auth = {
   },
 
   updateMe: async (data) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    // Direct localStorage — avoids supabase.auth.getSession hang
+    const session = readLocalSession();
     const user = session?.user;
     if (!user) throw new Error('Not authenticated');
 
@@ -312,25 +323,39 @@ const auth = {
   },
 
   deleteMe: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    // Direct localStorage — avoids supabase.auth.getSession hang
+    const session = readLocalSession();
     const user = session?.user;
     if (!user) throw new Error('Not authenticated');
 
-    // Call SECURITY DEFINER RPC that handles cascade deletion safely
-    const { error } = await supabase.rpc('delete_user_account', { user_id_param: user.id });
-    if (error) {
-      // Fallback: at minimum mark profile inactive and sign out
-      captureException(error, { msg: '[deleteMe] RPC failed, falling back to soft-delete:' });
-      await supabase.from('profiles').update({
-        is_active: false,
-        full_name: 'حساب محذوف',
-        phone: null,
-        avatar_url: null,
-        bio: null,
-      }).eq('id', user.id);
+    // Call SECURITY DEFINER RPC via direct REST (POST to /rpc/...)
+    try {
+      await restFetch('/rpc/delete_user_account', {
+        method: 'POST',
+        body: { user_id_param: user.id },
+        timeout: 10000,
+      });
+    } catch (rpcErr) {
+      // Fallback: soft-delete via direct REST
+      captureException(rpcErr, { msg: '[deleteMe] RPC failed, falling back to soft-delete:' });
+      try {
+        await restFetch(`/profiles?id=eq.${encodeURIComponent(user.id)}`, {
+          method: 'PATCH',
+          body: {
+            is_active: false,
+            full_name: 'حساب محذوف',
+            phone: null,
+            avatar_url: null,
+            bio: null,
+          },
+        });
+      } catch (softErr) {
+        captureException(softErr, { msg: '[deleteMe] soft-delete also failed:' });
+      }
     }
 
-    await supabase.auth.signOut();
+    // signOut() just clears localStorage — keep using supabase-js (no network call)
+    try { await supabase.auth.signOut(); } catch {}
     window.location.href = '/';
   },
 };
@@ -351,8 +376,8 @@ const integrations = {
         throw new Error('نوع الملف غير مدعوم. يُسمح بـ JPG و PNG و PDF فقط');
       }
 
-      // Verify session before upload
-      const { data: { session } } = await supabase.auth.getSession();
+      // Verify session before upload — use direct localStorage (avoids supabase-js hang)
+      const session = readLocalSession();
       if (!session) throw new Error('يجب تسجيل الدخول أولاً لرفع الملفات');
 
       const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
