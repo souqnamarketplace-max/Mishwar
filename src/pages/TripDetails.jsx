@@ -1,6 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { checkPassengerConflict } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -103,9 +104,13 @@ export default function TripDetails() {
     },
     onError: (err) => {
       setBooked(false);
-      // Don't show error toast for our redirect-to-login signal
-      if (err?.message !== "__redirect__") {
-        toast.error(err?.message || "فشل الحجز");
+      const msg = err?.message || "فشل الحجز";
+      if (msg === "__redirect__") return;
+      // SQL trigger errors come back with the Arabic text already
+      if (msg.includes("يتعارض") || msg.includes("لا يطابق") || msg.includes("لا يمكن") || msg.includes("لديك")) {
+        toast.error(msg.split("\\n")[0]);
+      } else {
+        toast.error(msg);
       }
     },
     onSuccess: () => {

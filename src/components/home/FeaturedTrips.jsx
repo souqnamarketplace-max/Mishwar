@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { isTripExpired } from "@/lib/tripScheduling";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, MapPin, Users, ArrowLeft, Zap, TrendingDown } from "lucide-react";

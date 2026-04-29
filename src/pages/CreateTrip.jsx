@@ -1,4 +1,5 @@
 import { CITIES } from "@/lib/cities";
+import { checkDriverConflict } from "@/lib/tripScheduling";
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
@@ -184,6 +185,32 @@ export default function CreateTrip() {
 
   const handleSubmit = async () => {
     if (!user?.id) { toast.error("لم يتم تحميل بيانات المستخدم. حاول مرة أخرى."); return; }
+
+    // ── Pre-submit conflict check (frontend layer; SQL trigger is the source of truth) ──
+    try {
+      const myTrips = await base44.entities.Trip.filter({ driver_id: user.id }, "-created_date", 200);
+      const tripsToCheck = form.is_recurring && form.recurring_days.length > 0
+        ? form.recurring_days.map((dayIndex) => {
+            const baseDate = new Date(form.date);
+            const diff = (dayIndex - baseDate.getDay() + 7) % 7;
+            const tripDate = new Date(baseDate);
+            tripDate.setDate(baseDate.getDate() + (diff === 0 ? 7 : diff));
+            return { ...form, date: tripDate.toISOString().split("T")[0] };
+          })
+        : [{ ...form }];
+
+      for (const candidate of tripsToCheck) {
+        const result = checkDriverConflict(candidate, myTrips);
+        if (!result.valid) {
+          toast.error(result.message || "يوجد تعارض في الجدول");
+          return;
+        }
+      }
+    } catch (e) {
+      // Don't block submission on a check failure — SQL trigger will catch real conflicts
+      console.warn("[CreateTrip] conflict check skipped:", e?.message);
+    }
+
     const baseData = {
       ...form,
       status: "confirmed",
@@ -223,8 +250,19 @@ export default function CreateTrip() {
       await Promise.all(promises);
       toast.success(`تم نشر ${form.recurring_days.length} رحلات متكررة بنجاح! 🎉`);
     } else {
-      await base44.entities.Trip.create(baseData);
-      toast.success("تم نشر الرحلة بنجاح! 🎉");
+      try {
+        await base44.entities.Trip.create(baseData);
+        toast.success("تم نشر الرحلة بنجاح! 🎉");
+      } catch (err) {
+        const msg = err?.message || "";
+        // SQL trigger errors come back with the Arabic text already
+        if (msg.includes("يتعارض") || msg.includes("لا يطابق") || msg.includes("لا يمكن")) {
+          toast.error(msg.split("\\n")[0]);
+          return;
+        }
+        toast.error("فشل نشر الرحلة. حاول مجدداً");
+        return;
+      }
     }
     navigate("/my-trips");
   };
