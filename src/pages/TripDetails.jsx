@@ -40,6 +40,7 @@ export default function TripDetails() {
   const [booked, setBooked] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [seatsToBook, setSeatsToBook] = useState(1);
+  const [showBookingConfirm, setShowBookingConfirm] = useState(false);
   // For multi-stop trips: which stop index does the passenger want to get off at?
   // null = all the way to to_city (default).
   const [dropoffStopIndex, setDropoffStopIndex] = useState(null);
@@ -222,7 +223,7 @@ export default function TripDetails() {
               {!isOwnTrip && (
                 <Button
                   className={`w-full h-11 rounded-xl font-bold gap-2 mt-1 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
-                  onClick={() => !booked && bookingMutation.mutate(trip)}
+                  onClick={() => !booked && setShowBookingConfirm(true)}
                   disabled={bookingMutation.isPending || booked}
                 >
                   {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز</> : bookingMutation.isPending ? "جاري الحجز..." : `احجز ${seatsToBook > 1 ? seatsToBook + " مقاعد" : "الآن"}`}
@@ -676,6 +677,142 @@ export default function TripDetails() {
           </div>
         ))}
       </div>
+
+    {/* ── Booking Confirmation Modal ──────────────────────────── */}
+    {showBookingConfirm && trip && (() => {
+      const stops = Array.isArray(trip.stops) ? trip.stops : [];
+      const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
+      const dropoffCity = isMidStop ? stops[dropoffStopIndex].city : trip.to_city;
+      const pricePerSeat = isMidStop && Number(stops[dropoffStopIndex].price_from_origin) > 0
+        ? Number(stops[dropoffStopIndex].price_from_origin)
+        : trip.price;
+      const totalPrice = pricePerSeat * seatsToBook;
+      const tripDate = trip.date ? new Date(trip.date).toLocaleDateString('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : trip.date;
+      return (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60"
+          dir="rtl"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowBookingConfirm(false); }}
+        >
+          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh]">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
+              <h3 className="font-bold text-foreground text-base flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-primary" />
+                تأكيد الحجز
+              </h3>
+              <button
+                onClick={() => setShowBookingConfirm(false)}
+                className="w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center"
+                aria-label="إغلاق"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {/* Route */}
+              <div className="bg-muted/40 rounded-xl p-4">
+                <div className="flex items-center justify-center gap-3 text-xl font-bold text-foreground mb-2">
+                  <span>{trip.from_city}</span>
+                  <ArrowRight className="w-5 h-5 text-primary" />
+                  <span>{dropoffCity}</span>
+                </div>
+                {isMidStop && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    ستنزل في محطة {dropoffCity} (وليس وجهة الرحلة الأخيرة)
+                  </p>
+                )}
+              </div>
+
+              {/* Date / Time */}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-muted/40 rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground mb-1">📅 التاريخ</p>
+                  <p className="font-semibold">{tripDate}</p>
+                </div>
+                <div className="bg-muted/40 rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground mb-1">🕐 الوقت</p>
+                  <p className="font-semibold">{trip.time}</p>
+                </div>
+              </div>
+
+              {/* Driver */}
+              <div className="bg-muted/40 rounded-xl p-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="font-bold text-primary">{trip.driver_name?.[0] || "س"}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">السائق</p>
+                  <p className="font-semibold truncate">{trip.driver_name || "السائق"}</p>
+                </div>
+                {trip.driver_rating > 0 && (
+                  <div className="text-sm font-bold text-amber-500">⭐ {trip.driver_rating.toFixed(1)}</div>
+                )}
+              </div>
+
+              {/* Seats */}
+              <div className="flex items-center justify-between py-2 border-y border-border">
+                <span className="text-sm text-muted-foreground">عدد المقاعد</span>
+                <span className="font-bold">{seatsToBook}</span>
+              </div>
+
+              {/* Price breakdown */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">سعر المقعد الواحد</span>
+                  <span>₪{pricePerSeat}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">المقاعد × {seatsToBook}</span>
+                  <span>₪{totalPrice}</span>
+                </div>
+                <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">
+                  <span>المجموع</span>
+                  <span className="text-primary">₪{totalPrice}</span>
+                </div>
+              </div>
+
+              {/* Payment method */}
+              <div className="bg-muted/40 rounded-xl p-3 text-sm">
+                <span className="text-muted-foreground">💳 طريقة الدفع: </span>
+                <span className="font-semibold">نقداً للسائق</span>
+              </div>
+
+              {/* Cancellation policy */}
+              <p className="text-xs text-muted-foreground text-center">
+                يمكنك إلغاء الحجز مجاناً حتى ساعتين قبل موعد الرحلة
+              </p>
+            </div>
+
+            {/* Footer buttons */}
+            <div className="border-t border-border px-5 py-4 flex gap-3 shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setShowBookingConfirm(false)}
+                className="flex-1 rounded-xl h-11"
+                disabled={bookingMutation.isPending}
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowBookingConfirm(false);
+                  bookingMutation.mutate(trip);
+                }}
+                className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                disabled={bookingMutation.isPending}
+              >
+                <CheckCircle className="w-4 h-4" />
+                تأكيد الحجز
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
     </div>
   );
 }

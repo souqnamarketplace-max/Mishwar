@@ -700,6 +700,21 @@ export default function AccountSettings() {
         )}
 
         {/* Danger Zone */}
+                {/* Logout button — visible signout for the user */}
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <Button
+            onClick={async () => {
+              try { await base44.auth.logout?.("/"); } catch {}
+              window.location.href = "/";
+            }}
+            variant="outline"
+            className="w-full rounded-xl gap-2 h-11 border-border hover:bg-muted"
+          >
+            <LogOut className="w-4 h-4" />
+            تسجيل الخروج
+          </Button>
+        </div>
+
         <div className="bg-destructive/5 rounded-2xl border border-destructive/20 p-6">
           <h3 className="font-bold text-destructive flex items-center gap-2 mb-3">
             <AlertCircle className="w-4 h-4" />
