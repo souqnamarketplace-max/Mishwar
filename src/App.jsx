@@ -60,13 +60,18 @@ const AuthenticatedApp = () => {
     );
   }
 
-  // Not authenticated → show Login page
+  // Public routes — accessible without sign-in
+  const PUBLIC_PATHS = new Set([
+    "/", "/search", "/how-it-works", "/community", "/help",
+    "/about", "/blog", "/safety", "/privacy", "/terms",
+  ]);
+  const isPublicPath = PUBLIC_PATHS.has(location.pathname) || location.pathname.startsWith("/trip/");
+
   if (!isAuthenticated) {
-    // Allow /login route to render directly
-    if (location.pathname === '/login') {
-      return <Login />;
+    if (location.pathname === "/login") return <Login />;
+    if (!isPublicPath) {
+      return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} replace />;
     }
-    return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
   // Redirect to onboarding if not completed
