@@ -24,7 +24,6 @@ export default function DashboardUsers() {
 
   // Server-side pagination — only loads 25 users at a time
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 25;
 
   const { data: usersData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["users", page],
