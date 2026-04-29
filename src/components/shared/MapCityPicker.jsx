@@ -34,14 +34,35 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
   const selectedMarkerRef = useRef(null);
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(forceOpen);
-  // Lock body scroll while map modal is open + scroll user back to top so map is visible
+  // Lock both html + body scroll while map modal is open. 
+  // Locking only `body` is not enough — html element can still scroll on some browsers.
   useEffect(() => {
     if (isOpen) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      // Make sure we're at the top so the modal isn't off-screen
-      window.scrollTo({ top: 0, behavior: "instant" });
-      return () => { document.body.style.overflow = prev; };
+      const html = document.documentElement;
+      const body = document.body;
+      const prevHtmlOverflow = html.style.overflow;
+      const prevBodyOverflow = body.style.overflow;
+      const prevBodyPosition = body.style.position;
+      const prevBodyTop = body.style.top;
+      // Remember scroll position so we can restore after modal closes
+      const scrollY = window.scrollY;
+      html.style.overflow = "hidden";
+      body.style.overflow = "hidden";
+      // Pin body to current scroll so iOS/Safari doesn't bounce or repaint underneath
+      body.style.position = "fixed";
+      body.style.top = `-${scrollY}px`;
+      body.style.left = "0";
+      body.style.right = "0";
+      return () => {
+        html.style.overflow = prevHtmlOverflow;
+        body.style.overflow = prevBodyOverflow;
+        body.style.position = prevBodyPosition;
+        body.style.top = prevBodyTop;
+        body.style.left = "";
+        body.style.right = "";
+        // Restore the scroll position
+        window.scrollTo(0, scrollY);
+      };
     }
   }, [isOpen]);
 
@@ -241,7 +262,8 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
 
       {/* Map Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center sm:p-4 bg-black/60" dir="rtl">
+        <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center sm:p-4 bg-black/60"
+          style={{ height: "100dvh", minHeight: "100dvh" }} dir="rtl">
           <div className="bg-card sm:rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col h-full sm:h-auto" style={{ height: "min(100dvh, 600px)" }}>
 
             {/* Modal Header */}
