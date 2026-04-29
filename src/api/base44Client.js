@@ -37,40 +37,85 @@ function withTimeout(promise, ms = 7000, label = 'query') {
 
 // ─── Entity factory ───────────────────────────────────────────
 
+// Read auth token directly from localStorage — bypasses supabase-js client (which hangs)
+function getRestHeaders() {
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
+  let userToken = ANON_KEY;
+  try {
+    const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.access_token) userToken = parsed.access_token;
+    }
+  } catch {}
+  return {
+    apikey: ANON_KEY,
+    Authorization: `Bearer ${userToken}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+// Direct REST fetch — avoids supabase-js client which hangs on token refresh.
+// Returns parsed JSON or throws with descriptive error.
+async function restFetch(pathAndQuery, opts = {}) {
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  const url = `${SUPABASE_URL}/rest/v1${pathAndQuery}`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 8000);
+  try {
+    const r = await fetch(url, {
+      method: opts.method ?? 'GET',
+      headers: { ...getRestHeaders(), ...(opts.headers || {}) },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: ctrl.signal,
+    });
+    if (!r.ok) {
+      const errText = await r.text().catch(() => '');
+      throw new Error(`REST ${r.status} ${r.statusText}: ${errText.slice(0, 200)}`);
+    }
+    if (r.status === 204) return null;
+    return await r.json();
+  } catch (e) {
+    if (e.name === 'AbortError') throw new Error(`REST request timed out (${opts.timeout ?? 8000}ms)`);
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// PostgREST query string builder
+function buildQs({ select = '*', orderBy, ascending = false, limit, filters = {} }) {
+  const parts = [`select=${encodeURIComponent(select)}`];
+  if (orderBy) parts.push(`order=${encodeURIComponent(orderBy)}.${ascending ? 'asc' : 'desc'}`);
+  if (limit) parts.push(`limit=${Math.min(limit, 1000)}`);
+  Object.entries(filters).forEach(([key, val]) => {
+    if (val === undefined || val === null) return;
+    parts.push(`${encodeURIComponent(key)}=eq.${encodeURIComponent(val)}`);
+  });
+  return parts.length ? `?${parts.join('&')}` : '';
+}
+
 function createEntityClient(tableName) {
   return {
     list: async (sort, limit) => {
       const { column, ascending } = parseSortField(sort);
-      let query = supabase.from(tableName).select('*').order(column, { ascending });
-      if (limit) query = query.limit(Math.min(limit || 100, 1000)); // cap at 1000
-      const { data, error } = await withTimeout(query, 7000, `${tableName}.list`);
-      if (error) throw error;
-      return data ?? [];
+      const qs = buildQs({ orderBy: column, ascending, limit });
+      return await restFetch(`/${tableName}${qs}`);
     },
 
     get: async (id) => {
       if (!id) throw new Error(`${tableName}.get: id is required`);
-      const { data, error } = await withTimeout(
-        supabase.from(tableName).select('*').eq('id', id).maybeSingle(),
-        5000,
-        `${tableName}.get`
-      );
-      if (error && error.code !== 'PGRST116') throw error;
-      return data ?? null;
+      // PostgREST: select with id eq filter and limit 1
+      const rows = await restFetch(`/${tableName}?select=*&id=eq.${encodeURIComponent(id)}&limit=1`);
+      return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     },
 
     filter: async (conditions, sort, limit) => {
       const { column, ascending } = parseSortField(sort);
-      let query = supabase.from(tableName).select('*').order(column, { ascending });
-      if (conditions && typeof conditions === 'object') {
-        Object.entries(conditions).forEach(([key, val]) => {
-          if (val !== undefined && val !== null) query = query.eq(key, val);
-        });
-      }
-      if (limit) query = query.limit(Math.min(limit, 1000)); // cap at 1000
-      const { data, error } = await withTimeout(query, 7000, `${tableName}.filter`);
-      if (error) throw error;
-      return data ?? [];
+      const qs = buildQs({ orderBy: column, ascending, limit, filters: conditions || {} });
+      return await restFetch(`/${tableName}${qs}`);
     },
 
     /**
