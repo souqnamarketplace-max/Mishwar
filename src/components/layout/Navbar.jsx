@@ -5,11 +5,22 @@ import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Shield, User } 
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 import NotificationBell from "../notifications/NotificationBell";
 
 const LOGO_URL = "https://media.base44.com/images/public/user_69994c756ca2186c5598c809/a83e759cf_ChatGPTImageApr27202601_01_06PM.png";
 
-const getNavLinks = (user) => {
+const getNavLinks = (user, isAuthenticated) => {
+  const publicLinks = [
+    { label: "الرئيسية", path: "/" },
+    { label: "ابحث عن رحلة", path: "/search" },
+    { label: "كيف تعمل؟", path: "/how-it-works" },
+    { label: "مجتمع مِشوار", path: "/community" },
+    { label: "المساعدة", path: "/help" },
+  ];
+  if (!isAuthenticated) return publicLinks;
+
+  // Authenticated user — show personal links
   const links = [
     { label: "الرئيسية", path: "/" },
     { label: "رحلاتي", path: "/my-trips" },
@@ -46,10 +57,7 @@ export default function Navbar() {
   }, [profileOpen]);
   const location = useLocation();
 
-  const { data: user } = useQuery({
-    queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
-  });
+  const { user, isAuthenticated } = useAuth();
 
   // Only drivers (or both) can post trips
   const isDriver = user?.account_type === "driver" || user?.account_type === "both";
@@ -71,7 +79,7 @@ export default function Navbar() {
 
           {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-1">
-            {getNavLinks(user).map((link) => (
+            {getNavLinks(user, isAuthenticated).map((link) => (
               <Link
                 key={link.path}
                 to={link.path}
@@ -88,20 +96,39 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {isDriver && (
+            {(!isAuthenticated || !user?.id) && (
+              <>
+                <Link to="/login" className="hidden sm:block">
+                  <Button size="sm" variant="outline" className="rounded-xl border-border">
+                    تسجيل الدخول
+                  </Button>
+                </Link>
+                <Link to="/login?signup=1">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
+                    إنشاء حساب
+                  </Button>
+                </Link>
+              </>
+            )}
+            {user?.id && isAuthenticated && isDriver && (
               <Link to="/create-trip">
                 <Button size="sm" className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
                   أنشر رحلة
                 </Button>
               </Link>
             )}
-            <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
-              <MessageSquare className="w-5 h-5 text-muted-foreground" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
-            </Link>
-            <NotificationBell userEmail={user?.email} />
+            {(isAuthenticated && user?.id) && (
+              <>
+                <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
+                </Link>
+                <NotificationBell userEmail={user?.email} />
+              </>
+            )}
             
-            {/* Profile Menu */}
+            {/* Profile Menu — only when authenticated */}
+            {(isAuthenticated && user?.id) && (
             <div ref={profileMenuRef} className="relative hidden lg:block">
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
@@ -162,6 +189,7 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+            )}
             <button
               className="lg:hidden p-2 rounded-lg hover:bg-muted"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -182,7 +210,7 @@ export default function Navbar() {
             className="lg:hidden border-t border-border overflow-hidden bg-card"
           >
             <div className="px-4 py-3 space-y-1">
-              {getNavLinks(user).map((link) => (
+              {getNavLinks(user, isAuthenticated).map((link) => (
                 <Link
                   key={link.path}
                   to={link.path}
@@ -196,26 +224,41 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <Link to="/create-trip" onClick={() => setMobileOpen(false)}>
-                <Button className="w-full mt-2 bg-primary text-primary-foreground rounded-xl">
-                  أنشر رحلة
-                </Button>
-              </Link>
-              <Link
-                to={`/profile?email=${user?.email}`}
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                ملفي الشخصي
-              </Link>
-              <button
-                onClick={() => { setMobileOpen(false); base44.auth.logout(); }}
-                className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <LogOut className="w-4 h-4" />
-                تسجيل الخروج
-              </button>
+              {!isAuthenticated ? (
+                <div className="flex flex-col gap-2 mt-2 pt-2 border-t border-border">
+                  <Link to="/login" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" className="w-full rounded-xl border-border">تسجيل الدخول</Button>
+                  </Link>
+                  <Link to="/login?signup=1" onClick={() => setMobileOpen(false)}>
+                    <Button className="w-full bg-primary text-primary-foreground rounded-xl">إنشاء حساب جديد</Button>
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  {isDriver && (
+                    <Link to="/create-trip" onClick={() => setMobileOpen(false)}>
+                      <Button className="w-full mt-2 bg-primary text-primary-foreground rounded-xl">
+                        أنشر رحلة
+                      </Button>
+                    </Link>
+                  )}
+                  <Link
+                    to={`/profile?email=${user?.email}`}
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    ملفي الشخصي
+                  </Link>
+                  <button
+                    onClick={() => { setMobileOpen(false); base44.auth.logout(); }}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    تسجيل الخروج
+                  </button>
+                </>
+              )}
             </div>
           </motion.div>
         )}

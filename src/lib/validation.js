@@ -1,56 +1,55 @@
-// Palestinian phone number validation
-// Accepts: 0599-xxx-xxx, 0599xxxxxx, +97059xxxxxxx, 97059xxxxxxx
+// Phone validation — accepts both Palestinian and Israeli mobile numbers.
+// Both regions use 05X-XXXXXXX format locally (10 digits).
+// International: +970 (Palestine) or +972 (Israel) followed by 9 digits starting with 5.
+//
+// Accepted formats:
+//   Local:        0501234567, 0521234567, 0531234567, 0541234567, 0551234567,
+//                 0561234567, 0571234567, 0581234567, 0591234567
+//   Spaced/dashed: 050-123-4567, 050 123 4567, 050.123.4567
+//   International (Palestine): +970501234567, +970591234567, 970591234567
+//   International (Israel):    +972501234567, +972541234567, 972501234567
 
 export function isValidPalestinianPhone(phone) {
   if (!phone) return false;
-  const cleaned = phone.replace(/[\s\-()]/g, "");
-  // Palestinian mobile: 059x, 056x, 057x with 7 more digits
-  const patterns = [
-    /^05[6-9]\d{7}$/,         // local format: 0598xxxxxxx
-    /^\+9705[6-9]\d{7}$/,     // intl: +9705xxxxxxxx
-    /^9705[6-9]\d{7}$/,       // without +
-    /^972[5][6-9]\d{7}$/,     // Israeli format also used in Palestine
+  // Strip spaces, dashes, dots, parentheses
+  const cleaned = phone.replace(/[\s\-().]/g, "");
+
+  const validFormats = [
+    /^05\d{8}$/,            // local 05X-XXXXXXX (any X 0-9) — covers all PS + IL mobiles
+    /^\+9705\d{8}$/,        // intl +970 5X XXXXXXX (Palestine)
+    /^\+9725\d{8}$/,        // intl +972 5X XXXXXXX (Israel)
+    /^9705\d{8}$/,          // 970 without +
+    /^9725\d{8}$/,          // 972 without +
   ];
-  return patterns.some(p => p.test(cleaned));
+
+  return validFormats.some(re => re.test(cleaned));
 }
+
+// Backward-compat alias — same function, more accurate name
+export const isValidPhone = isValidPalestinianPhone;
 
 export function normalizePhone(phone) {
   if (!phone) return "";
-  let p = phone.replace(/[\s\-()]/g, "");
-  if (p.startsWith("+")) p = p.slice(1);
+  let p = phone.replace(/[\s\-().]/g, "");
+  // Add + if it's a known international format without the plus
   if (p.startsWith("970")) return "+" + p;
   if (p.startsWith("972")) return "+" + p;
+  // Convert local 05X to +970 5X (Palestinian default)
   if (p.startsWith("0")) return "+970" + p.slice(1);
+  return p;
+}
+
+// Format for display: +970 59 123 4567 or +972 50 123 4567
+export function formatPhone(phone) {
+  if (!phone) return "";
+  const p = normalizePhone(phone);
+  // +970/+972 followed by 9 digits → +XXX XX XXX XXXX
+  const m = p.match(/^(\+97[02])(\d{2})(\d{3})(\d{4})$/);
+  if (m) return `${m[1]} ${m[2]} ${m[3]} ${m[4]}`;
   return p;
 }
 
 export function isValidEmail(email) {
   if (!email) return false;
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-export function passwordStrength(password) {
-  if (!password) return { score: 0, label: "ضعيفة", color: "bg-destructive" };
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (password.length >= 12) score++;
-  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-  if (/\d/.test(password)) score++;
-  if (/[^a-zA-Z0-9]/.test(password)) score++;
-
-  if (score <= 1) return { score, label: "ضعيفة", color: "bg-destructive" };
-  if (score === 2) return { score, label: "متوسطة", color: "bg-yellow-500" };
-  if (score === 3) return { score, label: "جيدة", color: "bg-blue-500" };
-  return { score, label: "قوية", color: "bg-green-500" };
-}
-
-// Sanitize text input to prevent XSS in trip notes / messages
-export function sanitizeText(text, maxLength = 500) {
-  if (!text) return "";
-  return String(text)
-    .slice(0, maxLength)
-    .replace(/<script[^>]*>.*?<\/script>/gi, "")
-    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, "")
-    .replace(/javascript:/gi, "")
-    .replace(/on\w+\s*=/gi, "");
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 }

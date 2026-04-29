@@ -34,6 +34,17 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
   const selectedMarkerRef = useRef(null);
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(forceOpen);
+  // Lock body scroll while map modal is open + scroll user back to top so map is visible
+  useEffect(() => {
+    if (isOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      // Make sure we're at the top so the modal isn't off-screen
+      window.scrollTo({ top: 0, behavior: "instant" });
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [isOpen]);
+
 
   const filtered = search.length > 0
     ? CITY_LIST.filter(c => c.name.includes(search))
@@ -230,8 +241,8 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
 
       {/* Map Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60" dir="rtl">
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col" style={{ height: "min(85vh, 600px)" }}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center sm:p-4 bg-black/60" dir="rtl">
+          <div className="bg-card sm:rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col h-full sm:h-auto" style={{ height: "min(100dvh, 600px)" }}>
 
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
