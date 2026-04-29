@@ -133,7 +133,7 @@ export default function DashboardOffers() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-0.5">
                     <code className="font-bold text-sm bg-muted px-2 py-0.5 rounded">{coupon.code}</code>
-                    <button onClick={() = aria-label="نسخ"> { navigator.clipboard.writeText(coupon.code); toast("تم نسخ الكود"); }}>
+                    <button onClick={() => { navigator.clipboard.writeText(coupon.code); toast("تم نسخ الكود"); }} aria-label="نسخ">
                       <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                     </button>
                   </div>
