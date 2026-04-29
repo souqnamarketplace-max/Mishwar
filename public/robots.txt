@@ -1,0 +1,19 @@
+User-agent: *
+Allow: /
+Allow: /search
+Allow: /how-it-works
+Allow: /about
+Allow: /help
+Allow: /safety
+Allow: /blog
+
+Disallow: /dashboard
+Disallow: /onboarding
+Disallow: /settings
+Disallow: /messages
+Disallow: /notifications
+Disallow: /create-trip
+Disallow: /profile
+Disallow: /my-trips
+
+Sitemap: https://mishwar.ps/sitemap.xml

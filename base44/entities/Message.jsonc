@@ -1,0 +1,43 @@
+{
+  "name": "Message",
+  "type": "object",
+  "properties": {
+    "conversation_id": {
+      "type": "string"
+    },
+    "sender_email": {
+      "type": "string"
+    },
+    "sender_name": {
+      "type": "string"
+    },
+    "receiver_email": {
+      "type": "string"
+    },
+    "receiver_name": {
+      "type": "string"
+    },
+    "content": {
+      "type": "string"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false
+    },
+    "message_type": {
+      "type": "string",
+      "enum": [
+        "text",
+        "trip_info",
+        "system"
+      ],
+      "default": "text"
+    },
+    "trip_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "content"
+  ]
+}

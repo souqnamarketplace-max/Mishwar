@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- ── Favicon ────────────────────────────────── -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- ── PWA ───────────────────────────────────── -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="مِشوار" />
+    <meta name="application-name" content="مِشوار" />
+    <meta name="theme-color" content="#2d6a4f" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- ── SEO ───────────────────────────────────── -->
+    <title>مِشوار — شارك الطريق، وفر أكثر 🇵🇸</title>
+    <meta name="description" content="مِشوار — منصة فلسطينية لمشاركة رحلات السيارة بين المدن. سافر بأمان، وفر المال، وتعرف على ناس جديدة. احجز رحلتك الآن من رام الله، نابلس، الخليل، بيت لحم والمزيد." />
+    <meta name="keywords" content="مشاركة سيارات, رحلات فلسطين, مشوار, سفر رخيص, نقل ركاب, رام الله نابلس, كارpooling فلسطين" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="مِشوار" />
+    <link rel="canonical" href="https://mishwar.ps/" />
+
+    <!-- ── Open Graph ─────────────────────────────── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://mishwar.ps/" />
+    <meta property="og:site_name" content="مِشوار" />
+    <meta property="og:title" content="مِشوار — شارك الطريق، وفر أكثر 🇵🇸" />
+    <meta property="og:description" content="منصة فلسطينية لمشاركة رحلات السيارة. سافر بأمان واحجز مقعدك في ثوانٍ." />
+    <meta property="og:image" content="https://mishwar.ps/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="ar_PS" />
+
+    <!-- ── Twitter Card ──────────────────────────── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@mishwarps" />
+    <meta name="twitter:title" content="مِشوار — شارك الطريق، وفر أكثر" />
+    <meta name="twitter:description" content="منصة فلسطينية لمشاركة رحلات السيارة. سافر بأمان واحجز مقعدك." />
+    <meta name="twitter:image" content="https://mishwar.ps/og-image.png" />
+
+    <!-- ── Schema.org Structured Data ───────────── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "MobileApplication",
+      "name": "مِشوار",
+      "description": "منصة فلسطينية لمشاركة رحلات السيارة بين المدن",
+      "url": "https://mishwar.ps",
+      "applicationCategory": "TravelApplication",
+      "operatingSystem": "Web, iOS, Android",
+      "inLanguage": "ar",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ILS" },
+      "areaServed": { "@type": "Country", "name": "Palestine" }
+    }
+    </script>
+
+    <!-- ── Performance ───────────────────────────── -->
+    <link rel="preconnect" href="https://dimtdwahtwaslmnuakij.supabase.co" />
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
+
+    <!-- ── Google Analytics (replace GA_MEASUREMENT_ID) ── -->
+    <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'GA_MEASUREMENT_ID');
+    </script> -->
+
+    <!-- ── Meta Pixel (replace PIXEL_ID) ─────── -->
+    <!-- <script>
+      !function(f,b,e,v,n,t,s){...}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init','PIXEL_ID');fbq('track','PageView');
+    </script> -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

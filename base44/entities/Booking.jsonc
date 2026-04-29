@@ -1,0 +1,38 @@
+{
+  "name": "Booking",
+  "type": "object",
+  "properties": {
+    "trip_id": {
+      "type": "string"
+    },
+    "passenger_name": {
+      "type": "string"
+    },
+    "passenger_email": {
+      "type": "string"
+    },
+    "seats_booked": {
+      "type": "number",
+      "default": 1
+    },
+    "total_price": {
+      "type": "number"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "confirmed",
+        "cancelled",
+        "completed"
+      ],
+      "default": "pending"
+    },
+    "payment_method": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "trip_id"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "Coupon",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "discount_percent": {
+      "type": "number"
+    },
+    "max_uses": {
+      "type": "number",
+      "default": 100
+    },
+    "uses_count": {
+      "type": "number",
+      "default": 0
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "code",
+    "discount_percent"
+  ]
+}
