@@ -152,6 +152,7 @@ function createEntityClient(tableName) {
     },
 
     create: async (data) => {
+      // Use direct REST instead of supabase-js (which hangs on writes after token refresh)
       const email = await getCurrentUserEmail();
       const insertData = {
         ...data,
@@ -159,24 +160,29 @@ function createEntityClient(tableName) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      const { data: result, error } = await supabase
-        .from(tableName).insert(insertData).select().single();
-      if (error) throw error;
-      return result;
+      const result = await restFetch(`/${tableName}`, {
+        method: 'POST',
+        headers: { Prefer: 'return=representation' },
+        body: insertData,
+      });
+      // PostgREST returns an array — single insert returns array of 1
+      return Array.isArray(result) ? result[0] : result;
     },
 
     update: async (id, data) => {
-      const { data: result, error } = await supabase
-        .from(tableName)
-        .update({ ...data, updated_at: new Date().toISOString() })
-        .eq('id', id).select().single();
-      if (error) throw error;
-      return result;
+      // Direct REST PATCH — bypasses supabase-js client hang
+      const updateData = { ...data, updated_at: new Date().toISOString() };
+      const result = await restFetch(`/${tableName}?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: updateData,
+      });
+      return Array.isArray(result) ? result[0] : result;
     },
 
     delete: async (id) => {
-      const { error } = await supabase.from(tableName).delete().eq('id', id);
-      if (error) throw error;
+      // Direct REST DELETE — bypasses supabase-js client hang
+      await restFetch(`/${tableName}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
       return true;
     },
 
@@ -258,6 +264,7 @@ const auth = {
 
     const { email, password, ...profileData } = data;
 
+    // Email/password updates still need supabase-js (auth-specific)
     if (email || password) {
       const authUpdate = {};
       if (email) authUpdate.email = email;
@@ -266,12 +273,13 @@ const auth = {
       if (error) throw error;
     }
 
+    // Profile data — direct REST PATCH (bypasses supabase-js client hang)
     if (Object.keys(profileData).length > 0) {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ ...profileData, updated_at: new Date().toISOString() })
-        .eq('id', user.id);
-      if (error) throw error;
+      await restFetch(`/profiles?id=eq.${encodeURIComponent(user.id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=representation' },
+        body: { ...profileData, updated_at: new Date().toISOString() },
+      });
     }
 
     return auth.me();
