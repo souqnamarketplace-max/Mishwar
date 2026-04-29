@@ -408,16 +408,26 @@ export default function Onboarding() {
           )}
         </AnimatePresence>
 
-        {/* Navigation */}
+        {/* Navigation — back button is ALWAYS visible. On step 0 it returns to home. */}
         <div className="flex justify-between mt-5 gap-3">
-          {step > 0 && (
-            <Button variant="outline" className="rounded-xl gap-2" onClick={() => setStep(step - 1)}>
-              <ArrowRight className="w-4 h-4" />
-              السابق
-            </Button>
-          )}
           <Button
-            className="flex-1 bg-primary text-primary-foreground rounded-xl gap-2"
+            variant="outline"
+            className="rounded-xl gap-2 px-4 h-11"
+            onClick={() => {
+              if (step > 0) {
+                setStep(step - 1);
+              } else {
+                // On the first step, go back to home (lets user abandon onboarding)
+                navigate("/");
+              }
+            }}
+            disabled={save.isPending}
+          >
+            <ArrowRight className="w-4 h-4" />
+            {step > 0 ? "السابق" : "الرئيسية"}
+          </Button>
+          <Button
+            className="flex-1 bg-primary text-primary-foreground rounded-xl gap-2 h-11"
             disabled={save.isPending}
             onClick={() => {
               if (!validateStep()) return;
