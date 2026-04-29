@@ -40,29 +40,60 @@ export default function TripDetails() {
   const [booked, setBooked] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [seatsToBook, setSeatsToBook] = useState(1);
+  // For multi-stop trips: which stop index does the passenger want to get off at?
+  // null = all the way to to_city (default).
+  const [dropoffStopIndex, setDropoffStopIndex] = useState(null);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
   const { user } = useAuth();
 
-  const { data: trips = [] } = useQuery({
+  const { data: trips = [], isLoading: tripsListLoading } = useQuery({
     queryKey: ["trips"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 50),
+    queryFn: () => base44.entities.Trip.list("-created_date", 200),
+  });
+
+  // Fast path: also try fetching the specific trip by ID (avoids find-in-list miss)
+  const { data: directTrip, isLoading: directLoading } = useQuery({
+    queryKey: ["trip", id],
+    queryFn: () => base44.entities.Trip.get(id),
+    enabled: !!id,
+    retry: 0,
   });
 
   const bookingMutation = useMutation({
     mutationFn: (tripData) => {
+      // Auth guard — redirect to login with return-to so they come back after sign-in
+      if (!user?.email) {
+        const returnTo = `/trip/${tripData.id}`;
+        navigate(`/login?returnTo=${encodeURIComponent(returnTo)}&action=book`);
+        return Promise.reject(new Error("__redirect__"));
+      }
       // Block self-booking — driver cannot book a seat in their own trip
-      if (tripData?.driver_email && user?.email && tripData.driver_email === user.email) {
+      if (tripData?.driver_email && tripData.driver_email === user.email) {
         return Promise.reject(new Error("لا يمكنك حجز مقعد في رحلتك الخاصة"));
       }
+      // Block booking if no seats
+      if ((tripData.available_seats || 0) < seatsToBook) {
+        return Promise.reject(new Error("عدد المقاعد المتاحة غير كافٍ"));
+      }
+      // Compute dropoff city + price based on selected stop (or final dest)
+      const stops = Array.isArray(tripData.stops) ? tripData.stops : [];
+      const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
+      const computedDropoffCity = isMidStop ? stops[dropoffStopIndex].city : tripData.to_city;
+      const pricePerSeat = isMidStop && Number(stops[dropoffStopIndex].price_from_origin) > 0
+        ? Number(stops[dropoffStopIndex].price_from_origin)
+        : tripData.price;
+
       return base44.entities.Booking.create({
         trip_id: tripData.id,
         passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
         passenger_email: user?.email || "",
         seats_booked: seatsToBook,
-        total_price: tripData.price * seatsToBook,
+        total_price: pricePerSeat * seatsToBook,
+        dropoff_stop_index: dropoffStopIndex,
+        dropoff_city: computedDropoffCity,
         status: "pending",
-        payment_method: "نقداً",
+        payment_method: "cash",
       });
     },
     onMutate: () => {
@@ -71,7 +102,10 @@ export default function TripDetails() {
     },
     onError: (err) => {
       setBooked(false);
-      toast.error(err?.message || "فشل الحجز");
+      // Don't show error toast for our redirect-to-login signal
+      if (err?.message !== "__redirect__") {
+        toast.error(err?.message || "فشل الحجز");
+      }
     },
     onSuccess: () => {
       toast.success("تم الحجز بنجاح! 🎉");
@@ -81,8 +115,8 @@ export default function TripDetails() {
     },
   });
 
-  const trip = trips.find((t) => t.id === id);
-  const tripsLoading = trips.length === 0;
+  const trip = directTrip || trips.find((t) => t.id === id);
+  const tripsLoading = (tripsListLoading && directLoading);
   const isOwnTrip = !!(trip && user && trip.driver_email === user.email);
 
   // Still loading the list — show spinner
@@ -265,6 +299,7 @@ export default function TripDetails() {
             <RouteMap
               fromCity={trip.from_city}
               toCity={trip.to_city}
+              stops={Array.isArray(trip.stops) ? trip.stops : []}
               height="220px"
               showStats={true}
               className="mt-2"
@@ -287,6 +322,88 @@ export default function TripDetails() {
                 </div>
               </div>
             </div>
+
+            {/* Multi-stop timeline (only shown if trip has stops) */}
+            {Array.isArray(trip.stops) && trip.stops.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <span>محطات الطريق</span>
+                  <span className="text-xs font-normal text-muted-foreground">({trip.stops.length} محطة)</span>
+                </p>
+                <div className="relative pl-4">
+                  {/* Vertical line */}
+                  <div className="absolute right-1.5 top-2 bottom-2 w-px bg-border" />
+                  {/* Origin */}
+                  <div className="flex items-start gap-3 pb-3 relative">
+                    <div className="w-3 h-3 rounded-full bg-primary mt-1 shrink-0 z-10" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{trip.from_city}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {trip.from_location || "نقطة البداية"}{trip.time && ` • ${trip.time}`}
+                      </p>
+                    </div>
+                  </div>
+                  {/* Intermediate stops */}
+                  {trip.stops.map((stop, idx) => (
+                    <div key={idx} className="flex items-start gap-3 pb-3 relative">
+                      <div className="w-3 h-3 rounded-full bg-yellow-500 mt-1 shrink-0 z-10 border-2 border-card" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{stop.city}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {stop.location || "محطة"}{stop.time && ` • ${stop.time}`}
+                          {Number(stop.price_from_origin) > 0 && ` • ₪${stop.price_from_origin} من البداية`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {/* Destination */}
+                  <div className="flex items-start gap-3 relative">
+                    <div className="w-3 h-3 rounded-full bg-destructive mt-1 shrink-0 z-10" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{trip.to_city}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {trip.to_location || "نقطة الوصول"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Drop-off selector — only shown for multi-stop trips when user can still book */}
+            {Array.isArray(trip.stops) && trip.stops.length > 0 && !booked && !isOwnTrip && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <Label className="text-sm font-semibold mb-2 block">أين تريد النزول؟</Label>
+                <div className="space-y-2">
+                  {trip.stops.map((stop, idx) => (
+                    <label key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="dropoff"
+                        value={idx}
+                        checked={dropoffStopIndex === idx}
+                        onChange={() => setDropoffStopIndex(idx)}
+                      />
+                      <span className="text-sm flex-1">{stop.city}</span>
+                      {Number(stop.price_from_origin) > 0 && (
+                        <span className="text-xs text-muted-foreground">₪{stop.price_from_origin}</span>
+                      )}
+                    </label>
+                  ))}
+                  <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="dropoff"
+                      value="-1"
+                      checked={dropoffStopIndex === null}
+                      onChange={() => setDropoffStopIndex(null)}
+                    />
+                    <span className="text-sm flex-1 font-medium">{trip.to_city} (الوجهة النهائية)</span>
+                    <span className="text-xs text-muted-foreground">₪{trip.price}</span>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Trip Details */}

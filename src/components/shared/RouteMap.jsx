@@ -29,6 +29,7 @@ function fixLeafletIcons(L) {
 export default function RouteMap({
   fromCity,
   toCity,
+  stops = [],     // array of {city, location, time, ...} for multi-stop trips
   height = '220px',
   showStats = true,
   onRouteCalculated,
@@ -137,6 +138,32 @@ export default function RouteMap({
         L.marker(toCoords, { icon: toIcon })
           .addTo(map)
           .bindPopup(`<b>إلى: ${toCity}</b>`, { direction: 'top' });
+
+        // Intermediate stop markers (for multi-stop trips)
+        if (Array.isArray(stops) && stops.length > 0) {
+          // Lazy-load coords map for stops
+          const { CITY_COORDS } = await import('@/lib/mapUtils');
+          const stopIcon = L.divIcon({
+            html: `<div style="
+              background: #f59e0b; color: white; border-radius: 50%;
+              width: 22px; height: 22px; display: flex; align-items: center;
+              justify-content: center;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid white;
+              font-size: 11px; font-weight: bold;
+            ">●</div>`,
+            className: '',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+          });
+          stops.forEach((stop, idx) => {
+            const coords = CITY_COORDS?.[stop.city];
+            if (coords && Array.isArray(coords) && coords.length === 2) {
+              L.marker(coords, { icon: stopIcon })
+                .addTo(map)
+                .bindPopup(`<b>محطة ${idx + 1}: ${stop.city}</b>${stop.time ? `<br/>الوقت: ${stop.time}` : ''}`, { direction: 'top' });
+            }
+          });
+        }
 
         // Draw route line
         if (geometry?.coordinates?.length > 0) {

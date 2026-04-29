@@ -81,8 +81,26 @@ export default function SearchTrips() {
   const filtered = trips
     .filter((t) => t.status === "confirmed")
     .filter((t) => {
-      if (activeFilters.from && t.from_city !== activeFilters.from) return false;
-      if (activeFilters.to   && t.to_city   !== activeFilters.to)   return false;
+      // Match trips where the from-city is direct OR is one of the stops
+      const stopCities = Array.isArray(t.stops) ? t.stops.map(s => s?.city).filter(Boolean) : [];
+      if (activeFilters.from) {
+        const fromMatchesOrigin = t.from_city === activeFilters.from;
+        const fromMatchesStop   = stopCities.includes(activeFilters.from);
+        if (!fromMatchesOrigin && !fromMatchesStop) return false;
+      }
+      if (activeFilters.to) {
+        const toMatchesDest = t.to_city === activeFilters.to;
+        const toMatchesStop = stopCities.includes(activeFilters.to);
+        if (!toMatchesDest && !toMatchesStop) return false;
+      }
+      // For via-stop matches, ensure the FROM appears BEFORE the TO in the route
+      // (i.e., the trip actually goes from→to in the right direction)
+      if (activeFilters.from && activeFilters.to) {
+        const sequence = [t.from_city, ...stopCities, t.to_city];
+        const fromIdx = sequence.indexOf(activeFilters.from);
+        const toIdx   = sequence.indexOf(activeFilters.to);
+        if (fromIdx === -1 || toIdx === -1 || fromIdx >= toIdx) return false;
+      }
       if (activeFilters.date && t.date       !== activeFilters.date) return false;
       if (maxPrice && t.price > parseFloat(maxPrice)) return false;
       if (genderPref && t.driver_gender !== genderPref) return false;

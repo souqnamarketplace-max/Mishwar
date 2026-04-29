@@ -97,6 +97,8 @@ export default function CreateTrip() {
     checkpoint_note: "",
     is_recurring: false,
     recurring_days: [],
+    // Multi-stop support: array of {city, location, time, price_from_origin, seats_available}
+    stops: [],
   });
 
   // Pre-fill car details from user profile once loaded
@@ -135,6 +137,29 @@ export default function CreateTrip() {
     }));
   };
 
+  const addStop = () => {
+    setForm((prev) => ({
+      ...prev,
+      stops: [...prev.stops, { city: "", location: "", time: "", price_from_origin: 0, seats_available: prev.available_seats || 4 }],
+      // A trip with stops is no longer "direct"
+      is_direct: false,
+    }));
+  };
+
+  const updateStop = (index, key, value) => {
+    setForm((prev) => ({
+      ...prev,
+      stops: prev.stops.map((s, i) => i === index ? { ...s, [key]: value } : s),
+    }));
+  };
+
+  const removeStop = (index) => {
+    setForm((prev) => {
+      const newStops = prev.stops.filter((_, i) => i !== index);
+      return { ...prev, stops: newStops, is_direct: newStops.length === 0 };
+    });
+  };
+
   const validateStep = (currentStep) => {
     if (currentStep === 1) {
       if (!form.from_city) { toast.error("يرجى اختيار مدينة الانطلاق ⚠️"); return false; }
@@ -142,6 +167,13 @@ export default function CreateTrip() {
       if (form.from_city === form.to_city) { toast.error("مدينة الانطلاق والوصول لا يمكن أن تكونا نفس المدينة ⚠️"); return false; }
       if (!form.date) { toast.error("يرجى تحديد تاريخ المغادرة ⚠️"); return false; }
       if (!form.time) { toast.error("يرجى تحديد وقت المغادرة ⚠️"); return false; }
+      // Validate every stop has city + time
+      for (let i = 0; i < form.stops.length; i++) {
+        const s = form.stops[i];
+        if (!s.city) { toast.error(`المحطة ${i + 1}: يرجى اختيار المدينة ⚠️`); return false; }
+        if (!s.time) { toast.error(`المحطة ${i + 1}: يرجى تحديد وقت الوصول ⚠️`); return false; }
+        if (s.city === form.from_city || s.city === form.to_city) { toast.error(`المحطة ${i + 1}: لا يمكن أن تكون نفس مدينة الانطلاق أو الوصول ⚠️`); return false; }
+      }
     }
     if (currentStep === 3) {
       if (!form.car_model) { toast.error("يرجى إدخال نوع السيارة ⚠️"); return false; }
@@ -151,15 +183,26 @@ export default function CreateTrip() {
   };
 
   const handleSubmit = async () => {
+    if (!user?.id) { toast.error("لم يتم تحميل بيانات المستخدم. حاول مرة أخرى."); return; }
     const baseData = {
       ...form,
       status: "confirmed",
       total_seats: form.available_seats,
+      // CRITICAL: link the trip to the driver via UUID (not just email)
+      driver_id: user.id,
       driver_name: user?.full_name || user?.email?.split("@")[0] || "سائق",
       driver_avatar: user?.avatar_url || "",
       driver_email: user?.email || "",
       driver_phone: user?.phone || "",
       driver_gender: form.gender || "",
+      // Ensure stops is a clean array (no undefined / partial entries)
+      stops: (form.stops || []).filter(s => s.city && s.time).map(s => ({
+        city: s.city,
+        location: s.location || "",
+        time: s.time,
+        price_from_origin: Number(s.price_from_origin) || 0,
+        seats_available: Number(s.seats_available) || form.available_seats,
+      })),
     };
 
     if (form.is_recurring && form.recurring_days.length > 0) {
@@ -303,12 +346,78 @@ export default function CreateTrip() {
                 />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={form.is_direct}
-                onCheckedChange={(v) => updateField("is_direct", v)}
-              />
-              <span className="text-sm">ذهاب فقط</span>
+            {/* Multi-stop trip support */}
+            <div className="border border-border rounded-xl p-4 bg-muted/30">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <Label className="text-sm font-medium">محطات إضافية في الطريق (اختياري)</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {form.stops.length === 0
+                      ? "أضف محطات إذا كنت ستتوقف بمدن أخرى — يمكن للركاب الصعود أو النزول بأي محطة"
+                      : `${form.stops.length} محطة في الطريق — الرحلة ستظهر للركاب الذين يبحثون عبر هذه المدن أيضاً`}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addStop}
+                  className="rounded-xl shrink-0"
+                  disabled={!form.from_city || !form.to_city}
+                >
+                  + محطة
+                </Button>
+              </div>
+              {form.stops.map((stop, idx) => (
+                <div key={idx} className="bg-card rounded-xl border border-border p-3 mb-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">محطة {idx + 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeStop(idx)}
+                      className="text-xs text-destructive hover:underline"
+                      aria-label={`حذف محطة ${idx + 1}`}
+                    >
+                      حذف
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <CityAutocomplete
+                      value={stop.city}
+                      onChange={(v) => updateStop(idx, "city", v)}
+                      placeholder="مدينة المحطة"
+                      iconColor="muted"
+                    />
+                    <Input
+                      type="time"
+                      value={stop.time}
+                      onChange={(e) => updateStop(idx, "time", e.target.value)}
+                      className="h-10 rounded-xl"
+                      placeholder="وقت الوصول"
+                    />
+                    <Input
+                      type="text"
+                      value={stop.location}
+                      onChange={(e) => updateStop(idx, "location", e.target.value)}
+                      className="h-10 rounded-xl"
+                      placeholder="المكان داخل المدينة (اختياري)"
+                    />
+                    <Input
+                      type="number"
+                      value={stop.price_from_origin}
+                      onChange={(e) => updateStop(idx, "price_from_origin", e.target.value)}
+                      className="h-10 rounded-xl"
+                      placeholder="سعر الراكب من البداية إلى هذه المحطة (₪)"
+                      min="0"
+                    />
+                  </div>
+                </div>
+              ))}
+              {form.stops.length === 0 && (
+                <div className="text-xs text-center text-muted-foreground py-2">
+                  رحلة مباشرة بدون محطات
+                </div>
+              )}
             </div>
 
             {/* Route Preview Map — shows when both cities are selected */}
@@ -318,6 +427,7 @@ export default function CreateTrip() {
                 <RouteMap
                   fromCity={form.from_city}
                   toCity={form.to_city}
+                  stops={form.stops}
                   height="200px"
                   showStats={true}
                   onRouteCalculated={({ distance, duration }) => {

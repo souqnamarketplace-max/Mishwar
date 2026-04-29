@@ -48,6 +48,17 @@ function createEntityClient(tableName) {
       return data ?? [];
     },
 
+    get: async (id) => {
+      if (!id) throw new Error(`${tableName}.get: id is required`);
+      const { data, error } = await withTimeout(
+        supabase.from(tableName).select('*').eq('id', id).maybeSingle(),
+        5000,
+        `${tableName}.get`
+      );
+      if (error && error.code !== 'PGRST116') throw error;
+      return data ?? null;
+    },
+
     filter: async (conditions, sort, limit) => {
       const { column, ascending } = parseSortField(sort);
       let query = supabase.from(tableName).select('*').order(column, { ascending });

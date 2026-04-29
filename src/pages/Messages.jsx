@@ -2,6 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sanitizeText } from "@/lib/validation";
@@ -24,27 +25,30 @@ export default function Messages() {
   const [search, setSearch] = useState("");
   const messagesEndRef = useRef(null);
 
-  // Current user
-  const { data: user } = useQuery({
-    queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
-  });
+  // Current user — from AuthContext (instant, no hang)
+  const { user } = useAuth();
 
-  // Fetch all messages where user is sender or receiver
+  // Fetch all messages where user is sender or receiver (parallel for speed)
   const { data: rawMessages = [], isLoading } = useQuery({
     queryKey: ["messages", user?.email],
     queryFn: async () => {
       if (!user?.email) return [];
-      // RLS ensures we only get our own messages — fetch them all and group by conversation
-      const sent = await base44.entities.Message.filter({ sender_email: user.email }, "-created_date", 200);
-      const received = await base44.entities.Message.filter({ receiver_email: user.email }, "-created_date", 200);
-      // Merge + dedupe
-      const map = new Map();
-      [...sent, ...received].forEach(m => map.set(m.id, m));
-      return Array.from(map.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      // RLS ensures we only get our own messages
+      const [sent, received] = await Promise.all([
+        base44.entities.Message.filter({ sender_email: user.email }, "-created_date", 100),
+        base44.entities.Message.filter({ receiver_email: user.email }, "-created_date", 100),
+      ]);
+      // Merge + dedupe by id
+      const seen = new Set();
+      const merged = [];
+      for (const m of [...sent, ...received]) {
+        if (!seen.has(m.id)) { seen.add(m.id); merged.push(m); }
+      }
+      return merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     },
     enabled: !!user?.email,
-    refetchInterval: 15000,  // refresh every 15s
+    refetchInterval: 10000,  // refresh every 10s
+    staleTime: 5000,
   });
 
   // Group messages by conversation_id (or fall back to "other person's email")

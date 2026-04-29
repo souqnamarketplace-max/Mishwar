@@ -29,11 +29,13 @@ export default function AppLayout() {
   if (isMobile) {
     return (
       <MobileLayout user={user}>
-        <PullToRefresh><AnimatePresence mode="wait">
-          <PageTransition key={location.pathname}>
-            <Outlet />
-          </PageTransition>
-        </AnimatePresence></PullToRefresh>
+        <PullToRefresh>
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname}>
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
+        </PullToRefresh>
       </MobileLayout>
     );
   }
@@ -42,11 +44,13 @@ export default function AppLayout() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <PullToRefresh><AnimatePresence mode="wait">
-          <PageTransition key={location.pathname}>
-            <Outlet />
-          </PageTransition>
-        </AnimatePresence></PullToRefresh>
+        <PullToRefresh>
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname}>
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
+        </PullToRefresh>
       </main>
       <Footer />
     </div>

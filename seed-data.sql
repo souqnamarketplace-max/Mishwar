@@ -62,68 +62,102 @@ WHERE NOT EXISTS (
 -- Wipe any prior seed trips first to avoid duplicates on re-run
 DELETE FROM public.trips WHERE created_by = 'seed-data';
 
+-- All trips for souqnamarketplace. driver_id is looked up from auth.users.
+WITH driver AS (
+  SELECT id AS driver_id FROM auth.users WHERE lower(email) = 'souqnamarketplace@gmail.com' LIMIT 1
+)
 INSERT INTO public.trips (
+  driver_id, driver_name, driver_email, driver_phone, driver_avatar, driver_rating, driver_reviews_count, driver_gender,
+  from_city, to_city, from_location, to_location,
+  date, time, price, available_seats, total_seats,
+  car_model, car_year, car_color, car_plate,
+  status, amenities, payment_methods, driver_note, is_direct, stops,
+  created_by, created_at
+)
+SELECT
+  driver.driver_id,
+  v.driver_name, v.driver_email, v.driver_phone, v.driver_avatar, v.driver_rating, v.driver_reviews_count, v.driver_gender,
+  v.from_city, v.to_city, v.from_location, v.to_location,
+  v.date::date, v.time, v.price, v.available_seats, v.total_seats,
+  v.car_model, v.car_year, v.car_color, v.car_plate,
+  v.status, v.amenities::jsonb, v.payment_methods::jsonb, v.driver_note, v.is_direct, v.stops::jsonb,
+  v.created_by, v.created_at
+FROM driver, (
+  VALUES
+  -- Trip 1: TODAY — confirmed (engallam booked seat in this)
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'رام الله', 'نابلس', 'دوار المنارة', 'دوار الشهداء',
+   CURRENT_DATE::text, '08:30', 35.0, 2, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'confirmed', '["wifi","ac","music","no_smoking"]', '["cash","card"]',
+   'الانطلاق من دوار المنارة الساعة 8:30 بالضبط. أرجو الالتزام بالموعد.',
+   true, '[]', 'seed-data', NOW() - INTERVAL '2 days'),
+
+  -- Trip 2: TOMORROW
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'نابلس', 'رام الله', 'دوار الشهداء', 'دوار المنارة',
+   (CURRENT_DATE + INTERVAL '1 day')::text, '17:00', 35.0, 3, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'confirmed', '["wifi","ac","music","no_smoking"]', '["cash","card"]',
+   'رحلة المساء — مريحة وسريعة',
+   true, '[]', 'seed-data', NOW() - INTERVAL '1 day'),
+
+  -- Trip 3: 2 DAYS — multi-stop showcase نابلس → بيت لحم via رام الله and بيت جالا
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'نابلس', 'بيت لحم', 'دوار الشهداء', 'باب بيت لحم',
+   (CURRENT_DATE + INTERVAL '2 days')::text, '07:00', 60.0, 3, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'confirmed', '["wifi","ac","music","no_smoking"]', '["cash","card"]',
+   'رحلة طويلة مع محطات. نتوقف لدقائق في كل محطة. يمكن للراكب النزول في رام الله أو بيت جالا.',
+   false,
+   '[{"city":"رام الله","location":"دوار المنارة","time":"08:30","price_from_origin":35,"seats_available":3},{"city":"بيت جالا","location":"ساحة المهد","time":"10:15","price_from_origin":50,"seats_available":2}]',
+   'seed-data', NOW() - INTERVAL '6 hours'),
+
+  -- Trip 4: 3 DAYS — long route الخليل → جنين with 3 stops
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'الخليل', 'جنين', 'دوار ابن رشد', 'دوار الشهداء',
+   (CURRENT_DATE + INTERVAL '3 days')::text, '06:30', 90.0, 4, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'confirmed', '["wifi","ac","music","no_smoking"]', '["cash"]',
+   'رحلة عبر الضفة الغربية كاملة. توقفات قصيرة في كل مدينة.',
+   false,
+   '[{"city":"بيت لحم","location":"باب بيت لحم","time":"07:30","price_from_origin":30,"seats_available":4},{"city":"رام الله","location":"دوار المنارة","time":"09:00","price_from_origin":55,"seats_available":4},{"city":"نابلس","location":"دوار الشهداء","time":"10:30","price_from_origin":75,"seats_available":3}]',
+   'seed-data', NOW() - INTERVAL '4 hours'),
+
+  -- Trip 5: COMPLETED — past trip (engallam booked + completed)
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'نابلس', 'رام الله', 'دوار الشهداء', 'دوار المنارة',
+   (CURRENT_DATE - INTERVAL '8 days')::text, '09:00', 35.0, 0, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'completed', '["wifi","ac","music","no_smoking"]', '["cash"]',
+   'رحلة تمت بنجاح',
+   true, '[]', 'seed-data', NOW() - INTERVAL '8 days'),
+
+  -- Trip 6: COMPLETED — older trip
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'رام الله', 'الخليل', 'دوار المنارة', 'دوار ابن رشد',
+   (CURRENT_DATE - INTERVAL '15 days')::text, '14:00', 80.0, 0, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'completed', '["wifi","ac","music","no_smoking"]', '["cash","card"]',
+   'رحلة طويلة',
+   true, '[]', 'seed-data', NOW() - INTERVAL '15 days'),
+
+  -- Trip 7: TODAY EVENING — soon
+  ('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL::text, 4.8, 12, 'male',
+   'نابلس', 'الخليل', 'دوار الشهداء', 'دوار ابن رشد',
+   CURRENT_DATE::text, '18:00', 75.0, 1, 4,
+   'تويوتا كامري', '2021', 'فضي', '6-1234-95',
+   'confirmed', '["wifi","ac","music","no_smoking"]', '["cash"]',
+   'رحلة المساء',
+   true, '[]', 'seed-data', NOW() - INTERVAL '3 hours')
+) AS v(
   driver_name, driver_email, driver_phone, driver_avatar, driver_rating, driver_reviews_count, driver_gender,
   from_city, to_city, from_location, to_location,
   date, time, price, available_seats, total_seats,
   car_model, car_year, car_color, car_plate,
-  status, amenities, payment_methods, driver_note, is_direct,
+  status, amenities, payment_methods, driver_note, is_direct, stops,
   created_by, created_at
-) VALUES
--- Trip 1: TODAY — confirmed (engallam booked seat in this)
-('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL, 4.8, 12, 'male',
- 'رام الله', 'نابلس', 'دوار المنارة', 'دوار الشهداء',
- CURRENT_DATE, '08:30', 35, 2, 4,
- 'تويوتا كامري', '2021', 'فضي', '6-1234-95',
- 'confirmed', '["wifi","ac","music","no_smoking"]'::jsonb, '["cash","card"]'::jsonb,
- 'الانطلاق من دوار المنارة الساعة 8:30 بالضبط. أرجو الالتزام بالموعد.',
- true, 'seed-data', NOW() - INTERVAL '2 days'),
-
--- Trip 2: TOMORROW — confirmed
-('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL, 4.8, 12, 'male',
- 'نابلس', 'رام الله', 'دوار الشهداء', 'دوار المنارة',
- CURRENT_DATE + 1, '17:00', 35, 3, 4,
- 'تويوتا كامري', '2021', 'فضي', '6-1234-95',
- 'confirmed', '["wifi","ac"]'::jsonb, '["cash","card"]'::jsonb,
- 'رحلة العودة المسائية',
- true, 'seed-data', NOW() - INTERVAL '1 day'),
-
--- Trip 3: 3 days from now — confirmed
-('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL, 4.8, 12, 'male',
- 'رام الله', 'الخليل', 'مجمع الدوحة', 'باب الزاوية',
- CURRENT_DATE + 3, '09:00', 50, 4, 4,
- 'تويوتا كامري', '2021', 'فضي', '6-1234-95',
- 'confirmed', '["wifi","ac","music"]'::jsonb, '["cash"]'::jsonb,
- 'رحلة طويلة، توقف قصير في بيت لحم متاح',
- false, 'seed-data', NOW() - INTERVAL '6 hours'),
-
--- Trip 4: PAST — completed (engallam was a passenger)
-('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL, 4.8, 12, 'male',
- 'نابلس', 'رام الله', 'دوار الشهداء', 'دوار المنارة',
- CURRENT_DATE - 7, '08:00', 35, 0, 4,
- 'تويوتا كامري', '2021', 'فضي', '6-1234-95',
- 'completed', '["wifi","ac"]'::jsonb, '["cash"]'::jsonb,
- 'رحلة الصباح المعتادة',
- true, 'seed-data', NOW() - INTERVAL '8 days'),
-
--- Trip 5: PAST — completed (engallam was a passenger)
-('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL, 4.8, 12, 'male',
- 'رام الله', 'بيت لحم', 'محطة الجاردنز', 'منطقة الكراديس',
- CURRENT_DATE - 14, '14:30', 40, 0, 4,
- 'تويوتا كامري', '2021', 'فضي', '6-1234-95',
- 'completed', '["wifi","ac","music"]'::jsonb, '["cash","card"]'::jsonb,
- NULL,
- true, 'seed-data', NOW() - INTERVAL '15 days'),
-
--- Trip 6: 5 days from now — confirmed (recurring weekly)
-('سوق نا - السائق', 'souqnamarketplace@gmail.com', '0599123456', NULL, 4.8, 12, 'male',
- 'رام الله', 'نابلس', 'دوار المنارة', 'دوار الشهداء',
- CURRENT_DATE + 5, '08:30', 35, 4, 4,
- 'تويوتا كامري', '2021', 'فضي', '6-1234-95',
- 'confirmed', '["wifi","ac","no_smoking"]'::jsonb, '["cash","card"]'::jsonb,
- 'رحلة أسبوعية ثابتة - كل ثلاثاء',
- true, 'seed-data', NOW() - INTERVAL '3 hours');
-
+);
 
 -- ── 3) BOOKINGS (engallam books some of souqnamarketplace's trips) ──
 DELETE FROM public.bookings WHERE created_by = 'seed-data';
@@ -282,13 +316,13 @@ INSERT INTO public.trip_preferences (
   user_email, user_name, from_city, to_city, max_price,
   notify_on_price, notify_on_date, is_active, created_by
 ) VALUES
-('engallam27@gmail.com', 'إنج علام', 'نابلس', 'رام الله', 50, true, true, true, 'seed-data'),
-('engallam27@gmail.com', 'إنج علام', 'رام الله', 'نابلس', 50, true, true, true, 'seed-data');
+('engallam27@gmail.com', 'إنج علام', 'نابلس', 'رام الله', 50, true, true, true, '[]'::jsonb, 'seed-data'),
+('engallam27@gmail.com', 'إنج علام', 'رام الله', 'نابلس', 50, true, true, true, '[]'::jsonb, 'seed-data');
 
 
 -- ── 8) ANNOUNCEMENT ──
 INSERT INTO public.announcements (text, is_active, created_by)
-SELECT '🌟 مرحباً بك في مِشوار - منصة مشاركة الرحلات الفلسطينية. تخفيض 10% على أول رحلة!', true, 'seed-data'
+SELECT '🌟 مرحباً بك في مِشوار - منصة مشاركة الرحلات الفلسطينية. تخفيض 10% على أول رحلة!', true, '[]'::jsonb, 'seed-data'
 WHERE NOT EXISTS (SELECT 1 FROM public.announcements WHERE text LIKE '%مرحباً بك في مِشوار%');
 
 

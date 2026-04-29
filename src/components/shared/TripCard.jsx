@@ -3,6 +3,30 @@ import { Link } from "react-router-dom";
 import { Star, Clock, Users, ArrowLeft, MapPin, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
+
+// Format PostgreSQL DATE (YYYY-MM-DD) to friendly Arabic
+function formatTripDate(dateStr) {
+  if (!dateStr) return "";
+  // Already formatted? Leave it alone
+  if (/[\u0600-\u06FF]/.test(dateStr) || dateStr.includes("/")) return dateStr;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(d);
+    target.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((target - today) / 86400000);
+    if (diffDays === 0) return "اليوم";
+    if (diffDays === 1) return "غداً";
+    if (diffDays === -1) return "أمس";
+    if (diffDays > 1 && diffDays <= 7) return d.toLocaleDateString("ar-EG", { weekday: "long" });
+    return d.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function TripCard({ trip }) {
   const [liveTrip, setLiveTrip] = useState(trip);
 
@@ -33,10 +57,17 @@ export default function TripCard({ trip }) {
               <ArrowLeft className="w-4 h-4 text-primary shrink-0" />
               <span className="truncate">{t.to_city}</span>
             </div>
+            {/* Via cities (only shown for multi-stop trips) */}
+            {Array.isArray(t.stops) && t.stops.length > 0 && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1 flex-wrap">
+                <span className="font-medium">عبر:</span>
+                <span className="truncate">{t.stops.map((s) => s.city).filter(Boolean).join(" • ")}</span>
+              </div>
+            )}
             {/* Date + Time */}
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <Clock className="w-3.5 h-3.5 shrink-0" />
-              <span>{t.date}</span>
+              <span>{formatTripDate(t.date)}</span>
               <span className="text-border">•</span>
               <span className="font-medium text-foreground">{t.time}</span>
               {t.distance && (
@@ -72,8 +103,14 @@ export default function TripCard({ trip }) {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">{t.driver_name || "سائق"}</p>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-              <span className="text-xs text-muted-foreground">{t.driver_rating || "4.5"}</span>
+              {t.driver_rating > 0 ? (
+                <>
+                  <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
+                  <span className="text-xs text-muted-foreground">{Number(t.driver_rating).toFixed(1)}</span>
+                </>
+              ) : (
+                <span className="text-xs text-muted-foreground bg-accent/10 text-accent px-1.5 py-0.5 rounded-full">سائق جديد</span>
+              )}
               {t.driver_gender && (
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
                   {t.driver_gender === "male" ? "👨" : "👩"}
