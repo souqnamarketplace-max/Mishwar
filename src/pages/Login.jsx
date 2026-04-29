@@ -1,13 +1,13 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { passwordStrength, isValidPalestinianPhone, isValidEmail } from "@/lib/validation";
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X } from 'lucide-react';
+import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 export default function Login() {
@@ -17,7 +17,7 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const { login, register, isAuthenticated } = useAuth();
 
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState(searchParams.get('signup') === '1' ? 'signup' : 'login');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
@@ -96,6 +96,15 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4" dir="rtl">
       <div className="w-full max-w-md">
+        {/* Back to home link */}
+        <Link
+          to="/"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 hover:text-primary dark:hover:text-primary mb-6 transition-colors"
+        >
+          <ArrowRight className="w-4 h-4" />
+          <span>العودة للرئيسية</span>
+        </Link>
+
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
