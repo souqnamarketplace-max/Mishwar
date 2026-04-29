@@ -7,6 +7,7 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 import MobileLayout from "./MobileLayout";
 import PageTransition from "../PageTransition";
+import PullToRefresh from "../shared/PullToRefresh";
 
 export default function AppLayout() {
   const location = useLocation();
@@ -28,11 +29,11 @@ export default function AppLayout() {
   if (isMobile) {
     return (
       <MobileLayout user={user}>
-        <AnimatePresence mode="wait">
+        <PullToRefresh><AnimatePresence mode="wait">
           <PageTransition key={location.pathname}>
             <Outlet />
           </PageTransition>
-        </AnimatePresence>
+        </AnimatePresence></PullToRefresh>
       </MobileLayout>
     );
   }
@@ -41,11 +42,11 @@ export default function AppLayout() {
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <AnimatePresence mode="wait">
+        <PullToRefresh><AnimatePresence mode="wait">
           <PageTransition key={location.pathname}>
             <Outlet />
           </PageTransition>
-        </AnimatePresence>
+        </AnimatePresence></PullToRefresh>
       </main>
       <Footer />
     </div>
