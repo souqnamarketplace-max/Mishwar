@@ -58,9 +58,33 @@ export const AuthProvider = ({ children }) => {
 
   const loadUserProfile = async (authUser) => {
     try {
-      // Direct DB query — skip auth.me() which calls getSession() again (slow)
-      const { data: profile } = await supabase
-        .from('profiles').select('*').eq('id', authUser.id).single();
+      // Direct REST fetch — supabase-js client hangs silently after token refresh
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
+      let userToken = ANON_KEY;
+      try {
+        const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.access_token) userToken = parsed.access_token;
+        }
+      } catch {}
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      let profile = null;
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/profiles?select=*&id=eq.${encodeURIComponent(authUser.id)}&limit=1`, {
+          headers: { apikey: ANON_KEY, Authorization: `Bearer ${userToken}` },
+          signal: ctrl.signal,
+        });
+        if (r.ok) {
+          const rows = await r.json();
+          profile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        }
+      } finally {
+        clearTimeout(timer);
+      }
 
       const fullUser = {
         id: authUser.id,
