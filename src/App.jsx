@@ -65,46 +65,52 @@ const AuthenticatedApp = () => {
     "/", "/search", "/how-it-works", "/community", "/help",
     "/about", "/blog", "/safety", "/privacy", "/terms",
   ]);
+  // /trip/:id is also public (view-only) — handled by prefix
   const isPublicPath = PUBLIC_PATHS.has(location.pathname) || location.pathname.startsWith("/trip/");
 
+  // Not authenticated AND trying to access a protected route → redirect to login
   if (!isAuthenticated) {
     if (location.pathname === "/login") return <Login />;
     if (!isPublicPath) {
       return <Navigate to={`/login?returnTo=${encodeURIComponent(location.pathname)}`} replace />;
     }
+    // else fall through to render the public page
   }
 
-  // Redirect to onboarding if not completed
+  // Redirect to onboarding if logged-in user hasn't completed it
   const onboardingPaths = ["/onboarding", "/dashboard"];
-  const needsOnboarding = user && !user.onboarding_completed && !onboardingPaths.includes(location.pathname);
+  const needsOnboarding = isAuthenticated && user && !user.onboarding_completed && !onboardingPaths.includes(location.pathname);
   if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
   }
 
   return (
     <Suspense fallback={<PageFallback />}><Routes>
-      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<AppLayout />}>
+        {/* PUBLIC pages — viewable without sign-in */}
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<SearchTrips />} />
         <Route path="/trip/:id" element={<TripDetails />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/community" element={<Community />} />
+        <Route path="/help" element={<Help />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/safety" element={<Safety />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<Terms />} />
+
+        {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/create-trip" element={<CreateTrip />} />
-        <Route path="/how-it-works" element={<HowItWorks />} />
-        <Route path="/community" element={<Community />} />
-        <Route path="/help" element={<Help />} />
         <Route path="/driver" element={<DriverDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<UserProfile />} />
-        <Route path="/about" element={<AboutUs />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/safety" element={<Safety />} />
         <Route path="/settings" element={<AccountSettings />} />
         <Route path="/booking-confirmation" element={<BookingConfirmation />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<Terms />} />
       </Route>
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/onboarding" element={<Onboarding />} />
