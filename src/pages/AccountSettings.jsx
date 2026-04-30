@@ -324,6 +324,30 @@ export default function AccountSettings() {
             <p className="text-xs text-muted-foreground mt-1">لا يمكن تغيير الاسم بعد التسجيل</p>
           </div>
 
+          {/* الجنس والمدينة */}
+          <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+            <h3 className="font-bold text-foreground text-sm">الجنس والمدينة</h3>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">الجنس (يُحدَّد أثناء التسجيل فقط)</label>
+              <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-input bg-muted/40 text-sm">
+                {user?.gender === "female"
+                  ? <><span>👩</span><span className="font-medium">أنثى</span></>
+                  : user?.gender === "male"
+                  ? <><span>👨</span><span className="font-medium">ذكر</span></>
+                  : <span className="text-muted-foreground text-xs">لم يُحدَّد — يرجى إكمال الإعداد الأولي</span>}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground mb-1 block">المدينة</label>
+              <div className="flex gap-2">
+                <Input value={city} onChange={e => setCity(e.target.value)} placeholder="رام الله" className="rounded-xl h-10 flex-1" dir="rtl" />
+                <Button onClick={handleProfileUpdate} disabled={profileLoading || city === (user?.city||"")} className="rounded-xl h-10 shrink-0" size="sm">
+                  {profileLoading ? "..." : "حفظ"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
           {/* Phone */}
           <div>
             <Label>رقم الهاتف</Label>
