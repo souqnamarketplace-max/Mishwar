@@ -7,7 +7,7 @@ import {
   Star, Car, MapPin, Calendar, Shield, Award,
   MessageCircle, ArrowLeft, Phone, Settings, CheckCircle2,
   TrendingUp, Clock, ThumbsUp, BadgeCheck, CreditCard
-} from "lucide-react";
+, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import RatingSummary from "../components/reviews/RatingSummary";
