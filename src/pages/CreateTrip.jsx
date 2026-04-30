@@ -252,7 +252,7 @@ export default function CreateTrip() {
       driver_avatar: user?.avatar_url || "",
       driver_email:  user?.email || "",
       driver_phone:  user?.phone || "",
-      driver_gender: user?.gender || form.gender || "",
+      driver_gender: user?.gender || form.gender || null,
       status: "confirmed",
     };
 
