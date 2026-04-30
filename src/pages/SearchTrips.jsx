@@ -10,7 +10,7 @@ import RouteMap from "@/components/shared/RouteMap";
 import SelectDrawer from "@/components/ui/select-drawer";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 import TripCard from "../components/shared/TripCard";
-import { CITIES } from "@/lib/cities";
+import { CITIES, cityMatches } from "@/lib/cities";
 
 export default function SearchTrips() {
   useSEO({ title: "البحث عن رحلة", description: "ابحث عن رحلات بين المدن الفلسطينية واحجز مقعدك بسهولة" });
@@ -86,21 +86,20 @@ export default function SearchTrips() {
       // Match trips where the from-city is direct OR is one of the stops
       const stopCities = Array.isArray(t.stops) ? t.stops.map(s => s?.city).filter(Boolean) : [];
       if (activeFilters.from) {
-        const fromMatchesOrigin = t.from_city === activeFilters.from;
-        const fromMatchesStop   = stopCities.includes(activeFilters.from);
+        const fromMatchesOrigin = cityMatches(t.from_city, activeFilters.from);
+        const fromMatchesStop   = stopCities.some(s => cityMatches(s, activeFilters.from));
         if (!fromMatchesOrigin && !fromMatchesStop) return false;
       }
       if (activeFilters.to) {
-        const toMatchesDest = t.to_city === activeFilters.to;
-        const toMatchesStop = stopCities.includes(activeFilters.to);
+        const toMatchesDest = cityMatches(t.to_city, activeFilters.to);
+        const toMatchesStop = stopCities.some(s => cityMatches(s, activeFilters.to));
         if (!toMatchesDest && !toMatchesStop) return false;
       }
-      // For via-stop matches, ensure the FROM appears BEFORE the TO in the route
-      // (i.e., the trip actually goes from→to in the right direction)
+      // Smart direction check: find the first position that matches each city
       if (activeFilters.from && activeFilters.to) {
         const sequence = [t.from_city, ...stopCities, t.to_city];
-        const fromIdx = sequence.indexOf(activeFilters.from);
-        const toIdx   = sequence.indexOf(activeFilters.to);
+        const fromIdx = sequence.findIndex(s => cityMatches(s, activeFilters.from));
+        const toIdx   = sequence.findIndex(s => cityMatches(s, activeFilters.to));
         if (fromIdx === -1 || toIdx === -1 || fromIdx >= toIdx) return false;
       }
       if (activeFilters.date && t.date       !== activeFilters.date) return false;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MapPin, X, Clock, TrendingUp, Map as MapIcon, Search } from "lucide-react";
-import { CITIES } from "@/lib/cities";
+import { CITIES, normalizeArabic } from "@/lib/cities";
 import { cn } from "@/lib/utils";
 import MapCityPicker from "@/components/shared/MapCityPicker";
 
@@ -46,7 +46,11 @@ export default function CityAutocomplete({
   useEffect(() => { setQuery(value || ""); }, [value]);
 
   const filtered = query.trim()
-    ? CITIES.filter(c => c.includes(query.trim()))
+    ? CITIES.filter(city => {
+        const normCity  = normalizeArabic(city);
+        const normQuery = normalizeArabic(query.trim());
+        return normCity.includes(normQuery) || normQuery.includes(normalizeArabic(city).split(" ")[0]);
+      })
     : [];
 
   const recent = getRecent();
