@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Shield, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import NotificationBell from "../notifications/NotificationBell";
