@@ -432,20 +432,25 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
       {/* Map modal */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60"
+          className="fixed inset-0 z-[9999] bg-black/60"
           onClick={handleClose}
-          onTouchMove={(e) => e.stopPropagation()}
-          style={{ overscrollBehavior: "none", touchAction: "none" }}
+          style={{ overscrollBehavior: "none" }}
         >
           <div
-            className="bg-card w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
             onClick={e => e.stopPropagation()}
-            onTouchMove={e => e.stopPropagation()}
             style={{
+              position: "fixed",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              top: "10vh",
+              background: "var(--card, white)",
+              borderRadius: "24px 24px 0 0",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxShadow: "0 -8px 40px rgba(0,0,0,0.2)",
               touchAction: "pan-y",
-              overscrollBehavior: "contain",
-              height: "92vh",
-              maxHeight: "700px",
             }}
           >
 
@@ -486,7 +491,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
             {/* Map + list */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div ref={mapRef} className="shrink-0" style={{ height: "45%", zIndex: 1, touchAction: "none", minHeight: "180px" }} />
+              <div ref={mapRef} className="shrink-0" style={{ height: "42%", minHeight: "200px", zIndex: 1, touchAction: "none" }} />
               <div ref={listRef} className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 {filtered.map(city => (
                   <button key={city.name} type="button"
