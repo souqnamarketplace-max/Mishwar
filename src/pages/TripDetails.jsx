@@ -720,7 +720,7 @@ export default function TripDetails() {
             >
               {bookingMutation.isPending ? "..." : "احجز الآن"}
             </Button>
-            {trip?.driver_phone && (
+            {hasConfirmedBooking && trip?.driver_phone && (
               <a href={`https://wa.me/970${trip.driver_phone.replace(/\D/g,'')}?text=${encodeURIComponent("مرحباً، أود الاستفسار عن رحلتك")}`}
                 target="_blank" rel="noopener noreferrer"
                 className="w-12 h-12 rounded-xl bg-green-500 flex items-center justify-center shrink-0">

@@ -53,25 +53,9 @@ export default function Messages() {
     staleTime: 5000,
   });
 
-  // Auto-open conversation from URL params (e.g. ?to=driver@email&name=...)
+  // URL params — read here (no deps issue since we just read strings)
   const paramTo   = searchParams.get("to");
   const paramName = searchParams.get("name");
-
-  React.useEffect(() => {
-    if (!paramTo || !user?.email) return;
-    // Don't open a convo with yourself
-    if (paramTo === user.email) return;
-    // Check if conversation already exists
-    const existing = conversations.find(c => c.otherEmail === paramTo);
-    if (existing) {
-      setActiveId(existing.id);
-      setNewConv(null);
-    } else {
-      // No existing messages yet — set up a "new conversation" panel
-      setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
-      setActiveId("__new__");
-    }
-  }, [paramTo, user?.email, conversations.length]);
 
   // Realtime subscription — new/updated messages appear instantly
   React.useEffect(() => {
@@ -126,7 +110,28 @@ export default function Messages() {
       )
     : conversations;
 
-  const activeConv = conversations.find(c => c.id === activeId);
+  // activeConv: resolve from existing conversations OR from the pending newConv state
+  const activeConv = React.useMemo(() => {
+    if (activeId === "__new__" && newConv) {
+      return { id: "__new__", otherEmail: newConv.email, otherName: newConv.name, messages: [], unreadCount: 0 };
+    }
+    return conversations.find(c => c.id === activeId) || null;
+  }, [activeId, newConv, conversations]);
+
+  // Auto-open conversation from URL params — runs AFTER conversations is defined
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  React.useEffect(() => {
+    if (!paramTo || !user?.email) return;
+    if (paramTo === user.email) return;
+    const existing = conversations.find(c => c.otherEmail === paramTo);
+    if (existing) {
+      setActiveId(existing.id);
+      setNewConv(null);
+    } else {
+      setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+      setActiveId("__new__");
+    }
+  }, [paramTo, user?.email, conversations.length]);
 
   // Auto-scroll to bottom when conversation changes or new message arrives
   useEffect(() => {
