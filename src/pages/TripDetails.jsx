@@ -92,10 +92,10 @@ export default function TripDetails() {
         passenger_email: user?.email || "",
         seats_booked:    seatsToBook,
         total_price:     pricePerSeat * seatsToBook,
-        dropoff_city:    computedDropoffCity,
-        dropoff_stop_index: dropoffStopIndex,
-        status:          'pending',
-        payment_method:  'cash',
+        status:          "pending",
+        payment_method:  "cash",
+        // dropoff_city stored in driver_note until we add the column via migration
+        // note: dropoffStopIndex & computedDropoffCity are shown in the UI only
       });
     },
     onMutate: () => {
@@ -113,10 +113,24 @@ export default function TripDetails() {
         toast.error(msg);
       }
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("تم الحجز بنجاح! 🎉");
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
+      // Notify the driver that someone booked their trip
+      if (trip?.driver_email && user?.email && trip.driver_email !== user.email) {
+        try {
+          await base44.entities.Notification.create({
+            user_email: trip.driver_email,
+            title: "حجز جديد على رحلتك 🎉",
+            message: `${user.full_name || user.email} حجز ${seatsToBook} مقعد في رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
+            type: "booking_received",
+            trip_id: trip.id,
+            link: "/my-trips?tab=driver",
+            is_read: false,
+          });
+        } catch (e) { console.warn("[Notif] booking_received:", e?.message); }
+      }
       navigate(`/booking-confirmation?trip=${trip?.id}`);
     },
   });

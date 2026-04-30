@@ -79,7 +79,7 @@ export default function Onboarding() {
 
         // Create notification for admin
         await base44.entities.Notification.create({
-          user_email: "admin@sirtana.com",
+          user_email: "souqnamarketplace@gmail.com",
           title: "طلب تحقق من رخصة قيادة جديد",
           message: `${user?.full_name} قدّم طلب للتحقق من رخصة القيادة الخاصة به`,
           type: "system",

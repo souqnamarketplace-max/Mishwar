@@ -44,10 +44,26 @@ export default function MyTrips() {
       if (error) throw error;
       return { success: true };
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
       qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
       toast.success("تم إلغاء الحجز بنجاح");
+      // Notify driver that the booking was cancelled
+      try {
+        const booking = passengerBookings?.find(b => b.id === bookingId);
+        const trip = allTrips?.find(t => t.id === booking?.trip_id);
+        if (trip?.driver_email && user?.email) {
+          await base44.entities.Notification.create({
+            user_email: trip.driver_email,
+            title: "تم إلغاء حجز على رحلتك",
+            message: `${user.full_name || user.email} ألغى حجزه في رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
+            type: "booking_cancelled",
+            trip_id: trip.id,
+            link: "/my-trips?tab=driver",
+            is_read: false,
+          });
+        }
+      } catch (e) { console.warn("[Notif] booking_cancelled:", e?.message); }
     },
     onError: (err) => toast.error(err.message || "فشل إلغاء الحجز"),
   });

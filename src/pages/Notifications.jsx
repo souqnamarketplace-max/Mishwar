@@ -316,7 +316,29 @@ export default function Notifications() {
               {notifications.map((notif) => (
                 <div
                   key={notif.id}
-                  className={`bg-card rounded-2xl border p-4 transition-all ${!notif.is_read ? "border-primary/30 bg-primary/3" : "border-border"}`}
+                  className={`bg-card rounded-2xl border p-4 transition-all cursor-pointer hover:shadow-sm ${!notif.is_read ? "border-primary/30 bg-primary/5" : "border-border"}`}
+                  onClick={async () => {
+                    // Mark as read
+                    if (!notif.is_read) {
+                      try { await base44.entities.Notification.update(notif.id, { is_read: true }); } catch {}
+                      qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
+                    }
+                    // Type-based routing
+                    const link = notif.link;
+                    if (link) { navigate(link); return; }
+                    switch (notif.type) {
+                      case 'booking_received':    navigate('/my-trips?tab=driver'); break;
+                      case 'booking_cancelled':   navigate('/my-trips?tab=driver'); break;
+                      case 'trip_cancelled':      navigate('/my-trips'); break;
+                      case 'license_approved':
+                      case 'license_rejected':    navigate('/settings'); break;
+                      case 'new_message':         navigate('/messages'); break;
+                      case 'new_review':
+                      default:
+                        if (notif.trip_id) navigate(`/trip/${notif.trip_id}`);
+                        break;
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1">
@@ -328,9 +350,9 @@ export default function Notifications() {
                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
                         <div className="flex items-center gap-3 mt-2">
                           {notif.trip_id && (
-                            <a href={`/trip/${notif.trip_id}`} className="text-xs text-primary hover:underline">
-                              عرض الرحلة ←
-                            </a>
+                            <span className="text-xs text-primary">
+                              اضغط للعرض ←
+                            </span>
                           )}
                           <span className="text-xs text-muted-foreground">
                             {((notif.created_at) ? new Date(notif.created_at).toLocaleDateString("ar") : "—")}

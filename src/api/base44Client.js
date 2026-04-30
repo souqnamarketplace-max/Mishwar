@@ -204,9 +204,9 @@ function createEntityClient(tableName) {
     },
 
     subscribe: (callback) => {
-      const channelName = `${tableName}-${Math.random().toString(36).slice(2)}`;
+      const channelName = `${tableName}-rt-${Math.random().toString(36).slice(2)}`;
       const channel = supabase
-        .channel(channelName)
+        .channel(channelName, { config: { broadcast: { self: true } } })
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: tableName },
@@ -383,29 +383,41 @@ const integrations = {
       const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
       const filePath = `public/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      // Try upload — if bucket missing, attempt creation first
-      let uploadData, uploadError;
-      ({ data: uploadData, error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, file, { cacheControl: '3600', upsert: true, contentType: file.type }));
+      // Direct REST upload — bypasses supabase-js client which hangs after token refresh.
+      // Storage REST API: POST /storage/v1/object/{bucket}/{path}
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const userToken = session.access_token || ANON_KEY;
 
-      if (uploadError?.message?.toLowerCase().includes('bucket')) {
-        // Bucket not found — try to create it (requires service role in production, this is best-effort)
-        await supabase.storage.createBucket('uploads', { public: true, fileSizeLimit: 5242880 });
-        ({ data: uploadData, error: uploadError } = await supabase.storage
-          .from('uploads')
-          .upload(filePath, file, { cacheControl: '3600', upsert: true, contentType: file.type }));
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 30000);
+      let uploadResp;
+      try {
+        uploadResp = await fetch(
+          `${SUPABASE_URL}/storage/v1/object/uploads/${filePath}`,
+          {
+            method: 'POST',
+            headers: {
+              apikey: ANON_KEY,
+              Authorization: `Bearer ${userToken}`,
+              'x-upsert': 'true',
+              'Content-Type': file.type,
+            },
+            body: file,
+            signal: ctrl.signal,
+          }
+        );
+      } finally {
+        clearTimeout(timer);
       }
 
-      if (uploadError) {
-        captureException(uploadError, { msg: '[Storage] Upload error:' });
-        if (uploadError.statusCode === 403 || uploadError.message?.includes('authorized')) {
-          throw new Error('غير مصرح بالرفع — تأكد من تشغيل supabase-production.sql في Supabase');
-        }
-        throw new Error(uploadError.message || 'فشل رفع الملف');
+      if (!uploadResp.ok) {
+        const errBody = await uploadResp.text().catch(() => '');
+        throw new Error(`فشل رفع الملف (${uploadResp.status}): ${errBody.slice(0, 200)}`);
       }
 
-      const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(filePath);
+      // Build public URL deterministically — no extra network call needed
+      const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/uploads/${filePath}`;
       return { file_url: publicUrl };
     },
   },
