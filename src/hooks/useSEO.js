@@ -49,5 +49,19 @@ export function useSEO({ title, description, canonical, ogImage }) {
       let ogImg = document.querySelector('meta[property="og:image"]');
       if (ogImg) ogImg.setAttribute("content", ogImage);
     }
+
+    // Update OG URL
+    const currentUrl = canonical || window.location.href;
+    let ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogUrl) ogUrl.setAttribute("content", currentUrl);
+
+    // Update Twitter desc
+    if (description) {
+      let twDesc = document.querySelector('meta[name="twitter:description"]');
+      if (twDesc) twDesc.setAttribute("content", description);
+      let twTitle = document.querySelector('meta[name="twitter:title"]');
+      const ft = title ? `${title} | مِشوار` : "مِشوار — شارك الطريق، وفر أكثر";
+      if (twTitle) twTitle.setAttribute("content", ft);
+    }
   }, [title, description, canonical, ogImage]);
 }

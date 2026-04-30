@@ -176,6 +176,17 @@ export default function TripDetails() {
   });
 
   const trip = directTrip || trips.find((t) => t.id === id);
+
+  // Dynamic SEO — updates as trip data loads (for JS-rendering crawlers)
+  const tripSeoTitle = trip ? `رحلة من ${trip.from_city} إلى ${trip.to_city}` : "تفاصيل الرحلة";
+  const tripSeoDesc  = trip
+    ? `₪${trip.price} للمقعد · ${trip.date} · ${trip.available_seats} مقاعد متاحة · السائق: ${trip.driver_name}`
+    : "احجز مقعدك في رحلة مريحة وآمنة";
+  useSEO({
+    title:       tripSeoTitle,
+    description: tripSeoDesc,
+    canonical:   trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined,
+  });
   const tripsLoading = (tripsListLoading && directLoading);
   const isOwnTrip = !!(trip && user && trip.driver_email === user.email);
 
