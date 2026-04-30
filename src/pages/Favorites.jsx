@@ -57,9 +57,15 @@ export default function Favorites() {
 
   // Get unique drivers from those bookings (cross-ref via trips)
   const bookedTripIds = pastBookings.map(b => b.trip_id).filter(Boolean);
+  // Filter out user-dismissed favorites
+  const getDismissedIds = () => {
+    const key = `mishwar-dismissed-favs-${user?.email || "anon"}`;
+    try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); }
+  };
   const sampleDrivers = React.useMemo(() => {
     const driversMap = new Map();
-    trips.filter(t => bookedTripIds.includes(t.id)).forEach(t => {
+    const dismissedIds = getDismissedIds();
+    trips.filter(t => bookedTripIds.includes(t.id) && !dismissedIds.has(String(t.id))).forEach(t => {
       if (!t.driver_email) return;
       if (!driversMap.has(t.driver_email)) {
         driversMap.set(t.driver_email, {
@@ -125,13 +131,24 @@ export default function Favorites() {
     },
   });
 
+  // Persist dismissed favorites so they survive page refresh
+  const DISMISSED_KEY = `mishwar-dismissed-favs-${user?.email || "anon"}`;
+  const getDismissed = () => {
+    try { return new Set(JSON.parse(localStorage.getItem(DISMISSED_KEY) || "[]")); } catch { return new Set(); }
+  };
+
   const removeFavorite = (id) => {
+    // Update local state immediately
     setFavorites(prev => {
       const newSet = new Set(prev);
       newSet.delete(id);
       return newSet;
     });
-    toast.success("تم إزالة من المفضلة");
+    // Persist to localStorage so it survives refresh
+    const dismissed = getDismissed();
+    dismissed.add(String(id));
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify([...dismissed]));
+    toast.success("تم إزالة من المفضلة ✓");
   };
 
   const handleSidebarAction = (action) => {

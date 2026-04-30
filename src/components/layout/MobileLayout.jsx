@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, Plus, Bell, User, ArrowRight, ChevronLeft } from "lucide-react";
+import { Home, Search, Plus, Bell, User, Heart, ArrowRight, ChevronLeft } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
 const ALL_TABS = [
-  { id: "home",    label: "الرئيسية", icon: Home,   path: "/" },
-  { id: "search",  label: "بحث",      icon: Search, path: "/search" },
-  { id: "create",  label: "أنشر",     icon: Plus,   path: "/create-trip", isAction: true, driverOnly: true },
-  { id: "notifs",  label: "إشعارات",  icon: Bell,   path: "/notifications" },
-  { id: "profile", label: "حسابي",    icon: User,   path: "/profile" },
+  { id: "home",      label: "الرئيسية", icon: Home,   path: "/" },
+  { id: "search",    label: "بحث",      icon: Search, path: "/search" },
+  { id: "create",    label: "أنشر",     icon: Plus,   path: "/create-trip", isAction: true, driverOnly: true },
+  { id: "favorites", label: "المفضلة",  icon: Heart,  path: "/favorites" },
+  { id: "profile",   label: "حسابي",    icon: User,   path: "/profile" },
 ];
 
 // Build the visible tabs list based on the user's account type.

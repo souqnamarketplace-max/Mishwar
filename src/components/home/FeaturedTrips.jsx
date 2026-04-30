@@ -63,7 +63,15 @@ export default function FeaturedTrips() {
               className="shrink-0 w-[85vw] sm:w-[70vw] md:w-auto snap-start"
             >
               <Link to={`/trip/${trip.id}`}>
-                <div className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-xl hover:border-primary/30 transition-all group cursor-pointer">
+                <div className={`rounded-2xl overflow-hidden hover:shadow-xl transition-all group cursor-pointer ${
+                  trip.driver_gender === 'female'
+                    ? 'border-2 border-rose-300 bg-gradient-to-br from-white to-rose-50 dark:from-[#1c1218] dark:to-[#1c1218]'
+                    : 'border border-border bg-card hover:border-primary/30'
+                }`}>
+                  {/* Female driver accent strip */}
+                  {trip.driver_gender === 'female' && (
+                    <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-pink-300 to-fuchsia-400" />
+                  )}
                   <div className="relative h-40 overflow-hidden">
                     <img loading="lazy"
                       src={trip.image || "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400&h=200&fit=crop"}
@@ -115,7 +123,10 @@ export default function FeaturedTrips() {
                           {(trip.driver_name || "س")[0]}
                         </div>
                         <div>
-                          <p className="text-sm font-medium leading-tight">{trip.driver_name}</p>
+                          <p className="text-sm font-medium leading-tight flex items-center gap-1">
+                            {trip.driver_name}
+                            {trip.driver_gender === 'female' && <span className="text-[10px] bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full font-bold">سائقة 🌸</span>}
+                          </p>
                           <div className="flex items-center gap-1">
                             <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
                             <span className="text-xs text-muted-foreground">{trip.driver_rating || "4.8"}</span>
