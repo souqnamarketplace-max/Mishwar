@@ -55,7 +55,8 @@ export default function DashboardPayments() {
   const totalRevenue = summary.totals?.total_revenue ?? 0;
   const confirmed = summary.totals?.total_bookings ?? 0;
   const cancelled = bookingsData.total - confirmed; // approximate, can be improved
-  const COMMISSION_RATE = 0.10;
+  const COMMISSION_RATE = summary.commission_rate ? summary.commission_rate / 100 : 0.10;
+  const COMMISSION_PCT  = summary.commission_rate || 10;
   // Build the same shape as before for downstream rendering
   const driverRevenue = (summary.drivers || []).reduce((acc, d) => {
     acc[d.driver_email || "unknown"] = {

@@ -1,4 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
+import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
+import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
@@ -360,6 +362,27 @@ export default function AccountSettings() {
               </div>
             </div>
           </div>
+
+          {/* طرق الدفع والاستلام */}
+          {(user?.account_type === "driver" || user?.account_type === "both") && (
+            <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+              <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                <span>💳</span>
+                طرق استلام المدفوعات
+              </h3>
+              <DriverPaymentSetup user={user} />
+            </div>
+          )}
+
+          {(user?.account_type === "passenger" || user?.account_type === "both") && (
+            <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
+              <h3 className="font-bold text-foreground text-sm flex items-center gap-2">
+                <span>💳</span>
+                طريقة الدفع المفضلة
+              </h3>
+              <PassengerPaymentSetup user={user} />
+            </div>
+          )}
 
           {/* Phone */}
           <div>

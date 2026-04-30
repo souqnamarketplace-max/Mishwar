@@ -1,140 +1,80 @@
+/**
+ * PassengerPaymentSetup — preferred payment method for passengers.
+ */
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CreditCard, Wallet, AlertCircle, CheckCircle } from "lucide-react";
+import { CheckCircle, Wallet, Building2, Smartphone, CreditCard, AlertCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
 
+const METHODS = [
+  { id: "cash",          label: "نقداً",        icon: Wallet,     color: "bg-green-500/10 text-green-600",   desc: "ادفع للسائق نقداً عند نهاية الرحلة" },
+  { id: "bank_transfer", label: "تحويل بنكي",  icon: Building2,  color: "bg-blue-500/10 text-blue-600",     desc: "حوّل المبلغ للسائق قبل أو بعد الرحلة" },
+  { id: "reflect",       label: "Reflect",      icon: Wallet,     color: "bg-purple-500/10 text-purple-600", desc: "أرسل عبر محفظة Reflect الإلكترونية" },
+  { id: "jawwal_pay",    label: "Jawwal Pay",   icon: Smartphone, color: "bg-green-600/10 text-green-700",   desc: "ادفع عبر خدمة Jawwal Pay" },
+  { id: "card",          label: "بطاقة",        icon: CreditCard, color: "bg-rose-500/10 text-rose-600",     desc: "بطاقة ائتمان أو خصم" },
+];
+
 export default function PassengerPaymentSetup({ user }) {
-  const [cardForm, setCardForm] = useState({
-    card_holder_name: user?.card_holder_name || "",
-    card_last_four: user?.card_last_four || "",
-  });
+  const [preferred, setPreferred] = useState(user?.preferred_payment || "cash");
   const qc = useQueryClient();
 
-  const saveCardMutation = useMutation({
-    mutationFn: (data) => base44.auth.updateMe(data),
+  const save = useMutation({
+    mutationFn: () => base44.auth.updateMe({ preferred_payment: preferred }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
-      toast.success("تم حفظ بيانات البطاقة بنجاح! 💳");
+      toast.success("تم حفظ طريقة الدفع المفضلة ✅");
     },
+    onError: (err) => toast.error(err?.message || "فشل الحفظ"),
   });
 
-  const handleSaveCard = () => {
-    if (!cardForm.card_holder_name || !cardForm.card_last_four) {
-      toast.error("يرجى ملء جميع الحقول المطلوبة");
-      return;
-    }
-    saveCardMutation.mutate(cardForm);
-  };
-
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="font-bold text-lg text-foreground mb-4">طرق الدفع</h3>
-        <p className="text-sm text-muted-foreground mb-6">أضف وأدِر طرق دفعك المفضلة للحجوزات</p>
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
+        <AlertCircle className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+        <p className="text-sm text-muted-foreground">
+          اختر طريقتك المفضلة للدفع. الدفع يتم مباشرة للسائق — مِشوار لا تتوسط في المدفوعات.
+        </p>
       </div>
 
-      {/* Payment Methods Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { id: "cash", label: "نقداً", icon: Wallet, color: "text-green-600" },
-          { id: "card", label: "بطاقة ائتمان", icon: CreditCard, color: "text-blue-600" },
-          { id: "bank", label: "تحويل بنكي", icon: Wallet, color: "text-purple-600" },
-        ].map((method) => (
-          <div
-            key={method.id}
-            className="bg-card rounded-2xl border border-border p-5 text-center"
+      <div className="space-y-2">
+        {METHODS.map(m => (
+          <button
+            key={m.id}
+            onClick={() => setPreferred(m.id)}
+            className={`w-full flex items-center gap-3 p-3.5 rounded-xl border transition-all text-right ${
+              preferred === m.id
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/30 bg-card"
+            }`}
           >
-            <div className={`w-12 h-12 rounded-xl ${method.color.replace("text-", "bg-").replace("-600", "/10")} flex items-center justify-center mx-auto mb-3`}>
-              <method.icon className={`w-6 h-6 ${method.color}`} />
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${m.color}`}>
+              <m.icon className="w-4.5 h-4.5" />
             </div>
-            <p className="font-medium text-foreground text-sm">{method.label}</p>
-            <p className="text-xs text-muted-foreground mt-1">متاح دائماً</p>
-          </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">{m.label}</p>
+              <p className="text-xs text-muted-foreground">{m.desc}</p>
+            </div>
+            <div className={`w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center ${
+              preferred === m.id ? "border-primary bg-primary" : "border-border"
+            }`}>
+              {preferred === m.id && <CheckCircle className="w-3 h-3 text-primary-foreground" />}
+            </div>
+          </button>
         ))}
       </div>
 
-      {/* Card Details Section */}
-      <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="w-5 h-5 text-primary" />
-          <h4 className="font-bold text-foreground">بطاقة الائتمان</h4>
-        </div>
+      <Button onClick={() => save.mutate()} disabled={save.isPending} className="w-full rounded-xl h-10 gap-2">
+        <CheckCircle className="w-4 h-4" />
+        {save.isPending ? "جاري الحفظ..." : "حفظ التفضيل"}
+      </Button>
 
-        <div className="flex items-start gap-3 p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-          <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-blue-900">معلومة أمان</p>
-            <p className="text-xs text-blue-800 mt-1">نحفظ فقط آخر 4 أرقام من بطاقتك لتسهيل عملية الدفع بأمان</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label>اسم صاحب البطاقة <span className="text-destructive">*</span></Label>
-            <Input
-              value={cardForm.card_holder_name}
-              onChange={(e) => setCardForm({ ...cardForm, card_holder_name: e.target.value })}
-              placeholder="الاسم الكامل"
-              className="h-11 rounded-xl mt-1"
-            />
-          </div>
-          <div>
-            <Label>آخر 4 أرقام من البطاقة <span className="text-destructive">*</span></Label>
-            <Input
-              value={cardForm.card_last_four}
-              onChange={(e) => setCardForm({ ...cardForm, card_last_four: e.target.value.slice(0, 4) })}
-              placeholder="1234"
-              maxLength="4"
-              className="h-11 rounded-xl mt-1"
-            />
-          </div>
-        </div>
-
-        <Button
-          onClick={handleSaveCard}
-          disabled={saveCardMutation.isPending}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl w-full gap-2"
-        >
-          {saveCardMutation.isPending ? "جاري الحفظ..." : (
-            <>
-              <CheckCircle className="w-4 h-4" />
-              حفظ بيانات البطاقة
-            </>
-          )}
-        </Button>
-
-        {user?.card_last_four && (
-          <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/20 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <p className="text-sm text-green-900">✓ تم حفظ بطاقتك (****{user.card_last_four})</p>
-          </div>
-        )}
-      </div>
-
-      {/* Cash & Bank Info */}
-      <div className="bg-muted/50 rounded-2xl border border-border p-6 space-y-4">
-        <h4 className="font-bold text-foreground">طرق دفع إضافية</h4>
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <Wallet className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium text-sm text-foreground">الدفع النقدي</p>
-              <p className="text-xs text-muted-foreground mt-0.5">ادفع للسائق نقداً عند نهاية الرحلة</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Wallet className="w-5 h-5 text-purple-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="font-medium text-sm text-foreground">التحويل البنكي</p>
-              <p className="text-xs text-muted-foreground mt-0.5">حول المبلغ مباشرة قبل أو بعد الرحلة</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {user?.preferred_payment && (
+        <p className="text-xs text-center text-muted-foreground">
+          طريقتك المفضلة الحالية: <span className="font-medium text-foreground">{METHODS.find(m=>m.id===user.preferred_payment)?.label}</span>
+        </p>
+      )}
     </div>
   );
 }

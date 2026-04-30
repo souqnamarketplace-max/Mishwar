@@ -44,7 +44,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
             await base44.entities.Notification.create({
               user_email: booking.passenger_email,
               title: "تم قبول حجزك ✅",
-              message: "تهانينا! قام السائق بقبول حجزك. تحقق من رحلاتي لعرض التفاصيل.",
+              message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}. تحقق من تفاصيل الدفع في صفحة تأكيد الحجز.`,
               type: "system",
               trip_id: booking.trip_id,
               is_read: false,

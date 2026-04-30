@@ -426,6 +426,27 @@ const integrations = {
 // ─── Functions ────────────────────────────────────────────────
 
 const functions = {
+  processBookingPayment: async (bookingId, confirmedBy = 'driver') => {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const session = readLocalSession();
+    const token = session?.access_token || ANON_KEY;
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/process_booking_payment`, {
+      method: 'POST',
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_booking_id: bookingId, p_confirmed_by: confirmedBy }),
+    });
+    if (!r.ok) {
+      const err = await r.text().catch(() => '');
+      throw new Error(`processBookingPayment failed (${r.status}): ${err.slice(0, 200)}`);
+    }
+    return r.json();
+  },
+  
   invoke: async (name, args = {}) => {
     if (name === 'cancelBooking') {
       const { booking_id } = args;
@@ -482,6 +503,8 @@ export const base44 = {
     Review:         createEntityClient('reviews'),
     Message:        createEntityClient('messages'),
     AdminAuditLog:  createEntityClient('admin_audit_log'),
+  Profile:         createEntityClient('profiles'),
+  DriverPayout:   createEntityClient('driver_payouts'),
     Notification:   createEntityClient('notifications'),
     DriverLicense:  createEntityClient('driver_licenses'),
     Coupon:         createEntityClient('coupons'),

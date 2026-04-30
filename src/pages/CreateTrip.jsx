@@ -609,8 +609,10 @@ export default function CreateTrip() {
               <Label className="mb-3 block">طرق الدفع المقبولة</Label>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { id: "cash", label: "نقداً", icon: "💵" },
-                  { id: "bank_transfer", label: "تحويل بنكي", icon: "🏦" },
+                  { id: "cash",          label: "نقداً",        icon: "💵" },
+                  { id: "bank_transfer", label: "تحويل بنكي",  icon: "🏦" },
+                  { id: "reflect",       label: "Reflect",      icon: "💜" },
+                  { id: "jawwal_pay",    label: "Jawwal Pay",   icon: "📱" },
                   { id: "card", label: "بطاقة ائتمان", icon: "💳" },
                 ].map((m) => (
                   <button

@@ -4,6 +4,7 @@ import MapCityPicker from "@/components/shared/MapCityPicker";
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -492,6 +493,24 @@ export default function Onboarding() {
             </motion.div>
           )}
         </AnimatePresence>
+
+          {/* Step 4: Driver Payment Methods */}
+          {step === 4 && isDriver && (
+            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground mb-1">طرق استلام المدفوعات 💳</h2>
+                  <p className="text-sm text-muted-foreground">أضف معلومات حسابك لاستلام مدفوعات الرحلات من الركاب</p>
+                </div>
+                <DriverPaymentSetupInline user={user} />
+                <div className="p-3 bg-muted/50 rounded-xl">
+                  <p className="text-xs text-muted-foreground text-center">
+                    يمكنك تخطي هذه الخطوة والإضافة لاحقاً من إعدادات الحساب
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
         {/* Navigation — back button is ALWAYS visible. On step 0 it returns to home. */}
         <div className="flex justify-between mt-5 gap-3">
