@@ -31,6 +31,9 @@ export default function AccountSettings() {
   const [gender, setGender] = useState("");
   const [city, setCity] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
+  const [gender, setGender] = useState("");
+  const [city, setCity] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Avatar
   const [avatar, setAvatar] = useState(user?.avatar_url || "");
@@ -69,6 +72,8 @@ export default function AccountSettings() {
       setEmail(user.email || "");
       setPhone(user.phone || "");
       setAvatar(user.avatar_url || "");
+      setGender(user.gender || "");
+      setCity(user.city || "");
       setGender(user.gender || "");
       setCity(user.city || "");
     }
