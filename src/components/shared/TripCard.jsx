@@ -1,305 +1,224 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, ArrowLeft, MapPin, AlertCircle, Share2 } from "lucide-react";
+import { Star, Clock, Users, AlertCircle, Share2, Zap } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
-
-// Format PostgreSQL DATE (YYYY-MM-DD) to friendly Arabic
-function formatTripDate(dateStr) {
+// ── Date formatter ─────────────────────────────────────────────────────────────
+function fmt(dateStr) {
   if (!dateStr) return "";
   if (/[\u0600-\u06FF]/.test(dateStr) || dateStr.includes("/")) return dateStr;
   try {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return dateStr;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const target = new Date(d);
-    target.setHours(0, 0, 0, 0);
-    const diffDays = Math.round((target - today) / 86400000);
-    if (diffDays === 0) return "اليوم";
-    if (diffDays === 1) return "غداً";
-    if (diffDays === -1) return "أمس";
-    if (diffDays > 1 && diffDays <= 7) return d.toLocaleDateString("ar-EG", { weekday: "long" });
+    const today = new Date(); today.setHours(0,0,0,0);
+    const target = new Date(d); target.setHours(0,0,0,0);
+    const diff = Math.round((target - today) / 86400000);
+    if (diff === 0) return "اليوم";
+    if (diff === 1) return "غداً";
+    if (diff === -1) return "أمس";
+    if (diff > 1 && diff <= 7) return d.toLocaleDateString("ar-EG", { weekday: "long" });
     return d.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
-  } catch {
-    return dateStr;
+  } catch { return dateStr; }
+}
+
+// ── Share ─────────────────────────────────────────────────────────────────────
+function share(e, id, from, to) {
+  e.preventDefault(); e.stopPropagation();
+  const url = `${window.location.origin}/trip/${id}`;
+  if (navigator.share) {
+    navigator.share({ title: "مِشوار", text: `رحلة من ${from} إلى ${to} على مِشوار 🚗`, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url)
+      .then(() => import("sonner").then(m => m.toast.success("تم نسخ رابط الرحلة! 📋")))
+      .catch(() => {});
   }
 }
 
+// ── Modern card — used for both male and female trips ─────────────────────────
+function Card({ t, noSeats, urgentSeats }) {
+  const isFemale = t.driver_gender === "female";
+  const stops    = Array.isArray(t.stops) ? t.stops.filter(s => s.city) : [];
 
-// ── Female driver card — elegant rose/floral theme ────────────────────────────
-function FemaleTripCard({ t, noSeats, urgentSeats }) {
+  // Theme colours
+  const theme = isFemale
+    ? { bar: "bg-gradient-to-b from-rose-400 to-fuchsia-400", border: "border-rose-200",
+        priceText: "text-rose-600", priceBg: "bg-rose-50",
+        seatBg: "bg-rose-50 text-rose-600", line: "bg-rose-200",
+        dot: "bg-rose-400", dotEmpty: "border-rose-400",
+        badge: "bg-rose-100 text-rose-700" }
+    : noSeats
+    ? { bar: "bg-destructive/50", border: "border-border",
+        priceText: "text-destructive", priceBg: "bg-destructive/5",
+        seatBg: "bg-destructive/8 text-destructive", line: "bg-border",
+        dot: "bg-muted-foreground/30", dotEmpty: "border-muted-foreground/30",
+        badge: "" }
+    : urgentSeats
+    ? { bar: "bg-gradient-to-b from-amber-400 to-orange-400", border: "border-amber-200/60",
+        priceText: "text-amber-700", priceBg: "bg-amber-50",
+        seatBg: "bg-amber-50 text-amber-700", line: "bg-amber-200",
+        dot: "bg-amber-500", dotEmpty: "border-amber-500",
+        badge: "bg-amber-100 text-amber-700" }
+    : { bar: "bg-gradient-to-b from-primary to-accent", border: "border-border",
+        priceText: "text-primary", priceBg: "bg-primary/8",
+        seatBg: "bg-primary/8 text-primary", line: "bg-primary/15",
+        dot: "bg-primary", dotEmpty: "border-primary",
+        badge: "bg-primary/8 text-primary" };
+
   return (
-    <div className={`relative rounded-2xl overflow-hidden shadow-sm transition-all ${
-      noSeats ? "opacity-60" : "hover:shadow-md hover:-translate-y-0.5"
-    }`}>
+    <div className={`relative bg-card rounded-2xl border ${theme.border} overflow-hidden shadow-sm active:scale-[0.985] transition-transform duration-150`}>
 
-      {/* Rose gradient border effect */}
-      <div className={`absolute inset-0 rounded-2xl ${
-        noSeats
-          ? "bg-border"
-          : "bg-gradient-to-br from-rose-300 via-pink-200 to-fuchsia-300"
-      }`} />
+      {/* Left accent bar */}
+      <div className={`absolute right-0 top-0 bottom-0 w-1.5 rounded-r-2xl ${theme.bar}`} />
 
-      {/* Inner card */}
-      <div className="relative m-[1.5px] rounded-[14px] bg-white dark:bg-[#1c1218] overflow-hidden">
-
-        {/* Decorative floral header strip */}
-        {!noSeats && (
-          <div className="h-1 w-full bg-gradient-to-r from-rose-400 via-pink-300 to-fuchsia-400" />
-        )}
-
-        {/* Floating rose petals decoration — top right */}
-        <div className="absolute top-2 left-2 text-[10px] opacity-30 select-none pointer-events-none leading-none">
-          🌸🌷🌸
+      {/* Urgency flash badge */}
+      {urgentSeats && !noSeats && (
+        <div className="absolute top-3 left-3 flex items-center gap-1 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse z-10">
+          <Zap className="w-2.5 h-2.5" />{t.available_seats} مقعد فقط!
         </div>
+      )}
+      {isFemale && (
+        <div className="absolute top-3 left-3 text-[11px] font-bold bg-rose-500 text-white px-2 py-0.5 rounded-full z-10">
+          سائقة 🌸
+        </div>
+      )}
 
-        {/* Top: Route + Price */}
-        <div className="flex items-start justify-between p-4 pb-3 pt-3">
+      <div className="pr-4 pl-3 pt-3.5 pb-3">
+
+        {/* ── Route + Price row ── */}
+        <div className="flex items-start justify-between gap-2 mb-2.5">
+
+          {/* Route */}
           <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              {/* FROM dot */}
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${theme.dot}`} />
 
-            {/* Female driver badge */}
-            <div className="flex items-center gap-1.5 mb-2">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-gradient-to-r from-rose-500 to-pink-500 text-white px-2.5 py-0.5 rounded-full shadow-sm shadow-rose-200">
-                <span>👩</span>
-                <span>سائقة</span>
-              </span>
-              {t.driver_rating > 0 && (
-                <span className="inline-flex items-center gap-0.5 text-[11px] text-rose-700 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200/60">
-                  <Star className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
-                  {Number(t.driver_rating).toFixed(1)}
-                </span>
-              )}
-            </div>
-
-            {/* Route */}
-            <div className="flex items-center gap-1.5 font-bold text-foreground text-base mb-1">
-              <span className="truncate">{t.from_city}</span>
-              <ArrowLeft className="w-4 h-4 text-rose-500 shrink-0" />
-              <span className="truncate">{t.to_city}</span>
-            </div>
-
-            {/* Via cities */}
-            {Array.isArray(t.stops) && t.stops.length > 0 && (
-              <div className="flex items-center gap-1 text-xs text-rose-400/80 mb-1 flex-wrap">
-                <MapPin className="w-3 h-3 shrink-0" />
-                <span className="truncate">{t.stops.map(s => s.city).filter(Boolean).join(" • ")}</span>
+              {/* Line + middle stops */}
+              <div className={`flex-1 h-px ${theme.line} relative`}>
+                {stops.length > 0 && (
+                  <div className="absolute inset-y-0 top-1/2 -translate-y-1/2 left-0 right-0 flex justify-evenly">
+                    {stops.slice(0, 3).map((_, i) => (
+                      <div key={i} className="w-1.5 h-1.5 rounded-full bg-yellow-500 border border-white ring-1 ring-yellow-300" />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Date + Time */}
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <Clock className="w-3.5 h-3.5 shrink-0 text-pink-400" />
-              <span>{formatTripDate(t.date)}</span>
-              <span className="text-pink-200">•</span>
-              <span className="font-medium text-foreground">{t.time}</span>
-              {t.distance && (
-                <>
-                  <span className="text-pink-200">•</span>
-                  <span>{t.distance}</span>
-                </>
-              )}
+              {/* TO dot */}
+              <div className={`w-2.5 h-2.5 rounded-full border-2 bg-card shrink-0 ${theme.dotEmpty}`} />
             </div>
+
+            {/* City names */}
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-black text-foreground leading-tight truncate">{t.from_city}</span>
+              <span className="text-muted-foreground text-xs shrink-0">←</span>
+              <span className="text-base font-black text-foreground leading-tight truncate">{t.to_city}</span>
+            </div>
+
+            {/* Stops hint */}
+            {stops.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                عبر: {stops.map(s => s.city).join(" • ")}
+              </p>
+            )}
           </div>
 
-          {/* Price */}
-          <div className="text-right shrink-0 mr-3">
-            <div className="text-2xl font-black bg-gradient-to-br from-rose-500 to-fuchsia-600 bg-clip-text text-transparent">
-              ₪{t.price}
-            </div>
-            <div className="text-[10px] text-muted-foreground">للمقعد</div>
+          {/* Price chip */}
+          <div className={`shrink-0 text-center rounded-xl px-2.5 py-1.5 ${theme.priceBg}`}>
+            <p className={`text-xl font-black leading-none ${theme.priceText}`}>₪{t.price}</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">للمقعد</p>
           </div>
         </div>
 
-        {/* Divider with rose tint */}
-        <div className="mx-4 h-px bg-gradient-to-r from-transparent via-rose-200/60 to-transparent" />
+        {/* ── Info chips: date · time · distance ── */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <span className="flex items-center gap-1 bg-muted/60 rounded-full px-2.5 py-1 text-[11px] font-medium text-foreground">
+            📅 {fmt(t.date)}
+          </span>
+          <span className="flex items-center gap-1 bg-muted/60 rounded-full px-2.5 py-1 text-[11px] font-medium text-foreground">
+            <Clock className="w-3 h-3" /> {t.time}
+          </span>
+          {t.distance && (
+            <span className="bg-muted/60 rounded-full px-2.5 py-1 text-[11px] text-muted-foreground">
+              {t.distance}
+            </span>
+          )}
+          {t.has_checkpoint && (
+            <span className="bg-orange-100 text-orange-700 rounded-full px-2.5 py-1 text-[10px] font-medium">
+              ⚠️ حاجز
+            </span>
+          )}
+        </div>
 
-        {/* Bottom: Driver + Seats */}
-        <div className="flex items-center gap-3 px-4 py-3">
+        {/* ── Divider ── */}
+        <div className="border-t border-border/50 mb-2.5" />
 
-          {/* Driver avatar with rose ring */}
-          <div className="relative shrink-0">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-200 to-pink-300 flex items-center justify-center text-sm font-bold text-rose-700 overflow-hidden ring-2 ring-rose-200 dark:ring-rose-800">
-              {t.driver_avatar
-                ? <img loading="lazy" src={t.driver_avatar} alt="" className="w-full h-full object-cover" />
-                : (t.driver_name?.[0] || "س")
-              }
-            </div>
-            <span className="absolute -bottom-0.5 -right-0.5 text-[10px] leading-none">🌸</span>
+        {/* ── Driver row ── */}
+        <div className="flex items-center gap-2">
+
+          {/* Avatar */}
+          <div className={`w-9 h-9 rounded-full overflow-hidden shrink-0 ${isFemale ? "ring-2 ring-rose-300" : "ring-1 ring-border"}`}>
+            {t.driver_avatar
+              ? <img loading="lazy" src={t.driver_avatar} alt="" className="w-full h-full object-cover" />
+              : <div className={`w-full h-full flex items-center justify-center text-sm font-bold ${isFemale ? "bg-rose-100 text-rose-600" : "bg-primary/10 text-primary"}`}>
+                  {(t.driver_name || "س")[0]}
+                </div>
+            }
           </div>
 
           {/* Driver info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground truncate">{t.driver_name || "سائقة"}</p>
+            <p className="text-sm font-semibold text-foreground leading-tight truncate">
+              {t.driver_name || "سائق"}
+            </p>
             <div className="flex items-center gap-1.5 flex-wrap">
-              {t.driver_rating === 0 && (
-                <span className="text-xs bg-rose-50 text-rose-600 dark:bg-rose-950/40 px-1.5 py-0.5 rounded-full border border-rose-200/50">
-                  سائقة جديدة ✨
+              {t.driver_rating > 0 ? (
+                <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
+                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                  {Number(t.driver_rating).toFixed(1)}
                 </span>
+              ) : (
+                <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded-full font-medium">جديد ✨</span>
               )}
               {t.car_model && (
-                <span className="text-xs text-muted-foreground truncate">{t.car_model}</span>
+                <span className="text-[11px] text-muted-foreground truncate">• {t.car_model}</span>
               )}
             </div>
           </div>
 
-          {/* Seats */}
-          <div className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${
-            noSeats
-              ? "bg-destructive/10 text-destructive"
-              : urgentSeats
-              ? "bg-amber-500/10 text-amber-700 border border-amber-200/60"
-              : "bg-rose-50 text-rose-600 dark:bg-rose-950/40 border border-rose-200/50"
-          }`}>
+          {/* Seats badge */}
+          <div className={`shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-bold ${theme.seatBg}`}>
             {noSeats
               ? <><AlertCircle className="w-3 h-3" /> مكتملة</>
-              : <><Users className="w-3 h-3" /> {t.available_seats} مقعد</>
+              : <><Users className="w-3 h-3" /> {t.available_seats}</>
             }
           </div>
+
           {/* Share */}
           <button
-            onClick={(e) => shareTrip(e, t.id, t.from_city, t.to_city)}
-            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-            title="مشاركة الرحلة"
+            onClick={(e) => share(e, t.id, t.from_city, t.to_city)}
+            className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/8 active:bg-primary/15 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Women-only preference badge */}
-        {t.driver_gender === "female" && (
-          <div className="bg-gradient-to-r from-rose-50 to-pink-50 dark:from-rose-950/30 dark:to-pink-950/30 border-t border-rose-100/60 dark:border-rose-900/40 px-4 py-2 flex items-center justify-between">
-            <span className="text-[11px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1.5">
-              🌷 رحلة بقيادة امرأة — آمنة ومريحة
-            </span>
-          </div>
-        )}
-
-        {/* Checkpoint warning */}
-        {t.has_checkpoint && (
-          <div className="bg-orange-500/10 border-t border-orange-500/20 px-4 py-2 flex items-center gap-1.5">
-            <AlertCircle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-            <span className="text-xs text-orange-700">المسار يمر بحاجز عسكري</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
-
-// Share trip link — works without login
-function shareTrip(e, tripId, from_city, to_city) {
-  e.preventDefault();
-  e.stopPropagation();
-  const url = `${window.location.origin}/trip/${tripId}`;
-  const text = `رحلة من ${from_city} إلى ${to_city} على مِشوار 🚗`;
-  if (navigator.share) {
-    navigator.share({ title: "مِشوار — رحلة مشتركة", text, url }).catch(() => {});
-  } else {
-    navigator.clipboard.writeText(url).then(
-      () => { import("sonner").then(m => m.toast.success("تم نسخ رابط الرحلة! 📋")); },
-      () => {}
-    );
-  }
-}
-
-// ── Standard male/neutral card ────────────────────────────────────────────────
-function StandardTripCard({ t, noSeats, urgentSeats }) {
-  return (
-    <div className={`bg-card rounded-2xl border overflow-hidden shadow-sm active:shadow-md transition-all ${
-      noSeats ? "opacity-60 border-border" : urgentSeats ? "border-yellow-400/50" : "border-border hover:border-primary/20"
-    }`}>
-      {/* Top: Route + Price */}
-      <div className="flex items-start justify-between p-4 pb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 font-bold text-foreground text-base mb-1">
-            <span className="truncate">{t.from_city}</span>
-            <ArrowLeft className="w-4 h-4 text-primary shrink-0" />
-            <span className="truncate">{t.to_city}</span>
-          </div>
-          {Array.isArray(t.stops) && t.stops.length > 0 && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1 flex-wrap">
-              <span className="font-medium">عبر:</span>
-              <span className="truncate">{t.stops.map(s => s.city).filter(Boolean).join(" • ")}</span>
+        {/* Car image strip (if available) */}
+        {t.car_image && (
+          <div className="mt-2.5 -mx-3 -mb-3 h-16 relative overflow-hidden rounded-b-2xl">
+            <img src={t.car_image} alt="" className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+            <div className="absolute bottom-1.5 right-3 text-white text-[10px] font-medium opacity-90">
+              {t.car_model}{t.car_color ? ` • ${t.car_color}` : ""}
             </div>
-          )}
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Clock className="w-3.5 h-3.5 shrink-0" />
-            <span>{formatTripDate(t.date)}</span>
-            <span className="text-border">•</span>
-            <span className="font-medium text-foreground">{t.time}</span>
-            {t.distance && (
-              <>
-                <span className="text-border">•</span>
-                <span>{t.distance}</span>
-              </>
-            )}
           </div>
-        </div>
-        <div className="text-right shrink-0 mr-3">
-          <div className="text-2xl font-black text-primary">₪{t.price}</div>
-          <div className="text-[10px] text-muted-foreground">للمقعد</div>
-        </div>
+        )}
       </div>
-
-      <div className="mx-4 border-t border-border/60" />
-
-      {/* Bottom: Driver + Seats */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary shrink-0 overflow-hidden">
-          {t.driver_avatar
-            ? <img loading="lazy" src={t.driver_avatar} alt="" className="w-full h-full object-cover" />
-            : (t.driver_name?.[0] || "س")
-          }
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-foreground truncate">{t.driver_name || "سائق"}</p>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {t.driver_rating > 0 ? (
-              <>
-                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500 shrink-0" />
-                <span className="text-xs text-muted-foreground">{Number(t.driver_rating).toFixed(1)}</span>
-              </>
-            ) : (
-              <span className="text-xs text-muted-foreground bg-accent/10 text-accent px-1.5 py-0.5 rounded-full">سائق جديد</span>
-            )}
-            {t.driver_gender === "male" && (
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">👨</span>
-            )}
-            {t.car_model && (
-              <span className="text-xs text-muted-foreground truncate">{t.car_model}</span>
-            )}
-          </div>
-        </div>
-        <div className={`shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold ${
-          noSeats
-            ? "bg-destructive/10 text-destructive"
-            : urgentSeats
-            ? "bg-yellow-500/15 text-yellow-700"
-            : "bg-primary/8 text-primary"
-        }`}>
-          {noSeats
-            ? <><AlertCircle className="w-3 h-3" /> مكتملة</>
-            : <><Users className="w-3 h-3" /> {t.available_seats} مقعد</>
-          }
-        </div>
-        <button onClick={(e) => shareTrip(e, t.id, t.from_city, t.to_city)} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/8 transition-colors" title="مشاركة الرحلة"><Share2 className="w-3.5 h-3.5" /></button>
-      </div>
-
-      {t.has_checkpoint && (
-        <div className="bg-orange-500/10 border-t border-orange-500/20 px-4 py-2 flex items-center gap-1.5">
-          <AlertCircle className="w-3.5 h-3.5 text-orange-600 shrink-0" />
-          <span className="text-xs text-orange-700">المسار يمر بحاجز عسكري</span>
-        </div>
-      )}
     </div>
   );
 }
 
-
-// ── Main TripCard — routes to the right variant ───────────────────────────────
+// ── Main export ───────────────────────────────────────────────────────────────
 export default function TripCard({ trip }) {
   const [liveTrip, setLiveTrip] = useState(trip);
 
@@ -311,18 +230,12 @@ export default function TripCard({ trip }) {
     return unsub;
   }, [trip?.id]);
 
-  const t = liveTrip || trip;
+  const t         = liveTrip || trip;
   const seatsLeft = t.available_seats || 0;
-  const urgentSeats = seatsLeft > 0 && seatsLeft <= 2;
-  const noSeats = seatsLeft === 0;
-  const isFemale = t.driver_gender === "female";
 
   return (
-    <Link to={`/trip/${t.id}`} className="block active:scale-[0.98] transition-transform">
-      {isFemale
-        ? <FemaleTripCard t={t} noSeats={noSeats} urgentSeats={urgentSeats} />
-        : <StandardTripCard t={t} noSeats={noSeats} urgentSeats={urgentSeats} />
-      }
+    <Link to={`/trip/${t.id}`} className="block">
+      <Card t={t} noSeats={seatsLeft === 0} urgentSeats={seatsLeft > 0 && seatsLeft <= 2} />
     </Link>
   );
 }
