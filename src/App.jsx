@@ -78,8 +78,19 @@ const AuthenticatedApp = () => {
   }
 
   // Redirect to onboarding if logged-in user hasn't completed it
-  const onboardingPaths = ["/onboarding", "/dashboard"];
-  const needsOnboarding = isAuthenticated && user && !user.onboarding_completed && !onboardingPaths.includes(location.pathname);
+  // Paths a partially-onboarded user can visit without being redirected to onboarding.
+  // Public browsing pages are allowed so the "الرئيسية" button on onboarding step 0 works.
+  const onboardingExempt = new Set([
+    "/onboarding", "/dashboard",
+    "/", "/search", "/how-it-works", "/community", "/help", "/login",
+  ]);
+  const needsOnboarding = (
+    isAuthenticated &&
+    user &&
+    !user.onboarding_completed &&
+    !onboardingExempt.has(location.pathname) &&
+    !location.pathname.startsWith("/trip/")
+  );
   if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
   }
