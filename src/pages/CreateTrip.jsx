@@ -211,25 +211,49 @@ export default function CreateTrip() {
       console.warn("[CreateTrip] conflict check skipped:", e?.message);
     }
 
+    // Build the payload using ONLY known DB columns — spreading form directly
+    // risks sending unknown keys (e.g. "gender") that don't exist in trips.
     const baseData = {
-      ...form,
-      status: "confirmed",
-      total_seats: form.available_seats,
-      // CRITICAL: link the trip to the driver via UUID (not just email)
-      driver_id: user.id,
-      driver_name: user?.full_name || user?.email?.split("@")[0] || "سائق",
-      driver_avatar: user?.avatar_url || "",
-      driver_email: user?.email || "",
-      driver_phone: user?.phone || "",
-      driver_gender: form.gender || "",
-      // Ensure stops is a clean array (no undefined / partial entries)
+      // Trip route + schedule
+      from_city:       form.from_city,
+      to_city:         form.to_city,
+      from_location:   form.from_location || "",
+      to_location:     form.to_location || "",
+      date:            form.date,
+      time:            form.time,
+      price:           form.price,
+      available_seats: form.available_seats,
+      total_seats:     form.available_seats,
+      // Trip options
+      is_direct:       form.is_direct,
+      is_recurring:    form.is_recurring,
+      recurring_days:  form.recurring_days || [],
+      amenities:       form.amenities || [],
+      payment_methods: form.payment_methods || ["cash"],
+      has_checkpoint:  form.has_checkpoint || false,
+      checkpoint_note: form.checkpoint_note || "",
+      driver_note:     form.driver_note || "",
+      // Car info
+      car_model:  form.car_model || "",
+      car_year:   form.car_year  || "",
+      car_color:  form.car_color || "",
+      car_plate:  form.car_plate || "",
+      // Multi-stop support
       stops: (form.stops || []).filter(s => s.city && s.time).map(s => ({
-        city: s.city,
-        location: s.location || "",
-        time: s.time,
+        city:              s.city,
+        location:          s.location || "",
+        time:              s.time,
         price_from_origin: Number(s.price_from_origin) || 0,
-        seats_available: Number(s.seats_available) || form.available_seats,
+        seats_available:   Number(s.seats_available) || form.available_seats,
       })),
+      // Driver identity — UUID link + denormalized display fields
+      driver_id:     user.id,
+      driver_name:   user?.full_name || user?.email?.split("@")[0] || "سائق",
+      driver_avatar: user?.avatar_url || "",
+      driver_email:  user?.email || "",
+      driver_phone:  user?.phone || "",
+      driver_gender: user?.gender || form.gender || "",
+      status: "confirmed",
     };
 
     if (form.is_recurring && form.recurring_days.length > 0) {
