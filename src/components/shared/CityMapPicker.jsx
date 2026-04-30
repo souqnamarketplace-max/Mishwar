@@ -412,20 +412,22 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
   return (
     <div className="relative" dir="rtl">
-      {/* Trigger button */}
-      <button type="button" onClick={() => setIsOpen(true)}
-        className="w-full h-11 flex items-center gap-2 px-3 rounded-xl bg-muted/50 border border-border text-sm hover:border-primary/40 transition-colors">
-        <MapPin className="w-4 h-4 text-primary shrink-0" />
-        <span className={selected ? "text-foreground font-medium" : "text-muted-foreground"}>
-          {selected || placeholder}
-        </span>
-        {selected && (
-          <button type="button" onClick={(e) => { e.stopPropagation(); handleSelect(""); }}
-            className="mr-auto p-1 rounded hover:bg-muted">
-            <X className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
-        )}
-      </button>
+      {/* Trigger button — hidden when parent controls open state via forceOpen */}
+      {!forceOpen && (
+        <button type="button" onClick={() => setIsOpen(true)}
+          className="w-full h-11 flex items-center gap-2 px-3 rounded-xl bg-muted/50 border border-border text-sm hover:border-primary/40 transition-colors">
+          <MapPin className="w-4 h-4 text-primary shrink-0" />
+          <span className={selected ? "text-foreground font-medium" : "text-muted-foreground"}>
+            {selected || placeholder}
+          </span>
+          {selected && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); handleSelect(""); }}
+              className="mr-auto p-1 rounded hover:bg-muted">
+              <X className="w-3.5 h-3.5 text-muted-foreground" />
+            </button>
+          )}
+        </button>
+      )}
 
       {/* Map modal */}
       {isOpen && (
@@ -436,10 +438,15 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
           style={{ overscrollBehavior: "none", touchAction: "none" }}
         >
           <div
-            className="bg-card w-full sm:max-w-lg h-[85vh] sm:h-[600px] rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+            className="bg-card w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
             onClick={e => e.stopPropagation()}
             onTouchMove={e => e.stopPropagation()}
-            style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
+            style={{
+              touchAction: "pan-y",
+              overscrollBehavior: "contain",
+              height: "92vh",
+              maxHeight: "700px",
+            }}
           >
 
             {/* Header */}
@@ -479,7 +486,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
             {/* Map + list */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div ref={mapRef} className="h-52 shrink-0" style={{ zIndex: 1, touchAction: "none" }} />
+              <div ref={mapRef} className="shrink-0" style={{ height: "45%", zIndex: 1, touchAction: "none", minHeight: "180px" }} />
               <div ref={listRef} className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 {filtered.map(city => (
                   <button key={city.name} type="button"

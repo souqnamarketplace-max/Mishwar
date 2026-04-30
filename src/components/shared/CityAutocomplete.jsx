@@ -108,11 +108,11 @@ export default function CityAutocomplete({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setShowMapPicker(true); setOpen(false); }}
-          className="shrink-0 flex items-center gap-1 text-[10px] font-medium text-primary/80 hover:text-primary bg-primary/8 hover:bg-primary/15 px-2 py-1 rounded-lg transition-colors"
+          className="shrink-0 flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 active:bg-primary/30 px-2.5 py-1.5 rounded-lg transition-colors border border-primary/20"
           title="اختر من الخريطة"
         >
-          <Map className="w-3 h-3" />
-          <span className="hidden sm:inline">خريطة</span>
+          <Map className="w-3.5 h-3.5" />
+          <span>خريطة</span>
         </button>
         <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
       </div>
