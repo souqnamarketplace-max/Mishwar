@@ -63,6 +63,9 @@ export default function TripDetails() {
     retry: 0,
   });
 
+  // Resolve trip — declared early so all subsequent hooks can use it
+  const trip = directTrip || trips.find((t) => t.id === id);
+
   // Check if user already has a confirmed booking on this trip
   const { data: existingBooking = null } = useQuery({
     queryKey: ["my-booking-on-trip", id, user?.email],
@@ -192,7 +195,6 @@ export default function TripDetails() {
     },
   });
 
-  const trip = directTrip || trips.find((t) => t.id === id);
 
   // Dynamic SEO — updates as trip data loads (for JS-rendering crawlers)
   const tripSeoTitle = trip ? `رحلة من ${trip.from_city} إلى ${trip.to_city}` : "تفاصيل الرحلة";
