@@ -87,15 +87,15 @@ export default function TripDetails() {
         : tripData.price;
 
       return base44.entities.Booking.create({
-        trip_id: tripData.id,
-        passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
+        trip_id:         tripData.id,
+        passenger_name:  user?.full_name || user?.email?.split("@")[0] || "راكب",
         passenger_email: user?.email || "",
-        seats_booked: seatsToBook,
-        total_price: pricePerSeat * seatsToBook,
+        seats_booked:    seatsToBook,
+        total_price:     pricePerSeat * seatsToBook,
+        dropoff_city:    computedDropoffCity,
         dropoff_stop_index: dropoffStopIndex,
-        dropoff_city: computedDropoffCity,
-        status: "pending",
-        payment_method: "cash",
+        status:          'pending',
+        payment_method:  'cash',
       });
     },
     onMutate: () => {
