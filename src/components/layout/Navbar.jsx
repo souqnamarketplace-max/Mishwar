@@ -35,6 +35,45 @@ const getNavLinks = (user, isAuthenticated) => {
   return links;
 };
 
+// ── Dynamic unread messages badge ────────────────────────────────────────────
+function MessagesBadge({ userEmail }) {
+  const qc = useQueryClient();
+
+  const { data: messages = [] } = useQuery({
+    queryKey: ["unread-messages-count", userEmail],
+    queryFn: async () => {
+      if (!userEmail) return [];
+      return base44.entities.Message.filter(
+        { receiver_email: userEmail, is_read: false },
+        "-created_date", 50
+      );
+    },
+    enabled: !!userEmail,
+    staleTime: 30_000,
+  });
+
+  const unreadCount = messages.length;
+
+  React.useEffect(() => {
+    if (!userEmail) return;
+    const unsub = base44.entities.Message.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["unread-messages-count", userEmail] });
+    });
+    return () => unsub();
+  }, [userEmail, qc]);
+
+  return (
+    <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+      <MessageSquare className="w-5 h-5 text-muted-foreground" />
+      {unreadCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 leading-none">
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -119,10 +158,7 @@ export default function Navbar() {
             )}
             {(isAuthenticated && user?.id) && (
               <>
-                <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
-                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
-                </Link>
+                <MessagesBadge userEmail={user?.email} />
                 <NotificationBell userEmail={user?.email} />
               </>
             )}

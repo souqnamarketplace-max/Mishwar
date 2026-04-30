@@ -146,7 +146,12 @@ export default function Messages() {
     );
     if (unread.length === 0) return;
     Promise.all(unread.map(m => base44.entities.Message.update(m.id, { is_read: true })))
-      .then(() => qc.invalidateQueries({ queryKey: ["messages", user.email] }))
+      .then(() => {
+        // Invalidate the messages cache AND both badge caches so counts update immediately
+        qc.invalidateQueries({ queryKey: ["messages", user.email] });
+        qc.invalidateQueries({ queryKey: ["unread-messages-count", user.email] });
+        qc.invalidateQueries({ queryKey: ["mobile-msg-badge", user.email] });
+      })
       .catch(() => {});
   }, [activeId, activeConv, user?.email, qc]);
 

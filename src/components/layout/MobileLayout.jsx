@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, Plus, Bell, User, Heart, ArrowRight, ChevronLeft, Car, Map } from "lucide-react";
+import { Home, Search, Plus, Bell, User, Heart, ArrowRight, ChevronLeft, Car, Map, MessageCircle } from "lucide-react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 
@@ -71,6 +71,17 @@ export default function MobileLayout({ children, user }) {
   const visibleTabs = getVisibleTabs(user);
 
   // Unread notifications badge (realtime)
+  // Unread messages count
+  const { data: unreadMessages = [] } = useQuery({
+    queryKey: ["mobile-msg-badge", user?.email],
+    queryFn: () => user?.email
+      ? base44.entities.Message.filter({ receiver_email: user.email, is_read: false }, "-created_date", 50)
+      : [],
+    enabled: !!user?.email,
+    staleTime: 30_000,
+  });
+  const unreadMsgCount = unreadMessages.length;
+
   const { data: notifications = [] } = useQuery({
     queryKey: ["mobile-notif-badge", user?.email],
     queryFn: () => user?.email
@@ -83,10 +94,13 @@ export default function MobileLayout({ children, user }) {
 
   useEffect(() => {
     if (!user?.email) return;
+    const unsubMsg = base44.entities.Message.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["mobile-msg-badge", user.email] });
+    });
     const unsub = base44.entities.Notification.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["mobile-notif-badge", user.email] });
     });
-    return () => unsub();
+    return () => { unsubMsg(); unsub(); };
   }, [user?.email, qc]);
 
   const showBackButton = BACK_BUTTON_PATHS.some(p => location.pathname.startsWith(p));
@@ -146,15 +160,28 @@ export default function MobileLayout({ children, user }) {
           {/* Notification bell + avatar */}
           <div className="flex items-center gap-1">
             {user && (
-              <Link to="/notifications"
-                className="relative w-11 h-11 flex items-center justify-center rounded-xl hover:bg-muted active:bg-muted/80">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 min-w-[18px] h-[18px] bg-destructive text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                    {unreadCount > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
-              </Link>
+              <>
+                {/* Messages icon with unread badge */}
+                <Link to="/messages"
+                  className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-muted active:bg-muted/80">
+                  <MessageCircle className="w-5 h-5 text-muted-foreground" />
+                  {unreadMsgCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] bg-destructive text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                      {unreadMsgCount > 9 ? "9+" : unreadMsgCount}
+                    </span>
+                  )}
+                </Link>
+                {/* Notifications bell */}
+                <Link to="/notifications"
+                  className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-muted active:bg-muted/80">
+                  <Bell className="w-5 h-5 text-muted-foreground" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] bg-destructive text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                      {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              </>
             )}
             {user?.avatar_url ? (
               <Link to="/profile" className="w-9 h-9 rounded-full overflow-hidden border-2 border-primary/20">
