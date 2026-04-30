@@ -63,6 +63,23 @@ export default function TripDetails() {
     retry: 0,
   });
 
+  // Check if user already has a confirmed booking on this trip
+  const { data: existingBooking = null } = useQuery({
+    queryKey: ["my-booking-on-trip", id, user?.email],
+    queryFn: async () => {
+      if (!user?.email || !id) return null;
+      const bookings = await base44.entities.Booking.filter(
+        { passenger_email: user.email, trip_id: id },
+        "-created_date", 5
+      );
+      return bookings.find(b => b.status === "confirmed") || null;
+    },
+    enabled: !!user?.email && !!id,
+  });
+
+  // User can see contact details if they have a confirmed booking OR just booked now
+  const hasConfirmedBooking = !!existingBooking || booked;
+
   // Realtime subscriptions:
   // 1) Trip changes (e.g. available_seats drops when someone else books)
   // 2) Booking changes (driver sees new bookings on their own trips)
@@ -272,8 +289,8 @@ export default function TripDetails() {
                 </Button>
               )}
 
-              {/* WhatsApp Contact */}
-              {trip?.driver_phone && (
+              {/* WhatsApp Contact — only after confirmed booking */}
+              {hasConfirmedBooking && trip?.driver_phone && (
                 <a
                   href={`https://wa.me/970${trip.driver_phone.replace(/\D/g, '')}?text=${encodeURIComponent("مرحباً، أود الاستفسار عن رحلتك من " + trip.from_city + " إلى " + trip.to_city)}`}
                   target="_blank"
@@ -600,13 +617,13 @@ export default function TripDetails() {
                 <MessageCircle className="w-4 h-4" />
                 راسل السائق
               </Button>
-              {trip.status === "confirmed" && trip.driver_phone && (
+              {hasConfirmedBooking && trip?.driver_phone && (
                 <Button variant="outline" className="w-full rounded-xl gap-2">
                   <Phone className="w-4 h-4" />
                   {trip.driver_phone}
                 </Button>
               )}
-              {trip.status !== "confirmed" && (
+              {!hasConfirmedBooking && (
                 <p className="text-xs text-muted-foreground text-center py-2">رقم الهاتف متاح بعد تأكيد الحجز</p>
               )}
             </div>

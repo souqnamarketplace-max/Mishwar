@@ -5,7 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sanitizeText } from "@/lib/validation";
+import { sanitizeText, containsPhoneNumber } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
 import { Search, Send, ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -150,6 +150,11 @@ export default function Messages() {
     mutationFn: async () => {
       if (!draft.trim() || !activeConv || !user?.email) return;
       const cleaned = sanitizeText(draft).slice(0, 5000);
+      // Block phone number sharing in chat
+      if (containsPhoneNumber(cleaned)) {
+        toast.error("🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. يمكنك التواصل عبر التطبيق فقط بعد تأكيد الحجز.");
+        return;
+      }
       // Generate a stable conversation_id for new conversations
       const convId = activeConv.id === "__new__"
         ? [user.email, activeConv.otherEmail].sort().join("__")

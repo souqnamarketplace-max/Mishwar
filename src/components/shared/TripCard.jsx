@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, ArrowLeft, MapPin, AlertCircle } from "lucide-react";
+import { Star, Clock, Users, ArrowLeft, MapPin, AlertCircle, Share2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 
@@ -156,6 +156,14 @@ function FemaleTripCard({ t, noSeats, urgentSeats }) {
               : <><Users className="w-3 h-3" /> {t.available_seats} مقعد</>
             }
           </div>
+          {/* Share */}
+          <button
+            onClick={(e) => shareTrip(e, t.id, t.from_city, t.to_city)}
+            className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            title="مشاركة الرحلة"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* Women-only preference badge */}
@@ -179,6 +187,23 @@ function FemaleTripCard({ t, noSeats, urgentSeats }) {
   );
 }
 
+
+
+// Share trip link — works without login
+function shareTrip(e, tripId, from_city, to_city) {
+  e.preventDefault();
+  e.stopPropagation();
+  const url = `${window.location.origin}/trip/${tripId}`;
+  const text = `رحلة من ${from_city} إلى ${to_city} على مِشوار 🚗`;
+  if (navigator.share) {
+    navigator.share({ title: "مِشوار — رحلة مشتركة", text, url }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(url).then(
+      () => { import("sonner").then(m => m.toast.success("تم نسخ رابط الرحلة! 📋")); },
+      () => {}
+    );
+  }
+}
 
 // ── Standard male/neutral card ────────────────────────────────────────────────
 function StandardTripCard({ t, noSeats, urgentSeats }) {
@@ -260,6 +285,7 @@ function StandardTripCard({ t, noSeats, urgentSeats }) {
             : <><Users className="w-3 h-3" /> {t.available_seats} مقعد</>
           }
         </div>
+        <button onClick={(e) => shareTrip(e, t.id, t.from_city, t.to_city)} className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/8 transition-colors" title="مشاركة الرحلة"><Share2 className="w-3.5 h-3.5" /></button>
       </div>
 
       {t.has_checkpoint && (

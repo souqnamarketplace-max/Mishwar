@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { isTripExpired } from "@/lib/tripScheduling";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Star, Clock, Users, ArrowLeft, Zap, MapPin } from "lucide-react";
+import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -255,6 +255,10 @@ export default function FeaturedTrips() {
                             <p className="text-lg font-black leading-none">₪{trip.price}</p>
                             <p className="text-[9px] opacity-70">للمقعد</p>
                           </div>
+                          <button
+                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); const url=`${window.location.origin}/trip/${trip.id}`; if(navigator.share)navigator.share({title:"مِشوار",text:`رحلة من ${trip.from_city} إلى ${trip.to_city}`,url}).catch(()=>{}); else navigator.clipboard.writeText(url).catch(()=>{}); }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-muted transition-colors"
+                          ><Share2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
                     </div>
