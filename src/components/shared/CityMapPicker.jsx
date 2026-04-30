@@ -267,6 +267,26 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
   const markersRef  = useRef([]);
   const [search,   setSearch]   = useState("");
   const [isOpen,   setIsOpen]   = useState(false);
+
+  // Lock body scroll when modal is open — prevents background page from scrolling
+  useEffect(() => {
+    if (isOpen) {
+      const prev = document.body.style.overflow;
+      const prevPos = document.body.style.position;
+      const scrollY = window.scrollY;
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+      return () => {
+        document.body.style.overflow = prev;
+        document.body.style.position = prevPos;
+        document.body.style.top = "";
+        document.body.style.width = "";
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [isOpen]);
   const [selected, setSelected] = useState(value || "");
 
   // Allow parent to force-open the map
@@ -295,7 +315,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
       const map = L.default.map(mapRef.current, {
         center: [32.0, 35.2], zoom: 9,
-        zoomControl: true, scrollWheelZoom: true,
+        zoomControl: true, scrollWheelZoom: false,
       });
 
       L.default.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -378,10 +398,18 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
       {/* Map modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60"
-          onClick={handleClose}>
-          <div className="bg-card w-full sm:max-w-lg h-[85vh] sm:h-[600px] rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
-            onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60"
+          onClick={handleClose}
+          onTouchMove={(e) => e.stopPropagation()}
+          style={{ overscrollBehavior: "none", touchAction: "none" }}
+        >
+          <div
+            className="bg-card w-full sm:max-w-lg h-[85vh] sm:h-[600px] rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
+            onClick={e => e.stopPropagation()}
+            onTouchMove={e => e.stopPropagation()}
+            style={{ touchAction: "pan-y", overscrollBehavior: "contain" }}
+          >
 
             {/* Header */}
             <div className="p-4 border-b border-border flex items-center gap-3 shrink-0">
@@ -417,7 +445,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
             {/* Map + list */}
             <div className="flex-1 flex flex-col overflow-hidden">
-              <div ref={mapRef} className="h-52 shrink-0" style={{ zIndex: 1 }} />
+              <div ref={mapRef} className="h-52 shrink-0" style={{ zIndex: 1, touchAction: "none" }} />
               <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 {filtered.map(city => (
                   <button key={city.name} type="button"
