@@ -199,6 +199,21 @@ export default function CityAutocomplete({
           setQuery(city);
           setShowMapPicker(false);
           onChange?.(city);
+          // Scroll page back to top so city input is visible after map closes
+          requestAnimationFrame(() => {
+            const el = containerRef.current;
+            if (!el) return;
+            // Find nearest scrollable parent
+            let parent = el.parentElement;
+            while (parent) {
+              const st = window.getComputedStyle(parent);
+              if (st.overflowY === "scroll" || st.overflowY === "auto" || parent.style.overflowY === "scroll") {
+                parent.scrollTo({ top: 0, behavior: "smooth" });
+                break;
+              }
+              parent = parent.parentElement;
+            }
+          });
         }}
       />
     )}

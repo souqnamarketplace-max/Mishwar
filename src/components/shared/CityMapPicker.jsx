@@ -270,24 +270,33 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
   const [search,   setSearch]   = useState("");
   const [isOpen,   setIsOpen]   = useState(false);
 
-  // Lock body scroll when modal is open — prevents background page from scrolling
+  // Lock the scrollable container (MobileLayout scroll div) when map is open
+  // MobileLayout is fixed inset-0, so we lock its scroll child, not the body
   useEffect(() => {
-    if (isOpen) {
-      const prev = document.body.style.overflow;
-      const prevPos = document.body.style.position;
-      const scrollY = window.scrollY;
-      document.body.style.overflow = "hidden";
-      document.body.style.position = "fixed";
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = "100%";
-      return () => {
-        document.body.style.overflow = prev;
-        document.body.style.position = prevPos;
-        document.body.style.top = "";
-        document.body.style.width = "";
-        window.scrollTo(0, scrollY);
-      };
-    }
+    if (!isOpen) return;
+
+    // Find the nearest scrollable ancestor
+    const findScrollParent = (el) => {
+      if (!el) return null;
+      const style = window.getComputedStyle(el);
+      if (style.overflowY === "scroll" || style.overflowY === "auto") return el;
+      return findScrollParent(el.parentElement);
+    };
+
+    // We need a DOM ref — use the trigger button's parent
+    const trigger = document.activeElement;
+    const scrollParent = findScrollParent(trigger) || document.documentElement;
+    const savedScrollTop = scrollParent.scrollTop;
+
+    // Lock the scroll container
+    scrollParent.style.overflow = "hidden";
+
+    return () => {
+      // Restore scroll container to where it was (at the input field)
+      scrollParent.style.overflow = "";
+      // Scroll back to where the user was — top of form
+      scrollParent.scrollTop = savedScrollTop;
+    };
   }, [isOpen]);
   const [selected, setSelected] = useState(value || "");
 
