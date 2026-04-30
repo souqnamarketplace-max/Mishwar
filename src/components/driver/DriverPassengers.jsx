@@ -30,9 +30,45 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
       qc.setQueryData(["bookings"], ctx);
       toast.error("فشل التحديث");
     },
-    onSuccess: () => {
+    onSuccess: async (_, { id, status }) => {
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
       qc.invalidateQueries({ queryKey: ["bookings"] });
-      toast.success("تم تحديث الحجز");
+      // Notify the passenger about the booking status change
+      try {
+        const allBookings = qc.getQueryData(["driver-bookings"]) ||
+                            qc.getQueryData(["bookings"]) || [];
+        const booking = allBookings.find(b => b.id === id);
+        if (booking?.passenger_email) {
+          if (status === "confirmed") {
+            await base44.entities.Notification.create({
+              user_email: booking.passenger_email,
+              title: "تم قبول حجزك ✅",
+              message: "تهانينا! قام السائق بقبول حجزك. تحقق من رحلاتي لعرض التفاصيل.",
+              type: "system",
+              trip_id: booking.trip_id,
+              is_read: false,
+            });
+            toast.success("تم قبول الحجز وإخطار الراكب ✅");
+          } else if (status === "cancelled") {
+            await base44.entities.Notification.create({
+              user_email: booking.passenger_email,
+              title: "تم رفض حجزك ❌",
+              message: "عذراً، قام السائق برفض حجزك. يمكنك البحث عن رحلة أخرى.",
+              type: "system",
+              trip_id: booking.trip_id,
+              is_read: false,
+            });
+            toast.info("تم رفض الحجز وإخطار الراكب");
+          } else {
+            toast.success("تم تحديث الحجز");
+          }
+        } else {
+          toast.success("تم تحديث الحجز");
+        }
+      } catch (e) {
+        console.warn("[DriverPassengers] notification failed:", e?.message);
+        toast.success("تم تحديث الحجز");
+      }
     },
   });
 
