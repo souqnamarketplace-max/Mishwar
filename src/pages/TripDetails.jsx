@@ -1,10 +1,6 @@
-import { useSEO } from "@/hooks/useSEO";
-import { logAudit } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { checkPassengerConflict } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
-import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +11,6 @@ import {
   Headphones, X, Check
 } from "lucide-react";
 import { toast } from "sonner";
-import RouteMap from "@/components/shared/RouteMap";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -34,202 +29,52 @@ const whyChoose = [
 ];
 
 export default function TripDetails() {
-  useSEO({ title: "تفاصيل الرحلة", description: "احجز مقعدك في هذه الرحلة" });
-
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [booked, setBooked] = useState(false);
   const [favorited, setFavorited] = useState(false);
-  const [seatsToBook, setSeatsToBook] = useState(1);
-  const [showBookingConfirm, setShowBookingConfirm] = useState(false);
-  // For multi-stop trips: which stop index does the passenger want to get off at?
-  // null = all the way to to_city (default).
-  const [dropoffStopIndex, setDropoffStopIndex] = useState(null);
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
-  const { user } = useAuth();
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
 
-  const { data: trips = [], isLoading: tripsListLoading } = useQuery({
+  const { data: trips = [] } = useQuery({
     queryKey: ["trips"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 200),
+    queryFn: () => base44.entities.Trip.list("-created_date", 50),
   });
-
-  // Fast path: also try fetching the specific trip by ID (avoids find-in-list miss)
-  const { data: directTrip, isLoading: directLoading } = useQuery({
-    queryKey: ["trip", id],
-    queryFn: () => base44.entities.Trip.get(id),
-    enabled: !!id,
-    retry: 0,
-  });
-
-  // Resolve trip — declared early so all subsequent hooks can use it
-  const trip = directTrip || trips.find((t) => t.id === id);
-
-  // Check if user already has a confirmed booking on this trip
-  const { data: existingBooking = null } = useQuery({
-    queryKey: ["my-booking-on-trip", id, user?.email],
-    queryFn: async () => {
-      if (!user?.email || !id) return null;
-      const bookings = await base44.entities.Booking.filter(
-        { passenger_email: user.email, trip_id: id },
-        "-created_date", 5
-      );
-      return bookings.find(b => b.status === "confirmed") || null;
-    },
-    enabled: !!user?.email && !!id,
-  });
-
-  // Reactive price: changes when passenger selects a different drop-off stop
-  const displayPricePerSeat = React.useMemo(() => {
-    const stops = Array.isArray(trip?.stops) ? trip.stops : [];
-    const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
-    if (isMidStop && Number(stops[dropoffStopIndex]?.price_from_origin) > 0) {
-      return Number(stops[dropoffStopIndex].price_from_origin);
-    }
-    return trip?.price || 0;
-  }, [trip?.stops, trip?.price, dropoffStopIndex]);
-
-  // Display dropoff city
-  const displayDropoffCity = React.useMemo(() => {
-    const stops = Array.isArray(trip?.stops) ? trip.stops : [];
-    const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
-    return isMidStop ? stops[dropoffStopIndex].city : trip?.to_city;
-  }, [trip?.stops, trip?.to_city, dropoffStopIndex]);
-
-  // User can see contact details if they have a confirmed booking OR just booked now
-  const hasConfirmedBooking = !!existingBooking || booked;
-
-  // Realtime subscriptions:
-  // 1) Trip changes (e.g. available_seats drops when someone else books)
-  // 2) Booking changes (driver sees new bookings on their own trips)
-  React.useEffect(() => {
-    if (!id) return;
-    const unsubTrip = base44.entities.Trip.subscribe(() => {
-      qc.invalidateQueries({ queryKey: ["trip", id] });
-      qc.invalidateQueries({ queryKey: ["trips"] });
-    });
-    const unsubBooking = base44.entities.Booking.subscribe((payload) => {
-      const bid = payload?.new?.trip_id || payload?.old?.trip_id;
-      if (bid && bid !== id) return;
-      qc.invalidateQueries({ queryKey: ["trip-bookings", id] });
-      qc.invalidateQueries({ queryKey: ["trip", id] });
-    });
-    return () => { unsubTrip(); unsubBooking(); };
-  }, [id]);
 
   const bookingMutation = useMutation({
-    mutationFn: (tripData) => {
-      // Auth guard — redirect to login with return-to so they come back after sign-in
-      if (!user?.email) {
-        const returnTo = `/trip/${tripData.id}`;
-        navigate(`/login?returnTo=${encodeURIComponent(returnTo)}&action=book`);
-        return Promise.reject(new Error("__redirect__"));
-      }
-      // Block self-booking — driver cannot book a seat in their own trip
-      if (tripData?.driver_email && tripData.driver_email === user.email) {
-        return Promise.reject(new Error("لا يمكنك حجز مقعد في رحلتك الخاصة"));
-      }
-      // Block booking if no seats
-      if ((tripData.available_seats || 0) < seatsToBook) {
-        return Promise.reject(new Error("عدد المقاعد المتاحة غير كافٍ"));
-      }
-      // Compute dropoff city + price based on selected stop (or final dest)
-      const stops = Array.isArray(tripData.stops) ? tripData.stops : [];
-      const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
-      const computedDropoffCity = isMidStop ? stops[dropoffStopIndex].city : tripData.to_city;
-      const pricePerSeat = isMidStop && Number(stops[dropoffStopIndex].price_from_origin) > 0
-        ? Number(stops[dropoffStopIndex].price_from_origin)
-        : tripData.price;
-
-      return base44.entities.Booking.create({
-        trip_id:         tripData.id,
-        passenger_name:  user?.full_name || user?.email?.split("@")[0] || "راكب",
-        passenger_email: user?.email || "",
-        seats_booked:    seatsToBook,
-        total_price:     pricePerSeat * seatsToBook,
-        status:          "pending",
-        payment_method:  "cash",
-        // dropoff_city stored in driver_note until we add the column via migration
-        // note: dropoffStopIndex & computedDropoffCity are shown in the UI only
-      });
-    },
+    mutationFn: (tripData) => base44.entities.Booking.create({
+      trip_id: tripData.id,
+      passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
+      passenger_email: user?.email || "",
+      seats_booked: 1,
+      total_price: tripData.price,
+      status: "pending",
+      payment_method: "نقداً",
+    }),
     onMutate: () => {
       setBooked(true);
       return null;
     },
-    onError: (err) => {
+    onError: () => {
       setBooked(false);
-      const msg = err?.message || "فشل الحجز";
-      if (msg === "__redirect__") return;
-      // SQL trigger errors come back with the Arabic text already
-      if (msg.includes("يتعارض") || msg.includes("لا يطابق") || msg.includes("لا يمكن") || msg.includes("لديك")) {
-        toast.error(msg.split("\\n")[0]);
-      } else {
-        toast.error(msg);
-      }
+      toast.error("فشل الحجز");
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       toast.success("تم الحجز بنجاح! 🎉");
       qc.invalidateQueries({ queryKey: ["trips"] });
-      qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
-      // Notify the driver that someone booked their trip
-      if (trip?.driver_email && user?.email && trip.driver_email !== user.email) {
-        try {
-          await base44.entities.Notification.create({
-            user_email: trip.driver_email,
-            title: "حجز جديد على رحلتك 🎉",
-            message: `${user.full_name || user.email} حجز ${seatsToBook} مقعد في رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
-            type: "booking_received",
-            trip_id: trip.id,
-            link: "/my-trips?tab=driver",
-            is_read: false,
-          });
-        } catch (e) { console.warn("[Notif] booking_received:", e?.message); }
-      }
-      logAudit("booking_created", "booking", null, {
-        route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
-        date: trip?.date, driver_email: trip?.driver_email, passenger_email: user?.email, seats: seatsToBook,
-      });
-      navigate(`/booking-confirmation?trip=${trip?.id}`);
     },
   });
 
+  const trip = trips.find((t) => t.id === id) || trips[0];
 
-  // Dynamic SEO — updates as trip data loads (for JS-rendering crawlers)
-  const tripSeoTitle = trip ? `رحلة من ${trip.from_city} إلى ${trip.to_city}` : "تفاصيل الرحلة";
-  const tripSeoDesc  = trip
-    ? `₪${trip.price} للمقعد · ${trip.date} · ${trip.available_seats} مقاعد متاحة · السائق: ${trip.driver_name}`
-    : "احجز مقعدك في رحلة مريحة وآمنة";
-  useSEO({
-    title:       tripSeoTitle,
-    description: tripSeoDesc,
-    canonical:   trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined,
-  });
-  const tripsLoading = (tripsListLoading && directLoading);
-  const isOwnTrip = !!(trip && user && trip.driver_email === user.email);
-
-  // Still loading the list — show spinner
-  if (tripsLoading) {
+  if (!trip) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
         <p className="text-muted-foreground">جاري التحميل...</p>
-      </div>
-    );
-  }
-
-  // List loaded but this trip ID doesn't exist
-  if (!trip) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center" dir="rtl">
-        <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">🔍</span>
-        </div>
-        <h2 className="text-xl font-bold text-foreground mb-2">الرحلة غير موجودة</h2>
-        <p className="text-sm text-muted-foreground mb-6">قد تكون الرحلة قد ألغيت أو الرابط غير صحيح</p>
-        <Link to="/search">
-          <Button className="rounded-xl">العودة للبحث</Button>
-        </Link>
       </div>
     );
   }
@@ -242,10 +87,10 @@ export default function TripDetails() {
         العودة إلى النتائج
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" dir="rtl">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* ===== LEFT SIDEBAR (Booking) ===== */}
-        <div className="space-y-4">
+        <div className="lg:order-first order-last space-y-4">
           <div className="bg-card rounded-2xl border border-border overflow-hidden sticky top-24">
             {/* Price header */}
             <div className="bg-primary p-4 text-primary-foreground">
@@ -270,65 +115,14 @@ export default function TripDetails() {
                 ))}
               </div>
 
-              {/* "This is your trip" notice — shown when viewer is the driver */}
-              {isOwnTrip && (
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 my-2 text-center">
-                  <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 mb-2">
-                    <span className="text-xl">🚗</span>
-                  </div>
-                  <p className="font-bold text-foreground mb-1">هذه رحلتك</p>
-                  <p className="text-xs text-muted-foreground mb-3">أنت السائق - لا يمكنك حجز مقعد في رحلتك الخاصة</p>
-                  <Link to="/my-trips">
-                    <Button variant="outline" className="rounded-xl text-sm">إدارة رحلاتي</Button>
-                  </Link>
-                </div>
-              )}
-
-              {/* Seats selector — hidden when viewing own trip */}
-              {!booked && !isOwnTrip && (
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-muted-foreground">عدد المقاعد</span>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setSeatsToBook(s => Math.max(1, s - 1))}
-                      className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center font-bold hover:bg-muted/80 transition-colors"
-                    >−</button>
-                    <span className="font-bold text-lg w-6 text-center">{seatsToBook}</span>
-                    <button
-                      onClick={() => setSeatsToBook(s => Math.min(trip?.available_seats || 4, s + 1))}
-                      className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center font-bold hover:bg-muted/80 transition-colors"
-                    >+</button>
-                  </div>
-                </div>
-              )}
-              {/* Price update notice when stop selected */}
-              {dropoffStopIndex !== null && displayPricePerSeat !== (trip?.price || 0) && !booked && !isOwnTrip && (
-                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-2.5 flex items-center justify-between">
-                  <span className="text-xs text-green-800">
-                    السعر حتى <span className="font-bold">{displayDropoffCity}</span>
-                  </span>
-                  <span className="text-sm font-black text-green-700">₪{displayPricePerSeat} / مقعد</span>
-                </div>
-              )}
-              {!booked && !isOwnTrip && seatsToBook > 1 && (
-                <div className="flex items-center justify-between text-sm text-muted-foreground pb-1">
-                  <span>الإجمالي</span>
-                  <span className="font-bold text-primary">₪{displayPricePerSeat * seatsToBook}</span>
-                </div>
-              )}
-
-              {/* Book button — hidden when viewing your own trip */}
-              {!isOwnTrip && (
-                <Button
-                  className={`w-full h-11 rounded-xl font-bold gap-2 mt-1 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
-                  onClick={() => !booked && setShowBookingConfirm(true)}
-                  disabled={bookingMutation.isPending || booked}
-                >
-                  {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز</> : bookingMutation.isPending ? "جاري الحجز..." : `احجز ${seatsToBook > 1 ? seatsToBook + " مقاعد" : "الآن"}`}
-                </Button>
-              )}
-
-              {/* Driver contact via in-app messages only */}
+              {/* Book button */}
+              <Button
+                className={`w-full h-11 rounded-xl font-bold gap-2 mt-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
+                onClick={() => !booked && bookingMutation.mutate(trip)}
+                disabled={bookingMutation.isPending}
+              >
+                {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
+              </Button>
 
               {/* Favorite */}
               <Button
@@ -382,169 +176,47 @@ export default function TripDetails() {
               <span>{trip.time} صباحاً</span>
             </div>
 
-            {/* Interactive Route Map */}
-            <RouteMap
-              fromCity={trip.from_city}
-              toCity={trip.to_city}
-              stops={Array.isArray(trip.stops) ? trip.stops : []}
-              height="220px"
-              showStats={true}
-              className="mt-2"
-            />
-
-            {/* Route pickup/dropoff points */}
-            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-border text-sm">
-              <div className="flex items-start gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">نقطة الانطلاق</p>
-                  <p className="font-medium">{trip.from_location || trip.from_city}</p>
-                </div>
+            {/* Map */}
+            <div className="rounded-xl overflow-hidden h-52 relative bg-muted">
+              <img
+                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&h=400&fit=crop"
+                alt="خريطة المسار"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-black/10" />
+              {/* From pin */}
+              <div className="absolute bottom-6 right-6 bg-white rounded-lg px-2 py-1 shadow text-xs font-bold text-foreground flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                {trip.from_city}
               </div>
-              <div className="flex items-start gap-2">
-                <div className="w-2 h-2 rounded-full bg-destructive mt-1.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-muted-foreground">نقطة الوصول</p>
-                  <p className="font-medium">{trip.to_location || trip.to_city}</p>
-                </div>
+              {/* To pin */}
+              <div className="absolute top-6 left-6 bg-white rounded-lg px-2 py-1 shadow text-xs font-bold text-foreground flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-destructive" />
+                {trip.to_city}
               </div>
             </div>
 
-            {/* Multi-stop timeline (only shown if trip has stops) */}
-            {Array.isArray(trip.stops) && trip.stops.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <span>محطات الطريق</span>
-                  <span className="text-xs font-normal text-muted-foreground">({trip.stops.length} محطة)</span>
+            {/* Route stats */}
+            <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border text-center">
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <MapPin className="w-3 h-3" /> {trip.to_city}
                 </p>
-                <div className="relative pl-4">
-                  {/* Vertical line */}
-                  <div className="absolute right-1.5 top-2 bottom-2 w-px bg-border" />
-                  {/* Origin */}
-                  <div className="flex items-start gap-3 pb-3 relative">
-                    <div className="w-3 h-3 rounded-full bg-primary mt-1 shrink-0 z-10" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{trip.from_city}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {trip.from_location || "نقطة البداية"}{trip.time && ` • ${trip.time}`}
-                      </p>
-                    </div>
-                  </div>
-                  {/* Intermediate stops */}
-                  {trip.stops.map((stop, idx) => (
-                    <div key={idx} className="flex items-start gap-3 pb-3 relative">
-                      <div className="w-3 h-3 rounded-full bg-yellow-500 mt-1 shrink-0 z-10 border-2 border-card" />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold">{stop.city}</p>
-                          {Number(stop.price_from_origin) > 0 && (
-                            <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
-                              ₪{stop.price_from_origin}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {stop.location || "محطة توقف"}{stop.time && ` • ${stop.time}`}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                  {/* Destination */}
-                  <div className="flex items-start gap-3 relative">
-                    <div className="w-3 h-3 rounded-full bg-destructive mt-1 shrink-0 z-10" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{trip.to_city}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {trip.to_location || "نقطة الوصول"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-xs font-medium">{trip.to_location || "دوار الشهداء"}</p>
               </div>
-            )}
-
-            {/* Drop-off selector — card-style with prominent pricing */}
-            {Array.isArray(trip.stops) && trip.stops.length > 0 && !booked && !isOwnTrip && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  🗺️ أين تريد النزول؟
-                  <span className="text-xs font-normal text-muted-foreground">اختر وجهتك لحساب السعر</span>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">المسافة</p>
+                <p className="text-xs font-medium">{trip.distance || "45 كم"}</p>
+                <p className="text-xs text-muted-foreground">المدة</p>
+                <p className="text-xs font-medium">{trip.duration || "55 د"} تقريباً</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
+                  <MapPin className="w-3 h-3" /> {trip.from_city}
                 </p>
-                <div className="space-y-2">
-                  {/* Final destination — full trip price */}
-                  <button
-                    type="button"
-                    onClick={() => setDropoffStopIndex(null)}
-                    className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-right transition-all ${
-                      dropoffStopIndex === null
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                        dropoffStopIndex === null ? "border-primary" : "border-muted-foreground"
-                      }`}>
-                        {dropoffStopIndex === null && <div className="w-2 h-2 rounded-full bg-primary" />}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold leading-tight">{trip.to_city}</p>
-                        <p className="text-[11px] text-muted-foreground">الوجهة النهائية</p>
-                      </div>
-                    </div>
-                    <span className={`text-base font-black shrink-0 ${
-                      dropoffStopIndex === null ? "text-primary" : "text-muted-foreground"
-                    }`}>₪{trip.price}</span>
-                  </button>
-
-                  {/* Intermediate stops — may have different prices */}
-                  {trip.stops.map((stop, idx) => {
-                    const stopPrice = Number(stop.price_from_origin);
-                    const hasDiscount = stopPrice > 0 && stopPrice < trip.price;
-                    return (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setDropoffStopIndex(idx)}
-                        className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-right transition-all ${
-                          dropoffStopIndex === idx
-                            ? "border-primary bg-primary/5 shadow-sm"
-                            : "border-border hover:border-primary/40"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                            dropoffStopIndex === idx ? "border-primary" : "border-yellow-500"
-                          }`}>
-                            {dropoffStopIndex === idx && <div className="w-2 h-2 rounded-full bg-primary" />}
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-semibold leading-tight">{stop.city}</p>
-                            <p className="text-[11px] text-muted-foreground">
-                              محطة توقف{stop.time ? ` • ${stop.time}` : ""}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-left shrink-0">
-                          {stopPrice > 0 ? (
-                            <>
-                              <p className={`text-base font-black ${dropoffStopIndex === idx ? "text-primary" : "text-muted-foreground"}`}>
-                                ₪{stopPrice}
-                              </p>
-                              {hasDiscount && (
-                                <p className="text-[10px] text-green-600 font-medium">أقل من النهاية</p>
-                              )}
-                            </>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">نفس السعر</p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="text-xs font-medium">{trip.from_location || "دوار المنارة"}</p>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Trip Details */}
@@ -573,7 +245,7 @@ export default function TripDetails() {
             <div className="flex items-center gap-3 mb-4">
               <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary shrink-0 overflow-hidden">
                 {trip.driver_avatar ? (
-                  <img loading="lazy" src={trip.driver_avatar} alt="" className="w-full h-full object-cover" />
+                  <img src={trip.driver_avatar} alt="" className="w-full h-full object-cover" />
                 ) : (
                   trip.driver_name?.[0] || "م"
                 )}
@@ -605,7 +277,7 @@ export default function TripDetails() {
               </div>
               <div className="text-center p-2 bg-muted/50 rounded-lg">
                 <p className="text-base font-bold text-primary">سنتان</p>
-                <p className="text-xs text-muted-foreground">خبرة في مِشوار</p>
+                <p className="text-xs text-muted-foreground">خبرة في سيرتنا</p>
               </div>
             </div>
 
@@ -613,9 +285,9 @@ export default function TripDetails() {
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
               <div className="w-20 h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
                 {trip.car_image ? (
-                  <img loading="lazy" src={trip.car_image} alt="" className="w-full h-full object-cover" />
+                  <img src={trip.car_image} alt="" className="w-full h-full object-cover" />
                 ) : (
-                  <img loading="lazy" src="https://images.unsplash.com/photo-1541443131876-44b03de101c5?w=200&h=120&fit=crop" alt="سيارة" className="w-full h-full object-cover" />
+                  <img src="https://images.unsplash.com/photo-1541443131876-44b03de101c5?w=200&h=120&fit=crop" alt="سيارة" className="w-full h-full object-cover" />
                 )}
               </div>
               <div>
@@ -644,13 +316,6 @@ export default function TripDetails() {
               </div>
             </div>
 
-            {/* Checkpoint Warning */}
-            {trip.has_checkpoint && (
-              <div className="mt-3 p-3 bg-orange-500/10 rounded-xl border border-orange-500/20">
-                <p className="text-sm font-medium text-orange-800 mb-1">⚠️ تحذير: المسار يمر بحاجز</p>
-                <p className="text-xs text-orange-700">{trip.checkpoint_note || "يرجى متابعة أخبار الحواجز قبل الانطلاق"}</p>
-              </div>
-            )}
             {/* Driver note */}
             <div className="mt-3 p-3 bg-primary/5 rounded-xl">
               <p className="text-sm">
@@ -689,22 +354,17 @@ export default function TripDetails() {
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="font-bold text-foreground mb-3">تواصل مع السائق</h3>
             <div className="space-y-2">
-              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => {
-                const to   = encodeURIComponent(trip.driver_email || "");
-                const name = encodeURIComponent(trip.driver_name  || "سائق");
-                const tid  = encodeURIComponent(trip.id || "");
-                navigate(`/messages?to=${to}&name=${name}&trip=${tid}`);
-              }}>
+              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => navigate("/messages")}>
                 <MessageCircle className="w-4 h-4" />
-                راسل السائق
+                محادثة
               </Button>
-              {hasConfirmedBooking && trip?.driver_phone && (
+              {trip.status === "confirmed" && trip.driver_phone && (
                 <Button variant="outline" className="w-full rounded-xl gap-2">
                   <Phone className="w-4 h-4" />
                   {trip.driver_phone}
                 </Button>
               )}
-              {!hasConfirmedBooking && (
+              {trip.status !== "confirmed" && (
                 <p className="text-xs text-muted-foreground text-center py-2">رقم الهاتف متاح بعد تأكيد الحجز</p>
               )}
             </div>
@@ -714,7 +374,15 @@ export default function TripDetails() {
           <div className="bg-card rounded-2xl border border-border p-5">
             <p className="text-sm font-medium mb-3">شارك الرحلة مع أصدقائك!</p>
             <div className="flex items-center justify-center gap-3 flex-wrap">
-
+              <button
+                className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
+                onClick={() => {
+                  const url = `https://wa.me/?text=انضم معي في رحلة من ${trip.from_city} إلى ${trip.to_city} بسعر ₪${trip.price}`;
+                  window.open(url, "_blank");
+                }}
+              >
+                واتساب
+              </button>
               <button
                 className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
                 onClick={() => {
@@ -759,76 +427,13 @@ export default function TripDetails() {
         </div>
       </div>
 
-      {/* ── Mobile Sticky Booking Bar ─────────────────────── */}
-      {isMobile && trip && !isOwnTrip && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border p-3"
-          style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom))" }}>
-
-          {/* Chat button — always visible on mobile */}
-          {!booked && (
-            <button
-              onClick={() => {
-                const to   = encodeURIComponent(trip.driver_email || "");
-                const name = encodeURIComponent(trip.driver_name  || "سائق");
-                const tid  = encodeURIComponent(trip.id || "");
-                navigate(`/messages?to=${to}&name=${name}&trip=${tid}`);
-              }}
-              className="w-full flex items-center justify-center gap-2 bg-muted/80 hover:bg-muted text-foreground rounded-xl h-10 mb-2 text-sm font-medium active:opacity-70 transition-opacity"
-            >
-              <MessageCircle className="w-4 h-4" />
-              راسل السائق
-            </button>
-          )}
-
-          {/* Book bar */}
-          {!booked && (
-            <div className="flex items-center gap-2">
-              <div className="shrink-0">
-                <div className="text-xl font-black text-primary leading-none">₪{displayPricePerSeat * seatsToBook}</div>
-                {seatsToBook > 1 && <div className="text-[10px] text-muted-foreground">{seatsToBook} × ₪{displayPricePerSeat}</div>}
-              </div>
-              <div className="flex items-center gap-1.5 mr-1 shrink-0">
-                <button onClick={() => setSeatsToBook(s => Math.max(1, s - 1))}
-                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center font-bold text-base active:bg-muted/80">−</button>
-                <span className="font-bold w-5 text-center text-sm">{seatsToBook}</span>
-                <button onClick={() => setSeatsToBook(s => Math.min(trip?.available_seats || 4, s + 1))}
-                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center font-bold text-base active:bg-muted/80">+</button>
-              </div>
-              <Button
-                className="flex-1 h-10 rounded-xl font-bold text-sm bg-primary text-primary-foreground active:bg-primary/80"
-                onClick={() => bookingMutation.mutate(trip)}
-                disabled={bookingMutation.isPending}
-              >
-                {bookingMutation.isPending ? "..." : "احجز الآن ✓"}
-              </Button>
-            </div>
-          )}
-
-          {/* Post-booking: show chat only */}
-          {booked && (
-            <button
-              onClick={() => {
-                const to   = encodeURIComponent(trip.driver_email || "");
-                const name = encodeURIComponent(trip.driver_name  || "سائق");
-                const tid  = encodeURIComponent(trip.id || "");
-                navigate(`/messages?to=${to}&name=${name}&trip=${tid}`);
-              }}
-              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl h-11 text-sm font-bold active:opacity-80 transition-opacity"
-            >
-              <MessageCircle className="w-4 h-4" />
-              راسل السائق
-            </button>
-          )}
-        </div>
-      )}
-
       {/* Bottom trust badges */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border">
         {[
           { icon: Headphones, title: "دعم على مدار الساعة", desc: "فريق الدعم جاهز لمساعدتك في أي وقت" },
           { icon: Shield, title: "طرق دفع آمنة", desc: "حماية كاملة لبياناتك ومعاملاتك المالية" },
           { icon: X, title: "إلغاء مجاني", desc: "إلغاء مجاني حتى موعد الرحلة بساعتين" },
-          { icon: Users, title: "مجتمع موثوق", desc: "آلاف المستخدمين يثقون في مِشوار كل يوم" },
+          { icon: Users, title: "مجتمع موثوق", desc: "آلاف المستخدمين يثقون في سيرتنا كل يوم" },
         ].map((b) => (
           <div key={b.title} className="flex items-start gap-3 p-4 bg-card rounded-xl border border-border">
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -841,142 +446,6 @@ export default function TripDetails() {
           </div>
         ))}
       </div>
-
-    {/* ── Booking Confirmation Modal ──────────────────────────── */}
-    {showBookingConfirm && trip && (() => {
-      const stops = Array.isArray(trip.stops) ? trip.stops : [];
-      const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
-      const dropoffCity = isMidStop ? stops[dropoffStopIndex].city : trip.to_city;
-      const pricePerSeat = isMidStop && Number(stops[dropoffStopIndex].price_from_origin) > 0
-        ? Number(stops[dropoffStopIndex].price_from_origin)
-        : trip.price;
-      const totalPrice = pricePerSeat * seatsToBook;
-      const tripDate = trip.date ? new Date(trip.date).toLocaleDateString('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : trip.date;
-      return (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60"
-          dir="rtl"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowBookingConfirm(false); }}
-        >
-          <div className="bg-card rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col max-h-[90dvh]">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-              <h3 className="font-bold text-foreground text-base flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-primary" />
-                تأكيد الحجز
-              </h3>
-              <button
-                onClick={() => setShowBookingConfirm(false)}
-                className="w-9 h-9 rounded-xl hover:bg-muted flex items-center justify-center"
-                aria-label="إغلاق"
-              >
-                <X className="w-5 h-5 text-muted-foreground" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-              {/* Route */}
-              <div className="bg-muted/40 rounded-xl p-4">
-                <div className="flex items-center justify-center gap-3 text-xl font-bold text-foreground mb-2">
-                  <span>{trip.from_city}</span>
-                  <ArrowRight className="w-5 h-5 text-primary" />
-                  <span>{dropoffCity}</span>
-                </div>
-                {isMidStop && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    ستنزل في محطة {dropoffCity} (وليس وجهة الرحلة الأخيرة)
-                  </p>
-                )}
-              </div>
-
-              {/* Date / Time */}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="bg-muted/40 rounded-xl p-3">
-                  <p className="text-xs text-muted-foreground mb-1">📅 التاريخ</p>
-                  <p className="font-semibold">{tripDate}</p>
-                </div>
-                <div className="bg-muted/40 rounded-xl p-3">
-                  <p className="text-xs text-muted-foreground mb-1">🕐 الوقت</p>
-                  <p className="font-semibold">{trip.time}</p>
-                </div>
-              </div>
-
-              {/* Driver */}
-              <div className="bg-muted/40 rounded-xl p-3 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="font-bold text-primary">{trip.driver_name?.[0] || "س"}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-muted-foreground">السائق</p>
-                  <p className="font-semibold truncate">{trip.driver_name || "السائق"}</p>
-                </div>
-                {trip.driver_rating > 0 && (
-                  <div className="text-sm font-bold text-amber-500">⭐ {trip.driver_rating.toFixed(1)}</div>
-                )}
-              </div>
-
-              {/* Seats */}
-              <div className="flex items-center justify-between py-2 border-y border-border">
-                <span className="text-sm text-muted-foreground">عدد المقاعد</span>
-                <span className="font-bold">{seatsToBook}</span>
-              </div>
-
-              {/* Price breakdown */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">سعر المقعد الواحد</span>
-                  <span>₪{pricePerSeat}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">المقاعد × {seatsToBook}</span>
-                  <span>₪{totalPrice}</span>
-                </div>
-                <div className="flex items-center justify-between text-base font-bold border-t border-border pt-2">
-                  <span>المجموع</span>
-                  <span className="text-primary">₪{totalPrice}</span>
-                </div>
-              </div>
-
-              {/* Payment method */}
-              <div className="bg-muted/40 rounded-xl p-3 text-sm">
-                <span className="text-muted-foreground">💳 طريقة الدفع: </span>
-                <span className="font-semibold">نقداً للسائق</span>
-              </div>
-
-              {/* Cancellation policy */}
-              <p className="text-xs text-muted-foreground text-center">
-                يمكنك إلغاء الحجز مجاناً حتى ساعتين قبل موعد الرحلة
-              </p>
-            </div>
-
-            {/* Footer buttons */}
-            <div className="border-t border-border px-5 py-4 flex gap-3 shrink-0">
-              <Button
-                variant="outline"
-                onClick={() => setShowBookingConfirm(false)}
-                className="flex-1 rounded-xl h-11"
-                disabled={bookingMutation.isPending}
-              >
-                إلغاء
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowBookingConfirm(false);
-                  bookingMutation.mutate(trip);
-                }}
-                className="flex-1 rounded-xl h-11 bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-                disabled={bookingMutation.isPending}
-              >
-                <CheckCircle className="w-4 h-4" />
-                تأكيد الحجز
-              </Button>
-            </div>
-          </div>
-        </div>
-      );
-    })()}
-
     </div>
   );
 }

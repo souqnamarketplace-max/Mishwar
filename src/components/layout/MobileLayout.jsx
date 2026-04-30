@@ -1,303 +1,157 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, Plus, Bell, User, Heart, ArrowRight, ChevronLeft, Car, Map, MessageCircle } from "lucide-react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { useLocation, Link } from "react-router-dom";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
 
-// ─── Tab definitions per role ───────────────────────────────────────────────
-
-// For drivers/both — center FAB = "أنشر رحلة", right slot = "لوحتي"
-const TABS_DRIVER = [
-  { id: "home",    label: "الرئيسية", icon: Home,   path: "/" },
-  { id: "search",  label: "بحث",      icon: Search, path: "/search" },
-  { id: "create",  label: "أنشر",     icon: Plus,   path: "/create-trip", isAction: true },
-  { id: "driver",  label: "لوحتي",    icon: Car,    path: "/driver" },
-  { id: "profile", label: "حسابي",    icon: User,   path: "/profile" },
+const MOBILE_TABS = [
+  { id: "home", label: "الرئيسية", icon: Home, path: "/" },
+  { id: "search", label: "بحث", icon: Search, path: "/search" },
+  { id: "trips", label: "رحلاتي", icon: MapPin, path: "/my-trips" },
+  { id: "messages", label: "الرسائل", icon: MessageSquare, path: "/messages" },
+  { id: "profile", label: "الملف", icon: User, path: "/profile?email=" },
 ];
 
-// For passengers — no FAB, show my-trips and favorites
-const TABS_PASSENGER = [
-  { id: "home",      label: "الرئيسية", icon: Home,   path: "/" },
-  { id: "search",    label: "بحث",      icon: Search, path: "/search" },
-  { id: "mytrips",   label: "رحلاتي",   icon: Map,    path: "/my-trips" },
-  { id: "favorites", label: "المفضلة",  icon: Heart,  path: "/favorites" },
-  { id: "profile",   label: "حسابي",    icon: User,   path: "/profile" },
-];
-
-function getVisibleTabs(user) {
-  const isDriver = user?.account_type === "driver" || user?.account_type === "both";
-  return isDriver ? TABS_DRIVER : TABS_PASSENGER;
-}
-
-// Pages that hide the bottom nav
-const HIDE_NAV_PATHS = ["/onboarding", "/login", "/booking-confirmation"];
-
-// Pages that show a back button in the header
-const BACK_BUTTON_PATHS = [
-  "/trip/", "/create-trip", "/settings", "/help", "/about", "/blog",
-  "/safety", "/my-trips", "/favorites", "/messages", "/notifications",
-  "/profile", "/driver", "/how-it-works", "/community", "/booking-confirmation",
-];
-
-const PAGE_TITLES = {
-  "/": "مِشوار",
-  "/search": "ابحث عن رحلة",
-  "/my-trips": "رحلاتي",
-  "/create-trip": "أنشر رحلة",
-  "/notifications": "الإشعارات",
-  "/messages": "الرسائل",
-  "/favorites": "المفضلة",
-  "/profile": "ملفي الشخصي",
-  "/settings": "الإعدادات",
-  "/how-it-works": "كيف تعمل؟",
-  "/driver": "لوحة السائق",
-  "/help": "المساعدة",
-  "/about": "من نحن",
-  "/community": "المجتمع",
-  "/blog": "المدونة",
-  "/safety": "الأمان",
-  "/booking-confirmation": "تم الحجز! 🎉",
-};
-
-export default function MobileLayout({ children, user }) {
-  const location   = useLocation();
-  const navigate   = useNavigate();
-  const qc         = useQueryClient();
+export default function MobileLayout({ children, user, showHeader = true, headerTitle = "" }) {
+  const location = useLocation();
+  const qc = useQueryClient();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const contentRef = useRef(null);
   const pullStartRef = useRef(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const tabHistoryRef = useRef({});
+  
+  // Detect if viewport is mobile
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
-  const isMobile   = typeof window !== "undefined" && window.innerWidth < 1024;
-  const visibleTabs = getVisibleTabs(user);
+  const currentTab = MOBILE_TABS.find(tab => location.pathname.startsWith(tab.path.split("?")[0]));
 
-  // Unread notifications badge (realtime)
-  // Unread messages count
-  const { data: unreadMessages = [] } = useQuery({
-    queryKey: ["mobile-msg-badge", user?.email],
-    queryFn: () => user?.email
-      ? base44.entities.Message.filter({ receiver_email: user.email, is_read: false }, "-created_date", 50)
-      : [],
-    enabled: !!user?.email,
-    staleTime: 30_000,
-  });
-  const unreadMsgCount = unreadMessages.length;
-
-  const { data: notifications = [] } = useQuery({
-    queryKey: ["mobile-notif-badge", user?.email],
-    queryFn: () => user?.email
-      ? base44.entities.Notification.filter({ user_email: user.email, is_read: false }, "-created_date", 20)
-      : [],
-    enabled: !!user?.email,
-    refetchInterval: false,
-  });
-  const unreadCount = notifications.length;
-
+  // Track tab history/stacks (unconditional)
   useEffect(() => {
-    if (!user?.email) return;
-    const unsubMsg = base44.entities.Message.subscribe(() => {
-      qc.invalidateQueries({ queryKey: ["mobile-msg-badge", user.email] });
-    });
-    const unsub = base44.entities.Notification.subscribe(() => {
-      qc.invalidateQueries({ queryKey: ["mobile-notif-badge", user.email] });
-    });
-    return () => { unsubMsg(); unsub(); };
-  }, [user?.email, qc]);
+    if (currentTab?.id && !tabHistoryRef.current[currentTab.id]) {
+      tabHistoryRef.current[currentTab.id] = [];
+    }
+    if (currentTab?.id) {
+      const stack = tabHistoryRef.current[currentTab.id];
+      if (stack[stack.length - 1] !== location.pathname) {
+        stack.push(location.pathname);
+      }
+    }
+  }, [currentTab?.id, location.pathname]);
 
-  const showBackButton = BACK_BUTTON_PATHS.some(p => location.pathname.startsWith(p));
-  const hideNav        = HIDE_NAV_PATHS.some(p => location.pathname.startsWith(p));
-  const pageTitle      = PAGE_TITLES[location.pathname]
-    || (location.pathname.startsWith("/trip/") ? "تفاصيل الرحلة" : "مِشوار");
+  if (!isMobile) return children;
 
-  // Pull-to-refresh
+  // Pull-to-refresh handler
   const handleTouchStart = (e) => {
-    if (contentRef.current?.scrollTop === 0) pullStartRef.current = e.touches[0].clientY;
+    if (contentRef.current?.scrollTop === 0) {
+      pullStartRef.current = e.touches[0].clientY;
+    }
   };
+
   const handleTouchMove = (e) => {
-    // Only trigger pull-to-refresh if truly at the very top (scrollTop < 2)
-    // and the drag is clearly downward (>120px) — avoids conflicting with form scrolling
-    const scrollTop = contentRef.current?.scrollTop ?? 1;
-    if (scrollTop < 2 && pullStartRef.current > 0) {
-      const drag = e.touches[0].clientY - pullStartRef.current;
-      if (drag > 120 && !isRefreshing) {
+    if (contentRef.current?.scrollTop === 0 && pullStartRef.current > 0) {
+      const pullDistance = e.touches[0].clientY - pullStartRef.current;
+      if (pullDistance > 60 && !isRefreshing) {
         setIsRefreshing(true);
         pullStartRef.current = 0;
       }
     }
   };
+
   const handleTouchEnd = async () => {
     if (isRefreshing) {
       await qc.refetchQueries();
-      setTimeout(() => setIsRefreshing(false), 800);
+      setIsRefreshing(false);
     }
     pullStartRef.current = 0;
   };
 
-  if (!isMobile) return children;
-
   return (
-    <div className="fixed inset-0 bg-background" dir="rtl" style={{ display: "flex", flexDirection: "column" }}>
-
-      {/* ── Top header ── */}
-      <div className="flex-shrink-0 bg-card/98 backdrop-blur-xl border-b border-border"
-        style={{ paddingTop: "env(safe-area-inset-top)" }}>
-        <div className="flex items-center h-14 px-4 gap-3">
-
-          {showBackButton ? (
-            <button onClick={() => navigate(-1)}
-              className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-muted active:bg-muted/80 -mr-1">
-              <ChevronLeft className="w-6 h-6 text-foreground" />
-            </button>
-          ) : (
-            <Link to="/" className="flex items-center gap-2">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-                <span className="text-primary-foreground font-black text-base">م</span>
+    <div className="fixed inset-0 bg-background flex flex-col">
+      {/* Sticky Header */}
+      {showHeader && (
+        <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border safe-area-inset-top">
+          <div className="flex items-center justify-between h-14 px-4 gap-2">
+            {location.pathname !== "/" ? (
+              <Link to="/">
+                <Button variant="ghost" size="icon" className="h-10 w-10">
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
+              </Link>
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground font-bold text-lg">س</span>
               </div>
-            </Link>
-          )}
-
-          <h1 className="flex-1 font-bold text-foreground text-base leading-tight">{pageTitle}</h1>
-
-          {/* Notification bell + avatar */}
-          <div className="flex items-center gap-1">
-            {user && (
-              <>
-                {/* Messages icon with unread badge */}
-                <Link to="/messages"
-                  className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-muted active:bg-muted/80">
-                  <MessageCircle className="w-5 h-5 text-muted-foreground" />
-                  {unreadMsgCount > 0 && (
-                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] bg-destructive text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
-                      {unreadMsgCount > 9 ? "9+" : unreadMsgCount}
-                    </span>
-                  )}
-                </Link>
-                {/* Notifications bell */}
-                <Link to="/notifications"
-                  className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-muted active:bg-muted/80">
-                  <Bell className="w-5 h-5 text-muted-foreground" />
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-[16px] bg-destructive text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </Link>
-              </>
             )}
-            {user?.avatar_url ? (
-              <Link to="/profile" className="w-9 h-9 rounded-full overflow-hidden border-2 border-primary/20">
-                <img loading="lazy" src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-              </Link>
-            ) : user && (
-              <Link to="/profile"
-                className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                {user.full_name?.[0] || "م"}
-              </Link>
-            )}
+            
+            <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
+              {headerTitle || currentTab?.label || "سيرتنا"}
+            </h1>
+            
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+            >
+              {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
-        </div>
-      </div>
-
-      {/* Pull-to-refresh indicator */}
-      {isRefreshing && (
-        <div className="flex-shrink-0 bg-primary/10 border-b border-primary/20 px-4 py-2 text-center text-xs text-primary font-medium">
-          🔄 جاري التحديث...
         </div>
       )}
 
-      {/* ── Scrollable content — Android-safe ── */}
+      {/* Main Content */}
       <div
         ref={contentRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{
-          flex: 1,
-          overflowY: "scroll",
-          overflowX: "hidden",
-          WebkitOverflowScrolling: "touch",
-          overscrollBehavior: "contain",
-          paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "80px",
-          position: "relative",
-          /* Android Chrome — must use scroll not auto */
-          willChange: "scroll-position",
-        }}
+        className="flex-1 overflow-y-auto pb-20 relative"
       >
+        {isRefreshing && (
+          <div className="sticky top-0 left-0 right-0 z-20 bg-primary/10 border-b border-primary/20 px-4 py-2 text-center text-xs text-primary font-medium">
+            🔄 جاري التحديث...
+          </div>
+        )}
         {children}
       </div>
 
-      {/* ── Bottom tab bar ── */}
-      {!hideNav && (
-        <div
-          className="flex-shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border"
-          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-        >
-          <div className="flex items-end justify-around h-16 px-1">
-            {visibleTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = tab.path === "/"
-                ? location.pathname === "/"
-                : location.pathname.startsWith(tab.path);
-
-              // Center action button (FAB) — only for drivers
-              if (tab.isAction) {
-                return (
-                  <Link key={tab.id} to={tab.path}
-                    className="flex flex-col items-center justify-center -mt-5 mb-1">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all active:scale-95 ${
-                      isActive ? "bg-primary/80" : "bg-primary"
-                    }`}>
-                      <Icon className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
-                    </div>
-                    <span className="text-[9px] font-medium text-primary mt-0.5">{tab.label}</span>
-                  </Link>
-                );
+      {/* Bottom Tab Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-inset-bottom">
+        <div className="flex items-center justify-around h-20 px-2">
+          {MOBILE_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = location.pathname.startsWith(tab.path.split("?")[0]);
+            const href = tab.id === "profile" ? `${tab.path}${user?.email}` : tab.path;
+            
+            const handleTabClick = (e) => {
+              if (isActive && location.pathname !== tab.path.split("?")[0]) {
+                e.preventDefault();
+                window.location.href = tab.path.split("?")[0];
               }
-
-              // Driver dashboard tab — special highlight
-              const isDashTab = tab.id === "driver";
-              const href = tab.id === "profile"
-                ? `/profile?email=${user?.email || ""}`
-                : tab.path;
-
-              return (
-                <Link key={tab.id} to={href}
-                  className={`relative flex flex-col items-center justify-center flex-1 h-full pt-2 pb-1 gap-0.5 transition-colors active:opacity-70 ${
-                    isActive ? "text-primary" : isDashTab ? "text-accent" : "text-muted-foreground"
-                  }`}
-                >
-                  {/* Active dot */}
-                  {isActive && (
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full bg-primary" />
-                  )}
-
-                  <div className={`relative w-10 h-8 flex items-center justify-center rounded-xl transition-all ${
-                    isActive
-                      ? "bg-primary/10"
-                      : isDashTab && !isActive
-                      ? "bg-accent/8 group-hover:bg-accent/15"
-                      : ""
-                  }`}>
-                    <Icon className={`w-5 h-5 transition-all ${
-                      isActive ? "scale-110" : "scale-100"
-                    }`} strokeWidth={isActive ? 2.5 : 2} />
-                    {/* Notification badge (for bell tab if we ever add it) */}
-                    {tab.id === "notifs" && unreadCount > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-white text-[9px] font-bold rounded-full flex items-center justify-center">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    )}
-                  </div>
-
-                  <span className={`text-[10px] font-medium leading-tight ${
-                    isActive ? "text-primary font-semibold" : isDashTab ? "text-accent" : ""
-                  }`}>
-                    {tab.label}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+              setShowMobileMenu(false);
+            };
+            
+            return (
+              <Link
+                key={tab.id}
+                to={href}
+                onClick={handleTabClick}
+                className={`flex flex-col items-center justify-center flex-1 h-full rounded-lg transition-colors ${
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Icon className="w-6 h-6 mb-1" />
+                <span className="text-[10px] font-medium">{tab.label}</span>
+              </Link>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {showMobileMenu && (
+        <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileMenu(false)} />
       )}
     </div>
   );
