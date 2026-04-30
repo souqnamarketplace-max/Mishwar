@@ -22,6 +22,11 @@ export default function DashboardUsers() {
   const [showAccessKey, setShowAccessKey] = useState(false);
   const qc = useQueryClient();
 
+  React.useEffect(() => {
+    const u = base44.entities.Profile.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-users"] }));
+    return () => u();
+  }, []);
+
   // Server-side pagination — only loads 25 users at a time
   const [page, setPage] = useState(1);
 

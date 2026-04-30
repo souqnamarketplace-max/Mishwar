@@ -20,6 +20,13 @@ export default function DashboardTrips() {
   const [search, setSearch] = useState("");
   const qc = useQueryClient();
 
+  // Realtime — admin sees trip changes instantly
+  React.useEffect(() => {
+    const u1 = base44.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-trips"] }));
+    const u2 = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-trips"] }));
+    return () => { u1(); u2(); };
+  }, []);
+
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
   const { data: tripsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({

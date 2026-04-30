@@ -62,6 +62,25 @@ export default function TripDetails() {
     retry: 0,
   });
 
+  // Realtime subscriptions:
+  // 1) Trip changes (e.g. available_seats drops when someone else books)
+  // 2) Booking changes (driver sees new bookings on their own trips)
+  React.useEffect(() => {
+    if (!tripId) return;
+    const unsubTrip = base44.entities.Trip.subscribe((payload) => {
+      if (!payload?.new?.id && !payload?.old?.id) return;
+      qc.invalidateQueries({ queryKey: ["trip", tripId] });
+      qc.invalidateQueries({ queryKey: ["trips"] });
+    });
+    const unsubBooking = base44.entities.Booking.subscribe((payload) => {
+      const bid = payload?.new?.trip_id || payload?.old?.trip_id;
+      if (bid && bid !== tripId) return;
+      qc.invalidateQueries({ queryKey: ["trip-bookings", tripId] });
+      qc.invalidateQueries({ queryKey: ["trip", tripId] });
+    });
+    return () => { unsubTrip(); unsubBooking(); };
+  }, [tripId]);
+
   const bookingMutation = useMutation({
     mutationFn: (tripData) => {
       // Auth guard — redirect to login with return-to so they come back after sign-in

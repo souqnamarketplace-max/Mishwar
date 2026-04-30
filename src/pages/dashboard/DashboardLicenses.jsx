@@ -16,6 +16,11 @@ export default function DashboardLicenses() {
   const [rejectionReason, setRejectionReason] = useState("");
   const qc = useQueryClient();
 
+  React.useEffect(() => {
+    const u = base44.entities.DriverLicense.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-licenses"] }));
+    return () => u();
+  }, []);
+
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
   const { data: licensesData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({

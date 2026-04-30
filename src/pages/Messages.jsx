@@ -47,9 +47,18 @@ export default function Messages() {
       return merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     },
     enabled: !!user?.email,
-    refetchInterval: 10000,  // refresh every 10s
+    refetchInterval: false,  // realtime subscription handles updates
     staleTime: 5000,
   });
+
+  // Realtime subscription — new/updated messages appear instantly
+  React.useEffect(() => {
+    if (!user?.email) return;
+    const unsub = base44.entities.Message.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["messages", user.email] });
+    });
+    return () => unsub();
+  }, [user?.email]);
 
   // Group messages by conversation_id (or fall back to "other person's email")
   const conversations = React.useMemo(() => {

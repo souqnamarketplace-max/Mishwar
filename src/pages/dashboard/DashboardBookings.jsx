@@ -18,6 +18,11 @@ export default function DashboardBookings() {
   const [search, setSearch] = useState("");
   const qc = useQueryClient();
 
+  React.useEffect(() => {
+    const u = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-bookings"] }));
+    return () => u();
+  }, []);
+
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
   const { data: bookingsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({

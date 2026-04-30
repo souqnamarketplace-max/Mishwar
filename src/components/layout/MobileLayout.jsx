@@ -43,9 +43,18 @@ export default function MobileLayout({ children, user }) {
       ? base44.entities.Notification.filter({ user_email: user.email, is_read: false }, "-created_date", 20)
       : [],
     enabled: !!user?.email,
-    refetchInterval: 30000,
+    refetchInterval: false,  // realtime handles this
   });
   const unreadCount = notifications.length;
+
+  // Realtime — notification badge updates instantly
+  React.useEffect(() => {
+    if (!user?.email) return;
+    const unsub = base44.entities.Notification.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["mobile-notif-badge", user.email] });
+    });
+    return () => unsub();
+  }, [user?.email]);
 
   const currentTab = visibleTabs.find(tab => {
     if (tab.path === "/") return location.pathname === "/";

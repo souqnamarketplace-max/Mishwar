@@ -24,10 +24,19 @@ export default function NotificationBell({ userEmail }) {
         ? base44.entities.Notification.filter({ user_email: userEmail }, "-created_date", 20)
         : [],
     enabled: !!userEmail,
-    refetchInterval: 30000,
+    refetchInterval: false,  // realtime subscription handles updates
   });
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  // Realtime subscription — badge updates instantly when new notification arrives
+  React.useEffect(() => {
+    if (!userEmail) return;
+    const unsub = base44.entities.Notification.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["notifications-bell", userEmail] });
+    });
+    return () => unsub();
+  }, [userEmail]);
 
   const markRead = useMutation({
     mutationFn: (id) => base44.entities.Notification.update(id, { is_read: true }),
