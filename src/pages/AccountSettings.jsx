@@ -88,6 +88,19 @@ export default function AccountSettings() {
     }
   }, [driverLicense]);
 
+  const handleProfileUpdate = async () => {
+    setProfileLoading(true);
+    try {
+      await base44.auth.updateMe({ city: city || undefined });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      toast.success("تم تحديث المدينة ✅");
+    } catch (err) {
+      toast.error(err?.message || "فشل التحديث");
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
   const updateEmail = async () => {
     if (!email || email === user?.email) {
       toast.error("أدخل بريد إلكتروني جديد");
