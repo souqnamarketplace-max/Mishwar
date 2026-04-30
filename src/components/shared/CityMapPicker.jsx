@@ -265,6 +265,8 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
   const mapRef      = useRef(null);
   const mapInstance = useRef(null);
   const markersRef  = useRef([]);
+  const listRef     = useRef(null);  // ref for city list scrolling
+  const searchRef   = useRef(null);  // ref to focus search after selection
   const [search,   setSearch]   = useState("");
   const [isOpen,   setIsOpen]   = useState(false);
 
@@ -341,7 +343,19 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
           .addTo(map)
           .bindTooltip(city.name, { permanent: false, direction: "top" });
 
-        marker.on("click", () => handleSelect(city.name));
+        marker.on("click", () => {
+          // Map marker click: highlight city in list, scroll to it, but don't close yet
+          setSelected(city.name);
+          setSearch("");
+          // Scroll list to show the selected city
+          setTimeout(() => {
+            if (listRef.current) {
+              const idx = PALESTINE_CITIES.findIndex(c => c.name === city.name);
+              const itemHeight = 44; // approx row height in px
+              listRef.current.scrollTop = Math.max(0, idx * itemHeight - 60);
+            }
+          }, 50);
+        });
         markersRef.current.push(marker);
       });
 
@@ -366,6 +380,14 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
   const handleClose = () => { setIsOpen(false); onClose?.(); };
 
   const handleSelect = (cityName) => {
+    if (!cityName) {
+      // Clear selection
+      setSelected("");
+      onChange("");
+      setSearch("");
+      if (listRef.current) listRef.current.scrollTop = 0;
+      return;
+    }
     setSelected(cityName);
     onChange(cityName);
     setIsOpen(false);
@@ -431,11 +453,14 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
                   value={search}
                   onChange={e => {
                     setSearch(e.target.value);
+                    // Scroll list to top on new search
+                    if (listRef.current) listRef.current.scrollTop = 0;
                     if (e.target.value) {
                       const city = PALESTINE_CITIES.find(c => c.name.startsWith(e.target.value));
                       if (city) flyToCity(city);
                     }
                   }}
+                  ref={searchRef}
                   placeholder={`ابحث في ${PALESTINE_CITIES.length} موقع...`}
                   className="w-full h-10 pr-9 pl-4 rounded-xl bg-muted/50 border border-border text-sm outline-none focus:border-primary/50"
                   autoFocus
@@ -446,7 +471,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
             {/* Map + list */}
             <div className="flex-1 flex flex-col overflow-hidden">
               <div ref={mapRef} className="h-52 shrink-0" style={{ zIndex: 1, touchAction: "none" }} />
-              <div className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
+              <div ref={listRef} className="flex-1 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" }}>
                 {filtered.map(city => (
                   <button key={city.name} type="button"
                     onClick={() => handleSelect(city.name)}
@@ -461,6 +486,25 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
                 ))}
               </div>
             </div>
+
+            {/* Confirm bar — shows when a city is highlighted but not yet confirmed */}
+            {selected && (
+              <div className="shrink-0 border-t border-border bg-card p-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(selected);
+                    setIsOpen(false);
+                    setSearch("");
+                    onClose?.();
+                  }}
+                  className="w-full h-11 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:opacity-80"
+                >
+                  <span>✓</span>
+                  اختر "{selected}"
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
