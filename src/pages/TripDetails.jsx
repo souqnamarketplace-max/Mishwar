@@ -760,30 +760,65 @@ export default function TripDetails() {
       </div>
 
       {/* ── Mobile Sticky Booking Bar ─────────────────────── */}
-      {isMobile && trip && !booked && !isOwnTrip && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border p-4"
+      {isMobile && trip && !isOwnTrip && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/98 backdrop-blur-xl border-t border-border p-3"
           style={{ paddingBottom: "calc(80px + env(safe-area-inset-bottom))" }}>
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="text-2xl font-black text-primary leading-none">₪{trip.price * seatsToBook}</div>
-              {seatsToBook > 1 && <div className="text-xs text-muted-foreground">{seatsToBook} مقاعد</div>}
-            </div>
-            <div className="flex items-center gap-2 mr-1">
-              <button onClick={() => setSeatsToBook(s => Math.max(1, s - 1))}
-                className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center font-bold text-lg active:bg-muted/80">−</button>
-              <span className="font-bold w-5 text-center">{seatsToBook}</span>
-              <button onClick={() => setSeatsToBook(s => Math.min(trip?.available_seats || 4, s + 1))}
-                className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center font-bold text-lg active:bg-muted/80">+</button>
-            </div>
-            <Button
-              className="flex-1 h-12 rounded-xl font-bold text-base bg-primary text-primary-foreground active:bg-primary/80"
-              onClick={() => bookingMutation.mutate(trip)}
-              disabled={bookingMutation.isPending}
-            >
-              {bookingMutation.isPending ? "..." : "احجز الآن"}
-            </Button>
 
-          </div>
+          {/* Chat button — always visible on mobile */}
+          {!booked && (
+            <button
+              onClick={() => {
+                const to   = encodeURIComponent(trip.driver_email || "");
+                const name = encodeURIComponent(trip.driver_name  || "سائق");
+                const tid  = encodeURIComponent(trip.id || "");
+                navigate(`/messages?to=${to}&name=${name}&trip=${tid}`);
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-muted/80 hover:bg-muted text-foreground rounded-xl h-10 mb-2 text-sm font-medium active:opacity-70 transition-opacity"
+            >
+              <MessageCircle className="w-4 h-4" />
+              راسل السائق
+            </button>
+          )}
+
+          {/* Book bar */}
+          {!booked && (
+            <div className="flex items-center gap-2">
+              <div className="shrink-0">
+                <div className="text-xl font-black text-primary leading-none">₪{displayPricePerSeat * seatsToBook}</div>
+                {seatsToBook > 1 && <div className="text-[10px] text-muted-foreground">{seatsToBook} × ₪{displayPricePerSeat}</div>}
+              </div>
+              <div className="flex items-center gap-1.5 mr-1 shrink-0">
+                <button onClick={() => setSeatsToBook(s => Math.max(1, s - 1))}
+                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center font-bold text-base active:bg-muted/80">−</button>
+                <span className="font-bold w-5 text-center text-sm">{seatsToBook}</span>
+                <button onClick={() => setSeatsToBook(s => Math.min(trip?.available_seats || 4, s + 1))}
+                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center font-bold text-base active:bg-muted/80">+</button>
+              </div>
+              <Button
+                className="flex-1 h-10 rounded-xl font-bold text-sm bg-primary text-primary-foreground active:bg-primary/80"
+                onClick={() => bookingMutation.mutate(trip)}
+                disabled={bookingMutation.isPending}
+              >
+                {bookingMutation.isPending ? "..." : "احجز الآن ✓"}
+              </Button>
+            </div>
+          )}
+
+          {/* Post-booking: show chat only */}
+          {booked && (
+            <button
+              onClick={() => {
+                const to   = encodeURIComponent(trip.driver_email || "");
+                const name = encodeURIComponent(trip.driver_name  || "سائق");
+                const tid  = encodeURIComponent(trip.id || "");
+                navigate(`/messages?to=${to}&name=${name}&trip=${tid}`);
+              }}
+              className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl h-11 text-sm font-bold active:opacity-80 transition-opacity"
+            >
+              <MessageCircle className="w-4 h-4" />
+              راسل السائق
+            </button>
+          )}
         </div>
       )}
 

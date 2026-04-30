@@ -121,7 +121,7 @@ export default function MobileLayout({ children, user }) {
   if (!isMobile) return children;
 
   return (
-    <div className="fixed inset-0 bg-background flex flex-col" dir="rtl">
+    <div className="fixed inset-0 bg-background" dir="rtl" style={{ display: "flex", flexDirection: "column" }}>
 
       {/* ── Top header ── */}
       <div className="flex-shrink-0 bg-card/98 backdrop-blur-xl border-b border-border"
@@ -177,27 +177,24 @@ export default function MobileLayout({ children, user }) {
         </div>
       )}
 
-      {/* ── Scrollable content ── */}
-      {/* Android fix: touch handlers on a separate pull-indicator, not on the scroll container */}
+      {/* ── Scrollable content — Android-safe ── */}
       <div
         ref={contentRef}
-        className="flex-1 overflow-y-auto"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{
-          paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "80px",
+          flex: 1,
+          overflowY: "scroll",
+          overflowX: "hidden",
           WebkitOverflowScrolling: "touch",
-          overflowY: "auto",
-          /* Android Chrome scroll fix */
-          touchAction: "pan-y",
-          overscrollBehaviorY: "contain",
+          overscrollBehavior: "contain",
+          paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "80px",
+          position: "relative",
+          /* Android Chrome — must use scroll not auto */
+          willChange: "scroll-position",
         }}
       >
-        {/* Pull-to-refresh detection area — only at very top */}
-        <div
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          style={{ position: "absolute", top: 0, left: 0, right: 0, height: "60px", zIndex: 0, pointerEvents: "none" }}
-        />
         {children}
       </div>
 

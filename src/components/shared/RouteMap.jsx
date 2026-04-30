@@ -227,7 +227,7 @@ export default function RouteMap({
   }
 
   return (
-    <div className={`rounded-xl overflow-hidden border border-border ${className}`}>
+    <div className={`rounded-xl overflow-hidden border border-border ${className}`} style={{ touchAction: "none" }}>
       {/* Map container */}
       <div className="relative" style={{ height }}>
         {loading && (
