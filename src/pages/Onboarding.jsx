@@ -146,7 +146,7 @@ export default function Onboarding() {
     if (step === 0 && !accountType) { toast.error("يرجى اختيار نوع الحساب ⚠️"); return false; }
     if (step === 1) {
       if (!form.phone) { toast.error("يرجى إدخال رقم الهاتف ⚠️"); return false; }
-      if (!isValidPalestinianPhone(form.phone)) { toast.error("رقم الهاتف غير صحيح. مثال: 0599123456 ⚠️"); return false; }
+      if (!isValidPalestinianPhone(form.phone)) { toast.error("رقم الهاتف غير صحيح. مثال: 05XXXXXXXX ⚠️"); return false; }
       if (!form.city) { toast.error("يرجى اختيار مدينتك ⚠️"); return false; }
     }
     if (step === 2 && isDriver) {

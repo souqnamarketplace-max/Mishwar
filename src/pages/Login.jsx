@@ -62,7 +62,7 @@ export default function Login() {
     setLoading(true);
     try {
       if (form.phone && !isValidPalestinianPhone(form.phone)) {
-        toast.error("رقم الهاتف غير صحيح. مثال: 0599123456");
+        toast.error("رقم الهاتف غير صحيح. مثال: 05XXXXXXXX");
         setLoading(false);
         return;
       }

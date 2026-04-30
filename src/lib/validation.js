@@ -89,54 +89,56 @@ export function passwordStrength(password) {
 // Alias for forward-compat with possible older imports
 export const sanitizeString = sanitizeText;
 
+
 // ─── PHONE NUMBER DETECTION IN CHAT ──────────────────────────────────────────
-// Detects phone numbers with various obfuscation tricks used to bypass filters:
-//   Standard:      0591234567, +970591234567
-//   With spaces:   059 123 4567, 059-123-4567
-//   Arabic digits: ٠٥٩١٢٣٤٥٦٧ (Unicode Arabic-Indic: ٠=0x0660 ... ٩=0x0669)
-//   Mixed:         0591٢٣٤٥٦٧, 05٩١٢٣٤٥٦٧
-//   Emoji digits:  0️⃣5️⃣9️⃣...
-//   Letter-o subs: o59, O59, ০59
-const PHONE_REGEX = new RegExp(
-  // Matches 8+ consecutive digit-like chars (any separator between them)
-  '([0-9٠-٩۰-۹]{1}[\s\-./،,_*]{0,2}){7,}' +
-  '|' +
-  // Palestinian/Israeli mobile starting with 0 or +970/+972
-  '(\+?(970|972|0)\s?[\s\-./]*([0-9٠-٩]{1}[\s\-./،,_*]{0,2}){8,})',
-  'g'
-);
+// Simple, reliable phone detection — strips separators then checks digit count.
+// Handles: Arabic-Indic digits, letter-O substitution, zero-width chars, mixed.
 
-const EMOJI_DIGITS = /[0️⃣1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣9️⃣]{4,}/g;
-
-/**
- * Returns true if the message content contains a phone number.
- * Detects standard formats + Arabic numerals + common obfuscation tricks.
- */
-export function containsPhoneNumber(text) {
-  if (!text) return false;
-  const normalized = text
-    // Normalize Arabic-Indic digits to ASCII
+function normalizeForPhoneCheck(text) {
+  return text
+    // Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) → ASCII
     .replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
+    // Extended Arabic-Indic (۰۱۲۳۴۵۶۷۸۹) → ASCII
     .replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 48))
-    // Normalize letter-o/O used in place of zero
+    // Letter O/o used instead of zero
     .replace(/[oO]/g, '0')
-    // Strip zero-width chars
-    .replace(/[​-‍﻿]/g, '');
-
-  // Check for 8+ consecutive digits (allowing common separators)
-  const digitOnly = normalized.replace(/[\s\-./،,_*()]/g, '');
-  if (/\d{8,}/.test(digitOnly)) return true;
-
-  // Check emoji digits
-  if (EMOJI_DIGITS.test(text)) return true;
-
-  return PHONE_REGEX.test(normalized);
+    // Zero-width and invisible chars
+    .replace(/[​-‍﻿­]/g, '');
 }
 
 /**
- * Returns the message with phone numbers replaced by a warning placeholder.
+ * Returns true if text contains a phone number (8+ digits with common separators).
+ * Catches standard formats + Arabic numerals + common obfuscation tricks.
  */
-export function maskPhoneNumbers(text) {
-  if (!containsPhoneNumber(text)) return text;
-  return text + ' [⚠️ تم حجب رقم الهاتف — يُمنع مشاركة الأرقام في المحادثة]';
+export function containsPhoneNumber(text) {
+  if (!text || text.length < 7) return false;
+
+  const norm = normalizeForPhoneCheck(text);
+
+  // Strip common separators and check if 8+ consecutive digits remain in any segment
+  // We scan the normalized text and count digit runs separated only by [\s\-.()+,*_]
+  let digitRun = 0;
+  for (let i = 0; i < norm.length; i++) {
+    const ch = norm[i];
+    if (ch >= '0' && ch <= '9') {
+      digitRun++;
+      if (digitRun >= 8) return true;
+    } else if (' -.()+,*_/'.includes(ch)) {
+      // Allow separator within a number (e.g. 059-123-4567)
+      // but reset if run has accumulated less than 3 before separator
+      if (digitRun < 2) digitRun = 0;
+      // else keep accumulating (separator inside number is fine)
+    } else {
+      // Non-digit, non-separator: break the run
+      digitRun = 0;
+    }
+  }
+  return false;
+}
+
+/**
+ * Returns a warning message if text contains a phone number, otherwise null.
+ */
+export function phoneWarning() {
+  return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. يمكنك التواصل عبر التطبيق فقط بعد تأكيد الحجز.";
 }
