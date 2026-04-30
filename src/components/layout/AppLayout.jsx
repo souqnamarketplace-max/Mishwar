@@ -6,6 +6,7 @@ import { AnimatePresence } from "framer-motion";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import MobileLayout from "./MobileLayout";
+import NetworkStatus from "@/components/NetworkStatus";
 import PageTransition from "../PageTransition";
 import PullToRefresh from "../shared/PullToRefresh";
 
@@ -41,6 +42,8 @@ export default function AppLayout() {
   }
 
   return (
+    <>
+    <NetworkStatus />
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-1">
@@ -54,5 +57,6 @@ export default function AppLayout() {
       </main>
       <Footer />
     </div>
+    </>
   );
 }

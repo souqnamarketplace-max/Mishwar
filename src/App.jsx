@@ -1,4 +1,21 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+// Per-page error fallback (smaller than full-page)
+const PageErrorFallback = ({ onReset }) => (
+  <div className="min-h-[60vh] flex items-center justify-center p-8" dir="rtl">
+    <div className="text-center max-w-xs">
+      <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+        <span className="text-2xl">⚠️</span>
+      </div>
+      <h3 className="font-bold text-foreground mb-2">فشل تحميل هذه الصفحة</h3>
+      <p className="text-sm text-muted-foreground mb-4">يرجى المحاولة مجدداً</p>
+      <button onClick={onReset || (() => window.location.reload())}
+        className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
+        إعادة المحاولة
+      </button>
+    </div>
+  </div>
+);
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -96,7 +113,7 @@ const AuthenticatedApp = () => {
   }
 
   return (
-    <Suspense fallback={<PageFallback />}><Routes>
+    <ErrorBoundary fallback={<PageErrorFallback />}><Suspense fallback={<PageFallback />}><Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       <Route element={<AppLayout />}>
         {/* PUBLIC pages — viewable without sign-in */}
@@ -126,7 +143,7 @@ const AuthenticatedApp = () => {
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/onboarding" element={<Onboarding />} />
       <Route path="*" element={<PageNotFound />} />
-    </Routes></Suspense>
+    </Routes></Suspense></ErrorBoundary>
   );
 };
 

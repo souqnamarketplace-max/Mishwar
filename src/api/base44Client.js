@@ -73,12 +73,19 @@ async function restFetch(pathAndQuery, opts = {}) {
     });
     if (!r.ok) {
       const errText = await r.text().catch(() => '');
+      if (r.status === 429) throw new Error('طلبات كثيرة — يرجى الانتظار لحظة');
+      if (r.status === 503) throw new Error('الخادم مشغول مؤقتاً — يرجى إعادة المحاولة');
+      if (r.status === 401) throw new Error('انتهت جلستك — يرجى إعادة تسجيل الدخول');
       throw new Error(`REST ${r.status} ${r.statusText}: ${errText.slice(0, 200)}`);
     }
     if (r.status === 204) return null;
     return await r.json();
   } catch (e) {
     if (e.name === 'AbortError') throw new Error(`REST request timed out (${opts.timeout ?? 8000}ms)`);
+    // Network failure (offline)
+    if (e.name === 'TypeError' && e.message.includes('fetch')) {
+      throw new Error('لا يوجد اتصال بالإنترنت — تحقق من شبكتك');
+    }
     throw e;
   } finally {
     clearTimeout(timer);
@@ -204,23 +211,35 @@ function createEntityClient(tableName) {
     },
 
     subscribe: (callback) => {
-      const channelName = `${tableName}-rt-${Math.random().toString(36).slice(2)}`;
+      // Use stable channel name — prevents duplicate channels on remount
+      const channelName = `${tableName}-realtime`;
+      
+      // Remove any existing channel with same name (cleanup from previous mount)
+      try { supabase.removeChannel(supabase.channel(channelName)); } catch {}
+      
       const channel = supabase
         .channel(channelName, { config: { broadcast: { self: true } } })
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: tableName },
-          (payload) => {
-            // Realtime payload received — trigger callback for cache invalidation
-            callback(payload);
-          }
+          (payload) => callback(payload)
         )
         .subscribe((status) => {
           if (status === 'CHANNEL_ERROR') {
-            console.warn(`[Realtime] Channel error on ${tableName}`);
+            console.warn(`[Realtime] Channel error on ${tableName} — will retry`);
+            // Auto-reconnect after 3 seconds
+            setTimeout(() => {
+              try { channel.subscribe(); } catch {}
+            }, 3000);
+          }
+          if (status === 'TIMED_OUT') {
+            console.warn(`[Realtime] Timed out on ${tableName}`);
           }
         });
-      return () => supabase.removeChannel(channel);
+      
+      return () => {
+        supabase.removeChannel(channel);
+      };
     },
   };
 }
