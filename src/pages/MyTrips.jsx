@@ -113,7 +113,13 @@ export default function MyTrips() {
     const unsubReviews = base44.entities.Review.subscribe((event) => {
       qc.invalidateQueries({ queryKey: ["my-reviews"] });
     });
-    return () => { unsubTrips(); unsubReviews(); };
+    // KEY FIX: when driver confirms/cancels a booking, passenger sees it instantly
+    const unsubBookings = base44.entities.Booking.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
+      qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
+      qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
+    });
+    return () => { unsubTrips(); unsubReviews(); unsubBookings(); };
   }, [qc]);
 
   const filtered = activeTab === "all" ? trips : trips.filter((t) => t.status === activeTab);

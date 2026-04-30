@@ -36,6 +36,15 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
     },
   });
 
+  // Realtime: booking list updates when any booking changes
+  React.useEffect(() => {
+    const u = base44.entities.Booking.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+    });
+    return () => u();
+  }, []);
+
   const selectedTrip = trips.find((t) => t.id === selectedTripId) || trips[0];
   const tripBookings = bookings.filter((b) => b.trip_id === selectedTrip?.id);
   const activeBookings = tripBookings.filter((b) => b.status !== "cancelled");

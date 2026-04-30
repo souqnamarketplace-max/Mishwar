@@ -431,15 +431,14 @@ const functions = {
       const { booking_id } = args;
       if (!booking_id) throw new Error('cancelBooking: booking_id required');
 
-      // Get booking
-      const { data: booking, error: bErr } = await supabase
-        .from('bookings').select('*').eq('id', booking_id).single();
-      if (bErr || !booking) throw new Error('Booking not found');
+      // Use direct REST (supabase-js client hangs after token refresh)
+      const bookingRows = await restFetch(`/bookings?select=*&id=eq.${encodeURIComponent(booking_id)}&limit=1`);
+      const booking = Array.isArray(bookingRows) && bookingRows.length > 0 ? bookingRows[0] : null;
+      if (!booking) throw new Error('Booking not found');
 
-      // Get trip
-      const { data: trip, error: tErr } = await supabase
-        .from('trips').select('*').eq('id', booking.trip_id).single();
-      if (tErr || !trip) throw new Error('Trip not found');
+      const tripRows = await restFetch(`/trips?select=date,time,id&id=eq.${encodeURIComponent(booking.trip_id)}&limit=1`);
+      const trip = Array.isArray(tripRows) && tripRows.length > 0 ? tripRows[0] : null;
+      if (!trip) throw new Error('Trip not found');
 
       // Check cancellation window
       const tripDateTime = new Date(`${trip.date}T${trip.time}`);
@@ -451,10 +450,11 @@ const functions = {
       if (!isCash && hoursUntilTrip < 24)
         throw new Error('لا يمكن إلغاء الحجوزات المدفوعة إلا قبل 24 ساعة من الرحلة');
 
-      // Cancel booking (trigger handles seat restore + notification)
-      const { error } = await supabase
-        .from('bookings').update({ status: 'cancelled' }).eq('id', booking_id);
-      if (error) throw error;
+      // Cancel via direct REST PATCH
+      await restFetch(`/bookings?id=eq.${encodeURIComponent(booking_id)}`, {
+        method: 'PATCH',
+        body: { status: 'cancelled', updated_at: new Date().toISOString() },
+      });
 
       return { success: true, message: 'تم إلغاء الحجز بنجاح' };
     }

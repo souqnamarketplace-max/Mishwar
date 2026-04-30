@@ -58,6 +58,16 @@ export default function DriverDashboard() {
   const activeTrips = trips.filter((t) => t.status === "confirmed" || t.status === "in_progress").length;
   const completedTrips = trips.filter((t) => t.status === "completed").length;
 
+  // Realtime: new bookings appear instantly in driver dashboard
+  React.useEffect(() => {
+    if (!user?.email) return;
+    const u = base44.entities.Booking.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["driver-bookings", user.email] });
+      qc.invalidateQueries({ queryKey: ["driver-trips", user.email] });
+    });
+    return () => u();
+  }, [user?.email]);
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       {/* Header */}
