@@ -99,8 +99,12 @@ export default function MobileLayout({ children, user }) {
     if (contentRef.current?.scrollTop === 0) pullStartRef.current = e.touches[0].clientY;
   };
   const handleTouchMove = (e) => {
-    if (contentRef.current?.scrollTop === 0 && pullStartRef.current > 0) {
-      if (e.touches[0].clientY - pullStartRef.current > 70 && !isRefreshing) {
+    // Only trigger pull-to-refresh if truly at the very top (scrollTop < 2)
+    // and the drag is clearly downward (>120px) — avoids conflicting with form scrolling
+    const scrollTop = contentRef.current?.scrollTop ?? 1;
+    if (scrollTop < 2 && pullStartRef.current > 0) {
+      const drag = e.touches[0].clientY - pullStartRef.current;
+      if (drag > 120 && !isRefreshing) {
         setIsRefreshing(true);
         pullStartRef.current = 0;
       }
@@ -179,8 +183,11 @@ export default function MobileLayout({ children, user }) {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="flex-1 overflow-y-auto"
-        style={{ paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "80px" }}
+        className="flex-1 overflow-y-auto overscroll-y-contain"
+        style={{
+          paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "80px",
+          WebkitOverflowScrolling: "touch",
+        }}
       >
         {children}
       </div>

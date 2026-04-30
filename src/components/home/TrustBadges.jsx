@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const badges = [
   { emoji: "🛡️", title: "سائقون موثوقون", desc: "نتحقق من الهوية والرخصة والتأمين قبل انضمام أي سائق", color: "bg-primary/8 border-primary/20" },
   { emoji: "💸", title: "إلغاء مجاني", desc: "ألغِ حجزك بكل سهولة حتى ساعتين قبل الرحلة", color: "bg-accent/8 border-accent/20" },
-  { emoji: "📱", title: "تواصل مباشر", desc: "تواصل مع السائق مباشرة عبر واتساب في أي وقت", color: "bg-green-500/8 border-green-500/20" },
+  { emoji: "💬", title: "تواصل مباشر", desc: "تواصل مع السائق مباشرة عبر نظام الرسائل الداخلي في أي وقت", color: "bg-green-500/8 border-green-500/20" },
   { emoji: "⚡", title: "حجز فوري", desc: "من البحث للتأكيد خلال أقل من دقيقتين", color: "bg-yellow-500/8 border-yellow-500/20" },
 ];
 

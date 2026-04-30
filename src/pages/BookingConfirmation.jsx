@@ -183,15 +183,7 @@ export default function BookingConfirmation() {
 
       {/* Action buttons */}
       <div className="space-y-2">
-        {trip.driver_phone && (
-          <a href={"https://wa.me/970" + cleanPhone(trip.driver_phone) + "?text=" + waText}
-            target="_blank" rel="noopener noreferrer">
-            <Button className="w-full bg-green-500 hover:bg-green-600 text-white rounded-xl gap-2 h-11">
-              <MessageCircle className="w-4 h-4" />
-              تواصل مع السائق عبر واتساب
-            </Button>
-          </a>
-        )}
+        
         <Link to="/my-trips">
           <Button variant="outline" className="w-full rounded-xl gap-2 h-11">
             <MapPin className="w-4 h-4" />

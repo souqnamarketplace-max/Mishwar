@@ -171,7 +171,7 @@ export default function Login() {
                 </div>
               </div>
               <div>
-                <Label className="mb-1.5 block">رقم الهاتف (واتساب)</Label>
+                <Label className="mb-1.5 block">رقم الهاتف</Label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input name="phone" type="tel" placeholder="05XXXXXXXX"
