@@ -22,7 +22,7 @@ export function isValidPalestinianPhone(phone) {
     /^9705\d{8}$/,
     /^9725\d{8}$/,
   ];
-  return validFormats.some((re) => re.test(cleaned));
+  const d=phone.replace(/[\s\-().+]/g,""); return /^\d{7,15}$/.test(d);
 }
 
 // Backward-compat alias — same function, more accurate name
