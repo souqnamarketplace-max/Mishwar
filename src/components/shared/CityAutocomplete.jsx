@@ -4,7 +4,8 @@
  */
 import React, { useState, useRef, useEffect } from "react";
 import { CITIES, normalizeArabic } from "@/lib/cities";
-import { MapPin, Search, Plus, X } from "lucide-react";
+import { MapPin, Search, Plus, X, Map } from "lucide-react";
+import CityMapPicker from "@/components/shared/CityMapPicker";
 
 export default function CityAutocomplete({
   value = "",
@@ -17,6 +18,7 @@ export default function CityAutocomplete({
   const [open,     setOpen]     = useState(false);
   const [focused,  setFocused]  = useState(false);
   const [customMode, setCustomMode] = useState(false); // user is typing a custom locality
+  const [showMapPicker, setShowMapPicker] = useState(false);
   const inputRef  = useRef(null);
   const containerRef = useRef(null);
 
@@ -102,6 +104,16 @@ export default function CityAutocomplete({
             <X className="w-3.5 h-3.5" />
           </button>
         )}
+        {/* Map picker trigger */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowMapPicker(true); setOpen(false); }}
+          className="shrink-0 flex items-center gap-1 text-[10px] font-medium text-primary/80 hover:text-primary bg-primary/8 hover:bg-primary/15 px-2 py-1 rounded-lg transition-colors"
+          title="اختر من الخريطة"
+        >
+          <Map className="w-3 h-3" />
+          <span className="hidden sm:inline">خريطة</span>
+        </button>
         <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
       </div>
 
@@ -176,6 +188,22 @@ export default function CityAutocomplete({
           )}
         </div>
       )}
+    {/* Map picker — opens its own modal panel */}
+    {showMapPicker && (
+      <div className="fixed inset-0 z-[300] bg-black/50" onClick={() => setShowMapPicker(false)}>
+        <div className="absolute inset-4 top-16 bg-card rounded-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+          <CityMapPicker
+            value={query}
+            placeholder={placeholder}
+            onChange={(city) => {
+              setQuery(city);
+              setShowMapPicker(false);
+              onChange?.(city);
+            }}
+          />
+        </div>
+      </div>
+    )}
     </div>
   );
 }
