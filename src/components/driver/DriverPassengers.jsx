@@ -1,4 +1,5 @@
 import React from "react";
+import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, MapPin, ArrowLeft, Phone, Star, CheckCircle, XCircle } from "lucide-react";
@@ -48,6 +49,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
               trip_id: booking.trip_id,
               is_read: false,
             });
+            logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
             toast.success("تم قبول الحجز وإخطار الراكب ✅");
           } else if (status === "cancelled") {
             await base44.entities.Notification.create({
@@ -58,6 +60,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
               trip_id: booking.trip_id,
               is_read: false,
             });
+            logAudit("driver_reject_booking", "booking", id, { passenger_email: booking.passenger_email });
             toast.info("تم رفض الحجز وإخطار الراكب");
           } else {
             toast.success("تم تحديث الحجز");

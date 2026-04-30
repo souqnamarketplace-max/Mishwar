@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { logAdminAction } from "@/lib/adminAudit";
 import Pagination from "@/components/dashboard/Pagination";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,7 +36,7 @@ export default function DashboardBookings() {
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Booking.update(id, { status }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-bookings"] }); toast.success("تم تحديث الحالة"); },
+    onSuccess: (_, { id, status }) => { qc.invalidateQueries({ queryKey: ["admin-bookings"] }); toast.success("تم تحديث الحالة"); logAdminAction("admin_update_booking_status", "booking", id, { new_status: status }); },
   });
 
   const filtered = bookings.filter((b) =>

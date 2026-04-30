@@ -481,6 +481,7 @@ export const base44 = {
     Booking:        createEntityClient('bookings'),
     Review:         createEntityClient('reviews'),
     Message:        createEntityClient('messages'),
+    AdminAuditLog:  createEntityClient('admin_audit_log'),
     Notification:   createEntityClient('notifications'),
     DriverLicense:  createEntityClient('driver_licenses'),
     Coupon:         createEntityClient('coupons'),

@@ -1,27 +1,39 @@
-import { supabase } from "@/lib/supabase";
+import { base44 } from "@/api/base44Client";
 
 /**
- * Log an admin action to the audit trail.
- * Call from any admin destructive action (delete, role change, ban, etc.)
+ * Log an admin/system action to the audit trail.
+ * Uses direct REST (not supabase-js) — safe to call from any context.
  *
  * @example
  * await logAdminAction("delete_trip", "trip", tripId, { reason: "user request" });
+ * await logAudit("booking_confirmed", "booking", bookingId, { passenger_email, driver_email });
  */
 export async function logAdminAction(action, targetType, targetId, details = {}) {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const adminEmail = session?.user?.email;
-    if (!adminEmail) return;
+    // Read admin email from session (direct localStorage — no supabase-js hang)
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const PROJECT_REF  = SUPABASE_URL?.split("//")[1]?.split(".")[0] || "";
+    let adminEmail = "system";
+    try {
+      const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        adminEmail = parsed?.user?.email || "system";
+      }
+    } catch {}
 
-    await supabase.from("admin_audit_log").insert({
+    await base44.entities.AdminAuditLog.create({
       admin_email: adminEmail,
       action,
       target_type: targetType,
-      target_id: targetId ? String(targetId) : null,
+      target_id:   targetId ? String(targetId) : null,
       details,
     });
   } catch (e) {
-    // Audit logging failures should not block the action — just warn
-    console.warn("[adminAudit] failed to log:", e);
+    // Audit logging failures must never block the main action
+    console.warn("[adminAudit] failed to log:", e?.message);
   }
 }
+
+// Alias — use this for non-admin user actions (booking events etc.)
+export const logAudit = logAdminAction;

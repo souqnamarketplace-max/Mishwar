@@ -47,10 +47,14 @@ export default function DashboardLicenses() {
         is_read: false,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, licenseId) => {
       qc.invalidateQueries({ queryKey: ["all-licenses"] });
       qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("✓ تم توثيق السائق");
+      logAdminAction("driver_license_approved", "driver_license", licenseId, {
+        driver_email: selectedLicense?.driver_email,
+        driver_name:  selectedLicense?.driver_name,
+      });
       setSelectedLicense(null);
     },
   });
@@ -72,10 +76,15 @@ export default function DashboardLicenses() {
         is_read: false,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, licenseId) => {
       qc.invalidateQueries({ queryKey: ["all-licenses"] });
       qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("✗ تم رفض التوثيق");
+      logAdminAction("driver_license_rejected", "driver_license", licenseId, {
+        driver_email:     selectedLicense?.driver_email,
+        driver_name:      selectedLicense?.driver_name,
+        rejection_reason: rejectionReason || "لم يتم توفير سبب",
+      });
       setSelectedLicense(null);
       setRejectionReason("");
     },

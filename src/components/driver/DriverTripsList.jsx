@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X } from "lucide-react";
@@ -62,9 +63,15 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       qc.setQueryData(["trips"], ctx);
       toast.error("فشل الحذف");
     },
-    onSuccess: () => {
+    onSuccess: (_, tripId) => {
       qc.invalidateQueries({ queryKey: ["trips"] });
       toast.success("تم حذف الرحلة");
+      const trip = trips?.find(t => t.id === tripId);
+      logAudit("driver_delete_trip", "trip", tripId, {
+        route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
+        date:  trip?.date,
+        driver_email: trip?.driver_email,
+      });
     },
   });
 

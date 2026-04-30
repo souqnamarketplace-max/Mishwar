@@ -76,9 +76,10 @@ export default function DashboardUsers() {
         is_active: data.is_active,
       }
     }),
-    onSuccess: () => {
+    onSuccess: (_, data) => {
       qc.invalidateQueries({ queryKey: ["users"] });
       toast.success("تم تحديث بيانات المستخدم");
+      logAdminAction("admin_update_user", "user", data.userId, { role: data.data?.role, is_active: data.data?.is_active });
       setShowModal(false);
     },
     onError: (error) => {
@@ -91,8 +92,9 @@ export default function DashboardUsers() {
       userId: user.id,
       data: { is_active: !user.is_active }
     }),
-    onSuccess: () => {
+    onSuccess: (_, user) => {
       qc.invalidateQueries({ queryKey: ["users"] });
+      logAdminAction(user.is_active ? "admin_deactivate_user" : "admin_activate_user", "user", user.id, { email: user.email });
       toast.success("تم تحديث حالة المستخدم");
     },
     onError: (error) => {

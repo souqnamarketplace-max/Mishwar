@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { logAudit } from "@/lib/adminAudit";
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
@@ -44,9 +45,10 @@ export default function MyTrips() {
       if (error) throw error;
       return { success: true };
     },
-    onSuccess: async () => {
+    onSuccess: async (_, bookingId) => {
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
       qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
+      logAudit("booking_cancelled_by_passenger", "booking", bookingId, { passenger_email: user?.email });
       toast.success("تم إلغاء الحجز بنجاح");
       // Notify driver that the booking was cancelled
       try {

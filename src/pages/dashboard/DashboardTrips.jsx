@@ -39,7 +39,16 @@ export default function DashboardTrips() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Trip.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-trips"] }); toast.success("تم حذف الرحلة"); },
+    onSuccess: (_, tripId) => {
+      qc.invalidateQueries({ queryKey: ["admin-trips"] });
+      toast.success("تم حذف الرحلة");
+      const trip = trips?.find(t => t.id === tripId);
+      logAdminAction("admin_delete_trip", "trip", tripId, {
+        route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
+        date:  trip?.date,
+        driver_email: trip?.driver_email,
+      });
+    },
   });
 
   const updateStatus = useMutation({

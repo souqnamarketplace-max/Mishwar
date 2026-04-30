@@ -1,4 +1,5 @@
 import { useSEO } from "@/hooks/useSEO";
+import { logAudit } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { checkPassengerConflict } from "@/lib/tripScheduling";
@@ -150,6 +151,10 @@ export default function TripDetails() {
           });
         } catch (e) { console.warn("[Notif] booking_received:", e?.message); }
       }
+      logAudit("booking_created", "booking", null, {
+        route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
+        date: trip?.date, driver_email: trip?.driver_email, passenger_email: user?.email, seats: seatsToBook,
+      });
       navigate(`/booking-confirmation?trip=${trip?.id}`);
     },
   });
