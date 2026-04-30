@@ -68,8 +68,7 @@ export default function TripDetails() {
   // 2) Booking changes (driver sees new bookings on their own trips)
   React.useEffect(() => {
     if (!id) return;
-    const unsubTrip = base44.entities.Trip.subscribe((payload) => {
-      if (!payload?.new?.id && !payload?.old?.id) return;
+    const unsubTrip = base44.entities.Trip.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["trip", id] });
       qc.invalidateQueries({ queryKey: ["trips"] });
     });
@@ -592,9 +591,14 @@ export default function TripDetails() {
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="font-bold text-foreground mb-3">تواصل مع السائق</h3>
             <div className="space-y-2">
-              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => navigate("/messages")}>
+              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => {
+                const to   = encodeURIComponent(trip.driver_email || "");
+                const name = encodeURIComponent(trip.driver_name  || "سائق");
+                const tid  = encodeURIComponent(trip.id || "");
+                navigate(`/messages?to=${to}&name=${name}&trip=${tid}`);
+              }}>
                 <MessageCircle className="w-4 h-4" />
-                محادثة
+                راسل السائق
               </Button>
               {trip.status === "confirmed" && trip.driver_phone && (
                 <Button variant="outline" className="w-full rounded-xl gap-2">

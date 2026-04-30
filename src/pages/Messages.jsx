@@ -9,7 +9,7 @@ import { sanitizeText } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
 import { Search, Send, ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 /**
  * Messages page — real DB-backed chat list.
@@ -23,6 +23,8 @@ export default function Messages() {
   const [activeId, setActiveId] = useState(null);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [searchParams] = useSearchParams();
+  const [newConv, setNewConv] = useState(null); // { email, name } for a not-yet-created conversation
   const messagesEndRef = useRef(null);
 
   // Current user — from AuthContext (instant, no hang)
@@ -50,6 +52,26 @@ export default function Messages() {
     refetchInterval: false,  // realtime subscription handles updates
     staleTime: 5000,
   });
+
+  // Auto-open conversation from URL params (e.g. ?to=driver@email&name=...)
+  const paramTo   = searchParams.get("to");
+  const paramName = searchParams.get("name");
+
+  React.useEffect(() => {
+    if (!paramTo || !user?.email) return;
+    // Don't open a convo with yourself
+    if (paramTo === user.email) return;
+    // Check if conversation already exists
+    const existing = conversations.find(c => c.otherEmail === paramTo);
+    if (existing) {
+      setActiveId(existing.id);
+      setNewConv(null);
+    } else {
+      // No existing messages yet — set up a "new conversation" panel
+      setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+      setActiveId("__new__");
+    }
+  }, [paramTo, user?.email, conversations.length]);
 
   // Realtime subscription — new/updated messages appear instantly
   React.useEffect(() => {
@@ -128,17 +150,25 @@ export default function Messages() {
     mutationFn: async () => {
       if (!draft.trim() || !activeConv || !user?.email) return;
       const cleaned = sanitizeText(draft).slice(0, 5000);
+      // Generate a stable conversation_id for new conversations
+      const convId = activeConv.id === "__new__"
+        ? [user.email, activeConv.otherEmail].sort().join("__")
+        : activeConv.id;
       await base44.entities.Message.create({
-        conversation_id: activeConv.id,
-        sender_email: user.email,
-        sender_name: user.full_name,
+        conversation_id: convId,
+        sender_email:   user.email,
+        sender_name:    user.full_name || user.email.split("@")[0],
         receiver_email: activeConv.otherEmail,
-        receiver_name: activeConv.otherName,
-        content: cleaned,
-        is_read: false,
-        message_type: "text",
+        receiver_name:  activeConv.otherName,
+        content:        cleaned,
+        is_read:        false,
+        message_type:   "text",
       });
       setDraft("");
+      setNewConv(null);
+      // Switch to real conversation after first message sent
+      const newConvId = [user.email, activeConv.otherEmail].sort().join("__");
+      setActiveId(newConvId);
       qc.invalidateQueries({ queryKey: ["messages", user?.email] });
     },
     onError: () => toast.error("تعذر إرسال الرسالة. حاول مجدداً"),
