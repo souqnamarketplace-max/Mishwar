@@ -34,7 +34,15 @@ export default function Onboarding() {
     car_plate: "",
     license_number: "",
     license_expiry: "",
-    license_image_url: ""
+    license_image_url: "",
+    // Car registration
+    car_reg_expiry: "",
+    car_reg_url: "",
+    // Insurance
+    insurance_expiry: "",
+    insurance_url: "",
+    // Identity selfie
+    selfie_url: "",
   });
   const [uploading, setUploading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -68,12 +76,17 @@ export default function Onboarding() {
           throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
         }
         await base44.entities.DriverLicense.create({
-          driver_email: user?.email,
-          driver_name: user?.full_name,
-          license_number: form.license_number,
-          expiry_date: form.license_expiry,
-          license_image_url: form.license_image_url,
-          status: "incomplete",
+          driver_email:                 user?.email,
+          driver_name:                  user?.full_name,
+          license_number:               form.license_number,
+          expiry_date:                  form.license_expiry,
+          license_image_url:            form.license_image_url,
+          car_registration_expiry_date: form.car_reg_expiry   || null,
+          car_registration_url:         form.car_reg_url      || null,
+          insurance_expiry_date:        form.insurance_expiry || null,
+          insurance_url:                form.insurance_url    || null,
+          selfie_1_url:                 form.selfie_url       || null,
+          status: "pending",
           submitted_at: new Date().toISOString(),
         });
 
@@ -340,69 +353,141 @@ export default function Onboarding() {
             </motion.div>
           )}
 
-          {/* Step 3: Driver License */}
+          {/* Step 3: Driver Documents */}
           {step === 3 && isDriver && (
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <h2 className="text-lg font-bold text-foreground mb-2">رخصة القيادة</h2>
-                <p className="text-sm text-muted-foreground mb-6">يجب التحقق من رخصة القيادة قبل نشر الرحلات</p>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">رقم الرخصة <span className="text-destructive">*</span></label>
-                    <Input
-                      value={form.license_number}
-                      onChange={(e) => setForm({ ...form, license_number: e.target.value })}
-                      placeholder="مثال: 123456789"
-                      className="rounded-xl"
-                    />
+              <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground mb-1">وثائق السائق</h2>
+                  <p className="text-sm text-muted-foreground">ارفع الوثائق المطلوبة للتحقق من هويتك. الحقول المُعلَّمة بـ * إلزامية.</p>
+                </div>
+
+                {/* Helper: reusable upload field */}
+                {/* ── 1) Driver License ── */}
+                <div className="p-4 bg-muted/30 rounded-xl border border-border space-y-3">
+                  <p className="text-sm font-bold flex items-center gap-2">🪪 رخصة القيادة <span className="text-destructive text-xs">*</span></p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">رقم الرخصة *</label>
+                      <Input value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} placeholder="123456789" className="rounded-xl h-10 text-sm" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">تاريخ الانتهاء *</label>
+                      <Input type="date" value={form.license_expiry} onChange={(e) => setForm({ ...form, license_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                    </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-1 block">تاريخ انتهاء الرخصة <span className="text-destructive">*</span></label>
-                    <Input
-                      type="date"
-                      value={form.license_expiry}
-                      onChange={(e) => setForm({ ...form, license_expiry: e.target.value })}
-                      className="rounded-xl"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">صورة الرخصة <span className="text-destructive">*</span></label>
-                    <label htmlFor="license-upload" className="cursor-pointer block">
-                      <Button variant="outline" className="rounded-xl gap-2 w-full" type="button">
-                        <Upload className="w-4 h-4" />
-                        {form.license_image_url ? "تم اختيار صورة" : "اختر صورة الرخصة"}
-                      </Button>
-                    </label>
-                    <input
-                      id="license-upload"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        if (file.size > 5 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
-                        setUploading(true);
-                        try {
-                          const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                          setForm({ ...form, license_image_url: file_url });
-                          toast.success("تم رفع صورة الرخصة ✅");
-                        } catch (err) {
-                          captureException(err, { msg: "License upload error:" });
-                          toast.error("فشل رفع صورة الرخصة. حاول مجدداً");
-                        } finally {
-                          setUploading(false);
-                        }
-                      }}
-                    />
-                    {form.license_image_url && <p className="text-xs text-accent mt-1">✓ تم اختيار الصورة</p>}
+                    <label className="text-xs text-muted-foreground mb-1 block">صورة الرخصة *</label>
+                    <Button
+                      variant="outline"
+                      className={`rounded-xl gap-2 w-full h-10 text-sm ${form.license_image_url ? "border-green-500 text-green-700 bg-green-50" : ""}`}
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => document.getElementById("upload-license").click()}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {uploading ? "جاري الرفع..." : form.license_image_url ? "✓ تم رفع صورة الرخصة" : "رفع صورة الرخصة"}
+                    </Button>
+                    <input id="upload-license" type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0]; if (!file) return;
+                      if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
+                      setUploading(true);
+                      try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, license_image_url: file_url })); toast.success("✅ تم رفع صورة الرخصة"); }
+                      catch (err) { toast.error("فشل رفع الملف. تأكد من الاتصال وحاول مجدداً"); }
+                      finally { setUploading(false); }
+                    }} />
                   </div>
                 </div>
 
-                <div className="mt-5 p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-                  <p className="text-sm text-yellow-700 font-medium">⏳ في انتظار التحقق</p>
-                  <p className="text-xs text-yellow-600 mt-1">سيتم التحقق من رخصتك خلال 24 ساعة. لن تتمكن من نشر رحلات قبل الموافقة.</p>
+                {/* ── 2) Car Registration ── */}
+                <div className="p-4 bg-muted/30 rounded-xl border border-border space-y-3">
+                  <p className="text-sm font-bold flex items-center gap-2">🚗 استمارة السيارة</p>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">تاريخ انتهاء الاستمارة</label>
+                    <Input type="date" value={form.car_reg_expiry} onChange={(e) => setForm({ ...form, car_reg_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                  </div>
+                  <div>
+                    <Button
+                      variant="outline"
+                      className={`rounded-xl gap-2 w-full h-10 text-sm ${form.car_reg_url ? "border-green-500 text-green-700 bg-green-50" : ""}`}
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => document.getElementById("upload-car-reg").click()}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {form.car_reg_url ? "✓ تم رفع الاستمارة" : "رفع صورة الاستمارة"}
+                    </Button>
+                    <input id="upload-car-reg" type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0]; if (!file) return;
+                      if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
+                      setUploading(true);
+                      try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, car_reg_url: file_url })); toast.success("✅ تم رفع الاستمارة"); }
+                      catch (err) { toast.error("فشل رفع الملف"); }
+                      finally { setUploading(false); }
+                    }} />
+                  </div>
                 </div>
+
+                {/* ── 3) Insurance ── */}
+                <div className="p-4 bg-muted/30 rounded-xl border border-border space-y-3">
+                  <p className="text-sm font-bold flex items-center gap-2">🛡️ وثيقة التأمين</p>
+                  <div>
+                    <label className="text-xs text-muted-foreground mb-1 block">تاريخ انتهاء التأمين</label>
+                    <Input type="date" value={form.insurance_expiry} onChange={(e) => setForm({ ...form, insurance_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                  </div>
+                  <div>
+                    <Button
+                      variant="outline"
+                      className={`rounded-xl gap-2 w-full h-10 text-sm ${form.insurance_url ? "border-green-500 text-green-700 bg-green-50" : ""}`}
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => document.getElementById("upload-insurance").click()}
+                    >
+                      <Upload className="w-4 h-4" />
+                      {form.insurance_url ? "✓ تم رفع وثيقة التأمين" : "رفع وثيقة التأمين"}
+                    </Button>
+                    <input id="upload-insurance" type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => {
+                      const file = e.target.files?.[0]; if (!file) return;
+                      if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
+                      setUploading(true);
+                      try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, insurance_url: file_url })); toast.success("✅ تم رفع وثيقة التأمين"); }
+                      catch (err) { toast.error("فشل رفع الملف"); }
+                      finally { setUploading(false); }
+                    }} />
+                  </div>
+                </div>
+
+                {/* ── 4) Selfie / ID ── */}
+                <div className="p-4 bg-muted/30 rounded-xl border border-border space-y-3">
+                  <p className="text-sm font-bold flex items-center gap-2">🤳 صورة شخصية مع الهوية</p>
+                  <p className="text-xs text-muted-foreground">صورة واضحة لوجهك مع إمساك بطاقة هويتك</p>
+                  <Button
+                    variant="outline"
+                    className={`rounded-xl gap-2 w-full h-10 text-sm ${form.selfie_url ? "border-green-500 text-green-700 bg-green-50" : ""}`}
+                    type="button"
+                    disabled={uploading}
+                    onClick={() => document.getElementById("upload-selfie").click()}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {form.selfie_url ? "✓ تم رفع الصورة" : "رفع صورة شخصية مع الهوية"}
+                  </Button>
+                  <input id="upload-selfie" type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0]; if (!file) return;
+                    if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
+                    setUploading(true);
+                    try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, selfie_url: file_url })); toast.success("✅ تم رفع الصورة الشخصية"); }
+                    catch (err) { toast.error("فشل رفع الملف"); }
+                    finally { setUploading(false); }
+                  }} />
+                </div>
+
+                {/* Amber warning — only shown after license image is uploaded */}
+                {form.license_image_url && (
+                  <div className="p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+                    <p className="text-sm text-yellow-700 font-medium">⏳ في انتظار التحقق</p>
+                    <p className="text-xs text-yellow-600 mt-1">سيتم مراجعة وثائقك من قِبل الفريق خلال 24 ساعة. لن تتمكن من نشر رحلات قبل الموافقة.</p>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
