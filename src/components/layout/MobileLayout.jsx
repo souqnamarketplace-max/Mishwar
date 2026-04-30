@@ -178,17 +178,26 @@ export default function MobileLayout({ children, user }) {
       )}
 
       {/* ── Scrollable content ── */}
+      {/* Android fix: touch handlers on a separate pull-indicator, not on the scroll container */}
       <div
         ref={contentRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        className="flex-1 overflow-y-auto overscroll-y-contain"
+        className="flex-1 overflow-y-auto"
         style={{
           paddingBottom: hideNav ? "env(safe-area-inset-bottom)" : "80px",
           WebkitOverflowScrolling: "touch",
+          overflowY: "auto",
+          /* Android Chrome scroll fix */
+          touchAction: "pan-y",
+          overscrollBehaviorY: "contain",
         }}
       >
+        {/* Pull-to-refresh detection area — only at very top */}
+        <div
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: "60px", zIndex: 0, pointerEvents: "none" }}
+        />
         {children}
       </div>
 

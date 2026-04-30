@@ -188,21 +188,19 @@ export default function CityAutocomplete({
           )}
         </div>
       )}
-    {/* Map picker — opens its own modal panel */}
+    {/* Map picker — uses CityMapPicker's own modal with forceOpen */}
     {showMapPicker && (
-      <div className="fixed inset-0 z-[300] bg-black/50" onClick={() => setShowMapPicker(false)}>
-        <div className="absolute inset-4 top-16 bg-card rounded-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-          <CityMapPicker
-            value={query}
-            placeholder={placeholder}
-            onChange={(city) => {
-              setQuery(city);
-              setShowMapPicker(false);
-              onChange?.(city);
-            }}
-          />
-        </div>
-      </div>
+      <CityMapPicker
+        value={query}
+        placeholder={placeholder}
+        forceOpen={true}
+        onClose={() => setShowMapPicker(false)}
+        onChange={(city) => {
+          setQuery(city);
+          setShowMapPicker(false);
+          onChange?.(city);
+        }}
+      />
     )}
     </div>
   );

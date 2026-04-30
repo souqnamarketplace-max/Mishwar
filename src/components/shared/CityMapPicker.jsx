@@ -42,12 +42,17 @@ const PALESTINE_CITIES = [
   { name: "سعير",           lat: 31.5815, lng: 35.1672 },
 ];
 
-export default function CityMapPicker({ value, onChange, placeholder = "اختر مدينتك" }) {
+export default function CityMapPicker({ value, onChange, placeholder = "اختر مدينتك", forceOpen = false, onClose }) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const markersRef = useRef([]);
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+
+  // Allow parent to force-open the map
+  useEffect(() => {
+    if (forceOpen) setIsOpen(true);
+  }, [forceOpen]);
   const [selected, setSelected] = useState(value || "");
 
   const filtered = PALESTINE_CITIES.filter(c =>
@@ -139,6 +144,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
     onChange(cityName);
     setIsOpen(false);
     setSearch("");
+    onClose?.();
   };
 
   const flyToCity = (city) => {
@@ -172,7 +178,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
 
       {/* Map Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center bg-black/60" onClick={() => { setIsOpen(false); onClose?.(); }}>
           <div
             className="bg-card w-full sm:max-w-lg h-[85vh] sm:h-[600px] rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col shadow-2xl"
             onClick={e => e.stopPropagation()}
@@ -184,7 +190,7 @@ export default function CityMapPicker({ value, onChange, placeholder = "اختر
                 <p className="font-bold text-foreground">اختر مدينتك على الخريطة</p>
                 <p className="text-xs text-muted-foreground">انقر على الخريطة أو ابحث بالاسم</p>
               </div>
-              <button onClick={() => setIsOpen(false)} className="p-2 rounded-xl hover:bg-muted">
+              <button onClick={() => { setIsOpen(false); onClose?.(); }} className="p-2 rounded-xl hover:bg-muted">
                 <X className="w-4 h-4" />
               </button>
             </div>
