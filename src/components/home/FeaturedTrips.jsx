@@ -56,11 +56,20 @@ function RouteBanner({ trip }) {
     <div
       className="relative h-24 overflow-hidden flex items-center justify-between px-4"
       style={{
-        background: isFemale
+        background: trip.car_image
+          ? "transparent"
+          : isFemale
           ? "linear-gradient(135deg, #fce7f3 0%, #fbcfe8 40%, #f9a8d4 100%)"
           : `linear-gradient(135deg, ${fromColor.from} 0%, ${toColor.to} 100%)`,
       }}
     >
+      {/* Car photo background */}
+      {trip.car_image && (
+        <>
+          <img src={trip.car_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className={`absolute inset-0 ${isFemale ? "bg-rose-900/50" : "bg-black/50"}`} />
+        </>
+      )}
       {/* Subtle road texture lines */}
       <div
         className="absolute inset-0 opacity-10"

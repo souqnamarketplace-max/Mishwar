@@ -6,7 +6,7 @@ import {
   Car, Users, DollarSign, Star, ChevronDown, Plus, X,
   TrendingUp, CreditCard, CheckCircle
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import DriverStats from "../components/driver/DriverStats";
 import DriverTripsList from "../components/driver/DriverTripsList";
@@ -169,7 +169,8 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
 export default function DriverDashboard() {
   useSEO({ title: "لوحة السائق", description: "لوحة قيادة السائق في مِشوار" });
 
-  const [activeTab, setActiveTab] = useState("trips");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "trips");
   const [selectedTripId, setSelectedTripId] = useState(null);
   const qc = useQueryClient();
 

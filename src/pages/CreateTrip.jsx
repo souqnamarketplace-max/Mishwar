@@ -232,10 +232,11 @@ export default function CreateTrip() {
       checkpoint_note: form.checkpoint_note || "",
       driver_note:     form.driver_note || "",
       // Car info
-      car_model:  form.car_model || "",
-      car_year:   form.car_year  || "",
-      car_color:  form.car_color || "",
-      car_plate:  form.car_plate || "",
+      car_model:  user?.car_model || form.car_model || "",
+      car_year:   user?.car_year  || form.car_year  || "",
+      car_color:  user?.car_color || form.car_color || "",
+      car_plate:  user?.car_plate || form.car_plate || "",
+      car_image:  user?.car_image || "",
       // Multi-stop support
       stops: (form.stops || []).filter(s => s.city && s.time).map(s => ({
         city:              s.city,
@@ -547,44 +548,56 @@ export default function CreateTrip() {
               <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">3</span>
               معلومات إضافية
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>نوع السيارة <span className="text-destructive">*</span></Label>
-                <Input
-                  value={form.car_model}
-                  onChange={(e) => updateField("car_model", e.target.value)}
-                  placeholder="مثال: كيا سيراتو"
-                  className="h-11 rounded-xl mt-1"
-                />
+            {/* Car details — pulled from "مركبتي" in driver dashboard */}
+            <div className="bg-muted/30 rounded-2xl border border-border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                  🚗 بيانات مركبتك
+                </p>
+                <Link to="/driver?tab=vehicle" className="text-xs text-primary hover:underline flex items-center gap-1">
+                  تعديل ← لوحة السائق
+                </Link>
               </div>
 
-              <div>
-                <Label>سنة الصنع</Label>
-                <Input
-                  value={form.car_year}
-                  onChange={(e) => updateField("car_year", e.target.value)}
-                  placeholder="مثال: 2020"
-                  className="h-11 rounded-xl mt-1"
-                />
-              </div>
-              <div>
-                <Label>اللون</Label>
-                <Input
-                  value={form.car_color}
-                  onChange={(e) => updateField("car_color", e.target.value)}
-                  placeholder="مثال: فضي"
-                  className="h-11 rounded-xl mt-1"
-                />
-              </div>
-              <div>
-                <Label>رقم اللوحة <span className="text-destructive">*</span></Label>
-                <Input
-                  value={form.car_plate}
-                  onChange={(e) => updateField("car_plate", e.target.value)}
-                  placeholder="مثال: 6-1234-95"
-                  className="h-11 rounded-xl mt-1"
-                />
-              </div>
+              {/* Car image preview */}
+              {user?.car_image && (
+                <div className="mb-3 rounded-xl overflow-hidden h-32 bg-muted relative">
+                  <img src={user.car_image} alt="المركبة" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  {user.car_model && (
+                    <div className="absolute bottom-2 right-3 text-white">
+                      <p className="text-sm font-bold">{user.car_model} {user.car_year}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {user?.car_model ? (
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="bg-card rounded-xl p-2.5 border border-border text-center">
+                    <p className="text-[10px] text-muted-foreground">الموديل</p>
+                    <p className="text-xs font-bold mt-0.5 truncate">{user.car_model} {user.car_year}</p>
+                  </div>
+                  <div className="bg-card rounded-xl p-2.5 border border-border text-center">
+                    <p className="text-[10px] text-muted-foreground">اللون</p>
+                    <p className="text-xs font-bold mt-0.5">{user.car_color || "—"}</p>
+                  </div>
+                  <div className="bg-card rounded-xl p-2.5 border border-border text-center">
+                    <p className="text-[10px] text-muted-foreground">اللوحة</p>
+                    <p className="text-xs font-bold mt-0.5 font-mono">{user.car_plate || "—"}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 flex items-start gap-2">
+                  <span className="text-amber-600 mt-0.5">⚠️</span>
+                  <div>
+                    <p className="text-xs font-medium text-amber-800">لم تضف بيانات مركبتك بعد</p>
+                    <p className="text-[11px] text-amber-700 mt-0.5">
+                      اذهب إلى <Link to="/driver?tab=vehicle" className="font-bold underline">لوحة السائق ← مركبتي</Link> لإضافة موديل السيارة، اللون، واللوحة. ستظهر تلقائياً في كل رحلة.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <Label className="mb-3 block">مرافق متاحة</Label>

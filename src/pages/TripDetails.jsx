@@ -77,6 +77,23 @@ export default function TripDetails() {
     enabled: !!user?.email && !!id,
   });
 
+  // Reactive price: changes when passenger selects a different drop-off stop
+  const displayPricePerSeat = React.useMemo(() => {
+    const stops = Array.isArray(trip?.stops) ? trip.stops : [];
+    const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
+    if (isMidStop && Number(stops[dropoffStopIndex]?.price_from_origin) > 0) {
+      return Number(stops[dropoffStopIndex].price_from_origin);
+    }
+    return trip?.price || 0;
+  }, [trip?.stops, trip?.price, dropoffStopIndex]);
+
+  // Display dropoff city
+  const displayDropoffCity = React.useMemo(() => {
+    const stops = Array.isArray(trip?.stops) ? trip.stops : [];
+    const isMidStop = dropoffStopIndex !== null && stops[dropoffStopIndex];
+    return isMidStop ? stops[dropoffStopIndex].city : trip?.to_city;
+  }, [trip?.stops, trip?.to_city, dropoffStopIndex]);
+
   // User can see contact details if they have a confirmed booking OR just booked now
   const hasConfirmedBooking = !!existingBooking || booked;
 
@@ -282,10 +299,19 @@ export default function TripDetails() {
                   </div>
                 </div>
               )}
+              {/* Price update notice when stop selected */}
+              {dropoffStopIndex !== null && displayPricePerSeat !== (trip?.price || 0) && !booked && !isOwnTrip && (
+                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-2.5 flex items-center justify-between">
+                  <span className="text-xs text-green-800">
+                    السعر حتى <span className="font-bold">{displayDropoffCity}</span>
+                  </span>
+                  <span className="text-sm font-black text-green-700">₪{displayPricePerSeat} / مقعد</span>
+                </div>
+              )}
               {!booked && !isOwnTrip && seatsToBook > 1 && (
                 <div className="flex items-center justify-between text-sm text-muted-foreground pb-1">
                   <span>الإجمالي</span>
-                  <span className="font-bold text-primary">₪{(trip?.price || 0) * seatsToBook}</span>
+                  <span className="font-bold text-primary">₪{displayPricePerSeat * seatsToBook}</span>
                 </div>
               )}
 
@@ -419,10 +445,16 @@ export default function TripDetails() {
                     <div key={idx} className="flex items-start gap-3 pb-3 relative">
                       <div className="w-3 h-3 rounded-full bg-yellow-500 mt-1 shrink-0 z-10 border-2 border-card" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium">{stop.city}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold">{stop.city}</p>
+                          {Number(stop.price_from_origin) > 0 && (
+                            <span className="text-xs font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">
+                              ₪{stop.price_from_origin}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                          {stop.location || "محطة"}{stop.time && ` • ${stop.time}`}
-                          {Number(stop.price_from_origin) > 0 && ` • ₪${stop.price_from_origin} من البداية`}
+                          {stop.location || "محطة توقف"}{stop.time && ` • ${stop.time}`}
                         </p>
                       </div>
                     </div>
@@ -441,37 +473,85 @@ export default function TripDetails() {
               </div>
             )}
 
-            {/* Drop-off selector — only shown for multi-stop trips when user can still book */}
+            {/* Drop-off selector — card-style with prominent pricing */}
             {Array.isArray(trip.stops) && trip.stops.length > 0 && !booked && !isOwnTrip && (
               <div className="mt-4 pt-4 border-t border-border">
-                <Label className="text-sm font-semibold mb-2 block">أين تريد النزول؟</Label>
+                <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  🗺️ أين تريد النزول؟
+                  <span className="text-xs font-normal text-muted-foreground">اختر وجهتك لحساب السعر</span>
+                </p>
                 <div className="space-y-2">
-                  {trip.stops.map((stop, idx) => (
-                    <label key={idx} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="dropoff"
-                        value={idx}
-                        checked={dropoffStopIndex === idx}
-                        onChange={() => setDropoffStopIndex(idx)}
-                      />
-                      <span className="text-sm flex-1">{stop.city}</span>
-                      {Number(stop.price_from_origin) > 0 && (
-                        <span className="text-xs text-muted-foreground">₪{stop.price_from_origin}</span>
-                      )}
-                    </label>
-                  ))}
-                  <label className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="dropoff"
-                      value="-1"
-                      checked={dropoffStopIndex === null}
-                      onChange={() => setDropoffStopIndex(null)}
-                    />
-                    <span className="text-sm flex-1 font-medium">{trip.to_city} (الوجهة النهائية)</span>
-                    <span className="text-xs text-muted-foreground">₪{trip.price}</span>
-                  </label>
+                  {/* Final destination — full trip price */}
+                  <button
+                    type="button"
+                    onClick={() => setDropoffStopIndex(null)}
+                    className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-right transition-all ${
+                      dropoffStopIndex === null
+                        ? "border-primary bg-primary/5 shadow-sm"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        dropoffStopIndex === null ? "border-primary" : "border-muted-foreground"
+                      }`}>
+                        {dropoffStopIndex === null && <div className="w-2 h-2 rounded-full bg-primary" />}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold leading-tight">{trip.to_city}</p>
+                        <p className="text-[11px] text-muted-foreground">الوجهة النهائية</p>
+                      </div>
+                    </div>
+                    <span className={`text-base font-black shrink-0 ${
+                      dropoffStopIndex === null ? "text-primary" : "text-muted-foreground"
+                    }`}>₪{trip.price}</span>
+                  </button>
+
+                  {/* Intermediate stops — may have different prices */}
+                  {trip.stops.map((stop, idx) => {
+                    const stopPrice = Number(stop.price_from_origin);
+                    const hasDiscount = stopPrice > 0 && stopPrice < trip.price;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setDropoffStopIndex(idx)}
+                        className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl border text-right transition-all ${
+                          dropoffStopIndex === idx
+                            ? "border-primary bg-primary/5 shadow-sm"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                            dropoffStopIndex === idx ? "border-primary" : "border-yellow-500"
+                          }`}>
+                            {dropoffStopIndex === idx && <div className="w-2 h-2 rounded-full bg-primary" />}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold leading-tight">{stop.city}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              محطة توقف{stop.time ? ` • ${stop.time}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-left shrink-0">
+                          {stopPrice > 0 ? (
+                            <>
+                              <p className={`text-base font-black ${dropoffStopIndex === idx ? "text-primary" : "text-muted-foreground"}`}>
+                                ₪{stopPrice}
+                              </p>
+                              {hasDiscount && (
+                                <p className="text-[10px] text-green-600 font-medium">أقل من النهاية</p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">نفس السعر</p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
