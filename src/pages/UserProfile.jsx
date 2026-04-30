@@ -189,12 +189,25 @@ export default function UserProfile() {
             {/* Action buttons (top right of card) */}
             <div className="flex flex-wrap gap-2 mt-14 sm:mt-16 justify-end">
               {isOwnProfile ? (
+                <>
+                <Button
+                  variant="outline" size="sm"
+                  className="rounded-xl gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={async () => {
+                    try { await base44.auth.logout("/"); } catch {}
+                    window.location.href = "/";
+                  }}
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  خروج
+                </Button>
                 <Link to="/settings">
                   <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9">
                     <Settings className="w-4 h-4" />
                     الإعدادات
                   </Button>
                 </Link>
+                </>
               ) : (
                 <>
                   <Link to="/messages">
