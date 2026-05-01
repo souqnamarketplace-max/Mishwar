@@ -15,7 +15,9 @@ const typeConfig = {
 
 export default function NotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 64, right: 8 });
   const ref = useRef(null);
+  const btnRef = useRef(null);
   const qc = useQueryClient();
 
   const { data: notifications = [] } = useQuery({
