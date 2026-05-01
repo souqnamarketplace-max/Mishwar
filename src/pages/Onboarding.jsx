@@ -272,7 +272,7 @@ export default function Onboarding() {
                       <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         type="tel"
-                        placeholder="05xxxxxxxx"
+                        placeholder="059XXXXXXX أو +970591234567"
                         value={form.phone}
                         onChange={(e) => setForm({ ...form, phone: e.target.value })}
                         className="pr-10 rounded-xl"

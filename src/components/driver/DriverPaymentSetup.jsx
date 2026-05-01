@@ -170,7 +170,7 @@ export default function DriverPaymentSetup({ user }) {
             <Label className="text-xs">رقم Jawwal Pay *</Label>
             <Input value={jawwal.jawwal_pay_number}
               onChange={e => setJawwal({ jawwal_pay_number: e.target.value })}
-              placeholder="05XXXXXXXX"
+              placeholder="059XXXXXXX أو +970591234567"
               className="h-10 rounded-xl mt-1 text-sm" dir="ltr" />
           </div>
           {user?.jawwal_pay_number && <SavedBadge text={`✓ Jawwal Pay: ${user.jawwal_pay_number}`} />}

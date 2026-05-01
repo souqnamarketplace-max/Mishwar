@@ -174,7 +174,7 @@ export default function Login() {
                 <Label className="mb-1.5 block">رقم الهاتف</Label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input name="phone" type="tel" placeholder="05XXXXXXXX"
+                  <Input name="phone" type="tel" placeholder="059XXXXXXX أو +970591234567"
                     value={form.phone} onChange={handleChange} className="pr-10 text-left" dir="ltr" autoComplete="tel" />
                 </div>
               </div>

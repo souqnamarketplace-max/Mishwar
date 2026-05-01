@@ -391,7 +391,7 @@ export default function AccountSettings() {
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="05xxxxxxxx"
+                placeholder="059XXXXXXX أو +970591234567"
                 className="rounded-xl h-10"
               />
               <Button
