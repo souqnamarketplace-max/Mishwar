@@ -67,7 +67,7 @@ export default function NotificationBell({ userEmail }) {
   }, [open]);
 
   return (
-    <div ref={ref}>
+    <div ref={ref} className="relative">
       {/* Bell button */}
       <button
         onClick={() => setOpen(v => !v)}

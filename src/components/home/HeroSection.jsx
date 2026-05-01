@@ -106,11 +106,18 @@ export default function HeroSection() {
       <section className="sm:hidden flex flex-col">
         {/* Compact hero banner */}
         <div className="relative h-48 overflow-hidden">
-          {/* Slideshow images */}
-          {CITY_SLIDES.map((s, i) => (
-            <img key={s.city} loading="lazy" src={s.img} alt={s.city}
-              className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${i === slideIdx ? "opacity-100" : "opacity-0"}`} />
-          ))}
+          {/* Slideshow - only load current + next image */}
+          {CITY_SLIDES.map((s, i) => {
+            const isCurrent = i === slideIdx;
+            const isNext = i === (slideIdx + 1) % CITY_SLIDES.length;
+            if (!isCurrent && !isNext) return null;
+            return (
+              <img key={s.city}
+                src={s.img.replace('w=1400&h=800', 'w=800&h=500')}
+                alt={s.city}
+                className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ${isCurrent ? "opacity-100" : "opacity-0"}`} />
+            );
+          })}
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/40 to-black/20" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
             <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full px-3 py-1 mb-2">
@@ -160,10 +167,17 @@ export default function HeroSection() {
       {/* ── DESKTOP LAYOUT ── */}
       <section className="hidden sm:block relative overflow-hidden" style={{ minHeight: "560px" }}>
         <div className="absolute inset-0">
-          {CITY_SLIDES.map((s, i) => (
-            <img key={s.city} loading="lazy" src={s.img} alt={s.city}
-              className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${i === slideIdx ? "opacity-100" : "opacity-0"}`} />
-          ))}
+          {CITY_SLIDES.map((s, i) => {
+            const isCurrent = i === slideIdx;
+            const isNext = i === (slideIdx + 1) % CITY_SLIDES.length;
+            if (!isCurrent && !isNext) return null;
+            return (
+              <img key={s.city}
+                src={s.img.replace('w=1400&h=800', 'w=1200&h=700')}
+                alt={s.city}
+                className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ${isCurrent ? "opacity-100" : "opacity-0"}`} />
+            );
+          })}
           <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/55 to-black/15" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
           {/* City label bottom-left */}
