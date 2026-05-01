@@ -527,9 +527,9 @@ export default function TripDetails() {
 
       {/* ── Booking Confirmation Dialog ── */}
       {showConfirm && trip && !isOwnTrip && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowConfirm(false)} />
-          <div className="relative bg-card rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md p-5 shadow-2xl" dir="rtl">
+          <div className="relative bg-card rounded-2xl w-full max-w-md p-5 shadow-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-black text-lg">تأكيد الحجز</h3>
