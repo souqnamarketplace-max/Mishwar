@@ -1,7 +1,13 @@
 -- ============================================================
--- مشوارو — Supabase Security Hardening Migration
--- Run this in: Supabase Dashboard → SQL Editor → New Query
+-- مشوارو — Supabase Security Hardening Migration v2
+-- Fixed: explicit text casting to avoid uuid = text errors
+-- Run in: Supabase Dashboard → SQL Editor → New Query
 -- ============================================================
+
+-- Helper: get current user email as TEXT (avoids uuid/text mismatch)
+-- auth.email() can sometimes return null before session loads,
+-- so we use jwt claim directly with explicit text cast
+-- Usage in policies: (auth.jwt() ->> 'email')
 
 -- ─── 1. ENABLE RLS ON ALL TABLES ────────────────────────────
 ALTER TABLE trips             ENABLE ROW LEVEL SECURITY;
@@ -19,11 +25,13 @@ ALTER TABLE announcements     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE coupons           ENABLE ROW LEVEL SECURITY;
 
--- ─── 2. DROP OLD POLICIES (clean slate) ─────────────────────
+-- ─── 2. DROP ALL EXISTING POLICIES (clean slate) ────────────
 DO $$ DECLARE r RECORD;
 BEGIN
-  FOR r IN SELECT schemaname, tablename, policyname
-    FROM pg_policies WHERE schemaname = 'public'
+  FOR r IN
+    SELECT schemaname, tablename, policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I',
       r.policyname, r.schemaname, r.tablename);
@@ -31,238 +39,273 @@ BEGIN
 END $$;
 
 -- ─── 3. TRIPS ────────────────────────────────────────────────
--- Anyone can read confirmed future trips (for search)
-CREATE POLICY "trips_read_public" ON trips
-  FOR SELECT USING (status IN ('confirmed','in_progress'));
+-- Public can search confirmed/active trips
+CREATE POLICY "trips_select_public" ON trips
+  FOR SELECT USING (
+    status IN ('confirmed', 'in_progress')
+    OR (created_by)::text = (auth.jwt() ->> 'email')
+  );
 
--- Driver can read ALL their own trips (including completed/cancelled)
-CREATE POLICY "trips_read_own" ON trips
-  FOR SELECT USING (created_by = auth.email());
-
--- Only authenticated users can create trips
+-- Only authenticated users insert trips as themselves
 CREATE POLICY "trips_insert" ON trips
   FOR INSERT WITH CHECK (
-    auth.role() = 'authenticated' AND
-    created_by = auth.email()
+    auth.role() = 'authenticated'
+    AND (created_by)::text = (auth.jwt() ->> 'email')
   );
 
--- Driver can only update their own trips
+-- Driver updates/deletes only their own trips
 CREATE POLICY "trips_update_own" ON trips
-  FOR UPDATE USING (created_by = auth.email());
+  FOR UPDATE USING (
+    (created_by)::text = (auth.jwt() ->> 'email')
+  );
 
--- Driver can only delete their own trips
 CREATE POLICY "trips_delete_own" ON trips
-  FOR DELETE USING (created_by = auth.email());
+  FOR DELETE USING (
+    (created_by)::text = (auth.jwt() ->> 'email')
+  );
 
 -- ─── 4. BOOKINGS ─────────────────────────────────────────────
--- Passenger sees their own bookings
-CREATE POLICY "bookings_read_passenger" ON bookings
-  FOR SELECT USING (passenger_email = auth.email());
-
--- Driver sees bookings on their trips
-CREATE POLICY "bookings_read_driver" ON bookings
+-- Passenger reads own bookings
+CREATE POLICY "bookings_select_passenger" ON bookings
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM trips t WHERE t.id = bookings.trip_id AND t.created_by = auth.email())
+    (passenger_email)::text = (auth.jwt() ->> 'email')
   );
 
--- Passenger creates booking (cannot book own trip — enforced by DB trigger)
+-- Driver reads bookings on their trips
+CREATE POLICY "bookings_select_driver" ON bookings
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM trips t
+      WHERE t.id = bookings.trip_id
+      AND (t.created_by)::text = (auth.jwt() ->> 'email')
+    )
+  );
+
+-- Passenger creates booking
 CREATE POLICY "bookings_insert" ON bookings
   FOR INSERT WITH CHECK (
-    auth.role() = 'authenticated' AND
-    passenger_email = auth.email()
+    auth.role() = 'authenticated'
+    AND (passenger_email)::text = (auth.jwt() ->> 'email')
   );
 
--- Passenger can cancel their booking; driver can accept/reject
+-- Passenger updates (cancel) their booking
 CREATE POLICY "bookings_update_passenger" ON bookings
-  FOR UPDATE USING (passenger_email = auth.email());
+  FOR UPDATE USING (
+    (passenger_email)::text = (auth.jwt() ->> 'email')
+  );
 
+-- Driver updates bookings on their trips (accept/reject)
 CREATE POLICY "bookings_update_driver" ON bookings
   FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM trips t WHERE t.id = bookings.trip_id AND t.created_by = auth.email())
+    EXISTS (
+      SELECT 1 FROM trips t
+      WHERE t.id = bookings.trip_id
+      AND (t.created_by)::text = (auth.jwt() ->> 'email')
+    )
   );
 
 -- ─── 5. REVIEWS ──────────────────────────────────────────────
--- Anyone can read reviews (public trust system)
-CREATE POLICY "reviews_read_all" ON reviews
+-- Public readable — trust system
+CREATE POLICY "reviews_select_all" ON reviews
   FOR SELECT USING (true);
 
--- Authenticated users write reviews as themselves
+-- Write only as yourself, immutable after posting (no UPDATE policy)
 CREATE POLICY "reviews_insert" ON reviews
   FOR INSERT WITH CHECK (
-    auth.role() = 'authenticated' AND
-    reviewer_email = auth.email()
+    auth.role() = 'authenticated'
+    AND (reviewer_email)::text = (auth.jwt() ->> 'email')
   );
-
--- Cannot edit reviews after posting
--- (no UPDATE policy = immutable reviews)
 
 -- ─── 6. MESSAGES ─────────────────────────────────────────────
--- User sees only messages they sent or received
-CREATE POLICY "messages_read_own" ON messages
+-- Only sender or receiver can read
+CREATE POLICY "messages_select_own" ON messages
   FOR SELECT USING (
-    sender_email = auth.email() OR
-    receiver_email = auth.email()
+    (sender_email)::text   = (auth.jwt() ->> 'email')
+    OR (receiver_email)::text = (auth.jwt() ->> 'email')
   );
 
--- User can only send messages as themselves
+-- Only send as yourself
 CREATE POLICY "messages_insert" ON messages
   FOR INSERT WITH CHECK (
-    auth.role() = 'authenticated' AND
-    sender_email = auth.email()
+    auth.role() = 'authenticated'
+    AND (sender_email)::text = (auth.jwt() ->> 'email')
   );
 
--- User can mark their received messages as read
+-- Mark received messages as read
 CREATE POLICY "messages_update_read" ON messages
-  FOR UPDATE USING (receiver_email = auth.email());
+  FOR UPDATE USING (
+    (receiver_email)::text = (auth.jwt() ->> 'email')
+  );
 
 -- ─── 7. PROFILES ─────────────────────────────────────────────
--- Anyone can read basic profile info (driver ratings, names)
-CREATE POLICY "profiles_read_all" ON profiles
+-- Public readable (driver names, ratings)
+CREATE POLICY "profiles_select_all" ON profiles
   FOR SELECT USING (true);
 
--- User can only update their own profile
-CREATE POLICY "profiles_update_own" ON profiles
-  FOR UPDATE USING (created_by = auth.email());
-
--- Auth system creates profile on signup
+-- Only edit your own profile
 CREATE POLICY "profiles_insert_own" ON profiles
-  FOR INSERT WITH CHECK (created_by = auth.email());
+  FOR INSERT WITH CHECK (
+    (created_by)::text = (auth.jwt() ->> 'email')
+  );
+
+CREATE POLICY "profiles_update_own" ON profiles
+  FOR UPDATE USING (
+    (created_by)::text = (auth.jwt() ->> 'email')
+  );
 
 -- ─── 8. NOTIFICATIONS ────────────────────────────────────────
--- User sees only their own notifications
-CREATE POLICY "notifications_read_own" ON notifications
-  FOR SELECT USING (user_email = auth.email());
+-- Only your own notifications
+CREATE POLICY "notifications_select_own" ON notifications
+  FOR SELECT USING (
+    (user_email)::text = (auth.jwt() ->> 'email')
+  );
 
--- System/authenticated users can create notifications for others
+-- Any authenticated user can create notifications (system sends to others)
 CREATE POLICY "notifications_insert" ON notifications
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (
+    auth.role() = 'authenticated'
+  );
 
--- User can mark own notifications as read
+-- Mark your own as read
 CREATE POLICY "notifications_update_own" ON notifications
-  FOR UPDATE USING (user_email = auth.email());
+  FOR UPDATE USING (
+    (user_email)::text = (auth.jwt() ->> 'email')
+  );
 
 -- ─── 9. DRIVER LICENSES ──────────────────────────────────────
--- Only the driver sees their own licenses
-CREATE POLICY "licenses_read_own" ON driver_licenses
-  FOR SELECT USING (created_by = auth.email());
-
--- Admins can see all licenses for verification
-CREATE POLICY "licenses_read_admin" ON driver_licenses
+CREATE POLICY "licenses_select_own" ON driver_licenses
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles p WHERE p.created_by = auth.email() AND p.role = 'admin')
+    (created_by)::text = (auth.jwt() ->> 'email')
   );
 
 CREATE POLICY "licenses_insert_own" ON driver_licenses
-  FOR INSERT WITH CHECK (created_by = auth.email());
-
-CREATE POLICY "licenses_update_own" ON driver_licenses
-  FOR UPDATE USING (created_by = auth.email());
-
--- ─── 10. DRIVER PAYOUTS ──────────────────────────────────────
--- Driver sees only their own payouts
-CREATE POLICY "payouts_read_own" ON driver_payouts
-  FOR SELECT USING (driver_email = auth.email());
-
-CREATE POLICY "payouts_insert" ON driver_payouts
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
--- ─── 11. TRIP PREFERENCES ────────────────────────────────────
--- User sees only their own preferences
-CREATE POLICY "prefs_read_own" ON trip_preferences
-  FOR SELECT USING (user_email = auth.email());
-
--- System reads all preferences for matching (allow service role)
-CREATE POLICY "prefs_read_system" ON trip_preferences
-  FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "prefs_insert_own" ON trip_preferences
-  FOR INSERT WITH CHECK (user_email = auth.email());
-
-CREATE POLICY "prefs_update_own" ON trip_preferences
-  FOR UPDATE USING (user_email = auth.email());
-
-CREATE POLICY "prefs_delete_own" ON trip_preferences
-  FOR DELETE USING (user_email = auth.email());
-
--- ─── 12. ADMIN AUDIT LOG ─────────────────────────────────────
--- Only admins can read audit log
-CREATE POLICY "audit_read_admin" ON admin_audit_log
-  FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles p WHERE p.created_by = auth.email() AND p.role = 'admin')
+  FOR INSERT WITH CHECK (
+    (created_by)::text = (auth.jwt() ->> 'email')
   );
 
--- Any authenticated user can insert (system actions)
+CREATE POLICY "licenses_update_own" ON driver_licenses
+  FOR UPDATE USING (
+    (created_by)::text = (auth.jwt() ->> 'email')
+  );
+
+-- ─── 10. DRIVER PAYOUTS ──────────────────────────────────────
+CREATE POLICY "payouts_select_own" ON driver_payouts
+  FOR SELECT USING (
+    (driver_email)::text = (auth.jwt() ->> 'email')
+  );
+
+CREATE POLICY "payouts_insert" ON driver_payouts
+  FOR INSERT WITH CHECK (
+    auth.role() = 'authenticated'
+  );
+
+-- ─── 11. TRIP PREFERENCES ────────────────────────────────────
+CREATE POLICY "prefs_select_own" ON trip_preferences
+  FOR SELECT USING (
+    (user_email)::text = (auth.jwt() ->> 'email')
+  );
+
+-- Allow reading all active prefs for trip matching notifications
+CREATE POLICY "prefs_select_matching" ON trip_preferences
+  FOR SELECT USING (
+    auth.role() = 'authenticated'
+    AND is_active = true
+  );
+
+CREATE POLICY "prefs_insert_own" ON trip_preferences
+  FOR INSERT WITH CHECK (
+    (user_email)::text = (auth.jwt() ->> 'email')
+  );
+
+CREATE POLICY "prefs_update_own" ON trip_preferences
+  FOR UPDATE USING (
+    (user_email)::text = (auth.jwt() ->> 'email')
+  );
+
+CREATE POLICY "prefs_delete_own" ON trip_preferences
+  FOR DELETE USING (
+    (user_email)::text = (auth.jwt() ->> 'email')
+  );
+
+-- ─── 12. ADMIN AUDIT LOG ─────────────────────────────────────
+-- Any authenticated user can insert (system logs)
 CREATE POLICY "audit_insert" ON admin_audit_log
   FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
--- ─── 13. SUPPORT TICKETS ─────────────────────────────────────
-CREATE POLICY "tickets_read_own" ON support_tickets
-  FOR SELECT USING (created_by = auth.email());
-
-CREATE POLICY "tickets_read_admin" ON support_tickets
+-- Only admins can read
+CREATE POLICY "audit_select_admin" ON admin_audit_log
   FOR SELECT USING (
-    EXISTS (SELECT 1 FROM profiles p WHERE p.created_by = auth.email() AND p.role = 'admin')
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE (p.created_by)::text = (auth.jwt() ->> 'email')
+      AND p.role = 'admin'
+    )
+  );
+
+-- ─── 13. SUPPORT TICKETS ─────────────────────────────────────
+CREATE POLICY "tickets_select_own" ON support_tickets
+  FOR SELECT USING (
+    (created_by)::text = (auth.jwt() ->> 'email')
   );
 
 CREATE POLICY "tickets_insert" ON support_tickets
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
--- ─── 14. ANNOUNCEMENTS & APP SETTINGS ────────────────────────
--- Public readable
-CREATE POLICY "announcements_read_all" ON announcements
-  FOR SELECT USING (true);
-
-CREATE POLICY "settings_read_all" ON app_settings
-  FOR SELECT USING (true);
-
--- Only admins can write
-CREATE POLICY "announcements_write_admin" ON announcements
-  FOR ALL USING (
-    EXISTS (SELECT 1 FROM profiles p WHERE p.created_by = auth.email() AND p.role = 'admin')
+  FOR INSERT WITH CHECK (
+    auth.role() = 'authenticated'
   );
 
-CREATE POLICY "settings_write_admin" ON app_settings
+-- ─── 14. ANNOUNCEMENTS & APP_SETTINGS (public read) ──────────
+CREATE POLICY "announcements_select_all" ON announcements
+  FOR SELECT USING (true);
+
+CREATE POLICY "settings_select_all" ON app_settings
+  FOR SELECT USING (true);
+
+-- Admins write announcements and settings
+CREATE POLICY "announcements_all_admin" ON announcements
   FOR ALL USING (
-    EXISTS (SELECT 1 FROM profiles p WHERE p.created_by = auth.email() AND p.role = 'admin')
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE (p.created_by)::text = (auth.jwt() ->> 'email')
+      AND p.role = 'admin'
+    )
   );
 
--- ─── 15. PREVENT DRIVER SELF-BOOKING (DB TRIGGER) ───────────
+CREATE POLICY "settings_all_admin" ON app_settings
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM profiles p
+      WHERE (p.created_by)::text = (auth.jwt() ->> 'email')
+      AND p.role = 'admin'
+    )
+  );
+
+-- ─── 15. SELF-BOOKING PREVENTION TRIGGER ────────────────────
 CREATE OR REPLACE FUNCTION prevent_self_booking()
 RETURNS TRIGGER AS $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM trips
-    WHERE id = NEW.trip_id AND created_by = NEW.passenger_email
+    WHERE id = NEW.trip_id
+    AND (created_by)::text = (NEW.passenger_email)::text
   ) THEN
     RAISE EXCEPTION 'لا يمكنك حجز مقعد في رحلتك الخاصة';
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 DROP TRIGGER IF EXISTS trg_prevent_self_booking ON bookings;
 CREATE TRIGGER trg_prevent_self_booking
   BEFORE INSERT ON bookings
   FOR EACH ROW EXECUTE FUNCTION prevent_self_booking();
 
--- ─── 16. AUTH RATE LIMITING (Supabase built-in) ──────────────
--- Run these in: Dashboard → Auth → Settings (UI) OR via SQL:
--- Email signups per hour: 10
--- OTP expiry: 3600 seconds
--- Minimum password length: 8
-
-ALTER SYSTEM SET app.settings.max_email_signups_per_hour = '10';
-
--- ─── 17. REALTIME SECURITY ───────────────────────────────────
--- Only allow realtime on tables that need it
--- (Messages, Notifications, Trips, Bookings)
+-- ─── 16. REALTIME (only needed tables) ───────────────────────
 ALTER PUBLICATION supabase_realtime ADD TABLE trips;
 ALTER PUBLICATION supabase_realtime ADD TABLE messages;
 ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE bookings;
 
--- ─── DONE ────────────────────────────────────────────────────
--- Verify RLS is enabled:
+-- ─── VERIFY: check RLS is ON for all tables ──────────────────
 SELECT tablename, rowsecurity
 FROM pg_tables
 WHERE schemaname = 'public'
