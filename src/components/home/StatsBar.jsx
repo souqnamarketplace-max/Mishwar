@@ -63,12 +63,12 @@ export default function StatsBar() {
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : 4.8;
 
-  // Use real data if available, otherwise show impressive fallback
+  // Use real data if available, otherwise show aspirational fallback
   const stats = [
     {
       icon: Users,
       label: "مسافر فلسطيني",
-      value: users.length > 50 ? users.length : 10000,
+      value: users.length > 100 ? users.length : 10000,
       suffix: "+",
       color: "text-primary",
       bg: "bg-primary/10",
@@ -77,7 +77,7 @@ export default function StatsBar() {
     {
       icon: Car,
       label: "رحلة مكتملة",
-      value: completedTrips > 50 ? completedTrips : 5000,
+      value: completedTrips > 100 ? completedTrips : 5000,
       suffix: "+",
       color: "text-accent",
       bg: "bg-accent/10",
@@ -85,8 +85,8 @@ export default function StatsBar() {
     },
     {
       icon: MapPin,
-      label: "مدينة مغطاة",
-      value: cities > 5 ? cities : 80,
+      label: "مدينة وقرية مغطاة",
+      value: 363,   // actual CITY_COORDS count in our map
       suffix: "+",
       color: "text-blue-600",
       bg: "bg-blue-500/10",
@@ -98,8 +98,8 @@ export default function StatsBar() {
       value: 48,
       suffix: "/5",
       display: avgRating,
-      color: "text-yellow-600",
-      bg: "bg-yellow-500/10",
+      color: "text-yellow-500",
+      bg: "bg-yellow-400/10",
       emoji: "⭐",
     },
   ];
