@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sanitizeText, getContactViolation } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
-import { Search, Send, ArrowLeft, MessageCircle } from "lucide-react";
+import { Search, Send, ArrowLeft, MessageCircle, Lock, CheckCircle2, Circle } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -52,6 +52,48 @@ export default function Messages() {
     refetchInterval: false,  // realtime subscription handles updates
     staleTime: 5000,
   });
+
+  // Fetch user's bookings to determine conversation status
+  const { data: myBookings = [] } = useQuery({
+    queryKey: ["my-bookings-msgs", user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      const [asPassenger, asDriver] = await Promise.all([
+        base44.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 100),
+        base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 100),
+      ]);
+      return { asPassenger, driverTrips: asDriver };
+    },
+    enabled: !!user?.email,
+    staleTime: 30000,
+  });
+
+  // Determine if a conversation with otherEmail is closed (trip completed/cancelled)
+  const getConvStatus = (otherEmail) => {
+    if (!myBookings?.asPassenger) return "active";
+    const { asPassenger = [], driverTrips = [] } = myBookings;
+
+    // Check as passenger: did I book a trip driven by otherEmail?
+    const asPassengerMatch = asPassenger.find(b =>
+      b.passenger_email === user?.email &&
+      (b.driver_email === otherEmail || b.created_by === otherEmail)
+    );
+    if (asPassengerMatch) {
+      if (["completed"].includes(asPassengerMatch.status)) return "completed";
+      if (["cancelled"].includes(asPassengerMatch.status)) return "cancelled";
+      return "active";
+    }
+
+    // Check as driver: does otherEmail have a booking on my trips?
+    const myTrip = driverTrips.find(t =>
+      ["completed", "cancelled"].includes(t.status)
+    );
+    // Simple check: if any of my trips involving this person is done
+    const driverMatch = asPassenger.find(b => b.passenger_email === otherEmail);
+    if (myTrip && driverMatch) return myTrip.status;
+
+    return "active";
+  };
 
   // URL params — read here (no deps issue since we just read strings)
   const paramTo   = searchParams.get("to");
@@ -241,11 +283,15 @@ export default function Messages() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <p className="font-medium text-sm text-foreground truncate">{conv.otherName}</p>
-                          {last && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {formatTime(last.created_at)}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {(() => {
+                              const st = getConvStatus(conv.otherEmail);
+                              if (st === "completed") return <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />مكتملة</span>;
+                              if (st === "cancelled") return <span className="text-[9px] bg-red-50 text-red-400 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />ملغاة</span>;
+                              return <span className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Circle className="w-2 h-2 fill-green-500" />نشطة</span>;
+                            })()}
+                            {last && <span className="text-[10px] text-muted-foreground">{formatTime(last.created_at)}</span>}
+                          </div>
                         </div>
                         <p className={`text-xs truncate ${conv.unreadCount > 0 && !isMe ? "font-bold text-foreground" : "text-muted-foreground"}`}>
                           {isMe && "أنت: "}{last?.content || ""}
@@ -310,35 +356,51 @@ export default function Messages() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Composer */}
-              <form
-                onSubmit={(e) => { e.preventDefault(); if (draft.trim()) send.mutate(); }}
-                className="p-3 border-t border-border sticky bottom-0 bg-card"
-              >
-                {getContactViolation(draft) && (
-                  <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-2 text-right">
-                    {getContactViolation(draft)}
-                  </div>
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    placeholder="اكتب رسالة..."
-                    className={`rounded-xl h-10 flex-1 ${getContactViolation(draft) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                    disabled={send.isPending}
-                  />
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={!draft.trim() || send.isPending || !!getContactViolation(draft)}
-                    className="rounded-xl bg-primary text-primary-foreground"
-                    aria-label="إرسال"
+              {/* Composer — locked if trip is completed/cancelled */}
+              {(() => {
+                const convStatus = getConvStatus(activeConv?.otherEmail);
+                const isClosed = convStatus === "completed" || convStatus === "cancelled";
+                if (isClosed) {
+                  return (
+                    <div className="p-4 border-t border-border bg-muted/30 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <Lock className="w-4 h-4 shrink-0" />
+                      {convStatus === "completed"
+                        ? "انتهت الرحلة — المحادثة مغلقة 🏁"
+                        : "تم إلغاء الرحلة — المحادثة مغلقة"}
+                    </div>
+                  );
+                }
+                return (
+                  <form
+                    onSubmit={(e) => { e.preventDefault(); if (draft.trim()) send.mutate(); }}
+                    className="p-3 border-t border-border sticky bottom-0 bg-card"
                   >
-                    <Send className="w-4 h-4" />
-                  </Button>
-                </div>
-              </form>
+                    {getContactViolation(draft) && (
+                      <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-2 text-right">
+                        {getContactViolation(draft)}
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={draft}
+                        onChange={e => setDraft(e.target.value)}
+                        placeholder="اكتب رسالة..."
+                        className={`rounded-xl h-10 flex-1 ${getContactViolation(draft) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                        disabled={send.isPending}
+                      />
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={!draft.trim() || send.isPending || !!getContactViolation(draft)}
+                        className="rounded-xl bg-primary text-primary-foreground"
+                        aria-label="إرسال"
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </form>
+                );
+              })()}
             </>
           )}
         </div>
