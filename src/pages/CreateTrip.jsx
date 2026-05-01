@@ -35,6 +35,45 @@ const amenitiesList = [
   { id: "luggage", label: "متاح للأمتعة", icon: Briefcase },
 ];
 
+// ── Notify users whose route preference matches a new trip ───────────────────
+async function notifyMatchingPreferences(trip) {
+  try {
+    // Fetch all active preferences
+    const prefs = await base44.entities.TripPreference.filter({ is_active: true }, "-created_date", 500);
+    if (!prefs?.length) return;
+
+    const tripStops = Array.isArray(trip.stops) ? trip.stops.map(s => s?.city).filter(Boolean) : [];
+    const tripCities = [trip.from_city, ...tripStops, trip.to_city];
+
+    const matches = prefs.filter(p => {
+      if (!p.from_city || !p.to_city || !p.user_email) return false;
+      // Don't notify the driver about their own trip
+      if (p.user_email === trip.driver_email) return false;
+      // Check if from_city appears before to_city in trip sequence
+      const fromIdx = tripCities.findIndex(c => c === p.from_city);
+      const toIdx   = tripCities.findIndex(c => c === p.to_city);
+      return fromIdx !== -1 && toIdx !== -1 && fromIdx < toIdx;
+    });
+
+    if (!matches.length) return;
+
+    // Send notification to each matching user (in parallel, silently)
+    await Promise.allSettled(matches.map(pref =>
+      base44.entities.Notification.create({
+        user_email: pref.user_email,
+        title: `رحلة جديدة: ${trip.from_city} ← ${trip.to_city} 🚗`,
+        message: `${trip.driver_name || "سائق"} ينشر رحلة من ${trip.from_city} إلى ${trip.to_city} بتاريخ ${trip.date} الساعة ${trip.time}. السعر: ₪${trip.price} للمقعد.`,
+        type: "new_trip",
+        trip_id: trip.id,
+        is_read: false,
+      })
+    ));
+  } catch (e) {
+    // Silent — never block trip creation
+    console.warn("[TripMatch] notification failed:", e?.message);
+  }
+}
+
 export default function CreateTrip() {
   useSEO({ title: "أنشر رحلتك", description: "انشر رحلتك واكسب من طريقك اليومي" });
 
@@ -270,12 +309,16 @@ export default function CreateTrip() {
           driver_note: (baseData.driver_note || "") + " (رحلة يومية - " + dayNames[dayIndex] + ")",
         });
       });
-      await Promise.all(promises);
+      const createdTrips = await Promise.all(promises);
       toast.success(`تم نشر ${form.recurring_days.length} رحلات متكررة بنجاح! 🎉`);
+      // Notify matching preferences for first recurring trip
+      if (createdTrips[0]) notifyMatchingPreferences({ ...baseData, id: createdTrips[0]?.id || createdTrips[0] });
     } else {
       try {
-        await base44.entities.Trip.create(baseData);
+        const newTrip = await base44.entities.Trip.create(baseData);
         toast.success("تم نشر الرحلة بنجاح! 🎉");
+        // Notify users with matching route preferences (fire & forget)
+        notifyMatchingPreferences({ ...baseData, id: newTrip?.id || newTrip });
       } catch (err) {
         const msg = err?.message || "";
         // SQL trigger errors come back with the Arabic text already
