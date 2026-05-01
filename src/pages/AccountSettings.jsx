@@ -511,7 +511,7 @@ export default function AccountSettings() {
               </div>
               <Button
                 onClick={async () => {
-                  if (!confirm("سيتم تحويل حسابك إلى حساب سائق وراكب. ستحتاج لإكمال توثيق 5 وثائق قبل أن تتمكن من نشر الرحلات. هل تريد المتابعة؟")) return;
+                  // Confirmed via UI button — no native confirm() needed
                   try {
                     await base44.auth.updateMe({ account_type: "both" });
                     toast.success("تم تفعيل حساب السائق! أكمل رفع الوثائق أدناه ↓");

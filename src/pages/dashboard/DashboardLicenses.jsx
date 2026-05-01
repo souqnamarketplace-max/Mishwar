@@ -276,6 +276,7 @@ export default function DashboardLicenses() {
                         href={selectedLicense[doc.key]}
                         target="_blank"
                         rel="noopener noreferrer"
+                        rel="noopener noreferrer"
                         className="block hover:opacity-90 transition-opacity"
                         title="انقر للعرض بالحجم الكامل"
                       >

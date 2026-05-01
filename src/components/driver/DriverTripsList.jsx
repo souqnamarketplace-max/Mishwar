@@ -23,6 +23,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [editingTrip, setEditingTrip] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [confirmDialog, setConfirmDialog] = useState(null); // { tripId, action: "start"|"complete" }
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // tripId to delete
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
@@ -229,32 +230,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                       size="sm"
                       variant="ghost"
                       className="rounded-lg text-xs text-destructive hover:bg-destructive/10 mr-auto"
-                      onClick={async () => {
-                        const activeBookings = bookings.filter(
-                          b => b.trip_id === trip.id && ['pending','confirmed'].includes(b.status)
-                        );
-                        if (activeBookings.length > 0) {
-                          const msg = `هذه الرحلة لديها ${activeBookings.length} حجز نشط. سيتم إلغاء جميع الحجوزات وإخطار الركاب. هل تريد المتابعة؟`;
-                          if (!confirm(msg)) return;
-                          // Cancel all active bookings and notify each passenger
-                          await Promise.all(activeBookings.map(async (b) => {
-                            try {
-                              await base44.entities.Booking.update(b.id, { status: 'cancelled' });
-                              await base44.entities.Notification.create({
-                                user_email: b.passenger_email,
-                                title: 'تم إلغاء رحلتك ⚠️',
-                                message: `عذراً، قام السائق بإلغاء الرحلة من ${trip.from_city} إلى ${trip.to_city} بتاريخ ${trip.date} الساعة ${trip.time}. تم إلغاء حجزك تلقائياً.`,
-                                type: 'system',
-                                trip_id: trip.id,
-                                is_read: false,
-                              });
-                            } catch (e) { console.warn('Failed to cancel booking/notify:', e); }
-                          }));
-                        } else {
-                          if (!confirm('هل تريد حذف هذه الرحلة؟')) return;
-                        }
-                        deleteMutation.mutate(trip.id);
-                      }}
+                      onClick={() => setDeleteConfirm(trip.id)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
