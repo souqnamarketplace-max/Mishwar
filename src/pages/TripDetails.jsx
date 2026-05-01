@@ -357,8 +357,8 @@ export default function TripDetails() {
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                  <span className="text-sm font-medium">{trip.driver_rating || 4.6}</span>
-                  <span className="text-xs text-muted-foreground">({trip.driver_reviews_count || 89} تقييم)</span>
+                  <span className="text-sm font-medium">{trip.driver_rating ? trip.driver_rating.toFixed(1) : "جديد"}</span>
+                  <span className="text-xs text-muted-foreground">{trip.driver_reviews_count ? `(${trip.driver_reviews_count} تقييم)` : "(لا يوجد تقييم بعد)"}</span>
                 </div>
               </div>
               <Link to={`/profile?email=${trip.created_by || ""}`} className="text-xs text-primary hover:underline">
