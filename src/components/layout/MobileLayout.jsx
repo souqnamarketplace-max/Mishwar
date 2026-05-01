@@ -84,13 +84,15 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 </Button>
               </Link>
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">س</span>
-              </div>
+              <Link to="/">
+                <img src="/logo.png" alt="مشوارو" className="h-10 w-10 rounded-xl object-cover" />
+              </Link>
             )}
             
             <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
-              {headerTitle || currentTab?.label || "مشوارو"}
+              {location.pathname === "/" ? (
+                <img src="/logo.png" alt="مشوارو" className="h-8 w-8 rounded-lg object-cover mx-auto" />
+              ) : (headerTitle || currentTab?.label || "مشوارو")}
             </h1>
             
             <div className="flex items-center gap-1">

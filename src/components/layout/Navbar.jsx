@@ -40,13 +40,11 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">س</span>
-            </div>
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="مشوارو" className="h-11 w-11 rounded-xl object-cover shadow-sm" />
             <div className="hidden sm:block">
               <h1 className="text-lg font-bold text-foreground leading-tight">مشوارو</h1>
-              <p className="text-[10px] text-muted-foreground leading-tight">شارك الطريق، وفر أكثر</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">رحلتك أسهل، أوفر، وأسرع</p>
             </div>
           </Link>
 

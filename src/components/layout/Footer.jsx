@@ -12,7 +12,7 @@ const quickLinks = [
 
 const aboutLinks = [
   { label: "من نحن", path: "/about" },
-  { label: "مدونة مِشوار", path: "/blog" },
+  { label: "مدونة مشوارو", path: "/blog" },
   { label: "الأسئلة الشائعة", path: "/help" },
   { label: "الأمان والخصوصية", path: "/safety" },
   { label: "شروط الاستخدام", path: "/terms" },
@@ -48,7 +48,7 @@ export default function Footer() {
           </button>
           {showStory && (
             <div className="mt-4 space-y-3 text-sm text-white/80 leading-relaxed">
-              <p>في فلسطين، التنقل بين المدن تحدٍّ يومي. مِشوار وُلد من فكرة بسيطة: لماذا لا نشارك الطريق ونوفر معاً؟</p>
+              <p>في فلسطين، التنقل بين المدن تحدٍّ يومي. مشوارو وُلد من فكرة بسيطة: لماذا لا نشارك الطريق ونوفر معاً؟</p>
               <p>منصة فلسطينية تربط السائقين بالركاب، تُقلل التكلفة، وتُعزز الترابط بين أبناء الشعب الواحد.</p>
             </div>
           )}
@@ -59,15 +59,13 @@ export default function Footer() {
           {/* Logo + App */}
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
-                <span className="text-2xl font-bold">م</span>
-              </div>
+              <img src="/logo.png" alt="مشوارو" className="h-14 w-14 rounded-2xl object-cover shadow-lg" />
               <div>
-                <h2 className="text-xl font-bold">مِشوار</h2>
+                <h2 className="text-xl font-bold">مشوارو</h2>
                 <p className="text-xs text-white/60">🇵🇸 منصة فلسطينية</p>
               </div>
             </div>
-            <p className="text-sm text-white/70 mb-4">شارك الطريق، وفر أكثر، وقوّي مجتمعك.</p>
+            <p className="text-sm text-white/70 mb-4">رحلتك أسهل، أوفر، وأسرع.</p>
             {/* App Store Badges */}
             <div className="space-y-2">
               <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2 text-xs cursor-pointer hover:bg-white/20 transition-colors">
@@ -103,7 +101,7 @@ export default function Footer() {
 
           {/* About */}
           <div>
-            <h3 className="font-bold text-lg mb-4">عن مِشوار</h3>
+            <h3 className="font-bold text-lg mb-4">عن مشوارو</h3>
             <ul className="space-y-2">
               {aboutLinks.map((l) => (
                 <li key={l.label}>
@@ -125,7 +123,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-white/20 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-white/50">
-          <p>© {new Date().getFullYear()} مِشوار — جميع الحقوق محفوظة 🇵🇸</p>
+          <p>© {new Date().getFullYear()} مشوارو — جميع الحقوق محفوظة 🇵🇸</p>
           <div className="flex gap-4">
             <Link to="/privacy" className="hover:text-white transition-colors">سياسة الخصوصية</Link>
             <Link to="/terms" className="hover:text-white transition-colors">شروط الاستخدام</Link>
