@@ -52,9 +52,11 @@ export default function SearchTrips() {
   const { data: trips = [], isLoading, error } = useQuery({
     queryKey: ["trips"],
     queryFn: async () => {
-      // Add a timeout safeguard — if Supabase client hangs, fail fast and show empty
+      // Fetch only confirmed future trips — avoids loading thousands of old trips
+      const today = new Date().toISOString().split("T")[0];
       return Promise.race([
-        base44.entities.Trip.list("-created_date", 200),
+        base44.entities.Trip.filter({ status: "confirmed" }, "-date", 150)
+          .then(trips => trips.filter(t => t.date >= today)),
         new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000)),
       ]);
     },

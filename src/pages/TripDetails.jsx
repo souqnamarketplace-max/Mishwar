@@ -10,7 +10,7 @@ import {
   ArrowRight, MapPin, Clock, Calendar, Users, Star, Car,
   Shield, Phone, MessageCircle, Heart, Share2, Navigation,
   Snowflake, Music, Cigarette, Briefcase, ChevronLeft, CheckCircle,
-  Headphones, X, Check
+  Headphones, X, Check, CreditCard, Wallet, Building2, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -36,6 +36,11 @@ export default function TripDetails() {
   const qc = useQueryClient();
   const [booked, setBooked] = useState(false);
   const [favorited, setFavorited] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState("cash");
+
+  // Scroll to top when trip page opens
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
 
   const { data: user } = useQuery({
     queryKey: ["me"],
@@ -65,28 +70,28 @@ export default function TripDetails() {
         seats_booked: 1,
         total_price: tripData.price,
         status: "pending",
-        payment_method: "نقداً",
+        payment_method: selectedPayment,
       });
       // Decrement available_seats immediately on booking
       const newSeats = Math.max(0, (tripData.available_seats || 1) - 1);
       await base44.entities.Trip.update(tripData.id, { available_seats: newSeats });
       return booking;
     },
-    onMutate: () => {
-      setBooked(true);
-      return null;
-    },
-    onError: () => {
+    onMutate: () => { return null; },
+    onError: (err) => {
       setBooked(false);
-      toast.error("فشل الحجز");
+      console.error("Booking error:", err);
+      toast.error("فشل الحجز، حاول مجدداً");
     },
     onSuccess: () => {
+      setBooked(true);
+      setShowConfirm(false);
       toast.success("تم الحجز بنجاح! 🎉");
       qc.invalidateQueries({ queryKey: ["trips"] });
     },
   });
 
-  const trip = trips.find((t) => t.id === id) || trips[0];
+  const trip = tripData || null;
   const carImage = driverProfile?.car_image || trip?.car_image || null;
 
   if (!trip) {
@@ -138,19 +143,23 @@ export default function TripDetails() {
                 <div className="w-full h-11 rounded-xl bg-muted flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground font-medium">
                   🔒 أُغلق الحجز قبل الانطلاق بـ 30 دقيقة
                 </div>
+              ) : booked ? (
+                <div className="w-full h-11 rounded-xl bg-accent/10 border border-accent flex items-center justify-center gap-2 mt-2 text-sm text-accent font-bold">
+                  <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح
+                </div>
               ) : (
                 <>
-                  {isLastChance(trip) && !booked && (
+                  {isLastChance(trip) && (
                     <div className="text-center text-xs text-orange-600 font-bold bg-orange-50 rounded-lg py-1.5 mt-2">
                       ⏰ آخر فرصة — {minutesUntilTrip(trip)} دقيقة للحجز!
                     </div>
                   )}
                   <Button
-                    className={`w-full h-11 rounded-xl font-bold gap-2 mt-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
-                    onClick={() => !booked && bookingMutation.mutate(trip)}
+                    className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                    onClick={() => setShowConfirm(true)}
                     disabled={bookingMutation.isPending}
                   >
-                    {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
+                    احجز الآن
                   </Button>
                 </>
               )}
@@ -457,6 +466,108 @@ export default function TripDetails() {
           </div>
         </div>
       </div>
+
+      {/* ── Sticky bottom booking bar (mobile only) ── */}
+      {!booked && !isBookingClosed(trip) && (
+        <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl p-3 flex items-center gap-3">
+            <div>
+              <p className="text-xl font-black text-primary">₪{trip.price}</p>
+              <p className="text-[10px] text-muted-foreground">للمقعد</p>
+            </div>
+            <div className="flex-1">
+              {isLastChance(trip) && (
+                <p className="text-[10px] text-orange-600 font-bold mb-1">⏰ {minutesUntilTrip(trip)} دقيقة للحجز!</p>
+              )}
+              <Button
+                className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground"
+                onClick={() => setShowConfirm(true)}
+                disabled={bookingMutation.isPending}
+              >
+                احجز الآن
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {booked && (
+        <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
+          <div className="bg-accent/10 border border-accent rounded-2xl p-3 flex items-center justify-center gap-2 text-accent font-bold">
+            <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح — تحقق من بريدك
+          </div>
+        </div>
+      )}
+
+      {/* ── Booking Confirmation Dialog ── */}
+      {showConfirm && trip && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowConfirm(false)} />
+          <div className="relative bg-card rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md p-5 shadow-2xl" dir="rtl">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-lg">تأكيد الحجز</h3>
+              <button onClick={() => setShowConfirm(false)} className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Trip summary */}
+            <div className="bg-muted/50 rounded-xl p-3 mb-4">
+              <div className="flex items-center gap-2 font-bold text-sm mb-1">
+                <span>{trip.from_city}</span>
+                <ArrowRight className="w-4 h-4 text-primary" />
+                <span>{trip.to_city}</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>📅 {trip.date}</span>
+                <span>🕐 {trip.time}</span>
+                <span>👤 {trip.driver_name}</span>
+              </div>
+            </div>
+
+            {/* Payment method */}
+            <p className="text-sm font-bold mb-2">طريقة الدفع</p>
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { id: "cash",    label: "نقداً",       icon: "💵" },
+                { id: "jawwal",  label: "جوال باي",     icon: "📱" },
+                { id: "reflect", label: "ريفلكت",       icon: "💳" },
+                { id: "bank",    label: "تحويل بنكي",   icon: "🏦" },
+              ].filter(m => !trip.payment_methods?.length || trip.payment_methods.includes(m.id) || m.id === "cash")
+               .map(m => (
+                <button key={m.id}
+                  onClick={() => setSelectedPayment(m.id)}
+                  className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border text-xs font-medium transition-all ${
+                    selectedPayment === m.id
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted/30 text-muted-foreground"
+                  }`}>
+                  <span className="text-lg">{m.icon}</span>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Price summary */}
+            <div className="flex items-center justify-between py-3 border-t border-border mb-4">
+              <span className="text-sm text-muted-foreground">المبلغ الإجمالي</span>
+              <span className="text-2xl font-black text-primary">₪{trip.price}</span>
+            </div>
+
+            {/* Confirm button */}
+            <Button
+              className="w-full h-12 rounded-xl font-black text-base bg-primary text-primary-foreground"
+              onClick={() => bookingMutation.mutate(trip)}
+              disabled={bookingMutation.isPending}
+            >
+              {bookingMutation.isPending ? "جاري الحجز..." : `تأكيد الحجز — ₪${trip.price}`}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground mt-2">
+              بالضغط على تأكيد الحجز فأنت توافق على شروط الاستخدام
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Bottom trust badges */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border">
