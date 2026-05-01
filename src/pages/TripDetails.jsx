@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import RouteMap from "@/components/shared/RouteMap";
 import { isBookingClosed, isLastChance, minutesUntilTrip } from "@/lib/tripScheduling";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -526,8 +527,8 @@ export default function TripDetails() {
       ) : null}
 
       {/* ── Booking Confirmation Dialog ── */}
-      {showConfirm && trip && !isOwnTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {showConfirm && trip && !isOwnTrip && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowConfirm(false)} />
           <div className="relative bg-card rounded-2xl w-full max-w-md p-5 shadow-2xl max-h-[90vh] overflow-y-auto" dir="rtl">
             {/* Header */}
@@ -594,7 +595,7 @@ export default function TripDetails() {
             </p>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* Bottom trust badges */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border">
