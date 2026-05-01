@@ -13,18 +13,31 @@ const CITY_LIST = Object.entries(CITY_COORDS).map(([name, [lat, lng]]) => ({
   lng,
 }));
 
-// Find nearest city to a clicked lat/lng
+// Find nearest city to a clicked lat/lng — returns { city, dist }
 function nearestCity(lat, lng) {
   let best = null;
   let bestDist = Infinity;
   for (const city of CITY_LIST) {
     const d = Math.hypot(city.lat - lat, city.lng - lng);
-    if (d < bestDist) {
-      bestDist = d;
-      best = city;
-    }
+    if (d < bestDist) { bestDist = d; best = city; }
   }
-  return best;
+  return { city: best, dist: bestDist };
+}
+
+// Reverse geocode via Nominatim — returns Arabic place name or null
+async function reverseGeocode(lat, lng) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=ar`,
+      { headers: { "Accept-Language": "ar" } }
+    );
+    const data = await res.json();
+    // Prefer village > town > city > county
+    const addr = data.address || {};
+    const name = addr.village || addr.town || addr.city || addr.suburb ||
+                 addr.municipality || addr.county || addr.state_district;
+    return name || null;
+  } catch { return null; }
 }
 
 export default function MapCityPicker({ value, onChange, forceOpen = false, onClose }) {
@@ -145,11 +158,32 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         }
       });
 
-      // Click on map → find nearest city
-      map.on("click", (e) => {
-        const nearest = nearestCity(e.latlng.lat, e.latlng.lng);
-        if (nearest) {
-          selectCity(nearest.name, nearest.lat, nearest.lng, L, map);
+      // Click on map → use known city if close, else reverse geocode
+      map.on("click", async (e) => {
+        const { lat, lng } = e.latlng;
+        const { city, dist } = nearestCity(lat, lng);
+        // ~0.02 degrees ≈ 2km threshold
+        if (dist < 0.02 && city) {
+          selectCity(city.name, city.lat, city.lng, L, map);
+        } else {
+          // Show loading indicator on map
+          const loadingMarker = L.marker([lat, lng], {
+            icon: L.divIcon({
+              className: "",
+              html: `<div style="background:#2d6a4f;color:white;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:bold;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3)">جاري التحديد...</div>`,
+              iconAnchor: [50, 10],
+            })
+          }).addTo(map);
+
+          const placeName = await reverseGeocode(lat, lng);
+          map.removeLayer(loadingMarker);
+
+          if (placeName) {
+            // Add to dynamic city list and select
+            selectCity(placeName, lat, lng, L, map);
+          } else if (city) {
+            selectCity(city.name, city.lat, city.lng, L, map);
+          }
         }
       });
 
@@ -206,7 +240,6 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
     onChange(name);
     setSearch("");
 
-    // Reset all markers to default
     import("leaflet").then((L) => {
       const makeIcon = (isSelected) => L.divIcon({
         className: "",
@@ -219,10 +252,29 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         marker.setIcon(makeIcon(city.name === name));
       });
 
-      // Pan to selected city
-      if (leafletMapRef.current && CITY_COORDS[name]) {
-        const [clat, clng] = CITY_COORDS[name];
+      // Pan to selected location (known or geocoded)
+      if (leafletMapRef.current) {
+        const coords = CITY_COORDS[name];
+        const clat = coords ? coords[0] : lat;
+        const clng = coords ? coords[1] : lng;
         leafletMapRef.current.setView([clat, clng], 13, { animate: true });
+
+        // For geocoded places not in our list, add a temporary marker
+        if (!coords && lat && lng) {
+          const tempIcon = L.divIcon({
+            className: "",
+            html: `<div style="width:14px;height:14px;background:#2d6a4f;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
+            iconSize: [14, 14], iconAnchor: [7, 7],
+          });
+          // Remove previous temp marker if any
+          if (leafletMapRef.current._tempMarker) {
+            leafletMapRef.current.removeLayer(leafletMapRef.current._tempMarker);
+          }
+          const m = L.marker([lat, lng], { icon: tempIcon })
+            .addTo(leafletMapRef.current)
+            .bindTooltip(name, { permanent: true, direction: "top", offset: [0, -8], className: "mishwar-city-tooltip" });
+          leafletMapRef.current._tempMarker = m;
+        }
       }
     });
   }
