@@ -183,17 +183,17 @@ export default function MobileLayout({ children, user, showHeader = true, header
             style={{ borderRadius: "0 24px 24px 0" }}>
 
             {/* User Header */}
-            <div className="bg-primary px-5 pt-10 pb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-primary-foreground/20 flex items-center justify-center overflow-hidden shrink-0">
+            <div className="bg-primary px-4 pt-6 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center overflow-hidden shrink-0">
                   {user?.avatar_url
                     ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                    : <span className="text-primary-foreground font-bold text-lg">{user?.full_name?.[0] || "م"}</span>
+                    : <span className="text-primary-foreground font-bold text-base">{user?.full_name?.[0] || "م"}</span>
                   }
                 </div>
                 <div className="min-w-0">
                   <p className="text-primary-foreground font-bold text-sm truncate">{user?.full_name || "مرحباً"}</p>
-                  <p className="text-primary-foreground/70 text-xs truncate">{user?.email || ""}</p>
+                  <p className="text-primary-foreground/70 text-[11px] truncate">{user?.email || ""}</p>
                 </div>
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     key={path}
                     to={path}
                     onClick={() => setShowMobileMenu(false)}
-                    className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted transition-colors text-foreground"
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted transition-colors text-foreground"
                   >
                     <Icon className="w-5 h-5 text-primary shrink-0" />
                     <span className="text-sm font-medium">{label}</span>
@@ -241,9 +241,9 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     key={path}
                     to={path}
                     onClick={() => setShowMobileMenu(false)}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors text-muted-foreground"
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-muted transition-colors text-muted-foreground"
                   >
-                    <Icon className="w-4 h-4 shrink-0" />
+                    <Icon className="w-3.5 h-3.5 shrink-0" />
                     <span className="text-sm">{label}</span>
                   </Link>
                 ))}
@@ -254,12 +254,12 @@ export default function MobileLayout({ children, user, showHeader = true, header
             <div className="border-t border-border" dir="rtl">
               <button
                 onClick={() => { setShowMobileMenu(false); base44.auth.logout(); }}
-                className="flex items-center gap-3 w-full px-5 py-4 hover:bg-destructive/10 transition-colors text-destructive"
+                className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive"
               >
                 <LogOut className="w-5 h-5 shrink-0" />
                 <span className="text-sm font-medium">تسجيل الخروج</span>
               </button>
-              <p className="text-center text-xs text-muted-foreground pb-4">مِشوار · النسخة 1.0</p>
+              <p className="text-center text-[11px] text-muted-foreground pb-2">مشوارو · النسخة 1.0</p>
             </div>
           </div>
         </>
