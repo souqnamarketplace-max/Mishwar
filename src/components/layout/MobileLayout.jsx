@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -149,9 +149,75 @@ export default function MobileLayout({ children, user, showHeader = true, header
         </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay + Drawer */}
       {showMobileMenu && (
-        <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileMenu(false)} />
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileMenu(false)} />
+          <div className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
+            style={{ borderRadius: "0 24px 24px 0" }}>
+
+            {/* Header */}
+            <div className="bg-primary px-5 pt-10 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xl overflow-hidden">
+                  {user?.avatar_url
+                    ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                    : <span className="text-primary-foreground font-bold">{user?.full_name?.[0] || "م"}</span>
+                  }
+                </div>
+                <div>
+                  <p className="text-primary-foreground font-bold text-sm">{user?.full_name || "مرحباً"}</p>
+                  <p className="text-primary-foreground/70 text-xs">{user?.email || ""}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Nav Links */}
+            <div className="flex-1 overflow-y-auto py-3" dir="rtl">
+              {[
+                { icon: Home,        label: "الرئيسية",       path: "/" },
+                { icon: MapPin,      label: "رحلاتي",          path: "/my-trips" },
+                { icon: MessageSquare, label: "الرسائل",       path: "/messages" },
+                { icon: User,        label: "الملف الشخصي",   path: user?.email ? `/profile?email=${user.email}` : "/profile" },
+                { icon: Settings,    label: "الإعدادات",       path: "/account-settings" },
+              ].map(({ icon: Icon, label, path }) => (
+                <Link
+                  key={path}
+                  to={path}
+                  onClick={() => setShowMobileMenu(false)}
+                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted transition-colors text-foreground"
+                >
+                  <Icon className="w-5 h-5 text-primary shrink-0" />
+                  <span className="text-sm font-medium">{label}</span>
+                </Link>
+              ))}
+
+              <div className="mx-4 my-2 border-t border-border" />
+
+              {[
+                { icon: HelpCircle, label: "المساعدة",       path: "/help" },
+                { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy-policy" },
+                { icon: FileText,   label: "الشروط والأحكام", path: "/terms" },
+                { icon: Info,       label: "عن مِشوار",       path: "/about-us" },
+              ].map(({ icon: Icon, label, path }) => (
+                <Link
+                  key={path}
+                  to={path}
+                  onClick={() => setShowMobileMenu(false)}
+                  className="flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors text-muted-foreground"
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  <span className="text-sm">{label}</span>
+                </Link>
+              ))}
+            </div>
+
+            {/* App version */}
+            <div className="px-5 py-4 border-t border-border text-center">
+              <p className="text-xs text-muted-foreground">مِشوار · النسخة 1.0</p>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
