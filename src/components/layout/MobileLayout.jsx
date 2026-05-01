@@ -3,6 +3,7 @@ import { useLocation, Link } from "react-router-dom";
 import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
@@ -89,12 +90,15 @@ export default function MobileLayout({ children, user, showHeader = true, header
               {headerTitle || currentTab?.label || "سيرتنا"}
             </h1>
             
-            <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
-            >
-              {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+            <div className="flex items-center gap-1">
+              <NotificationBell userEmail={user?.email} />
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+              >
+                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
         </div>
       )}
