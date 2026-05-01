@@ -46,6 +46,15 @@ export default function TripDetails() {
     queryFn: () => base44.entities.Trip.list("-created_date", 50),
   });
 
+  const tripForProfile = trips.find((t) => t.id === id) || trips[0];
+
+  const { data: driverProfile } = useQuery({
+    queryKey: ["driver-profile", tripForProfile?.driver_id],
+    queryFn: () => base44.entities.Profile.filter({ created_by: tripForProfile.driver_id }, "-created_at", 1),
+    enabled: !!tripForProfile?.driver_id,
+    select: (data) => data?.[0] || null,
+  });
+
   const bookingMutation = useMutation({
     mutationFn: (tripData) => base44.entities.Booking.create({
       trip_id: tripData.id,
@@ -71,6 +80,7 @@ export default function TripDetails() {
   });
 
   const trip = trips.find((t) => t.id === id) || trips[0];
+  const carImage = driverProfile?.car_image || trip?.car_image || null;
 
   if (!trip) {
     return (
@@ -273,10 +283,10 @@ export default function TripDetails() {
             {/* Car */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
               <div className="w-20 h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                {trip.car_image ? (
-                  <img src={trip.car_image} alt="" className="w-full h-full object-cover" />
+                {carImage ? (
+                  <img src={carImage} alt="سيارة السائق" className="w-full h-full object-cover" />
                 ) : (
-                  <img src="https://images.unsplash.com/photo-1541443131876-44b03de101c5?w=200&h=120&fit=crop" alt="سيارة" className="w-full h-full object-cover" />
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">🚗</div>
                 )}
               </div>
               <div>
