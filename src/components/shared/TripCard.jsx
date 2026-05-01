@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, AlertCircle, Share2, Zap } from "lucide-react";
+import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer } from "lucide-react";
+import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
 
 // ── Date formatter ─────────────────────────────────────────────────────────────
@@ -79,6 +80,22 @@ function Card({ t, noSeats, urgentSeats }) {
       {isFemale && (
         <div className="absolute top-3 left-3 text-[11px] font-bold bg-rose-500 text-white px-2 py-0.5 rounded-full z-10">
           سائقة 🌸
+        </div>
+      )}
+      {isLastChance(t) && !isBookingClosed(t) && (() => {
+        const mins = minutesUntilTrip(t);
+        const label = mins >= 60
+          ? `آخر ${Math.floor(mins / 60)} ساعة للحجز ⏰`
+          : `آخر ${mins} دقيقة للحجز ⏰`;
+        return (
+          <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse z-10">
+            <Timer className="w-2.5 h-2.5" />{label}
+          </div>
+        );
+      })()}
+      {isBookingClosed(t) && (
+        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-destructive text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">
+          🔒 أُغلق الحجز
         </div>
       )}
 

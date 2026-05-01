@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import RouteMap from "@/components/shared/RouteMap";
+import { isBookingClosed, isLastChance, minutesUntilTrip } from "@/lib/tripScheduling";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -127,13 +128,26 @@ export default function TripDetails() {
               </div>
 
               {/* Book button */}
-              <Button
-                className={`w-full h-11 rounded-xl font-bold gap-2 mt-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
-                onClick={() => !booked && bookingMutation.mutate(trip)}
-                disabled={bookingMutation.isPending}
-              >
-                {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
-              </Button>
+              {isBookingClosed(trip) && !booked ? (
+                <div className="w-full h-11 rounded-xl bg-muted flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground font-medium">
+                  🔒 أُغلق الحجز قبل الانطلاق بـ 30 دقيقة
+                </div>
+              ) : (
+                <>
+                  {isLastChance(trip) && !booked && (
+                    <div className="text-center text-xs text-orange-600 font-bold bg-orange-50 rounded-lg py-1.5 mt-2">
+                      ⏰ آخر فرصة — {minutesUntilTrip(trip)} دقيقة للحجز!
+                    </div>
+                  )}
+                  <Button
+                    className={`w-full h-11 rounded-xl font-bold gap-2 mt-2 ${booked ? "bg-accent hover:bg-accent/90 text-accent-foreground" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
+                    onClick={() => !booked && bookingMutation.mutate(trip)}
+                    disabled={bookingMutation.isPending}
+                  >
+                    {booked ? <><CheckCircle className="w-5 h-5" />تم الحجز بنجاح</> : bookingMutation.isPending ? "جاري الحجز..." : "احجز الآن"}
+                  </Button>
+                </>
+              )}
 
               {/* Favorite */}
               <Button

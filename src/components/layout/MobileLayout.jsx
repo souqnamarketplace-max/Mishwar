@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
+import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
@@ -157,6 +158,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
 
       {/* Global Booking Request Popup for drivers */}
       <BookingRequestPopup user={user} />
+      <ExpiredTripNotifier user={user} />
 
       {/* Mobile Menu Overlay + Drawer */}
       {showMobileMenu && (

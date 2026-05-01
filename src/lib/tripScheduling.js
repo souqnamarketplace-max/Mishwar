@@ -249,3 +249,31 @@ export function filterBookableTrips(trips) {
   if (!Array.isArray(trips)) return [];
   return trips.filter((t) => t.status === "confirmed" && !isTripExpired(t));
 }
+
+/**
+ * Returns how many minutes until the trip departs (negative = already departed).
+ */
+export function minutesUntilTrip(trip) {
+  const start = getTripStartUTC(trip);
+  if (!start) return null;
+  return Math.round((start.getTime() - Date.now()) / 60_000);
+}
+
+/**
+ * "Last chance" = trip departs within 2 hours.
+ * Passengers should be warned to book quickly.
+ */
+export function isLastChance(trip) {
+  const mins = minutesUntilTrip(trip);
+  if (mins === null) return false;
+  return mins > 0 && mins <= 120;
+}
+
+/**
+ * Booking cutoff: passengers cannot book within 30 minutes of departure.
+ */
+export function isBookingClosed(trip) {
+  const mins = minutesUntilTrip(trip);
+  if (mins === null) return true;
+  return mins <= 30;
+}
