@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { base44 } from "@/api/base44Client";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
@@ -156,65 +157,80 @@ export default function MobileLayout({ children, user, showHeader = true, header
           <div className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
             style={{ borderRadius: "0 24px 24px 0" }}>
 
-            {/* Header */}
+            {/* User Header */}
             <div className="bg-primary px-5 pt-10 pb-5">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xl overflow-hidden">
+                <div className="w-12 h-12 rounded-full bg-primary-foreground/20 flex items-center justify-center overflow-hidden shrink-0">
                   {user?.avatar_url
                     ? <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
-                    : <span className="text-primary-foreground font-bold">{user?.full_name?.[0] || "م"}</span>
+                    : <span className="text-primary-foreground font-bold text-lg">{user?.full_name?.[0] || "م"}</span>
                   }
                 </div>
-                <div>
-                  <p className="text-primary-foreground font-bold text-sm">{user?.full_name || "مرحباً"}</p>
-                  <p className="text-primary-foreground/70 text-xs">{user?.email || ""}</p>
+                <div className="min-w-0">
+                  <p className="text-primary-foreground font-bold text-sm truncate">{user?.full_name || "مرحباً"}</p>
+                  <p className="text-primary-foreground/70 text-xs truncate">{user?.email || ""}</p>
                 </div>
               </div>
             </div>
 
-            {/* Nav Links */}
-            <div className="flex-1 overflow-y-auto py-3" dir="rtl">
-              {[
-                { icon: Home,        label: "الرئيسية",       path: "/" },
-                { icon: MapPin,      label: "رحلاتي",          path: "/my-trips" },
-                { icon: MessageSquare, label: "الرسائل",       path: "/messages" },
-                { icon: User,        label: "الملف الشخصي",   path: user?.email ? `/profile?email=${user.email}` : "/profile" },
-                { icon: Settings,    label: "الإعدادات",       path: "/account-settings" },
-              ].map(({ icon: Icon, label, path }) => (
-                <Link
-                  key={path}
-                  to={path}
-                  onClick={() => setShowMobileMenu(false)}
-                  className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted transition-colors text-foreground"
-                >
-                  <Icon className="w-5 h-5 text-primary shrink-0" />
-                  <span className="text-sm font-medium">{label}</span>
-                </Link>
-              ))}
+            {/* Main Nav — mirrors bottom tabs */}
+            <div className="flex-1 overflow-y-auto" dir="rtl">
+              <div className="py-2">
+                {[
+                  { icon: Home,          label: "الرئيسية",        path: "/" },
+                  { icon: Search,        label: "بحث عن رحلة",     path: "/search" },
+                  { icon: MapPin,        label: "رحلاتي",           path: "/my-trips" },
+                  { icon: MessageSquare, label: "الرسائل",          path: "/messages" },
+                  { icon: User,          label: "الملف الشخصي",    path: user?.email ? `/profile?email=${user.email}` : "/profile" },
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                    ? [{ icon: Settings, label: "لوحة تحكم السائق", path: "/driver" }]
+                    : [{ icon: Settings, label: "الإعدادات",         path: "/account-settings" }]
+                  ),
+                ].map(({ icon: Icon, label, path }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    onClick={() => setShowMobileMenu(false)}
+                    className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted transition-colors text-foreground"
+                  >
+                    <Icon className="w-5 h-5 text-primary shrink-0" />
+                    <span className="text-sm font-medium">{label}</span>
+                  </Link>
+                ))}
+              </div>
 
-              <div className="mx-4 my-2 border-t border-border" />
+              <div className="mx-4 my-1 border-t border-border" />
 
-              {[
-                { icon: HelpCircle, label: "المساعدة",       path: "/help" },
-                { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy-policy" },
-                { icon: FileText,   label: "الشروط والأحكام", path: "/terms" },
-                { icon: Info,       label: "عن مِشوار",       path: "/about-us" },
-              ].map(({ icon: Icon, label, path }) => (
-                <Link
-                  key={path}
-                  to={path}
-                  onClick={() => setShowMobileMenu(false)}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors text-muted-foreground"
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span className="text-sm">{label}</span>
-                </Link>
-              ))}
+              <div className="py-2">
+                {[
+                  { icon: HelpCircle, label: "المساعدة",         path: "/help" },
+                  { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy-policy" },
+                  { icon: FileText,   label: "الشروط والأحكام",  path: "/terms" },
+                  { icon: Info,       label: "عن مِشوار",         path: "/about-us" },
+                ].map(({ icon: Icon, label, path }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    onClick={() => setShowMobileMenu(false)}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors text-muted-foreground"
+                  >
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="text-sm">{label}</span>
+                  </Link>
+                ))}
+              </div>
             </div>
 
-            {/* App version */}
-            <div className="px-5 py-4 border-t border-border text-center">
-              <p className="text-xs text-muted-foreground">مِشوار · النسخة 1.0</p>
+            {/* Sign Out + Version */}
+            <div className="border-t border-border" dir="rtl">
+              <button
+                onClick={() => { setShowMobileMenu(false); base44.auth.logout(); }}
+                className="flex items-center gap-3 w-full px-5 py-4 hover:bg-destructive/10 transition-colors text-destructive"
+              >
+                <LogOut className="w-5 h-5 shrink-0" />
+                <span className="text-sm font-medium">تسجيل الخروج</span>
+              </button>
+              <p className="text-center text-xs text-muted-foreground pb-4">مِشوار · النسخة 1.0</p>
             </div>
           </div>
         </>
