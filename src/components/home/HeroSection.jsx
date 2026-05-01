@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Search, Star, Calendar, ArrowLeftRight } from "lucide-react";
 import { motion } from "framer-motion";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
 
 // Palestinian cities slideshow — real Unsplash photos
 const CITY_SLIDES = [
