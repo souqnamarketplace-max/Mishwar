@@ -20,7 +20,7 @@ const TABS = [
   { id: "trips",      label: "رحلاتي",      icon: Car,        color: "text-primary"   },
   { id: "passengers", label: "الركاب",       icon: Users,      color: "text-blue-600"  },
   { id: "earnings",   label: "الأرباح",      icon: DollarSign, color: "text-green-600" },
-  { id: "ratings",    label: "التقييمات",    icon: Star,       color: "text-yellow-600"},
+  { id: "ratings",    label: "التقييمات",    icon: Star,       color: "text-yellow-600" },
   { id: "vehicle",    label: "مركبتي",       icon: Car,        color: "text-accent"    },
   { id: "payments",   label: "الدفع",        icon: CreditCard, color: "text-purple-600"},
 ];

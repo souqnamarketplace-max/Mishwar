@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag } from "lucide-react";
+import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ const statusConfig = {
 
 export default function DriverTripsList({ trips, bookings, loading, onSelectTrip }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
   const [editingTrip, setEditingTrip] = useState(null);
   const [editForm, setEditForm] = useState({});

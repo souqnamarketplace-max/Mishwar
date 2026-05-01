@@ -74,7 +74,26 @@ export default function DriverRatePassengers({ trips, bookings }) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground mb-2">قيّم ركابك بعد اكتمال الرحلة لتعزيز الثقة في المجتمع</p>
+      {/* Header with unrated count */}
+      {(() => {
+        const unratedCount = passengerBookings.filter(b => {
+          const key = b.trip_id + "_" + b.passenger_email;
+          return !reviewedIds.has(key);
+        }).length;
+        return unratedCount > 0 ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center shrink-0">
+              <Star className="w-5 h-5 text-yellow-500 fill-yellow-400" />
+            </div>
+            <div>
+              <p className="font-bold text-sm text-yellow-800">{unratedCount} راكب ينتظر تقييمك</p>
+              <p className="text-xs text-yellow-600">تقييمك يساعد المجتمع ويبني الثقة في مشوارو</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground mb-4">قيّم ركابك بعد اكتمال الرحلة لتعزيز الثقة في المجتمع</p>
+        );
+      })()}
       {passengerBookings.map((booking) => {
         const trip = completedTrips.find((t) => t.id === booking.trip_id);
         const key = booking.trip_id + "_" + booking.passenger_email;
