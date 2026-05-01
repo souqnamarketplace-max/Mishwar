@@ -90,46 +90,59 @@ export function passwordStrength(password) {
 export const sanitizeString = sanitizeText;
 
 
-// ─── PHONE NUMBER DETECTION IN CHAT ──────────────────────────────────────────
-// Simple, reliable phone detection — strips separators then checks digit count.
-// Handles: Arabic-Indic digits, letter-O substitution, zero-width chars, mixed.
+// ─── CONTACT INFO DETECTION IN CHAT ─────────────────────────────────────────
+// Catches phone numbers, contact-sharing requests, and social media handles.
+// Handles: Arabic-Indic digits, obfuscation, word-form numbers, multi-language.
 
-function normalizeForPhoneCheck(text) {
-  return text
-    // Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) → ASCII
+// Arabic number words → digit
+const AR_WORD_TO_DIGIT = {
+  'صفر':'0','واحد':'1','اثنين':'2','اثنان':'2','ثلاثة':'3','ثلاث':'3',
+  'أربعة':'4','اربعة':'4','خمسة':'5','ستة':'6','ست':'6',
+  'سبعة':'7','ثمانية':'8','تسعة':'9',
+  // English words
+  'zero':'0','one':'1','two':'2','three':'3','four':'4',
+  'five':'5','six':'6','seven':'7','eight':'8','nine':'9',
+};
+
+function normalizeForCheck(text) {
+  let t = text
+    // Arabic-Indic digits → ASCII
     .replace(/[٠-٩]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
-    // Extended Arabic-Indic (۰۱۲۳۴۵۶۷۸۹) → ASCII
+    // Extended Arabic-Indic → ASCII
     .replace(/[۰-۹]/g, d => String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 48))
-    // Letter O/o used instead of zero
-    .replace(/[oO]/g, '0')
     // Zero-width and invisible chars
-    .replace(/[​-‍﻿­]/g, '');
+    .replace(/[​-‍﻿­]/g, '')
+    // Common letter substitutions
+    .replace(/[oO]/g, '0')
+    .replace(/[lI|]/g, '1')
+    .replace(/[zZ]/g, '2')
+    // Dots/commas between digits that are separators
+    .replace(/(\d)[.,·•](\d)/g, '$1$2');
+
+  // Replace Arabic/English number words with digits
+  const pattern = new RegExp(Object.keys(AR_WORD_TO_DIGIT).join('|'), 'gi');
+  t = t.replace(pattern, m => AR_WORD_TO_DIGIT[m.toLowerCase()] ?? m);
+
+  return t;
 }
 
 /**
- * Returns true if text contains a phone number (8+ digits with common separators).
- * Catches standard formats + Arabic numerals + common obfuscation tricks.
+ * Checks if text contains a phone number (7+ digits with common separators).
+ * Catches: Arabic-Indic digits, obfuscation, word-form numbers, mixed scripts.
  */
 export function containsPhoneNumber(text) {
-  if (!text || text.length < 7) return false;
+  if (!text || text.length < 6) return false;
+  const norm = normalizeForCheck(text);
 
-  const norm = normalizeForPhoneCheck(text);
-
-  // Strip common separators and check if 8+ consecutive digits remain in any segment
-  // We scan the normalized text and count digit runs separated only by [\s\-.()+,*_]
   let digitRun = 0;
   for (let i = 0; i < norm.length; i++) {
     const ch = norm[i];
     if (ch >= '0' && ch <= '9') {
       digitRun++;
-      if (digitRun >= 8) return true;
-    } else if (' -.()+,*_/'.includes(ch)) {
-      // Allow separator within a number (e.g. 059-123-4567)
-      // but reset if run has accumulated less than 3 before separator
+      if (digitRun >= 7) return true;
+    } else if (' \-.()+,*_/'.includes(ch)) {
       if (digitRun < 2) digitRun = 0;
-      // else keep accumulating (separator inside number is fine)
     } else {
-      // Non-digit, non-separator: break the run
       digitRun = 0;
     }
   }
@@ -137,8 +150,77 @@ export function containsPhoneNumber(text) {
 }
 
 /**
- * Returns a warning message if text contains a phone number, otherwise null.
+ * Checks if text contains a contact-sharing request or social media handle.
+ * Catches requests in Arabic, English, and common evasion tricks.
  */
+export function containsContactRequest(text) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+
+  // Direct contact platforms
+  const platforms = [
+    'whatsapp','واتساب','وتساب','واتس اب','ويتساب',
+    'telegram','تيليجرام','تيلغرام','تلغرام','تيلجرام',
+    'instagram','انستغرام','انستجرام','ايستغرام',
+    'snapchat','سناب','سناب شات',
+    'tiktok','تيك توك','تيكتوك',
+    'facebook','فيسبوك','فيس بوك',
+    'twitter','تويتر',
+    'signal','سيجنال',
+    'imo', 'ايمو',
+    'viber','فايبر',
+  ];
+
+  // Contact-asking phrases
+  const contactPhrases = [
+    // Arabic
+    'رقمي','رقمك','رقم الهاتف','رقم تلفون','رقم موبايل','رقم جوال',
+    'ارسل رقم','ابعث رقم','اعطني رقم','عطني رقم','شاركني رقم',
+    'تواصل معي','تواصل معك','تواصل على','تواصلوا','تواصل بـ',
+    'اتصل بي','اتصل علي','اتصل معي','كلمني','كلمني على',
+    'ارسل لي','ابعث لي','راسلني على','راسلني في',
+    'على الواتس','ع الواتس','على التيليجرام',
+    'دم اتصال','معلومات التواصل','بيانات التواصل',
+    'خارج التطبيق','برا التطبيق','بره التطبيق',
+    'ايميلي','ايميلك','بريدي','بريدك','البريد الالكتروني',
+    '@gmail','@hotmail','@yahoo','@outlook',
+    // English
+    'my number','your number','call me','text me','dm me',
+    'reach me','contact me','message me on','find me on',
+    'outside the app','off the app','off app',
+    'my email','your email','send me your',
+  ];
+
+  for (const p of platforms) {
+    if (t.includes(p)) return true;
+  }
+  for (const p of contactPhrases) {
+    if (t.includes(p)) return true;
+  }
+
+  // Detect @handle patterns (social media)
+  if (/@[a-z0-9_.]{3,}/i.test(text)) return true;
+
+  // Detect email-like patterns
+  if (/[a-zA-Z0-9._%+\-]{3,}@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/.test(text)) return true;
+
+  return false;
+}
+
+/**
+ * Master check — returns a warning string if message violates contact policy, else null.
+ */
+export function getContactViolation(text) {
+  if (containsPhoneNumber(text)) {
+    return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. التواصل يتم عبر مِشوار فقط.";
+  }
+  if (containsContactRequest(text)) {
+    return "🚫 يُمنع طلب أو مشاركة معلومات التواصل الخارجية. استخدم مِشوار للتواصل مع السائقين والركاب.";
+  }
+  return null;
+}
+
+// Legacy alias
 export function phoneWarning() {
   return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. يمكنك التواصل عبر التطبيق فقط بعد تأكيد الحجز.";
 }

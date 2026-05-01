@@ -5,7 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sanitizeText, containsPhoneNumber } from "@/lib/validation";
+import { sanitizeText, getContactViolation } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
 import { Search, Send, ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -160,9 +160,10 @@ export default function Messages() {
     mutationFn: async () => {
       if (!draft.trim() || !activeConv || !user?.email) return;
       const cleaned = sanitizeText(draft).slice(0, 5000);
-      // Block phone number sharing in chat
-      if (containsPhoneNumber(cleaned)) {
-        toast.error("🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. يمكنك التواصل عبر التطبيق فقط بعد تأكيد الحجز.");
+      // Block phone/contact sharing in chat
+      const violation = getContactViolation(cleaned);
+      if (violation) {
+        toast.error(violation, { duration: 5000 });
         return;
       }
       // Generate a stable conversation_id for new conversations
@@ -312,24 +313,31 @@ export default function Messages() {
               {/* Composer */}
               <form
                 onSubmit={(e) => { e.preventDefault(); if (draft.trim()) send.mutate(); }}
-                className="p-3 border-t border-border flex items-center gap-2 sticky bottom-0 bg-card"
+                className="p-3 border-t border-border sticky bottom-0 bg-card"
               >
-                <Input
-                  value={draft}
-                  onChange={e => setDraft(e.target.value)}
-                  placeholder="اكتب رسالة..."
-                  className="rounded-xl h-10 flex-1"
-                  disabled={send.isPending}
-                />
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!draft.trim() || send.isPending}
-                  className="rounded-xl bg-primary text-primary-foreground"
-                  aria-label="إرسال"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+                {getContactViolation(draft) && (
+                  <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-2 text-right">
+                    {getContactViolation(draft)}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={draft}
+                    onChange={e => setDraft(e.target.value)}
+                    placeholder="اكتب رسالة..."
+                    className={`rounded-xl h-10 flex-1 ${getContactViolation(draft) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                    disabled={send.isPending}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!draft.trim() || send.isPending || !!getContactViolation(draft)}
+                    className="rounded-xl bg-primary text-primary-foreground"
+                    aria-label="إرسال"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </form>
             </>
           )}
