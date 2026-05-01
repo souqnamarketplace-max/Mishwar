@@ -484,47 +484,56 @@ export default function TripDetails() {
         </div>
       </div>
 
-      {/* ── Sticky bottom bar (mobile only) ── */}
-      {isOwnTrip ? (
-        <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
-          <div className="bg-card border-2 border-primary rounded-2xl shadow-2xl p-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-primary" />
+      {/* ── Floating bottom bar (mobile only) — portal escapes Framer Motion transform ── */}
+      {typeof document !== "undefined" && createPortal(
+        <div className="lg:hidden" dir="rtl">
+          {isOwnTrip ? (
+            <div className="fixed bottom-24 left-4 right-4 z-[999]">
+              <div className="bg-card border-2 border-primary rounded-2xl shadow-2xl shadow-primary/20 p-3 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">هذه رحلتك</p>
+                  <Button className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground mt-1"
+                    onClick={() => navigate("/driver?tab=passengers")}>
+                    إدارة الحجوزات
+                  </Button>
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">هذه رحلتك</p>
-              <Button className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground mt-1"
-                onClick={() => navigate("/driver?tab=passengers")}>
-                إدارة الحجوزات
-              </Button>
+          ) : booked ? (
+            <div className="fixed bottom-24 left-4 right-4 z-[999]">
+              <div className="bg-green-50 border-2 border-green-500 rounded-2xl p-3 flex items-center justify-center gap-2 text-green-700 font-bold shadow-xl shadow-green-500/20">
+                <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح ✅
+              </div>
             </div>
-          </div>
+          ) : isBookingClosed(trip) ? null : (
+            <div className="fixed bottom-24 left-4 right-4 z-[999]">
+              <div className="bg-card rounded-2xl shadow-2xl shadow-black/20 border border-border/50 overflow-hidden">
+                {isLastChance(trip) && (
+                  <div className="bg-orange-500 text-white text-center text-xs font-bold py-1.5 px-3">
+                    ⏰ آخر فرصة — {minutesUntilTrip(trip)} دقيقة للحجز!
+                  </div>
+                )}
+                <div className="p-3 flex items-center gap-3">
+                  <div className="shrink-0">
+                    <p className="text-2xl font-black text-primary leading-none">₪{trip.price}</p>
+                    <p className="text-[10px] text-muted-foreground">للمقعد</p>
+                  </div>
+                  <Button
+                    className="flex-1 h-12 rounded-xl font-black text-base bg-primary text-primary-foreground shadow-lg shadow-primary/30 active:scale-95 transition-transform"
+                    onClick={() => setShowConfirm(true)}
+                    disabled={bookingMutation.isPending}
+                  >
+                    احجز الآن
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      ) : !booked && !isBookingClosed(trip) ? (
-        <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
-          <div className="bg-card border border-border rounded-2xl shadow-2xl p-3 flex items-center gap-3">
-            <div>
-              <p className="text-xl font-black text-primary">₪{trip.price}</p>
-              <p className="text-[10px] text-muted-foreground">للمقعد</p>
-            </div>
-            <div className="flex-1">
-              {isLastChance(trip) && (
-                <p className="text-[10px] text-orange-600 font-bold mb-1">⏰ {minutesUntilTrip(trip)} دقيقة للحجز!</p>
-              )}
-              <Button className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground"
-                onClick={() => setShowConfirm(true)} disabled={bookingMutation.isPending}>
-                احجز الآن
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : booked ? (
-        <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
-          <div className="bg-accent/10 border border-accent rounded-2xl p-3 flex items-center justify-center gap-2 text-accent font-bold">
-            <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح
-          </div>
-        </div>
-      ) : null}
+      , document.body)}
 
       {/* ── Booking Confirmation Dialog ── */}
       {showConfirm && trip && !isOwnTrip && createPortal(
