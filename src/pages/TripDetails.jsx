@@ -192,10 +192,30 @@ export default function TripDetails() {
               fromCity={trip.from_city}
               toCity={trip.to_city}
               stops={trip.stops || []}
-              height="220px"
-              showStats={false}
+              height="240px"
+              showStats={true}
               className="mt-2"
             />
+
+            {/* Stop badges */}
+            {Array.isArray(trip.stops) && trip.stops.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                <p className="text-xs text-muted-foreground font-medium">محطات الطريق ({trip.stops.length})</p>
+                {trip.stops.map((stop, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                    <div className="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center text-white text-xs font-bold shrink-0">{idx + 1}</div>
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-foreground">{stop.city}</span>
+                      {stop.location && <span className="text-xs text-muted-foreground mr-1">— {stop.location}</span>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {stop.time && <span className="text-xs text-muted-foreground">⏰ {stop.time}</span>}
+                      {stop.price_from_origin > 0 && <span className="text-xs font-bold text-primary">₪{stop.price_from_origin}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Route stats */}
             <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border text-center">

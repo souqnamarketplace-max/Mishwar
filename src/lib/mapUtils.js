@@ -201,3 +201,66 @@ export async function calculateRoute(fromCity, toCity) {
     };
   }
 }
+
+/**
+ * Calculate a multi-stop route: from → stop1 → stop2 → ... → to
+ * Uses OSRM with all waypoints in a single request.
+ * Returns same shape as calculateRoute() plus stopCoords array.
+ */
+export async function calculateMultiStopRoute(fromCity, toCity, stops = []) {
+  // No stops — fall back to simple 2-point route
+  if (!stops || stops.length === 0) {
+    const result = await calculateRoute(fromCity, toCity);
+    return result ? { ...result, stopCoords: [] } : null;
+  }
+
+  // Geocode all points in parallel
+  const stopCities = stops.map(s => s.city).filter(Boolean);
+  const allCities  = [fromCity, ...stopCities, toCity];
+  const allCoords  = await Promise.all(allCities.map(geocodeCity));
+
+  if (!allCoords[0] || !allCoords[allCoords.length - 1]) return null;
+
+  const validCoords = allCoords.filter(Boolean);
+  const fromCoords  = allCoords[0];
+  const toCoords    = allCoords[allCoords.length - 1];
+  const stopCoords  = allCoords.slice(1, -1).filter(Boolean);
+
+  try {
+    // Build OSRM waypoints string: lng,lat;lng,lat;...
+    const waypointStr = validCoords
+      .map(([lat, lng]) => `${lng},${lat}`)
+      .join(';');
+
+    const url = `https://router.project-osrm.org/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if (data.code !== 'Ok' || !data.routes?.[0]) {
+      return { fromCoords, toCoords, stopCoords, distance: null, duration: null, geometry: null };
+    }
+
+    const route       = data.routes[0];
+    const distanceKm  = Math.round(route.distance / 1000);
+    const durationMin = Math.round(route.duration / 60);
+
+    const distance = `${distanceKm} كم`;
+    const duration = durationMin >= 60
+      ? `${Math.floor(durationMin / 60)} س ${durationMin % 60} د`
+      : `${durationMin} دقيقة`;
+
+    return {
+      fromCoords,
+      toCoords,
+      stopCoords,
+      distance,
+      duration,
+      distanceKm,
+      durationMin,
+      geometry: route.geometry,
+    };
+  } catch (e) {
+    console.warn('OSRM multi-stop routing failed:', e);
+    return null;
+  }
+}

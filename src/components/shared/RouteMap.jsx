@@ -14,7 +14,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { captureException } from "@/lib/sentry";
 import { MapPin, Clock, Navigation, Loader2 } from 'lucide-react';
-import { calculateRoute } from '@/lib/mapUtils';
+import { calculateRoute, calculateMultiStopRoute } from '@/lib/mapUtils';
 
 // Fix Leaflet default marker icons (broken in Vite)
 function fixLeafletIcons(L) {
@@ -55,7 +55,9 @@ export default function RouteMap({
         const L = (await import('leaflet')).default;
         fixLeafletIcons(L);
 
-        const route = await calculateRoute(fromCity, toCity);
+        const route = stops && stops.length > 0
+          ? await calculateMultiStopRoute(fromCity, toCity, stops)
+          : await calculateRoute(fromCity, toCity);
         if (cancelled) return;
 
         if (!route) {
@@ -139,29 +141,29 @@ export default function RouteMap({
           .addTo(map)
           .bindPopup(`<b>إلى: ${toCity}</b>`, { direction: 'top' });
 
-        // Intermediate stop markers (for multi-stop trips)
-        if (Array.isArray(stops) && stops.length > 0) {
-          // Lazy-load coords map for stops
-          const { CITY_COORDS } = await import('@/lib/mapUtils');
+        // Intermediate stop markers — use coords returned from multi-stop route
+        if (Array.isArray(stops) && stops.length > 0 && Array.isArray(route.stopCoords)) {
           const stopIcon = L.divIcon({
             html: `<div style="
               background: #f59e0b; color: white; border-radius: 50%;
-              width: 22px; height: 22px; display: flex; align-items: center;
+              width: 26px; height: 26px; display: flex; align-items: center;
               justify-content: center;
               box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid white;
               font-size: 11px; font-weight: bold;
             ">●</div>`,
             className: '',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11],
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
           });
-          stops.forEach((stop, idx) => {
-            const coords = CITY_COORDS?.[stop.city];
-            if (coords && Array.isArray(coords) && coords.length === 2) {
-              L.marker(coords, { icon: stopIcon })
-                .addTo(map)
-                .bindPopup(`<b>محطة ${idx + 1}: ${stop.city}</b>${stop.time ? `<br/>الوقت: ${stop.time}` : ''}`, { direction: 'top' });
-            }
+          route.stopCoords.forEach((coords, idx) => {
+            if (!coords) return;
+            const stop = stops[idx];
+            const label = stop?.city || `محطة ${idx + 1}`;
+            const timeStr = stop?.time ? `<br/>⏰ ${stop.time}` : '';
+            const priceStr = stop?.price_from_origin ? `<br/>₪${stop.price_from_origin} من الانطلاق` : '';
+            L.marker(coords, { icon: stopIcon })
+              .addTo(map)
+              .bindPopup(`<b>🟡 محطة ${idx + 1}: ${label}</b>${timeStr}${priceStr}`, { direction: 'top' });
           });
         }
 
@@ -212,7 +214,7 @@ export default function RouteMap({
         mapInstanceRef.current = null;
       }
     };
-  }, [fromCity, toCity]);
+  }, [fromCity, toCity, JSON.stringify(stops)]);
 
   if (!fromCity || !toCity) {
     return (
