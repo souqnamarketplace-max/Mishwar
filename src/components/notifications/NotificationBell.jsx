@@ -1,48 +1,37 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, MapPin, ArrowLeft, X, Check, CheckCheck, Settings } from "lucide-react";
+import { Bell, X, Check, CheckCheck, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 const typeConfig = {
-  new_trip:   { color: "bg-primary/10 text-primary", dot: "bg-primary" },
-  price_drop: { color: "bg-green-500/10 text-green-600", dot: "bg-green-500" },
-  date_match: { color: "bg-accent/10 text-accent", dot: "bg-accent" },
-  system:     { color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
+  new_trip:   { dot: "bg-primary" },
+  price_drop: { dot: "bg-green-500" },
+  date_match: { dot: "bg-accent" },
+  system:     { dot: "bg-muted-foreground" },
 };
 
 export default function NotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
-  const [dropPos, setDropPos] = useState({ top: 64, right: 8 });
   const ref = useRef(null);
-  const btnRef = useRef(null);
   const qc = useQueryClient();
-
-  const updatePos = useCallback(() => {
-    if (!btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    setDropPos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) });
-  }, []);
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", userEmail],
-    queryFn: () =>
-      userEmail
-        ? base44.entities.Notification.filter({ user_email: userEmail }, "-created_date", 20)
-        : [],
+    queryFn: () => userEmail
+      ? base44.entities.Notification.filter({ user_email: userEmail }, "-created_date", 20)
+      : [],
     enabled: !!userEmail,
-    refetchInterval: false,  // realtime subscription handles updates
   });
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Realtime subscription — badge updates instantly when new notification arrives
-  React.useEffect(() => {
+  useEffect(() => {
     if (!userEmail) return;
     const unsub = base44.entities.Notification.subscribe(() => {
-      qc.invalidateQueries({ queryKey: ["notifications-bell", userEmail] });
+      qc.invalidateQueries({ queryKey: ["notifications", userEmail] });
     });
     return () => unsub();
   }, [userEmail]);
@@ -54,8 +43,8 @@ export default function NotificationBell({ userEmail }) {
 
   const markAllRead = useMutation({
     mutationFn: async () => {
-      const unread = notifications.filter((n) => !n.is_read);
-      await Promise.all(unread.map((n) => base44.entities.Notification.update(n.id, { is_read: true })));
+      await Promise.all(notifications.filter(n => !n.is_read)
+        .map(n => base44.entities.Notification.update(n.id, { is_read: true })));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
   });
@@ -67,18 +56,22 @@ export default function NotificationBell({ userEmail }) {
 
   // Close on outside click
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [open]);
 
   return (
-    <div className="relative" ref={ref}>
+    <div ref={ref}>
+      {/* Bell button */}
       <button
-        ref={btnRef}
-        onClick={() => { updatePos(); setOpen(!open); }}
+        onClick={() => setOpen(v => !v)}
         className="relative p-2 rounded-lg hover:bg-muted transition-colors"
-        aria-label="فتح الإشعارات">
+        aria-label="الإشعارات"
+      >
         <Bell className="w-5 h-5 text-muted-foreground" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full text-[9px] text-white flex items-center justify-center font-bold">
@@ -87,71 +80,69 @@ export default function NotificationBell({ userEmail }) {
         )}
       </button>
 
+      {/* Dropdown — always fixed below header, full width on mobile */}
       <AnimatePresence>
         {open && createPortal(
-          <motion.div
-            initial={{ opacity: 0, y: 8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            style={{ position: "fixed", top: dropPos.top, right: dropPos.right, left: dropPos.right > 8 ? "auto" : 8, width: dropPos.right > 8 ? 320 : "auto", maxWidth: "calc(100vw - 16px)" }}
-            className="bg-card border border-border rounded-2xl shadow-2xl z-[9998] overflow-hidden"
-            dir="rtl"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-primary" />
-                <h3 className="font-bold text-sm">الإشعارات</h3>
-                {unreadCount > 0 && (
-                  <span className="bg-destructive text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
-                    {unreadCount}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                {unreadCount > 0 && (
-                  <button
-                    onClick={() => markAllRead.mutate()}
-                    className="p-1.5 rounded-lg hover:bg-muted text-xs text-muted-foreground flex items-center gap-1"
-                    title="تحديد الكل كمقروء"
-                  >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                <Link
-                  to="/notifications"
-                  onClick={() => setOpen(false)}
-                  className="p-1.5 rounded-lg hover:bg-muted"
-                  title="إعدادات الإشعارات"
-                >
-                  <Settings className="w-3.5 h-3.5 text-muted-foreground" />
-                </Link>
-              </div>
-            </div>
-
-            {/* List */}
-            <div className="max-h-80 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">لا توجد إشعارات</p>
-                  <Link
-                    to="/notifications"
-                    onClick={() => setOpen(false)}
-                    className="text-xs text-primary mt-1 block hover:underline"
-                  >
-                    أضف مسارات مفضلة للحصول على إشعارات
-                  </Link>
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 z-[9990]"
+              onClick={() => setOpen(false)}
+            />
+            {/* Panel */}
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="fixed top-[57px] right-2 left-2 sm:left-auto sm:right-4 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-[9991] overflow-hidden"
+              dir="rtl"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-primary" />
+                  <h3 className="font-bold text-sm">الإشعارات</h3>
+                  {unreadCount > 0 && (
+                    <span className="bg-destructive text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                      {unreadCount}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                notifications.map((notif) => {
+                <div className="flex items-center gap-1">
+                  {unreadCount > 0 && (
+                    <button onClick={() => markAllRead.mutate()}
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground" title="تحديد الكل">
+                      <CheckCheck className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <Link to="/notifications" onClick={() => setOpen(false)}
+                    className="p-1.5 rounded-lg hover:bg-muted">
+                    <Settings className="w-3.5 h-3.5 text-muted-foreground" />
+                  </Link>
+                  <button onClick={() => setOpen(false)}
+                    className="p-1.5 rounded-lg hover:bg-muted">
+                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="max-h-72 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">لا توجد إشعارات</p>
+                    <Link to="/notifications" onClick={() => setOpen(false)}
+                      className="text-xs text-primary mt-1 block hover:underline">
+                      أضف مسارات مفضلة
+                    </Link>
+                  </div>
+                ) : notifications.map(notif => {
                   const cfg = typeConfig[notif.type] || typeConfig.system;
                   return (
-                    <div
-                      key={notif.id}
-                      className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 hover:bg-muted/30 transition-colors ${!notif.is_read ? "bg-primary/3" : ""}`}
-                    >
+                    <div key={notif.id}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 ${!notif.is_read ? "bg-primary/5" : ""}`}>
                       <div className={`w-2 h-2 rounded-full ${cfg.dot} mt-1.5 shrink-0 ${notif.is_read ? "opacity-30" : ""}`} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium leading-tight ${notif.is_read ? "text-muted-foreground" : "text-foreground"}`}>
@@ -159,53 +150,42 @@ export default function NotificationBell({ userEmail }) {
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{notif.message}</p>
                         {notif.trip_id && (
-                          <Link
-                            to={`/trip/${notif.trip_id}`}
+                          <Link to={`/trip/${notif.trip_id}`}
                             onClick={() => { markRead.mutate(notif.id); setOpen(false); }}
-                            className="text-xs text-primary mt-1 hover:underline inline-block"
-                          >
+                            className="text-xs text-primary mt-1 hover:underline inline-block">
                             عرض الرحلة ←
                           </Link>
                         )}
                       </div>
                       <div className="flex flex-col gap-1 shrink-0">
                         {!notif.is_read && (
-                          <button
-                            onClick={() => markRead.mutate(notif.id)}
-                            className="p-1 rounded hover:bg-muted"
-                            title="تحديد كمقروء"
-                          >
+                          <button onClick={() => markRead.mutate(notif.id)}
+                            className="p-1 rounded hover:bg-muted">
                             <Check className="w-3 h-3 text-muted-foreground" />
                           </button>
                         )}
-                        <button
-                          onClick={() => deleteNotif.mutate(notif.id)}
-                          className="p-1 rounded hover:bg-muted"
-                          aria-label="حذف الإشعار"
-                          title="حذف الإشعار"
-                        >
+                        <button onClick={() => deleteNotif.mutate(notif.id)}
+                          className="p-1 rounded hover:bg-muted">
                           <X className="w-3 h-3 text-muted-foreground" />
                         </button>
                       </div>
                     </div>
                   );
-                })
-              )}
-            </div>
-
-            {notifications.length > 0 && (
-              <div className="p-3 border-t border-border text-center">
-                <Link
-                  to="/notifications"
-                  onClick={() => setOpen(false)}
-                  className="text-xs text-primary hover:underline"
-                >
-                  إدارة تفضيلات الإشعارات
-                </Link>
+                })}
               </div>
-            )}
-          </motion.div>
-        , document.body)}
+
+              {notifications.length > 0 && (
+                <div className="p-3 border-t border-border text-center">
+                  <Link to="/notifications" onClick={() => setOpen(false)}
+                    className="text-xs text-primary hover:underline">
+                    إدارة تفضيلات الإشعارات
+                  </Link>
+                </div>
+              )}
+            </motion.div>
+          </>,
+          document.body
+        )}
       </AnimatePresence>
     </div>
   );
