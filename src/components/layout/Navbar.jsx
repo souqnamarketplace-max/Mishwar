@@ -7,7 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import NotificationBell from "../notifications/NotificationBell";
 
-const LOGO_URL = "https://media.base44.com/images/public/user_69994c756ca2186c5598c809/a83e759cf_ChatGPTImageApr27202601_01_06PM.png";
+const LOGO_URL = "/logo.png";
 
 const getNavLinks = (user) => {
   const links = [
