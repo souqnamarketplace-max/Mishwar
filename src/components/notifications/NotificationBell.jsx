@@ -15,8 +15,7 @@ const typeConfig = {
 
 export default function NotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 64, right: 8 });
-  const ref = useRef(null);
+  const [pos, setPos] = useState({ top: 60, right: 8 });
   const btnRef = useRef(null);
   const qc = useQueryClient();
 
@@ -30,6 +29,7 @@ export default function NotificationBell({ userEmail }) {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  // Realtime
   useEffect(() => {
     if (!userEmail) return;
     const unsub = base44.entities.Notification.subscribe(() => {
@@ -45,8 +45,8 @@ export default function NotificationBell({ userEmail }) {
 
   const markAllRead = useMutation({
     mutationFn: async () => {
-      await Promise.all(notifications.filter(n => !n.is_read)
-        .map(n => base44.entities.Notification.update(n.id, { is_read: true })));
+      const unread = notifications.filter(n => !n.is_read);
+      await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { is_read: true })));
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
   });
@@ -60,17 +60,34 @@ export default function NotificationBell({ userEmail }) {
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
   }, [open]);
 
+  const handleToggle = () => {
+    // Calculate position from button before opening
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const vw = window.innerWidth;
+      setPos({
+        top: rect.bottom + 8,
+        right: Math.max(8, vw - rect.right - 4),
+      });
+    }
+    setOpen(v => !v);
+  };
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={btnRef}>
       {/* Bell button */}
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={handleToggle}
         className="relative p-2 rounded-lg hover:bg-muted transition-colors"
         aria-label="الإشعارات"
       >
@@ -82,22 +99,23 @@ export default function NotificationBell({ userEmail }) {
         )}
       </button>
 
-      {/* Dropdown — always fixed below header, full width on mobile */}
-      <AnimatePresence>
-        {open && createPortal(
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-[9990]"
-              onClick={() => setOpen(false)}
-            />
-            {/* Panel */}
+      {/* Dropdown — rendered in body via portal */}
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {open && (
             <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
               transition={{ duration: 0.15 }}
-              className="fixed top-[57px] right-2 left-2 sm:left-auto sm:right-4 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-[9991] overflow-hidden"
+              style={{
+                position: "fixed",
+                top: pos.top,
+                right: pos.right,
+                width: Math.min(320, window.innerWidth - 16),
+                zIndex: 9999,
+              }}
+              className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
               dir="rtl"
             >
               {/* Header */}
@@ -114,17 +132,19 @@ export default function NotificationBell({ userEmail }) {
                 <div className="flex items-center gap-1">
                   {unreadCount > 0 && (
                     <button onClick={() => markAllRead.mutate()}
-                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground" title="تحديد الكل">
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground"
+                      title="تحديد الكل كمقروء">
                       <CheckCheck className="w-3.5 h-3.5" />
                     </button>
                   )}
                   <Link to="/notifications" onClick={() => setOpen(false)}
-                    className="p-1.5 rounded-lg hover:bg-muted">
+                    className="p-1.5 rounded-lg hover:bg-muted"
+                    title="إعدادات الإشعارات">
                     <Settings className="w-3.5 h-3.5 text-muted-foreground" />
                   </Link>
                   <button onClick={() => setOpen(false)}
-                    className="p-1.5 rounded-lg hover:bg-muted">
-                    <X className="w-3.5 h-3.5 text-muted-foreground" />
+                    className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -137,14 +157,14 @@ export default function NotificationBell({ userEmail }) {
                     <p className="text-sm text-muted-foreground">لا توجد إشعارات</p>
                     <Link to="/notifications" onClick={() => setOpen(false)}
                       className="text-xs text-primary mt-1 block hover:underline">
-                      أضف مسارات مفضلة
+                      أضف مسارات مفضلة للحصول على إشعارات
                     </Link>
                   </div>
                 ) : notifications.map(notif => {
                   const cfg = typeConfig[notif.type] || typeConfig.system;
                   return (
                     <div key={notif.id}
-                      className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 ${!notif.is_read ? "bg-primary/5" : ""}`}>
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-border/50 hover:bg-muted/30 transition-colors ${!notif.is_read ? "bg-primary/5" : ""}`}>
                       <div className={`w-2 h-2 rounded-full ${cfg.dot} mt-1.5 shrink-0 ${notif.is_read ? "opacity-30" : ""}`} />
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium leading-tight ${notif.is_read ? "text-muted-foreground" : "text-foreground"}`}>
@@ -162,12 +182,12 @@ export default function NotificationBell({ userEmail }) {
                       <div className="flex flex-col gap-1 shrink-0">
                         {!notif.is_read && (
                           <button onClick={() => markRead.mutate(notif.id)}
-                            className="p-1 rounded hover:bg-muted">
+                            className="p-1 rounded hover:bg-muted" title="تحديد كمقروء">
                             <Check className="w-3 h-3 text-muted-foreground" />
                           </button>
                         )}
                         <button onClick={() => deleteNotif.mutate(notif.id)}
-                          className="p-1 rounded hover:bg-muted">
+                          className="p-1 rounded hover:bg-muted" aria-label="حذف">
                           <X className="w-3 h-3 text-muted-foreground" />
                         </button>
                       </div>
@@ -185,10 +205,9 @@ export default function NotificationBell({ userEmail }) {
                 </div>
               )}
             </motion.div>
-          </>,
-          document.body
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      , document.body)}
     </div>
   );
 }
