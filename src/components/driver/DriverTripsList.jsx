@@ -55,13 +55,13 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         ));
       } else if (data.status === "completed") {
         toast.success("✅ تم إنهاء الرحلة بنجاح!");
-        // Notify passengers trip completed
+        // Notify passengers trip completed — with rating prompt
         const passengers = (tripBookings || []).filter(b => b.trip_id === id && b.status === "confirmed");
         await Promise.allSettled(passengers.map(b =>
           base44.entities.Notification.create({
             user_email: b.passenger_email,
-            title: "اكتملت الرحلة ✅",
-            message: `وصلت رحلتك من ${trip?.from_city} إلى ${trip?.to_city}. شكراً لاستخدامك مشوارو! يسعدنا تقييمك للسائق.`,
+            title: "اكتملت الرحلة ✅ — قيّم السائق",
+            message: `وصلت رحلتك من ${trip?.from_city} إلى ${trip?.to_city} مع السائق ${trip?.driver_name || ""}. شكراً لاستخدامك مشوارو! اذهب إلى رحلاتي وقيّم السائق لمساعدة المجتمع.`,
             type: "system", trip_id: id, is_read: false,
           })
         ));

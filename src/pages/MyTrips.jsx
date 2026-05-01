@@ -266,30 +266,33 @@ export default function MyTrips() {
 
                       {/* Review Button for completed trips */}
                       {status === "completed" && !reviewedTripIds.has(trip.id) && (
-                        <div className="mt-2 px-1">
+                        <div className="mt-3 mx-4">
                           {reviewingTrip === trip.id ? (
                             <ReviewForm
-                            trip={trip}
-                            reviewerUser={user}
-                            targetEmail={trip.driver_email || trip.created_by}
-                            targetName={trip.driver_name || "السائق"}
-                            onClose={() => setReviewingTrip(null)}
-                          />
-                        ) : (
+                              trip={trip}
+                              reviewerUser={user}
+                              targetEmail={trip.driver_email || trip.created_by}
+                              targetName={trip.driver_name || "السائق"}
+                              onClose={() => setReviewingTrip(null)}
+                            />
+                          ) : (
                             <button
                               onClick={() => setReviewingTrip(trip.id)}
-                              className="flex items-center gap-2 text-sm text-primary hover:underline px-4 py-1"
+                              className="w-full flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 hover:bg-yellow-100 transition-colors"
                             >
-                              <Star className="w-4 h-4 text-yellow-500" />
-                              قيّم هذه الرحلة
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(s => <Star key={s} className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />)}
+                              </div>
+                              <span className="text-sm font-bold text-yellow-800">قيّم السائق {trip.driver_name || ""}</span>
+                              <span className="text-xs text-yellow-600 mr-auto">اضغط هنا ←</span>
                             </button>
                           )}
                         </div>
                       )}
                       {status === "completed" && reviewedTripIds.has(trip.id) && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1 px-5 mt-1">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 px-5 mt-2 pb-1">
                           <CheckCircle className="w-3 h-3 text-accent" />
-                          تم تقييم هذه الرحلة
+                          شكراً — تم تقييم هذه الرحلة ✅
                         </p>
                       )}
                     </div>
