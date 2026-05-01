@@ -94,6 +94,8 @@ export default function TripDetails() {
 
   const trip = tripData || null;
   const carImage = driverProfile?.car_image || tripData?.car_image || null;
+  // Detect if current user is the driver of this trip
+  const isOwnTrip = !!user?.email && !!trip?.created_by && user.email === trip.created_by;
 
   if (!trip) {
     return (
@@ -140,7 +142,14 @@ export default function TripDetails() {
               </div>
 
               {/* Book button */}
-              {isBookingClosed(trip) && !booked ? (
+              {isOwnTrip ? (
+                <Button
+                  className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
+                  onClick={() => navigate("/driver?tab=passengers")}
+                >
+                  <Users className="w-4 h-4" /> إدارة حجوزات هذه الرحلة
+                </Button>
+              ) : isBookingClosed(trip) && !booked ? (
                 <div className="w-full h-11 rounded-xl bg-muted flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground font-medium">
                   🔒 أُغلق الحجز قبل الانطلاق بـ 30 دقيقة
                 </div>
@@ -460,8 +469,23 @@ export default function TripDetails() {
         </div>
       </div>
 
-      {/* ── Sticky bottom booking bar (mobile only) ── */}
-      {!booked && !isBookingClosed(trip) && (
+      {/* ── Sticky bottom bar (mobile only) ── */}
+      {isOwnTrip ? (
+        <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
+          <div className="bg-card border-2 border-primary rounded-2xl shadow-2xl p-3 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground">هذه رحلتك</p>
+              <Button className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground mt-1"
+                onClick={() => navigate("/driver?tab=passengers")}>
+                إدارة الحجوزات
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : !booked && !isBookingClosed(trip) ? (
         <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
           <div className="bg-card border border-border rounded-2xl shadow-2xl p-3 flex items-center gap-3">
             <div>
@@ -472,27 +496,23 @@ export default function TripDetails() {
               {isLastChance(trip) && (
                 <p className="text-[10px] text-orange-600 font-bold mb-1">⏰ {minutesUntilTrip(trip)} دقيقة للحجز!</p>
               )}
-              <Button
-                className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground"
-                onClick={() => setShowConfirm(true)}
-                disabled={bookingMutation.isPending}
-              >
+              <Button className="w-full h-10 rounded-xl font-bold bg-primary text-primary-foreground"
+                onClick={() => setShowConfirm(true)} disabled={bookingMutation.isPending}>
                 احجز الآن
               </Button>
             </div>
           </div>
         </div>
-      )}
-      {booked && (
+      ) : booked ? (
         <div className="lg:hidden fixed bottom-20 left-0 right-0 z-40 px-4 pb-2">
           <div className="bg-accent/10 border border-accent rounded-2xl p-3 flex items-center justify-center gap-2 text-accent font-bold">
-            <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح — تحقق من بريدك
+            <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* ── Booking Confirmation Dialog ── */}
-      {showConfirm && trip && (
+      {showConfirm && trip && !isOwnTrip && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowConfirm(false)} />
           <div className="relative bg-card rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md p-5 shadow-2xl" dir="rtl">
