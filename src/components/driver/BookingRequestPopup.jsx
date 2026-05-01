@@ -66,7 +66,20 @@ export default function BookingRequestPopup({ user }) {
   }, [pendingBookings.length]);
 
   const updateBooking = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.Booking.update(id, { status }),
+    mutationFn: async ({ id, status }) => {
+      await base44.entities.Booking.update(id, { status });
+      // Restore seats if driver rejects a pending booking
+      if (status === "cancelled") {
+        const booking = allBookings.find(b => b.id === id);
+        if (booking?.trip_id) {
+          const trip = myTrips.find(t => t.id === booking.trip_id);
+          if (trip) {
+            const restoredSeats = (trip.available_seats || 0) + (booking.seats_booked || 1);
+            await base44.entities.Trip.update(booking.trip_id, { available_seats: restoredSeats });
+          }
+        }
+      }
+    },
     onSuccess: async (_, { id, status }) => {
       qc.invalidateQueries({ queryKey: ["popup-bookings", user.email] });
       qc.invalidateQueries({ queryKey: ["driver-bookings", user.email] });

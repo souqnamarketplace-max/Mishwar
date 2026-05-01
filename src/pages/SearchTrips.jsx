@@ -1,7 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { isTripExpired } from "@/lib/tripScheduling";
+import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ export default function SearchTrips() {
   const filtered = trips
     .filter((t) => t.status === "confirmed")
     .filter((t) => !isTripExpired(t))
+    .filter((t) => !isBookingClosed(t))  // hide trips with < 30 min to departure
     .filter((t) => {
       // Match trips where the from-city is direct OR is one of the stops
       const stopCities = Array.isArray(t.stops) ? t.stops.map(s => s?.city).filter(Boolean) : [];
@@ -106,6 +107,7 @@ export default function SearchTrips() {
       if (maxPrice && t.price > parseFloat(maxPrice)) return false;
       if (genderPref && t.driver_gender !== genderPref) return false;
       if (t.available_seats < minSeats) return false;
+      if (t.available_seats <= 0) return false; // fully booked
       return true;
     })
     .sort((a, b) => {

@@ -18,7 +18,22 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
   const qc = useQueryClient();
 
   const updateBooking = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.Booking.update(id, { status }),
+    mutationFn: async ({ id, status }) => {
+      await base44.entities.Booking.update(id, { status });
+      // Restore seats if driver cancels/rejects a pending booking
+      if (status === "cancelled") {
+        const allBookings = qc.getQueryData(["driver-bookings"]) || [];
+        const booking = allBookings.find(b => b.id === id);
+        if (booking?.trip_id && booking?.status === "pending") {
+          const allTrips = qc.getQueryData(["trips"]) || [];
+          const trip = allTrips.find(t => t.id === booking.trip_id);
+          if (trip) {
+            const restoredSeats = (trip.available_seats || 0) + (booking.seats_booked || 1);
+            await base44.entities.Trip.update(booking.trip_id, { available_seats: restoredSeats });
+          }
+        }
+      }
+    },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ["bookings"] });
       const prev = qc.getQueryData(["bookings"]);

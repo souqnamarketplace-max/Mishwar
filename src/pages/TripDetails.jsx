@@ -57,15 +57,21 @@ export default function TripDetails() {
   });
 
   const bookingMutation = useMutation({
-    mutationFn: (tripData) => base44.entities.Booking.create({
-      trip_id: tripData.id,
-      passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
-      passenger_email: user?.email || "",
-      seats_booked: 1,
-      total_price: tripData.price,
-      status: "pending",
-      payment_method: "نقداً",
-    }),
+    mutationFn: async (tripData) => {
+      const booking = await base44.entities.Booking.create({
+        trip_id: tripData.id,
+        passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
+        passenger_email: user?.email || "",
+        seats_booked: 1,
+        total_price: tripData.price,
+        status: "pending",
+        payment_method: "نقداً",
+      });
+      // Decrement available_seats immediately on booking
+      const newSeats = Math.max(0, (tripData.available_seats || 1) - 1);
+      await base44.entities.Trip.update(tripData.id, { available_seats: newSeats });
+      return booking;
+    },
     onMutate: () => {
       setBooked(true);
       return null;
