@@ -52,12 +52,10 @@ export default function HeroSection() {
       const { data, error } = await supabase
         .from("app_settings")
         .select("hero_city_slides")
-        .not("hero_city_slides", "is", null)
         .limit(1);
       if (error || !data?.[0]?.hero_city_slides) return null;
-      const parsed = typeof data[0].hero_city_slides === "string"
-        ? JSON.parse(data[0].hero_city_slides)
-        : data[0].hero_city_slides;
+      const raw = data[0].hero_city_slides;
+      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       return Array.isArray(parsed) ? parsed.filter(s => s.active !== false) : null;
     },
     staleTime: 30000,
