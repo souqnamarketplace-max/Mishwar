@@ -150,8 +150,8 @@ export default function DashboardHeroSlides() {
   const { data: settingRow, isLoading } = useQuery({
     queryKey: ["hero-slides-admin"],
     queryFn: async () => {
-      const { data } = await supabase.from("app_settings").select("id, hero_city_slides").limit(1).single();
-      return data || null;
+      const { data } = await supabase.from("app_settings").select("id, hero_city_slides").limit(1).order("created_at", { ascending: false });
+      return data?.[0] || null;
     },
   });
 
