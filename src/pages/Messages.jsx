@@ -210,16 +210,21 @@ export default function Messages() {
       const convId = activeConv.id === "__new__"
         ? [user.email, activeConv.otherEmail].sort().join("__")
         : activeConv.id;
-      await base44.entities.Message.create({
+      const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: convId,
         sender_email:   user.email,
-        sender_name:    user.full_name || user.email.split("@")[0],
+        sender_name:    user.full_name || user.full_name || user.email.split("@")[0],
         receiver_email: activeConv.otherEmail,
-        receiver_name:  activeConv.otherName,
+        receiver_name:  activeConv.otherName || activeConv.otherEmail.split("@")[0],
         content:        cleaned,
         is_read:        false,
         message_type:   "text",
+        trip_id:        activeConv.tripId || null,
       });
+      if (msgErr) {
+        console.error("Message insert error:", msgErr);
+        throw new Error(msgErr.message);
+      }
       setDraft("");
       setNewConv(null);
       // Switch to real conversation after first message sent

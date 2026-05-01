@@ -181,9 +181,13 @@ export default function TripDetails() {
                 >
                   <Users className="w-4 h-4" /> إدارة حجوزات هذه الرحلة
                 </Button>
-              ) : isBookingClosed(trip) && !booked ? (
+              ) : isTripExpired(trip) && !booked ? (
                 <div className="w-full h-11 rounded-xl bg-muted flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground font-medium">
-                  🔒 أُغلق الحجز قبل الانطلاق بـ 30 دقيقة
+                  ⏰ انتهى وقت هذه الرحلة
+                </div>
+              ) : isBookingClosed(trip) && !booked ? (
+                <div className="w-full h-11 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-2 mt-2 text-sm text-orange-700 font-medium">
+                  🔒 أُغلق الحجز — أقل من 30 دقيقة للانطلاق
                 </div>
               ) : booked ? (
                 <div className="space-y-2 mt-2">
@@ -645,7 +649,7 @@ export default function TripDetails() {
             <Button
               className="w-full h-12 rounded-xl font-black text-base bg-primary text-primary-foreground"
               onClick={() => bookingMutation.mutate(trip)}
-              disabled={bookingMutation.isPending}
+              disabled={bookingMutation.isPending || isTripExpired(trip) || isBookingClosed(trip)}
             >
               {bookingMutation.isPending ? "جاري الحجز..." : `تأكيد الحجز — ₪${trip.price}`}
             </Button>

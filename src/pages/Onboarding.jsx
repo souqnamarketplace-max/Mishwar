@@ -405,7 +405,7 @@ export default function Onboarding() {
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
                       try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, license_image_url: url })); toast.success("✅ تم رفع صورة الرخصة"); }
-                      catch (err) { toast.error("فشل رفع الملف. تأكد من الاتصال وحاول مجدداً"); }
+                      catch (err) { console.error("License upload error:", err); toast.error("فشل رفع الصورة. حجم الملف يجب أن يكون أقل من 5MB وبصيغة صورة أو PDF"); }
                       finally { setUploading(false); }
                     }} />
                   </div>
@@ -483,15 +483,18 @@ export default function Onboarding() {
                     <Upload className="w-4 h-4" />
                     {form.selfie_url ? "✓ تم رفع الصورة" : "رفع صورة شخصية مع الهوية"}
                   </Button>
-                  <input id="upload-selfie" type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  <input id="upload-selfie" type="file" accept="image/*" capture="user" className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0]; if (!file) return;
-                    if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
+                    if (file.size > 10*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 10 MB"); return; }
                     setUploading(true);
                     try {
                       const url = await uploadToSupabase(file);
                       setForm(f => ({ ...f, selfie_url: url }));
-                      toast.success("✅ تم رفع الصورة الشخصية");
-                    } catch (err) { toast.error("فشل رفع الصورة: " + (err.message || "")); }
+                      toast.success("✅ تم رفع الصورة الشخصية بنجاح");
+                    } catch (err) {
+                      console.error("Selfie upload error:", err);
+                      toast.error("فشل رفع الصورة. تأكد من الاتصال وأن حجم الصورة أقل من 10MB");
+                    }
                     finally { setUploading(false); }
                   }} />
                 </div>

@@ -242,6 +242,33 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
           })}
         </div>
       )}
+      {/* Delete Confirm Modal */}
+      {deleteConfirm && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/50" dir="rtl">
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                <Trash2 className="w-6 h-6 text-destructive" />
+              </div>
+              <h3 className="font-bold text-lg text-foreground">حذف الرحلة</h3>
+              <p className="text-sm text-muted-foreground mt-1">هل أنت متأكد من حذف هذه الرحلة؟ سيتم إلغاء جميع الحجوزات المرتبطة بها.</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setDeleteConfirm(null)}>
+                إلغاء
+              </Button>
+              <Button
+                className="flex-1 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={() => { deleteMutation.mutate(deleteConfirm); setDeleteConfirm(null); }}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "جاري الحذف..." : "حذف نهائياً"}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
       {/* Edit Trip Modal */}
       {editingTrip && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Search, ArrowLeft, Map, SlidersHorizontal, X, ArrowLeftRight } from "lucide-react";
@@ -52,13 +53,17 @@ export default function SearchTrips() {
   const { data: trips = [], isLoading, error } = useQuery({
     queryKey: ["trips"],
     queryFn: async () => {
-      // Fetch only confirmed future trips — avoids loading thousands of old trips
+      // Fetch ALL confirmed trips via Supabase directly (base44 adds created_by filter)
       const today = new Date().toISOString().split("T")[0];
-      return Promise.race([
-        base44.entities.Trip.filter({ status: "confirmed" }, "-date", 150)
-          .then(trips => trips.filter(t => t.date >= today)),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000)),
-      ]);
+      const { data, error } = await supabase
+        .from("trips")
+        .select("*")
+        .in("status", ["confirmed", "in_progress"])
+        .gte("date", today)
+        .order("date", { ascending: true })
+        .limit(500);
+      if (error) throw new Error(error.message);
+      return data || [];
     },
     retry: 1,
     staleTime: 30000,  // 30s — refresh in background, don't refetch on every mount
@@ -84,7 +89,7 @@ export default function SearchTrips() {
   const filtered = trips
     .filter((t) => t.status === "confirmed")
     .filter((t) => !isTripExpired(t))
-    .filter((t) => !isBookingClosed(t))  // hide trips with < 30 min to departure
+    // Note: isBookingClosed is enforced in TripDetails booking button, not hidden from search
     .filter((t) => {
       // Match trips where the from-city is direct OR is one of the stops
       const stopCities = Array.isArray(t.stops) ? t.stops.map(s => s?.city).filter(Boolean) : [];

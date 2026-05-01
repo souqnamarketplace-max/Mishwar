@@ -4,6 +4,7 @@ import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -245,19 +246,28 @@ export default function AccountSettings() {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("حجم الملف يجب أن يكون أقل من 5 MB");
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("حجم الملف يجب أن يكون أقل من 8 MB");
+      return;
+    }
+    if (!file.type.startsWith("image/") && !file.type.includes("pdf")) {
+      toast.error("يرجى رفع صورة أو ملف PDF فقط");
       return;
     }
 
     setLicenseLoading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setUrl(file_url);
-      toast.success(`تم رفع ${fileType} بنجاح`);
+      // Use Supabase storage directly (bypasses base44 upload)
+      const ext = file.name.split(".").pop();
+      const path = `public/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("uploads").upload(path, file, { upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);
+      setUrl(publicUrl);
+      toast.success(`✅ تم رفع ${fileType} بنجاح`);
     } catch (err) {
-      captureException(err, { msg: "Upload error:" });
-      toast.error(`خطأ في رفع ${fileType}`);
+      console.error("Upload error:", err);
+      toast.error(`خطأ في رفع ${fileType}: ${err.message || "حاول مجدداً"}`);
     }
     setLicenseLoading(false);
   };
