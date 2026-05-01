@@ -22,12 +22,24 @@ export async function logAdminAction(action, targetType, targetId, details = {})
       }
     } catch {}
 
-    await base44.entities.AdminAuditLog.create({
-      admin_email: adminEmail,
-      action,
-      target_type: targetType,
-      target_id:   targetId ? String(targetId) : null,
-      details,
+    // Use direct REST to bypass base44 SDK auto-injecting 'created_by'
+    // which doesn't exist on admin_audit_log table
+    const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    await fetch(`${SUPABASE_URL}/rest/v1/admin_audit_log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON_KEY,
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "Prefer": "return=minimal",
+      },
+      body: JSON.stringify({
+        admin_email: adminEmail,
+        action,
+        target_type: targetType,
+        target_id:   targetId ? String(targetId) : null,
+        details,
+      }),
     });
   } catch (e) {
     // Audit logging failures must never block the main action
