@@ -270,10 +270,11 @@ export function isLastChance(trip) {
 }
 
 /**
- * Booking cutoff: passengers cannot book within 30 minutes of departure.
+ * Booking cutoff: passengers cannot book after 60 minutes past departure.
+ * Booking stays open right up to and 60 minutes after the trip departs.
  */
 export function isBookingClosed(trip) {
   const mins = minutesUntilTrip(trip);
   if (mins === null) return true;
-  return mins <= 30;
+  return mins <= -60; // close 60 minutes AFTER departure
 }

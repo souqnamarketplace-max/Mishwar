@@ -181,13 +181,9 @@ export default function TripDetails() {
                 >
                   <Users className="w-4 h-4" /> إدارة حجوزات هذه الرحلة
                 </Button>
-              ) : isTripExpired(trip) && !booked ? (
-                <div className="w-full h-11 rounded-xl bg-muted flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground font-medium">
-                  ⏰ انتهى وقت هذه الرحلة
-                </div>
               ) : isBookingClosed(trip) && !booked ? (
-                <div className="w-full h-11 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center gap-2 mt-2 text-sm text-orange-700 font-medium">
-                  🔒 أُغلق الحجز — أقل من 30 دقيقة للانطلاق
+                <div className="w-full h-11 rounded-xl bg-muted border border-border flex items-center justify-center gap-2 mt-2 text-sm text-muted-foreground">
+                  ⏰ انتهى وقت الحجز
                 </div>
               ) : booked ? (
                 <div className="space-y-2 mt-2">
@@ -550,16 +546,10 @@ export default function TripDetails() {
                 </div>
               </div>
             </div>
-          ) : isTripExpired(trip) ? (
-            <div className="fixed bottom-24 left-4 right-4 z-[999]">
-              <div className="bg-muted rounded-2xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground border border-border">
-                ⏰ انتهى وقت هذه الرحلة
-              </div>
-            </div>
           ) : isBookingClosed(trip) ? (
             <div className="fixed bottom-24 left-4 right-4 z-[999]">
-              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 flex items-center justify-center gap-2 text-sm text-orange-700 font-medium">
-                🔒 الحجز مغلق — أقل من 30 دقيقة للانطلاق
+              <div className="bg-muted border border-border rounded-2xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                ⏰ انتهى وقت الحجز — مرت أكثر من ساعة على موعد الرحلة
               </div>
             </div>
           ) : (
