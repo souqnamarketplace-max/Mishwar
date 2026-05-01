@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -201,6 +201,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   { icon: Search,        label: "بحث عن رحلة",     path: "/search" },
                   { icon: MapPin,        label: "رحلاتي",           path: "/my-trips" },
                   { icon: MessageSquare, label: "الرسائل",          path: "/messages" },
+                  { icon: Heart,         label: "المفضلة",          path: "/favorites" },
                   { icon: User,          label: "الملف الشخصي",    path: user?.email ? `/profile?email=${user.email}` : "/profile" },
                   ...(user?.account_type === "driver" || user?.account_type === "both"
                     ? [{ icon: Settings, label: "لوحة تحكم السائق", path: "/driver" }]

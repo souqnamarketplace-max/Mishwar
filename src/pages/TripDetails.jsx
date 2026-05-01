@@ -35,9 +35,21 @@ export default function TripDetails() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [booked, setBooked] = useState(false);
-  const [favorited, setFavorited] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
+
+  // Favorites — persisted in localStorage per user
+  const favKey = `mishwar-favs-${user?.email || "anon"}`;
+  const getFavs = () => { try { return new Set(JSON.parse(localStorage.getItem(favKey) || "[]")); } catch { return new Set(); } };
+  const [favorited, setFavorited] = useState(() => getFavs().has(id));
+
+  const toggleFavorite = () => {
+    const favs = getFavs();
+    if (favorited) { favs.delete(id); toast("تمت الإزالة من المفضلة"); }
+    else { favs.add(id); toast.success("تمت الإضافة للمفضلة ❤️"); }
+    localStorage.setItem(favKey, JSON.stringify([...favs]));
+    setFavorited(!favorited);
+  };
 
   // Scroll to top when trip page opens
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
@@ -174,15 +186,17 @@ export default function TripDetails() {
                 </>
               )}
 
-              {/* Favorite */}
-              <Button
-                variant="outline"
-                className={`w-full rounded-xl gap-2 ${favorited ? "border-destructive text-destructive" : ""}`}
-                onClick={() => { setFavorited(!favorited); toast(favorited ? "تمت الإزالة من المفضلة" : "تمت الإضافة للمفضلة ❤️"); }}
-              >
-                <Heart className={`w-4 h-4 ${favorited ? "fill-destructive text-destructive" : ""}`} />
-                {favorited ? "في المفضلة" : "إضافة للمفضلة"}
-              </Button>
+              {/* Favorite — only for passengers, not driver's own trip */}
+              {!isOwnTrip && (
+                <Button
+                  variant="outline"
+                  className={`w-full rounded-xl gap-2 ${favorited ? "border-destructive text-destructive" : ""}`}
+                  onClick={toggleFavorite}
+                >
+                  <Heart className={`w-4 h-4 ${favorited ? "fill-destructive text-destructive" : ""}`} />
+                  {favorited ? "في المفضلة ❤️" : "إضافة للمفضلة"}
+                </Button>
+              )}
             </div>
 
             {/* Trust info */}

@@ -35,9 +35,15 @@ export default function Favorites() {
     queryFn: () => base44.auth.me(),
   });
 
+  // Read favorited trip IDs from localStorage
+  const getFavIds = (email) => {
+    try { return new Set(JSON.parse(localStorage.getItem(`mishwar-favs-${email || "anon"}`) || "[]")); }
+    catch { return new Set(); }
+  };
+
   const { data: trips = [] } = useQuery({
     queryKey: ["trips"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 20),
+    queryFn: () => base44.entities.Trip.list("-created_date", 200),
   });
 
   const { data: userPreferences = [] } = useQuery({
@@ -217,19 +223,37 @@ export default function Favorites() {
                     عرض الكل <ChevronLeft className="w-3 h-3" />
                   </Link>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {trips.slice(0, 3).map((trip) => (
-                    <div key={trip.id} className="relative">
-                      <button 
-                        onClick={() => removeFavorite(trip.id)}
-                        className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-destructive flex items-center justify-center hover:bg-destructive/90 transition-colors"
-                      >
-                        <Heart className="w-3.5 h-3.5 text-white fill-white" />
-                      </button>
-                      <TripCard trip={trip} />
+                {(() => {
+                  const favIds = getFavIds(user?.email);
+                  const favTrips = trips.filter(t => favIds.has(t.id));
+                  if (favTrips.length === 0) return (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <Heart className="w-10 h-10 mx-auto mb-2 opacity-20" />
+                      <p className="text-sm">لم تضف أي رحلة للمفضلة بعد</p>
+                      <Link to="/search" className="text-primary text-sm hover:underline mt-1 block">ابحث عن رحلات</Link>
                     </div>
-                  ))}
-                </div>
+                  );
+                  return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {favTrips.map((trip) => (
+                        <div key={trip.id} className="relative">
+                          <button
+                            onClick={() => {
+                              const favs = getFavIds(user?.email);
+                              favs.delete(trip.id);
+                              localStorage.setItem(`mishwar-favs-${user?.email || "anon"}`, JSON.stringify([...favs]));
+                              window.location.reload();
+                            }}
+                            className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full bg-destructive flex items-center justify-center hover:bg-destructive/90 transition-colors"
+                          >
+                            <Heart className="w-3.5 h-3.5 text-white fill-white" />
+                          </button>
+                          <TripCard trip={trip} />
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
