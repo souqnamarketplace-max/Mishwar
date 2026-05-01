@@ -33,9 +33,6 @@ function formatDate(dateStr) {
     if (diff > 2 && diff <= 6) return days[d.getDay()];
     return `${d.getDate()} ${PS_MONTHS[d.getMonth()]}`;
   } catch { return dateStr; }
-});
-    return d.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
-  } catch { return dateStr; }
 }
 
 // ── Compact featured card — vertical on ALL screen sizes ──────────────────────
