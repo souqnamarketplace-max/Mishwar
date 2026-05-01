@@ -155,20 +155,38 @@ function formatDuration(minutes) {
  * Route via Valhalla (openstreetmap.de) — CORS-enabled, no API key needed.
  * Supports West Bank roads. Falls back to straight-line estimate if API fails.
  */
+// Multiple Valhalla servers — try in order, skip on rate limit or CORS
+const VALHALLA_SERVERS = [
+  'https://valhalla1.openstreetmap.de/route',
+  'https://valhalla2.openstreetmap.de/route',
+  'https://valhalla3.openstreetmap.de/route',
+];
+
 async function valhallaRoute(locations) {
   const body = {
     locations: locations.map(([lat, lng]) => ({ lat, lon: lng })),
     costing: 'auto',
     directions_options: { units: 'kilometers' },
   };
-  const res = await fetch('https://valhalla1.openstreetmap.de/route', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
-  });
-  if (!res.ok) throw new Error(`Valhalla ${res.status}`);
-  return res.json();
+
+  for (const server of VALHALLA_SERVERS) {
+    try {
+      const res = await fetch(server, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.status === 429) continue; // rate limited — try next server
+      if (!res.ok) throw new Error(`Valhalla ${res.status}`);
+      return res.json();
+    } catch (e) {
+      // CORS or network error — try next server
+      if (e?.name === 'AbortError') throw e; // timeout — stop trying
+      continue;
+    }
+  }
+  throw new Error('All Valhalla servers unavailable');
 }
 
 export async function calculateRoute(fromCity, toCity) {
