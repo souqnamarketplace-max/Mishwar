@@ -123,38 +123,70 @@ export default function SearchTrips() {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8" dir="rtl">
-      {/* Search Bar */}
-      <div className="bg-card rounded-2xl border border-border p-4 mb-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row gap-3 items-end">
-          {/* From — type-to-search */}
-          <div className="flex-1 bg-muted/50 rounded-xl border border-border">
-            <CityAutocomplete value={from} onChange={setFrom} placeholder="من أين تنطلق؟" iconColor="primary" />
+      {/* ── Search Card ── */}
+      <div className="bg-card rounded-3xl shadow-lg border border-border/60 mb-6 overflow-hidden">
+
+        {/* Route inputs */}
+        <div className="relative" dir="rtl">
+          {/* Vertical connector line */}
+          <div className="absolute right-[3.25rem] top-[3.5rem] bottom-[1rem] w-px bg-gradient-to-b from-primary via-primary/40 to-accent hidden sm:block" style={{zIndex:0}} />
+
+          {/* FROM */}
+          <div className="relative flex items-center gap-3 px-4 pt-4 pb-2">
+            <div className="w-9 h-9 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center shrink-0 z-10">
+              <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-primary mb-0.5 tracking-wider uppercase">من</p>
+              <div className="bg-muted/40 rounded-2xl">
+                <CityAutocomplete value={from} onChange={setFrom} placeholder="مدينة الانطلاق" iconColor="primary" />
+              </div>
+            </div>
           </div>
 
-          {/* Swap button */}
-          <button onClick={handleSwap}
-            className="self-center sm:self-end w-9 h-9 shrink-0 rounded-full bg-muted hover:bg-muted/80 flex items-center justify-center transition-colors mb-0.5 hover:rotate-180 duration-300"
-            aria-label="عكس الاتجاه" title="عكس الاتجاه">
-            <ArrowLeftRight className="w-4 h-4 text-muted-foreground" />
-          </button>
-
-          {/* To — type-to-search */}
-          <div className="flex-1 bg-muted/50 rounded-xl border border-border">
-            <CityAutocomplete value={to} onChange={setTo} placeholder="إلى أين؟" iconColor="accent" />
+          {/* Swap + divider */}
+          <div className="flex items-center px-4 py-1 gap-3">
+            <button onClick={handleSwap}
+              className="w-9 h-9 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 flex items-center justify-center transition-all hover:rotate-180 duration-300 shrink-0 z-10">
+              <ArrowLeftRight className="w-3.5 h-3.5 text-primary" />
+            </button>
+            <div className="flex-1 h-px bg-border/60" />
           </div>
 
+          {/* TO */}
+          <div className="relative flex items-center gap-3 px-4 pt-2 pb-4">
+            <div className="w-9 h-9 rounded-full bg-accent/10 border-2 border-accent flex items-center justify-center shrink-0 z-10">
+              <MapPin className="w-4 h-4 text-accent" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-accent mb-0.5 tracking-wider uppercase">إلى</p>
+              <div className="bg-muted/40 rounded-2xl">
+                <CityAutocomplete value={to} onChange={setTo} placeholder="مدينة الوصول" iconColor="accent" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Date + Search row */}
+        <div className="border-t border-border/60 flex items-stretch" dir="rtl">
           {/* Date */}
-          <div className="flex-1 relative">
-            <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full h-11 pr-10 pl-4 rounded-xl bg-muted/50 border border-border text-sm" />
+          <div className="flex-1 flex items-center gap-2.5 px-4 py-3">
+            <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              <p className="text-[10px] font-bold text-muted-foreground mb-0.5 tracking-wider uppercase">التاريخ</p>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full bg-transparent text-sm font-medium text-foreground focus:outline-none cursor-pointer" />
+            </div>
           </div>
 
-          {/* Search */}
-          <Button className="h-11 px-6 bg-primary text-primary-foreground rounded-xl gap-2 shrink-0" onClick={handleSearch}>
+          {/* Search button */}
+          <button
+            onClick={handleSearch}
+            className="bg-primary hover:bg-primary/90 active:scale-95 text-primary-foreground px-6 flex items-center gap-2 font-bold text-sm transition-all border-r border-primary/20"
+          >
             <Search className="w-4 h-4" />
-            بحث
-          </Button>
+            <span className="hidden sm:inline">بحث</span>
+          </button>
         </div>
       </div>
 
