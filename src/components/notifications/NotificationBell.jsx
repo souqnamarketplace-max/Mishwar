@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, MapPin, ArrowLeft, X, Check, CheckCheck, Settings } from "lucide-react";
@@ -78,13 +79,14 @@ export default function NotificationBell({ userEmail }) {
       </button>
 
       <AnimatePresence>
-        {open && (
+        {open && createPortal(
           <motion.div
             initial={{ opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-12 w-80 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden"
+            className="fixed top-16 right-2 left-2 sm:left-auto sm:right-4 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-[9998] overflow-hidden"
+            dir="rtl"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -193,7 +195,7 @@ export default function NotificationBell({ userEmail }) {
               </div>
             )}
           </motion.div>
-        )}
+        , document.body)}
       </AnimatePresence>
     </div>
   );
