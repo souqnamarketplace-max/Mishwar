@@ -90,9 +90,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             )}
             
             <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
-              {location.pathname === "/" ? (
-                <img src="/logo.png" alt="مشوارو" className="h-8 w-8 rounded-lg object-cover mx-auto" />
-              ) : (headerTitle || currentTab?.label || "مشوارو")}
+              {headerTitle || currentTab?.label || "مشوارو"}
             </h1>
             
             <div className="flex items-center gap-1">
