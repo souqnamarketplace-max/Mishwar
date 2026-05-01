@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X } from "lucide-react";
+import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [filter, setFilter] = useState("all");
   const [editingTrip, setEditingTrip] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [confirmDialog, setConfirmDialog] = useState(null); // { tripId, action: "start"|"complete" }
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
@@ -35,11 +36,47 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       qc.setQueryData(["trips"], ctx);
       toast.error("فشل التحديث");
     },
-    onSuccess: () => {
+    onSuccess: async (_, { id, data, trip, bookings: tripBookings }) => {
       qc.invalidateQueries({ queryKey: ["trips"] });
-      toast.success("تم تحديث الحالة");
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+      if (data.status === "in_progress") {
+        toast.success("🚗 انطلقت الرحلة!");
+        // Notify all confirmed passengers
+        const passengers = (tripBookings || []).filter(b => b.trip_id === id && b.status === "confirmed");
+        await Promise.allSettled(passengers.map(b =>
+          base44.entities.Notification.create({
+            user_email: b.passenger_email,
+            title: "رحلتك انطلقت! 🚗",
+            message: `السائق ${trip?.driver_name || ""} انطلق من ${trip?.from_city} إلى ${trip?.to_city}. استعد للوصول خلال ${trip?.duration || "المدة المحددة"}.`,
+            type: "system", trip_id: id, is_read: false,
+          })
+        ));
+      } else if (data.status === "completed") {
+        toast.success("✅ تم إنهاء الرحلة بنجاح!");
+        // Notify passengers trip completed
+        const passengers = (tripBookings || []).filter(b => b.trip_id === id && b.status === "confirmed");
+        await Promise.allSettled(passengers.map(b =>
+          base44.entities.Notification.create({
+            user_email: b.passenger_email,
+            title: "اكتملت الرحلة ✅",
+            message: `وصلت رحلتك من ${trip?.from_city} إلى ${trip?.to_city}. شكراً لاستخدامك مشوارو! يسعدنا تقييمك للسائق.`,
+            type: "system", trip_id: id, is_read: false,
+          })
+        ));
+      } else {
+        toast.success("تم تحديث الحالة");
+      }
     },
   });
+
+  // Real-time subscription — status updates instantly without reload
+  useEffect(() => {
+    const unsub = base44.entities.Trip.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+    });
+    return () => unsub();
+  }, [qc]);
 
   const editMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
@@ -167,8 +204,9 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                       size="sm"
                       variant="outline"
                       className="rounded-lg text-xs gap-1 text-yellow-600 border-yellow-200"
-                      onClick={() => updateMutation.mutate({ id: trip.id, data: { status: "in_progress" } })}
+                      onClick={() => setConfirmDialog({ tripId: trip.id, action: "start", trip })}
                     >
+                      <Play className="w-3 h-3" />
                       بدء الرحلة
                     </Button>
                   )}
@@ -177,9 +215,9 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     <Button
                       size="sm"
                       className="rounded-lg text-xs gap-1 bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => updateMutation.mutate({ id: trip.id, data: { status: "completed" } })}
+                      onClick={() => setConfirmDialog({ tripId: trip.id, action: "complete", trip })}
                     >
-                      <CheckCircle className="w-3.5 h-3.5" />
+                      <Flag className="w-3.5 h-3.5" />
                       إنهاء الرحلة
                     </Button>
                   )}
