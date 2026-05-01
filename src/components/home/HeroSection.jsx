@@ -64,7 +64,7 @@ export default function HeroSection() {
         {/* Compact hero banner */}
         <div className="relative h-48 overflow-hidden">
           <img loading="lazy"
-            src="https://images.unsplash.com/photo-1544413660-299165566b1d?w=1400&h=800&fit=crop&q=80"
+            src="https://images.unsplash.com/photo-1580834341580-8c17a3a630ca?w=1400&h=800&fit=crop&q=80"
             alt="" className="w-full h-full object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
@@ -104,7 +104,7 @@ export default function HeroSection() {
       <section className="hidden sm:block relative overflow-hidden" style={{ minHeight: "560px" }}>
         <div className="absolute inset-0">
           <img loading="lazy"
-            src="https://images.unsplash.com/photo-1544413660-299165566b1d?w=1400&h=800&fit=crop&q=80"
+            src="https://images.unsplash.com/photo-1580834341580-8c17a3a630ca?w=1400&h=800&fit=crop&q=80"
             alt="" className="w-full h-full object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/55 to-black/15" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />

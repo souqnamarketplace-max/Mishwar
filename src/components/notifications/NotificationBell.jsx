@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,8 +15,16 @@ const typeConfig = {
 
 export default function NotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 64, right: 8 });
   const ref = useRef(null);
+  const btnRef = useRef(null);
   const qc = useQueryClient();
+
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setDropPos({ top: rect.bottom + 6, right: Math.max(8, window.innerWidth - rect.right) });
+  }, []);
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", userEmail],
@@ -67,9 +75,10 @@ export default function NotificationBell({ userEmail }) {
   return (
     <div className="relative" ref={ref}>
       <button
-        onClick={() => setOpen(!open)}
+        ref={btnRef}
+        onClick={() => { updatePos(); setOpen(!open); }}
         className="relative p-2 rounded-lg hover:bg-muted transition-colors"
-       aria-label="فتح الإشعارات">
+        aria-label="فتح الإشعارات">
         <Bell className="w-5 h-5 text-muted-foreground" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full text-[9px] text-white flex items-center justify-center font-bold">
@@ -85,7 +94,8 @@ export default function NotificationBell({ userEmail }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.15 }}
-            className="fixed top-16 right-2 left-2 sm:left-auto sm:right-4 sm:w-80 bg-card border border-border rounded-2xl shadow-2xl z-[9998] overflow-hidden"
+            style={{ position: "fixed", top: dropPos.top, right: dropPos.right, left: dropPos.right > 8 ? "auto" : 8, width: dropPos.right > 8 ? 320 : "auto", maxWidth: "calc(100vw - 16px)" }}
+            className="bg-card border border-border rounded-2xl shadow-2xl z-[9998] overflow-hidden"
             dir="rtl"
           >
             {/* Header */}

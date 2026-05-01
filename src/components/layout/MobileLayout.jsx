@@ -129,7 +129,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
               </Link>
             ) : (
               <Link to="/">
-                <img src="/logo.png" alt="مشوارو" className="h-10 w-10 rounded-xl object-cover" />
+                <img src="/logo.png" alt="مشوارو" className="h-8 w-8 rounded-lg object-cover" />
               </Link>
             )}
           </div>
