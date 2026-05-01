@@ -17,6 +17,7 @@ import DashboardFeedback from "./dashboard/DashboardFeedback";
 import DashboardContent from "./dashboard/DashboardContent";
 import DashboardOffers from "./dashboard/DashboardOffers";
 import DashboardSettings from "./dashboard/DashboardSettings";
+import DashboardHeroSlides from "./dashboard/DashboardHeroSlides";
 import DashboardLogs from "./dashboard/DashboardLogs";
 import DashboardLicenses from "./dashboard/DashboardLicenses";
 import { useState as useBroadcastState } from "react";

@@ -42,7 +42,26 @@ const CITY_SLIDES = [
 export default function HeroSection() {
   const navigate = useNavigate();
   const [slideIdx, setSlideIdx] = useState(0);
-  const slide = CITY_SLIDES[slideIdx];
+
+  // Load slides from admin settings (fallback to hardcoded)
+  const { data: slideSetting } = useQuery({
+    queryKey: ["hero-slides"],
+    queryFn: async () => {
+      const results = await base44.entities.AppSettings.filter({ key: "hero_city_slides" }, "-created_at", 1);
+      return results?.[0] || null;
+    },
+    staleTime: 60000,
+  });
+
+  const slides = (() => {
+    try {
+      const parsed = JSON.parse(slideSetting?.value || "null");
+      if (parsed?.length) return parsed.filter(s => s.active !== false);
+    } catch {}
+    return CITY_SLIDES;
+  })();
+
+  const slide = slides[slideIdx % slides.length] || CITY_SLIDES[0];
 
   // Auto-advance every 4 seconds
   useEffect(() => {
