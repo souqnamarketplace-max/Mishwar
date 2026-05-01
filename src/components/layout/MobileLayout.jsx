@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -229,11 +229,13 @@ export default function MobileLayout({ children, user, showHeader = true, header
 
               <div className="py-2">
                 {[
-                  { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
-                { icon: HelpCircle, label: "المساعدة",         path: "/help" },
-                  { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy" },
-                  { icon: FileText,   label: "الشروط والأحكام",  path: "/terms" },
-                  { icon: Info,       label: "عن مِشوار",         path: "/about" },
+                  { icon: BookOpen,        label: "كيف يعمل مِشوار",    path: "/how-it-works" },
+                { icon: Bell,           label: "إشعاراتي ومساراتي",  path: "/notifications" },
+                { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
+                { icon: HelpCircle,     label: "المساعدة",            path: "/help" },
+                { icon: Shield,         label: "الخصوصية والأمان",    path: "/privacy" },
+                { icon: FileText,       label: "الشروط والأحكام",     path: "/terms" },
+                { icon: Info,           label: "عن مِشوار",            path: "/about" },
                 ].map(({ icon: Icon, label, path }) => (
                   <Link
                     key={path}
