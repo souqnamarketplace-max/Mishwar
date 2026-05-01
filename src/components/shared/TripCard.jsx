@@ -71,35 +71,38 @@ function Card({ t, noSeats, urgentSeats }) {
       {/* Left accent bar */}
       <div className={`absolute right-0 top-0 bottom-0 w-1.5 rounded-r-2xl ${theme.bar}`} />
 
-      {/* Urgency flash badge */}
-      {urgentSeats && !noSeats && (
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse z-10">
-          <Zap className="w-2.5 h-2.5" />{t.available_seats} مقعد فقط!
-        </div>
-      )}
-      {isFemale && (
-        <div className="absolute top-3 left-3 text-[11px] font-bold bg-rose-500 text-white px-2 py-0.5 rounded-full z-10">
-          سائقة 🌸
-        </div>
-      )}
-      {isLastChance(t) && !isBookingClosed(t) && (() => {
-        const mins = minutesUntilTrip(t);
-        const label = mins >= 60
-          ? `آخر ${Math.floor(mins / 60)} ساعة للحجز ⏰`
-          : `آخر ${mins} دقيقة للحجز ⏰`;
-        return (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse z-10">
-            <Timer className="w-2.5 h-2.5" />{label}
-          </div>
-        );
-      })()}
-      {isBookingClosed(t) && (
-        <div className="absolute bottom-3 left-3 flex items-center gap-1 bg-destructive text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">
-          🔒 أُغلق الحجز
-        </div>
-      )}
+      <div className="pr-4 pl-3 pt-3 pb-3">
 
-      <div className="pr-4 pl-3 pt-3.5 pb-3">
+        {/* ── Badge row — inline, never overlapping ── */}
+        {(urgentSeats || isFemale || isLastChance(t) || isBookingClosed(t)) && (
+          <div className="flex flex-wrap gap-1.5 mb-2.5">
+            {isFemale && (
+              <span className="text-[10px] font-bold bg-rose-500 text-white px-2 py-0.5 rounded-full">
+                سائقة 🌸
+              </span>
+            )}
+            {urgentSeats && !noSeats && (
+              <span className="flex items-center gap-1 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                <Zap className="w-2.5 h-2.5" />{t.available_seats} مقعد فقط!
+              </span>
+            )}
+            {isBookingClosed(t) ? (
+              <span className="flex items-center gap-1 bg-destructive text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                🔒 أُغلق الحجز
+              </span>
+            ) : isLastChance(t) && (() => {
+              const mins = minutesUntilTrip(t);
+              const label = mins >= 60
+                ? `آخر ${Math.floor(mins / 60)} ساعة للحجز ⏰`
+                : `آخر ${mins} دقيقة للحجز ⏰`;
+              return (
+                <span className="flex items-center gap-1 bg-orange-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                  <Timer className="w-2.5 h-2.5" />{label}
+                </span>
+              );
+            })()}
+          </div>
+        )}
 
         {/* ── Route + Price row ── */}
         <div className="flex items-start justify-between gap-2 mb-2.5">
