@@ -122,23 +122,17 @@ export default function MobileLayout({ children, user, showHeader = true, header
         {children}
       </div>
 
-      {/* Floating Action Button — post trip (drivers only) */}
-      {(user?.account_type === "driver" || user?.account_type === "both") && (
-        <RouterLink to="/create-trip"
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-2xl flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all border-4 border-card"
-          aria-label="نشر رحلة">
-          <Plus className="w-7 h-7 font-black" strokeWidth={3} />
-        </RouterLink>
-      )}
-
-      {/* Bottom Tab Bar */}
+      {/* Bottom Tab Bar — with integrated driver post-trip button */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-inset-bottom">
-        <div className="flex items-center justify-around h-20 px-2">
-          {MOBILE_TABS.map((tab) => {
+        <div className="flex items-end justify-around h-20 px-2 pb-1">
+          {MOBILE_TABS.map((tab, idx) => {
             const Icon = tab.icon;
             const isActive = location.pathname.startsWith(tab.path.split("?")[0]);
             const href = tab.id === "profile" ? `${tab.path}${user?.email}` : tab.path;
-            
+            const isDriver = user?.account_type === "driver" || user?.account_type === "both";
+            // Insert driver post-trip button in the center (after index 1)
+            const centerInsert = isDriver && idx === 2;
+
             const handleTabClick = (e) => {
               if (isActive && location.pathname !== tab.path.split("?")[0]) {
                 e.preventDefault();
@@ -146,10 +140,20 @@ export default function MobileLayout({ children, user, showHeader = true, header
               }
               setShowMobileMenu(false);
             };
-            
+
             return (
+              <React.Fragment key={tab.id}>
+                {centerInsert && (
+                  <RouterLink to="/create-trip"
+                    className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5"
+                    onClick={() => setShowMobileMenu(false)}>
+                    <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5">
+                      <Plus className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
+                    </div>
+                    <span className="text-[10px] font-bold text-primary">نشر رحلة</span>
+                  </RouterLink>
+                )}
               <Link
-                key={tab.id}
                 to={href}
                 onClick={handleTabClick}
                 className={`flex flex-col items-center justify-center flex-1 h-full rounded-lg transition-colors ${
@@ -161,6 +165,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <Icon className="w-6 h-6 mb-1" />
                 <span className="text-[10px] font-medium">{tab.label}</span>
               </Link>
+              </React.Fragment>
             );
           })}
         </div>
