@@ -35,7 +35,18 @@ export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [booked, setBooked] = useState(false);
+  // Check if user already has an active booking for this trip (persists across reloads)
+  const { data: existingBooking } = useQuery({
+    queryKey: ["my-booking", id, user?.email],
+    queryFn: () => user?.email
+      ? base44.entities.Booking.filter({ trip_id: id, passenger_email: user.email }, "-created_date", 1)
+      : [],
+    enabled: !!user?.email && !!id,
+  });
+  const alreadyBooked = existingBooking?.length > 0 &&
+    ["pending", "confirmed"].includes(existingBooking[0]?.status);
+  const [justBooked, setJustBooked] = useState(false);
+  const booked = justBooked || alreadyBooked;
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
 
@@ -90,6 +101,10 @@ export default function TripDetails() {
       const newSeats = Math.max(0, (tripData.available_seats || 1) - 1);
       await base44.entities.Trip.update(tripData.id, { available_seats: newSeats });
       return booking;
+    },
+    onSuccess: () => {
+      setJustBooked(true);
+      qc.invalidateQueries({ queryKey: ["my-booking", id, user?.email] });
     },
     onMutate: () => { return null; },
     onError: (err) => {
@@ -167,8 +182,16 @@ export default function TripDetails() {
                   🔒 أُغلق الحجز قبل الانطلاق بـ 30 دقيقة
                 </div>
               ) : booked ? (
-                <div className="w-full h-11 rounded-xl bg-accent/10 border border-accent flex items-center justify-center gap-2 mt-2 text-sm text-accent font-bold">
-                  <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl h-9">
+                    <CheckCircle className="w-4 h-4" /> تم الحجز بنجاح
+                  </div>
+                  <Button
+                    className="w-full h-11 rounded-xl font-bold bg-primary text-primary-foreground"
+                    onClick={() => navigate("/my-trips")}
+                  >
+                    إدارة رحلتي ←
+                  </Button>
                 </div>
               ) : (
                 <>
@@ -504,8 +527,19 @@ export default function TripDetails() {
             </div>
           ) : booked ? (
             <div className="fixed bottom-24 left-4 right-4 z-[999]">
-              <div className="bg-green-50 border-2 border-green-500 rounded-2xl p-3 flex items-center justify-center gap-2 text-green-700 font-bold shadow-xl shadow-green-500/20">
-                <CheckCircle className="w-5 h-5" /> تم الحجز بنجاح ✅
+              <div className="bg-card rounded-2xl shadow-2xl shadow-black/20 border border-border/50 overflow-hidden">
+                <div className="bg-green-500/10 border-b border-green-200 px-3 py-1.5 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  <span className="text-xs font-bold text-green-700">تم الحجز بنجاح</span>
+                </div>
+                <div className="p-3">
+                  <Button
+                    className="w-full h-12 rounded-xl font-black text-base bg-primary text-primary-foreground"
+                    onClick={() => navigate("/my-trips")}
+                  >
+                    إدارة رحلتي ←
+                  </Button>
+                </div>
               </div>
             </div>
           ) : isBookingClosed(trip) ? null : (
