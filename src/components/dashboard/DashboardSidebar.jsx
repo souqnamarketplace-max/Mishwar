@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard,
-  Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus
+  Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon
 } from "lucide-react";
 
 const menuItems = [
@@ -18,7 +18,7 @@ const menuItems = [
   { id: "feedback", icon: MessageSquarePlus, label: "الاقتراحات والشكاوى" },
   { id: "licenses", icon: Shield, label: "توثيق السائقين" },
   { id: "content", icon: FileText, label: "إدارة المحتوى" },
-  { id: "hero-slides", icon: Image, label: "شرائح الصفحة الرئيسية" },
+  { id: "hero-slides", icon: ImageIcon, label: "شرائح الصفحة الرئيسية" },
   { id: "offers", icon: Tag, label: "إدارة العروض والكوبونات" },
   { id: "settings", icon: Settings, label: "إعدادات النظام" },
   { id: "logs", icon: Activity, label: "سجل النشاطات" },
