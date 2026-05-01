@@ -240,3 +240,6 @@ SELECT tablename, rowsecurity
 FROM pg_tables
 WHERE schemaname = 'public'
 ORDER BY tablename;
+
+-- ─── ADD hero_city_slides COLUMN TO app_settings ────────────────
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS hero_city_slides TEXT;

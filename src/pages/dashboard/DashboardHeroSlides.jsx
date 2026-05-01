@@ -145,30 +145,32 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
 export default function DashboardHeroSlides() {
   const qc = useQueryClient();
 
-  const { data: setting, isLoading } = useQuery({
-    queryKey: ["hero-slides-setting"],
-    queryFn: async () => {
-      const results = await base44.entities.AppSettings.filter({ key: "hero_city_slides" }, "-created_at", 1);
-      return results?.[0] || null;
-    },
+  // app_settings is a single-row table — load it and use hero_city_slides field
+  const { data: settingsArr = [], isLoading } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
   });
+  const setting = settingsArr[0] || null;
 
   const slides = (() => {
-    try { return JSON.parse(setting?.value || "null") || DEFAULT_SLIDES; }
-    catch { return DEFAULT_SLIDES; }
+    try {
+      const val = setting?.hero_city_slides;
+      if (val) return typeof val === "string" ? JSON.parse(val) : val;
+    } catch {}
+    return DEFAULT_SLIDES;
   })();
 
   const save = useMutation({
     mutationFn: async (newSlides) => {
-      const val = JSON.stringify(newSlides);
+      const payload = { hero_city_slides: JSON.stringify(newSlides) };
       if (setting?.id) {
-        await base44.entities.AppSettings.update(setting.id, { value: val });
+        await base44.entities.AppSettings.update(setting.id, payload);
       } else {
-        await base44.entities.AppSettings.create({ key: "hero_city_slides", value: val, label: "صور المدن في الصفحة الرئيسية" });
+        await base44.entities.AppSettings.create(payload);
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["hero-slides-setting"] });
+      qc.invalidateQueries({ queryKey: ["app_settings"] });
       qc.invalidateQueries({ queryKey: ["hero-slides"] });
       toast.success("✅ تم الحفظ");
     },

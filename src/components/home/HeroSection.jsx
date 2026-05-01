@@ -46,19 +46,19 @@ export default function HeroSection() {
   const [slideIdx, setSlideIdx] = useState(0);
 
   // Load slides from admin settings (fallback to hardcoded)
-  const { data: slideSetting } = useQuery({
-    queryKey: ["hero-slides"],
-    queryFn: async () => {
-      const results = await base44.entities.AppSettings.filter({ key: "hero_city_slides" }, "-created_at", 1);
-      return results?.[0] || null;
-    },
+  const { data: settingsArr = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
     staleTime: 60000,
   });
 
   const slides = (() => {
     try {
-      const parsed = JSON.parse(slideSetting?.value || "null");
-      if (parsed?.length) return parsed.filter(s => s.active !== false);
+      const val = settingsArr[0]?.hero_city_slides;
+      if (val) {
+        const parsed = typeof val === "string" ? JSON.parse(val) : val;
+        if (parsed?.length) return parsed.filter(s => s.active !== false);
+      }
     } catch {}
     return CITY_SLIDES;
   })();
