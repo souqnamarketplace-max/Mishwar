@@ -282,6 +282,7 @@ const pageTitles = {
   licenses: { title: "توثيق السائقين", subtitle: "مراجعة جميع وثائق السائق (الرخصة، التسجيل، التأمين، السيلفي)" },
   content: { title: "إدارة المحتوى", subtitle: "إعلانات التطبيق والمدن المدعومة" },
   offers: { title: "إدارة العروض والكوبونات", subtitle: "إنشاء وإدارة كوبونات الخصم" },
+  "hero-slides": { title: "شرائح الصفحة الرئيسية", subtitle: "ارفع وأدر صور المدن التي تظهر في الصفحة الرئيسية" },
   settings: { title: "إعدادات النظام", subtitle: "إعدادات التطبيق العامة" },
   logs: { title: "سجل النشاطات", subtitle: "جميع أحداث المنصة" },
 };
@@ -401,6 +402,7 @@ export default function Dashboard() {
         {activePage === "licenses" && <DashboardLicenses />}
         {activePage === "content" && <DashboardContent />}
         {activePage === "offers" && <DashboardOffers />}
+        {activePage === "hero-slides" && <DashboardHeroSlides />}
         {activePage === "settings" && <DashboardSettings />}
         {activePage === "logs" && <DashboardLogs />}
       </div>

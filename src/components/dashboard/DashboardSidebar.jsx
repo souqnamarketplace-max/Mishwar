@@ -18,6 +18,7 @@ const menuItems = [
   { id: "feedback", icon: MessageSquarePlus, label: "الاقتراحات والشكاوى" },
   { id: "licenses", icon: Shield, label: "توثيق السائقين" },
   { id: "content", icon: FileText, label: "إدارة المحتوى" },
+  { id: "hero-slides", icon: Image, label: "شرائح الصفحة الرئيسية" },
   { id: "offers", icon: Tag, label: "إدارة العروض والكوبونات" },
   { id: "settings", icon: Settings, label: "إعدادات النظام" },
   { id: "logs", icon: Activity, label: "سجل النشاطات" },
