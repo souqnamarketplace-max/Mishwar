@@ -17,6 +17,7 @@ const getNavLinks = (user) => {
     { label: "كيف تعمل؟", path: "/how-it-works" },
     { label: "مجتمع سيرتنا", path: "/community" },
     { label: "المساعدة", path: "/help" },
+    { label: "اقتراحات", path: "/feedback" },
   ];
   if (user?.account_type === "driver" || user?.account_type === "both") {
     links.splice(1, 0, { label: "لوحة السائق", path: "/driver" });

@@ -13,6 +13,7 @@ import DashboardPayments from "./dashboard/DashboardPayments";
 import DashboardReports from "./dashboard/DashboardReports";
 import DashboardNotifications from "./dashboard/DashboardNotifications";
 import DashboardSupport from "./dashboard/DashboardSupport";
+import DashboardFeedback from "./dashboard/DashboardFeedback";
 import DashboardContent from "./dashboard/DashboardContent";
 import DashboardOffers from "./dashboard/DashboardOffers";
 import DashboardSettings from "./dashboard/DashboardSettings";
@@ -276,6 +277,7 @@ const pageTitles = {
   reports: { title: "التقارير والإحصائيات", subtitle: "تحليل بيانات المنصة" },
   notifications: { title: "الإشعارات", subtitle: "سجل أحداث المنصة" },
   support: { title: "الدعم والشكاوى", subtitle: "إدارة تذاكر الدعم الفني" },
+  feedback: { title: "الاقتراحات والشكاوى", subtitle: "ملاحظات المستخدمين" },
   licenses: { title: "توثيق السائقين", subtitle: "مراجعة جميع وثائق السائق (الرخصة، التسجيل، التأمين، السيلفي)" },
   content: { title: "إدارة المحتوى", subtitle: "إعلانات التطبيق والمدن المدعومة" },
   offers: { title: "إدارة العروض والكوبونات", subtitle: "إنشاء وإدارة كوبونات الخصم" },
@@ -394,6 +396,7 @@ export default function Dashboard() {
         {activePage === "reports" && <DashboardReports />}
         {activePage === "notifications" && <DashboardNotifications />}
         {activePage === "support" && <DashboardSupport />}
+        {activePage === "feedback" && <DashboardFeedback />}
         {activePage === "licenses" && <DashboardLicenses />}
         {activePage === "content" && <DashboardContent />}
         {activePage === "offers" && <DashboardOffers />}

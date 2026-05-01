@@ -423,15 +423,7 @@ export default function TripDetails() {
             <p className="text-sm font-medium mb-3">شارك الرحلة مع أصدقائك!</p>
             <div className="flex items-center justify-center gap-3 flex-wrap">
 
-              <button
-                className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
-                onClick={() => {
-                  const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`;
-                  window.open(url, "_blank");
-                }}
-              >
-                فيسبوك
-              </button>
+
               <button
                 className="bg-muted text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
                 onClick={() => {

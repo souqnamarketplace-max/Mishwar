@@ -21,8 +21,7 @@ const aboutLinks = [
 export default function Footer() {
   const [showStory, setShowStory] = useState(false);
 
-    const FACEBOOK_URL = "https://www.facebook.com/mishwarapp";
-  const EMERGENCY_PHONE = "tel:+970599000000";
+      const EMERGENCY_PHONE = "tel:+970599000000";
 
   return (
     <footer className="bg-primary text-primary-foreground" dir="rtl">

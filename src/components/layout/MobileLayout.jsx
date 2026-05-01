@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import NotificationBell from "@/components/notifications/NotificationBell";
@@ -213,7 +213,8 @@ export default function MobileLayout({ children, user, showHeader = true, header
 
               <div className="py-2">
                 {[
-                  { icon: HelpCircle, label: "المساعدة",         path: "/help" },
+                  { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
+                { icon: HelpCircle, label: "المساعدة",         path: "/help" },
                   { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy-policy" },
                   { icon: FileText,   label: "الشروط والأحكام",  path: "/terms" },
                   { icon: Info,       label: "عن مِشوار",         path: "/about-us" },

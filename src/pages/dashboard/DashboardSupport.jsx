@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Headphones, CheckCircle, Clock, AlertCircle, Trash2, MessageSquare, X, Download } from "lucide-react";
+import { Headphones, CheckCircle, Clock, AlertCircle, Trash2, MessageSquare, X, Download, Lightbulb, ThumbsUp, Filter } from "lucide-react";
 import { toast } from "sonner";
 
 const statusConfig = {
@@ -31,6 +31,8 @@ export default function DashboardSupport() {
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyNote, setReplyNote] = useState("");
   const [page, setPage] = useState(1);
+  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const PAGE_SIZE = 25;
   const { data: ticketsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["tickets", page],

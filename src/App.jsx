@@ -49,6 +49,7 @@ const Safety           = lazy(() => import('./pages/Safety'));
 const AccountSettings  = lazy(() => import('./pages/AccountSettings'));
 const Login            = lazy(() => import('./pages/Login'));
 const BookingConfirmation = lazy(() => import('./pages/BookingConfirmation'));
+const Feedback = lazy(() => import('./pages/Feedback'));
 const PrivacyPolicy    = lazy(() => import('./pages/PrivacyPolicy'));
 const Terms            = lazy(() => import('./pages/Terms'));
 
