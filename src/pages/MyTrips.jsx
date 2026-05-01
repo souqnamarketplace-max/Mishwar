@@ -199,7 +199,15 @@ export default function MyTrips() {
                 </h3>
                 <div className="space-y-3">
                   {statusTrips.map((trip) => (
-                    <div key={trip.id}>
+                    <div
+                      key={trip.id}
+                      ref={trip.id === highlightTripId ? highlightRef : null}
+                      className={`rounded-2xl transition-all duration-700 ${
+                        trip.id === highlightTripId
+                          ? "ring-2 ring-primary ring-offset-2 shadow-lg shadow-primary/20"
+                          : ""
+                      }`}
+                    >
                       <Link to={`/trip/${trip.id}`}>
                         <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-4">

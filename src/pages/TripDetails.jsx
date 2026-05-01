@@ -192,7 +192,7 @@ export default function TripDetails() {
                   </div>
                   <Button
                     className="w-full h-11 rounded-xl font-bold bg-primary text-primary-foreground"
-                    onClick={() => navigate("/my-trips")}
+                    onClick={() => navigate(`/my-trips?trip=${id}`)}
                   >
                     إدارة رحلتي ←
                   </Button>
@@ -539,7 +539,7 @@ export default function TripDetails() {
                 <div className="p-3">
                   <Button
                     className="w-full h-12 rounded-xl font-black text-base bg-primary text-primary-foreground"
-                    onClick={() => navigate("/my-trips")}
+                    onClick={() => navigate(`/my-trips?trip=${id}`)}
                   >
                     إدارة رحلتي ←
                   </Button>
