@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus } from "lucide-react";
+import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import NotificationBell from "@/components/notifications/NotificationBell";
@@ -120,6 +121,15 @@ export default function MobileLayout({ children, user, showHeader = true, header
         )}
         {children}
       </div>
+
+      {/* Floating Action Button — post trip (drivers only) */}
+      {(user?.account_type === "driver" || user?.account_type === "both") && (
+        <RouterLink to="/create-trip"
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-2xl flex items-center justify-center hover:bg-primary/90 active:scale-95 transition-all border-4 border-card"
+          aria-label="نشر رحلة">
+          <Plus className="w-7 h-7 font-black" strokeWidth={3} />
+        </RouterLink>
+      )}
 
       {/* Bottom Tab Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-inset-bottom">

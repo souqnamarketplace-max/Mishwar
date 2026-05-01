@@ -47,17 +47,18 @@ export default function TripDetails() {
     queryFn: () => base44.auth.me(),
   });
 
-  const { data: trips = [] } = useQuery({
-    queryKey: ["trips"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 50),
+  // Fetch single trip by ID — smart, no need to load all trips
+  const { data: tripData } = useQuery({
+    queryKey: ["trip", id],
+    queryFn: () => base44.entities.Trip.get(id),
+    enabled: !!id,
+    staleTime: 30000,
   });
 
-  const tripForProfile = trips.find((t) => t.id === id) || trips[0];
-
   const { data: driverProfile } = useQuery({
-    queryKey: ["driver-profile", tripForProfile?.driver_id],
-    queryFn: () => base44.entities.Profile.filter({ created_by: tripForProfile.driver_id }, "-created_at", 1),
-    enabled: !!tripForProfile?.driver_id,
+    queryKey: ["driver-profile", tripData?.driver_id],
+    queryFn: () => base44.entities.Profile.filter({ created_by: tripData.driver_id }, "-created_at", 1),
+    enabled: !!tripData?.driver_id,
     select: (data) => data?.[0] || null,
   });
 
@@ -92,7 +93,7 @@ export default function TripDetails() {
   });
 
   const trip = tripData || null;
-  const carImage = driverProfile?.car_image || trip?.car_image || null;
+  const carImage = driverProfile?.car_image || tripData?.car_image || null;
 
   if (!trip) {
     return (
