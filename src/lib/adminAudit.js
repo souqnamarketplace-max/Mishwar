@@ -43,7 +43,7 @@ export async function logAdminAction(action, targetType, targetId, details = {})
     });
   } catch (e) {
     // Audit logging failures must never block the main action
-    console.warn("[adminAudit] failed to log:", e?.message);
+    // silent in production
   }
 }
 

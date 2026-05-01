@@ -24,13 +24,40 @@ export default function Login() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
+  // Brute force protection — max 5 attempts per 15 minutes
+  const getRateLimit = () => {
+    try {
+      const d = JSON.parse(localStorage.getItem('mishwaro_login_rl') || '{}');
+      return d;
+    } catch { return {}; }
+  };
+  const checkRateLimit = () => {
+    const d = getRateLimit();
+    const now = Date.now();
+    if (d.until && now < d.until) return false; // blocked
+    if (d.until && now >= d.until) localStorage.removeItem('mishwaro_login_rl'); // reset
+    return true;
+  };
+  const incrementAttempts = () => {
+    const d = getRateLimit();
+    const attempts = (d.attempts || 0) + 1;
+    if (attempts >= 5) {
+      localStorage.setItem('mishwaro_login_rl', JSON.stringify({ attempts, until: Date.now() + 15 * 60 * 1000 }));
+    } else {
+      localStorage.setItem('mishwaro_login_rl', JSON.stringify({ attempts }));
+    }
+  };
+
   const [form, setForm] = useState({
     email: '', password: '', fullName: '', phone: '', confirmPassword: '',
   });
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate(searchParams.get('returnTo') || '/', { replace: true });
+      // Validate returnTo — only allow internal paths (prevent open redirect)
+      const raw = searchParams.get('returnTo') || '/';
+      const safePath = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
+      navigate(safePath, { replace: true });
     }
   }, [isAuthenticated, navigate, searchParams]);
 
@@ -38,6 +65,11 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (!checkRateLimit()) {
+      const mins = Math.ceil((getRateLimit().until - Date.now()) / 60000);
+      toast.error(`تم تجاوز عدد المحاولات. انتظر ${mins} دقيقة`);
+      return;
+    }
     if (!form.email || !form.password) { toast.error('يرجى ملء جميع الحقول'); return; }
     setLoading(true);
     try {

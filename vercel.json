@@ -3,16 +3,45 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Frame-Options",            "value": "DENY" },
-        { "key": "X-Content-Type-Options",      "value": "nosniff" },
-        { "key": "X-XSS-Protection",            "value": "1; mode=block" },
-        { "key": "Referrer-Policy",             "value": "strict-origin-when-cross-origin" },
-        { "key": "Strict-Transport-Security",   "value": "max-age=31536000; includeSubDomains; preload" }
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co https://images.unsplash.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://valhalla1.openstreetmap.de; frame-ancestors 'none';"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), camera=(self), microphone=()"
+        }
       ]
     }
   ],
   "rewrites": [
-    { "source": "/trip/:id", "destination": "/api/trip?id=:id" },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    {
+      "source": "/trip/:id",
+      "destination": "/api/trip?id=:id"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
