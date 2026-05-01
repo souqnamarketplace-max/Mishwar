@@ -8,75 +8,96 @@
 @layer base {
   :root {
     --font-tajawal: 'Tajawal', sans-serif;
-    
-    --background: 40 20% 98%;
-    --foreground: 0 0% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
-    --primary: 135 20% 30%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 40 15% 95%;
-    --secondary-foreground: 135 20% 25%;
-    --muted: 40 10% 94%;
-    --muted-foreground: 0 0% 42%;
-    --accent: 90 35% 42%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 84.2% 60.2%;
+
+    /* ── Mشوارو Brand Colors ── */
+    /* Primary: Deep forest green from logo #1e3d2a */
+    /* Accent:  Metallic gold from logo   #c9a227  */
+
+    --background:         45 30% 98%;
+    --foreground:         148 40% 8%;
+    --card:               0 0% 100%;
+    --card-foreground:    148 30% 10%;
+    --popover:            0 0% 100%;
+    --popover-foreground: 148 30% 10%;
+
+    --primary:            148 42% 18%;      /* #1a3d2a deep forest green */
+    --primary-foreground: 44 80% 88%;       /* warm cream on green */
+
+    --secondary:          45 25% 94%;
+    --secondary-foreground: 148 40% 18%;
+
+    --muted:              45 15% 93%;
+    --muted-foreground:   148 10% 42%;
+
+    --accent:             44 72% 47%;       /* #c9a227 gold */
+    --accent-foreground:  148 42% 10%;      /* dark on gold */
+
+    --destructive:        0 84% 60%;
     --destructive-foreground: 0 0% 98%;
-    --border: 40 10% 90%;
-    --input: 40 10% 88%;
-    --ring: 135 20% 30%;
-    --chart-1: 135 30% 40%;
-    --chart-2: 90 35% 42%;
-    --chart-3: 40 60% 55%;
-    --chart-4: 0 60% 55%;
-    --chart-5: 200 50% 50%;
+
+    --border:             45 15% 88%;
+    --input:              45 15% 86%;
+    --ring:               148 42% 18%;
+
+    --chart-1:            148 42% 22%;
+    --chart-2:            44 72% 47%;
+    --chart-3:            148 30% 38%;
+    --chart-4:            44 60% 60%;
+    --chart-5:            0 60% 55%;
+
     --radius: 0.75rem;
-    --sidebar-background: 135 15% 18%;
-    --sidebar-foreground: 40 10% 92%;
-    --sidebar-primary: 90 35% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 135 15% 24%;
-    --sidebar-accent-foreground: 40 10% 92%;
-    --sidebar-border: 135 10% 25%;
-    --sidebar-ring: 90 35% 50%;
+
+    --sidebar-background:         148 45% 12%;
+    --sidebar-foreground:         44 40% 88%;
+    --sidebar-primary:            44 72% 47%;
+    --sidebar-primary-foreground: 148 42% 10%;
+    --sidebar-accent:             148 40% 18%;
+    --sidebar-accent-foreground:  44 40% 88%;
+    --sidebar-border:             148 35% 20%;
+    --sidebar-ring:               44 72% 47%;
   }
 
   .dark {
-    --background: 135 15% 8%;
-    --foreground: 40 10% 92%;
-    --card: 135 15% 11%;
-    --card-foreground: 40 10% 92%;
-    --popover: 135 15% 11%;
-    --popover-foreground: 40 10% 92%;
-    --primary: 90 35% 50%;
-    --primary-foreground: 0 0% 5%;
-    --secondary: 135 15% 16%;
-    --secondary-foreground: 40 10% 92%;
-    --muted: 135 10% 18%;
-    --muted-foreground: 40 5% 55%;
-    --accent: 90 30% 38%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background:         148 40% 6%;
+    --foreground:         45 20% 92%;
+    --card:               148 38% 9%;
+    --card-foreground:    45 20% 92%;
+    --popover:            148 38% 9%;
+    --popover-foreground: 45 20% 92%;
+
+    --primary:            44 72% 47%;        /* gold becomes primary in dark */
+    --primary-foreground: 148 42% 8%;
+
+    --secondary:          148 35% 14%;
+    --secondary-foreground: 45 20% 88%;
+
+    --muted:              148 30% 14%;
+    --muted-foreground:   45 10% 55%;
+
+    --accent:             148 42% 26%;
+    --accent-foreground:  45 30% 92%;
+
+    --destructive:        0 63% 31%;
     --destructive-foreground: 0 0% 98%;
-    --border: 135 10% 18%;
-    --input: 135 10% 18%;
-    --ring: 90 35% 50%;
-    --chart-1: 135 30% 50%;
-    --chart-2: 90 35% 50%;
-    --chart-3: 40 60% 60%;
-    --chart-4: 0 60% 60%;
-    --chart-5: 200 50% 55%;
-    --sidebar-background: 135 15% 6%;
-    --sidebar-foreground: 40 10% 92%;
-    --sidebar-primary: 90 35% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 135 15% 12%;
-    --sidebar-accent-foreground: 40 10% 92%;
-    --sidebar-border: 135 10% 15%;
-    --sidebar-ring: 90 35% 50%;
+
+    --border:             148 25% 16%;
+    --input:              148 25% 16%;
+    --ring:               44 72% 47%;
+
+    --chart-1:            148 42% 40%;
+    --chart-2:            44 72% 55%;
+    --chart-3:            148 30% 50%;
+    --chart-4:            44 60% 65%;
+    --chart-5:            0 60% 60%;
+
+    --sidebar-background: 148 45% 5%;
+    --sidebar-foreground: 44 40% 88%;
+    --sidebar-primary:    44 72% 47%;
+    --sidebar-primary-foreground: 148 42% 8%;
+    --sidebar-accent:     148 40% 12%;
+    --sidebar-accent-foreground: 44 40% 88%;
+    --sidebar-border:     148 35% 14%;
+    --sidebar-ring:       44 72% 47%;
   }
 }
 
@@ -90,20 +111,13 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-    }
-    
+    :root { color-scheme: dark; }
     .dark,
     [data-theme="dark"],
-    [class*="dark"] {
-      color-scheme: dark;
-    }
+    [class*="dark"] { color-scheme: dark; }
   }
 
-  * {
-    @apply border-border outline-ring/50;
-  }
+  * { @apply border-border outline-ring/50; }
 
   body {
     @apply bg-background text-foreground font-tajawal;
@@ -111,7 +125,6 @@
     overscroll-behavior: none;
   }
 
-  /* Safe area support for notches */
   @supports (padding: max(0px)) {
     body {
       padding-left: max(var(--safe-area-inset-left), 0);
@@ -119,32 +132,18 @@
     }
   }
 
-  /* Touch-friendly targets (44px minimum) */
   button, a, [role="button"] {
     @apply select-none;
     min-height: 2.75rem;
   }
 
-  /* Prevent rubber-band scroll bounce */
   html, body {
     overscroll-behavior-y: none;
     overscroll-behavior-x: none;
   }
 
-  /* Safe area padding helper classes */
-  .safe-area-inset-top {
-    padding-top: max(1rem, env(safe-area-inset-top));
-  }
-
-  .safe-area-inset-bottom {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-
-  .safe-area-inset-left {
-    padding-left: max(1rem, env(safe-area-inset-left));
-  }
-
-  .safe-area-inset-right {
-    padding-right: max(1rem, env(safe-area-inset-right));
-  }
+  .safe-area-inset-top    { padding-top:    max(1rem, env(safe-area-inset-top)); }
+  .safe-area-inset-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .safe-area-inset-left   { padding-left:   max(1rem, env(safe-area-inset-left)); }
+  .safe-area-inset-right  { padding-right:  max(1rem, env(safe-area-inset-right)); }
 }

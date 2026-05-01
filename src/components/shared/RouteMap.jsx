@@ -110,7 +110,7 @@ export default function RouteMap({
         // Custom markers
         const fromIcon = L.divIcon({
           html: `<div style="
-            background: #2d6a4f; color: white; border-radius: 50% 50% 50% 0;
+            background: #1a3d2a; color: white; border-radius: 50% 50% 50% 0;
             width: 28px; height: 28px; display: flex; align-items: center;
             justify-content: center; transform: rotate(-45deg);
             box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid white;
@@ -182,7 +182,7 @@ export default function RouteMap({
 
           // Main route line
           L.polyline(latLngs, {
-            color: '#2d6a4f',
+            color: '#1a3d2a',
             weight: 5,
             opacity: 0.95,
             lineJoin: 'round',

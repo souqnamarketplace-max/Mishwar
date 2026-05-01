@@ -90,7 +90,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             )}
             
             <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
-              {headerTitle || currentTab?.label || "سيرتنا"}
+              {headerTitle || currentTab?.label || "مشوارو"}
             </h1>
             
             <div className="flex items-center gap-1">

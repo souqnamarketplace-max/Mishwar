@@ -15,7 +15,7 @@ const getNavLinks = (user) => {
     { label: "رحلاتي", path: "/my-trips" },
     { label: "المفضلة", path: "/favorites" },
     { label: "كيف تعمل؟", path: "/how-it-works" },
-    { label: "مجتمع سيرتنا", path: "/community" },
+    { label: "مجتمع مشوارو", path: "/community" },
     { label: "المساعدة", path: "/help" },
     { label: "اقتراحات", path: "/feedback" },
   ];
@@ -45,7 +45,7 @@ export default function Navbar() {
               <span className="text-primary-foreground font-bold text-lg">س</span>
             </div>
             <div className="hidden sm:block">
-              <h1 className="text-lg font-bold text-foreground leading-tight">سيرتنا</h1>
+              <h1 className="text-lg font-bold text-foreground leading-tight">مشوارو</h1>
               <p className="text-[10px] text-muted-foreground leading-tight">شارك الطريق، وفر أكثر</p>
             </div>
           </Link>

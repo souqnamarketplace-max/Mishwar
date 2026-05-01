@@ -120,7 +120,7 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
           <div style="
             width: ${isSelected ? 14 : 10}px;
             height: ${isSelected ? 14 : 10}px;
-            background: ${isSelected ? "#2d6a4f" : "#52b788"};
+            background: ${isSelected ? "#1a3d2a" : "#2d6a4f"};
             border: 2px solid white;
             border-radius: 50%;
             box-shadow: 0 2px 6px rgba(0,0,0,0.35);
@@ -170,7 +170,7 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
           const loadingMarker = L.marker([lat, lng], {
             icon: L.divIcon({
               className: "",
-              html: `<div style="background:#2d6a4f;color:white;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:bold;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3)">جاري التحديد...</div>`,
+              html: `<div style="background:#1a3d2a;color:white;border-radius:20px;padding:4px 10px;font-size:11px;font-weight:bold;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.3)">جاري التحديد...</div>`,
               iconAnchor: [50, 10],
             })
           }).addTo(map);
@@ -220,7 +220,7 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         }
         .mishwar-city-tooltip::before { display: none !important; }
         .leaflet-control-zoom { border: none !important; box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important; }
-        .leaflet-control-zoom a { border-radius: 8px !important; color: #2d6a4f !important; font-weight: bold !important; }
+        .leaflet-control-zoom a { border-radius: 8px !important; color: #1a3d2a !important; font-weight: bold !important; }
       `;
       document.head.appendChild(style);
     }
@@ -243,7 +243,7 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
     import("leaflet").then((L) => {
       const makeIcon = (isSelected) => L.divIcon({
         className: "",
-        html: `<div style="width:${isSelected ? 14 : 10}px;height:${isSelected ? 14 : 10}px;background:${isSelected ? "#2d6a4f" : "#52b788"};border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
+        html: `<div style="width:${isSelected ? 14 : 10}px;height:${isSelected ? 14 : 10}px;background:${isSelected ? "#1a3d2a" : "#2d6a4f"};border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
         iconSize: [isSelected ? 14 : 10, isSelected ? 14 : 10],
         iconAnchor: [isSelected ? 7 : 5, isSelected ? 7 : 5],
       });
@@ -263,7 +263,7 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         if (!coords && lat && lng) {
           const tempIcon = L.divIcon({
             className: "",
-            html: `<div style="width:14px;height:14px;background:#2d6a4f;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
+            html: `<div style="width:14px;height:14px;background:#1a3d2a;border:2px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
             iconSize: [14, 14], iconAnchor: [7, 7],
           });
           // Remove previous temp marker if any
