@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { logAudit } from "@/lib/adminAudit";
 import { useSEO } from "@/hooks/useSEO";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -37,6 +37,18 @@ export default function MyTrips() {
   const [activeTab, setActiveTab] = useState("all");
   const [reviewingTrip, setReviewingTrip] = useState(null);
   const qc = useQueryClient();
+  const [searchParams] = useSearchParams();
+  const highlightTripId = searchParams.get("trip");
+  const highlightRef = useRef(null);
+
+  // Auto-scroll to highlighted trip after data loads
+  useEffect(() => {
+    if (highlightTripId && highlightRef.current) {
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 600);
+    }
+  }, [highlightTripId]);
 
   // Cancel booking mutation (for passenger bookings)
   const cancelBookingMutation = useMutation({
