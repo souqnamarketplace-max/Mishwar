@@ -169,7 +169,7 @@ export default function Onboarding() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <span className="text-primary-foreground font-bold text-2xl">س</span>
+            <img src="/logo.png" alt="مشوارو" className="w-12 h-12 rounded-xl object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">مرحباً في مِشوار</h1>
           <p className="text-muted-foreground text-sm mt-1">

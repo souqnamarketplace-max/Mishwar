@@ -29,8 +29,8 @@ export default function AboutUs() {
 
       {/* Hero */}
       <div className="text-center mb-12">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl font-bold text-primary">س</span>
+        <div className="flex items-center justify-center mx-auto mb-4">
+          <img src="/logo.png" alt="مشوارو" className="w-20 h-20 rounded-2xl object-cover shadow-lg" />
         </div>
         <h1 className="text-3xl font-bold text-foreground mb-3">من نحن</h1>
         <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">

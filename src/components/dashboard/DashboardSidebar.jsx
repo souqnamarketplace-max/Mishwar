@@ -30,7 +30,7 @@ export default function DashboardSidebar({ activePage, setActivePage }) {
       <div className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-sidebar-primary rounded-xl flex items-center justify-center">
-            <span className="text-sidebar-primary-foreground font-bold text-lg">س</span>
+            <img src="/logo.png" alt="مشوارو" className="w-8 h-8 rounded-lg object-cover" />
           </div>
           <div>
             <h1 className="text-base font-bold text-sidebar-foreground">مِشوار</h1>
