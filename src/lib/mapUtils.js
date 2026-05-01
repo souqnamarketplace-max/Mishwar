@@ -155,11 +155,10 @@ function formatDuration(minutes) {
  * Route via Valhalla (openstreetmap.de) — CORS-enabled, no API key needed.
  * Supports West Bank roads. Falls back to straight-line estimate if API fails.
  */
-// Multiple Valhalla servers — try in order, skip on rate limit or CORS
+// Multiple routing servers — try in order, skip on rate limit or CORS
 const VALHALLA_SERVERS = [
   'https://valhalla1.openstreetmap.de/route',
   'https://valhalla2.openstreetmap.de/route',
-  'https://valhalla3.openstreetmap.de/route',
 ];
 
 async function valhallaRoute(locations) {
