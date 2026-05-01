@@ -5,8 +5,51 @@ import { Search, Star, Calendar, ArrowLeftRight } from "lucide-react";
 import { motion } from "framer-motion";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 
+// Palestinian cities slideshow — real Unsplash photos
+const CITY_SLIDES = [
+  {
+    city: "القدس",
+    subtitle: "المدينة المقدسة",
+    img: "https://images.unsplash.com/photo-1552423314-cf29ab68ad73?w=1400&h=800&fit=crop&q=80",
+  },
+  {
+    city: "بيت لحم",
+    subtitle: "مهد المسيح",
+    img: "https://images.unsplash.com/photo-1549900932-5f7a1f04e17f?w=1400&h=800&fit=crop&q=80",
+  },
+  {
+    city: "نابلس",
+    subtitle: "جبل النار",
+    img: "https://images.unsplash.com/photo-1578895101408-1a36b834405b?w=1400&h=800&fit=crop&q=80",
+  },
+  {
+    city: "أريحا",
+    subtitle: "أقدم مدينة في العالم",
+    img: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=1400&h=800&fit=crop&q=80",
+  },
+  {
+    city: "الخليل",
+    subtitle: "مدينة الآباء",
+    img: "https://images.unsplash.com/photo-1580834341580-8c17a3a630ca?w=1400&h=800&fit=crop&q=80",
+  },
+  {
+    city: "غزة",
+    subtitle: "عروس البحر",
+    img: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1400&h=800&fit=crop&q=80",
+  },
+];
+
 export default function HeroSection() {
   const navigate = useNavigate();
+  const [slideIdx, setSlideIdx] = useState(0);
+  const slide = CITY_SLIDES[slideIdx];
+
+  // Auto-advance every 4 seconds
+  useEffect(() => {
+    const t = setInterval(() => setSlideIdx(i => (i + 1) % CITY_SLIDES.length), 4000);
+    return () => clearInterval(t);
+  }, []);
+
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [date, setDate] = useState("");
@@ -63,10 +106,12 @@ export default function HeroSection() {
       <section className="sm:hidden flex flex-col">
         {/* Compact hero banner */}
         <div className="relative h-48 overflow-hidden">
-          <img loading="lazy"
-            src="https://images.unsplash.com/photo-1580834341580-8c17a3a630ca?w=1400&h=800&fit=crop&q=80"
-            alt="" className="w-full h-full object-cover object-center" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/20" />
+          {/* Slideshow images */}
+          {CITY_SLIDES.map((s, i) => (
+            <img key={s.city} loading="lazy" src={s.img} alt={s.city}
+              className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${i === slideIdx ? "opacity-100" : "opacity-0"}`} />
+          ))}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/40 to-black/20" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
             <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full px-3 py-1 mb-2">
               <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
@@ -75,6 +120,18 @@ export default function HeroSection() {
             <h1 className="text-2xl font-black text-white leading-tight">
               وصّل للمكان الصح <span className="text-accent">بنص السعر</span>
             </h1>
+            {/* City label */}
+            <div className="mt-2 flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1">
+              <span className="text-white/90 text-xs font-bold">{slide.city}</span>
+              <span className="text-white/50 text-[10px]">— {slide.subtitle}</span>
+            </div>
+            {/* Dot indicators */}
+            <div className="flex gap-1.5 mt-2">
+              {CITY_SLIDES.map((_, i) => (
+                <button key={i} onClick={() => setSlideIdx(i)}
+                  className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-4 bg-accent" : "w-1.5 bg-white/40"}`} />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -103,11 +160,25 @@ export default function HeroSection() {
       {/* ── DESKTOP LAYOUT ── */}
       <section className="hidden sm:block relative overflow-hidden" style={{ minHeight: "560px" }}>
         <div className="absolute inset-0">
-          <img loading="lazy"
-            src="https://images.unsplash.com/photo-1580834341580-8c17a3a630ca?w=1400&h=800&fit=crop&q=80"
-            alt="" className="w-full h-full object-cover object-center" />
+          {CITY_SLIDES.map((s, i) => (
+            <img key={s.city} loading="lazy" src={s.img} alt={s.city}
+              className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${i === slideIdx ? "opacity-100" : "opacity-0"}`} />
+          ))}
           <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/55 to-black/15" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+          {/* City label bottom-left */}
+          <div className="absolute bottom-6 left-6 flex flex-col gap-1">
+            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-1.5">
+              <span className="text-white font-black text-sm">{slide.city}</span>
+              <span className="text-white/60 text-xs">{slide.subtitle}</span>
+            </div>
+            <div className="flex gap-1.5 mr-2">
+              {CITY_SLIDES.map((_, i) => (
+                <button key={i} onClick={() => setSlideIdx(i)}
+                  className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-accent" : "w-1.5 bg-white/40"}`} />
+              ))}
+            </div>
+          </div>
         </div>
         <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-10 flex items-center" style={{ minHeight: "560px" }}>
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.55 }}
