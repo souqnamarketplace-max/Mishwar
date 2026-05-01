@@ -150,12 +150,23 @@ export async function calculateRoute(fromCity, toCity) {
   const [toLat, toLng] = toCoords;
 
   try {
-    // OSRM public demo server — free, no key needed
-    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const data = await res.json();
+    // Try multiple OSRM servers in order until one works
+    const waypointStr = `${fromLng},${fromLat};${toLng},${toLat}`;
+    const OSRM_SERVERS = [
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
+      `https://router.project-osrm.org/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
+    ];
 
-    if (data.code !== 'Ok' || !data.routes?.[0]) {
+    let data = null;
+    for (const url of OSRM_SERVERS) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const json = await res.json();
+        if (json.code === 'Ok' && json.routes?.[0]) { data = json; break; }
+      } catch { continue; }
+    }
+
+    if (!data) {
       return { fromCoords, toCoords, distance: null, duration: null, geometry: null };
     }
 
@@ -163,7 +174,6 @@ export async function calculateRoute(fromCity, toCity) {
     const distanceKm = Math.round(route.distance / 1000);
     const durationMin = Math.round(route.duration / 60);
 
-    // Format Arabic strings
     const distance = `${distanceKm} كم`;
     const duration = durationMin >= 60
       ? `${Math.floor(durationMin / 60)} س ${durationMin % 60} د`
@@ -176,7 +186,7 @@ export async function calculateRoute(fromCity, toCity) {
       duration,
       distanceKm,
       durationMin,
-      geometry: route.geometry, // GeoJSON geometry
+      geometry: route.geometry,
     };
   } catch (e) {
     console.warn('OSRM routing failed:', e);
@@ -232,11 +242,21 @@ export async function calculateMultiStopRoute(fromCity, toCity, stops = []) {
       .map(([lat, lng]) => `${lng},${lat}`)
       .join(';');
 
-    const url = `https://router.project-osrm.org/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`;
-    const res  = await fetch(url);
-    const data = await res.json();
+    const OSRM_SERVERS = [
+      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
+      `https://router.project-osrm.org/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
+    ];
 
-    if (data.code !== 'Ok' || !data.routes?.[0]) {
+    let data = null;
+    for (const url of OSRM_SERVERS) {
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const json = await res.json();
+        if (json.code === 'Ok' && json.routes?.[0]) { data = json; break; }
+      } catch { continue; }
+    }
+
+    if (!data) {
       return { fromCoords, toCoords, stopCoords, distance: null, duration: null, geometry: null };
     }
 

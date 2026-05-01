@@ -171,28 +171,30 @@ export default function RouteMap({
         if (geometry?.coordinates?.length > 0) {
           // GeoJSON coords are [lng, lat] — Leaflet needs [lat, lng]
           const latLngs = geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+          // Outline for contrast
+          L.polyline(latLngs, {
+            color: '#ffffff',
+            weight: 7,
+            opacity: 0.6,
+            lineJoin: 'round',
+          }).addTo(map);
+
+          // Main route line
           L.polyline(latLngs, {
             color: '#2d6a4f',
-            weight: 4,
-            opacity: 0.85,
-            dashArray: null,
+            weight: 5,
+            opacity: 0.95,
             lineJoin: 'round',
           }).addTo(map);
 
           // Fit map to route bounds with padding
           const bounds = L.latLngBounds(latLngs);
-          map.fitBounds(bounds, { padding: [30, 30] });
-        } else {
-          // No route geometry — draw a dashed straight line
-          L.polyline([fromCoords, toCoords], {
-            color: '#2d6a4f',
-            weight: 3,
-            opacity: 0.6,
-            dashArray: '8, 8',
-          }).addTo(map);
-
-          const bounds = L.latLngBounds([fromCoords, toCoords]);
           map.fitBounds(bounds, { padding: [40, 40] });
+        } else {
+          // Geometry unavailable — show message instead of fake line
+          const bounds = L.latLngBounds([fromCoords, toCoords]);
+          map.fitBounds(bounds, { padding: [50, 50] });
         }
 
       } catch (e) {
