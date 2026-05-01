@@ -10,12 +10,39 @@ import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
-  { id: "home", label: "الرئيسية", icon: Home, path: "/" },
-  { id: "search", label: "بحث", icon: Search, path: "/search" },
-  { id: "trips", label: "رحلاتي", icon: MapPin, path: "/my-trips" },
-  { id: "messages", label: "الرسائل", icon: MessageSquare, path: "/messages" },
-  { id: "profile", label: "الملف", icon: User, path: "/profile?email=" },
+  { id: "home",     label: "الرئيسية", icon: Home,          path: "/" },
+  { id: "search",   label: "بحث",      icon: Search,        path: "/search" },
+  { id: "trips",    label: "رحلاتي",   icon: MapPin,        path: "/my-trips" },
+  { id: "messages", label: "الرسائل",  icon: MessageSquare, path: "/messages" },
+  { id: "profile",  label: "الملف",    icon: User,          path: "/profile?email=" },
 ];
+
+const PAGE_TITLES = {
+  "/":                     "الرئيسية",
+  "/search":               "البحث عن رحلة",
+  "/my-trips":             "رحلاتي",
+  "/messages":             "الرسائل",
+  "/favorites":            "المفضلة",
+  "/notifications":        "الإشعارات",
+  "/account-settings":     "الإعدادات",
+  "/create-trip":          "نشر رحلة",
+  "/driver":               "لوحة السائق",
+  "/how-it-works":         "كيف يعمل مشوارو؟",
+  "/about":                "عن مشوارو",
+  "/about-us":             "عن مشوارو",
+  "/help":                 "المساعدة",
+  "/feedback":             "اقتراحات وشكاوى",
+  "/privacy":              "سياسة الخصوصية",
+  "/privacy-policy":       "سياسة الخصوصية",
+  "/terms":                "الشروط والأحكام",
+  "/terms-of-service":     "الشروط والأحكام",
+  "/safety":               "الأمان والسلامة",
+  "/community":            "المجتمع",
+  "/blog":                 "المدونة",
+  "/booking-confirmation": "تأكيد الحجز",
+  "/onboarding":           "مرحباً بك",
+  "/dashboard":            "لوحة الإدارة",
+};
 
 export default function MobileLayout({ children, user, showHeader = true, headerTitle = "" }) {
   const location = useLocation();
@@ -90,7 +117,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             )}
             
             <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
-              {headerTitle || currentTab?.label || "مشوارو"}
+              {headerTitle || PAGE_TITLES[location.pathname] || currentTab?.label || "مشوارو"}
             </h1>
             
             <div className="flex items-center gap-1">

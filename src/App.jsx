@@ -143,10 +143,12 @@ const AuthenticatedApp = () => {
         <Route path="/profile" element={<UserProfile />} />
         <Route path="/settings" element={<AccountSettings />} />
         <Route path="/booking-confirmation" element={<BookingConfirmation />} />
+        <Route path="/account-settings" element={<AccountSettings />} />
+        <Route path="/feedback" element={<Feedback />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="*" element={<PageNotFound />} />
       </Route>
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/onboarding" element={<Onboarding />} />
-      <Route path="*" element={<PageNotFound />} />
     </Routes></Suspense></ErrorBoundary>
   );
 };
