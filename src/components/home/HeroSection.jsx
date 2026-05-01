@@ -5,7 +5,7 @@ import { Search, Star, Calendar, ArrowLeftRight } from "lucide-react";
 import { motion } from "framer-motion";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 
 // Palestinian cities slideshow — real Unsplash photos
 const CITY_SLIDES = [
@@ -45,23 +45,25 @@ export default function HeroSection() {
   const navigate = useNavigate();
   const [slideIdx, setSlideIdx] = useState(0);
 
-  // Load slides from admin settings (fallback to hardcoded)
-  const { data: settingsArr = [] } = useQuery({
-    queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
-    staleTime: 60000,
+  // Load slides directly from Supabase (bypasses base44 created_by filter)
+  const { data: heroSlides } = useQuery({
+    queryKey: ["hero-city-slides-public"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("hero_city_slides")
+        .limit(1)
+        .single();
+      if (error || !data?.hero_city_slides) return null;
+      const parsed = typeof data.hero_city_slides === "string"
+        ? JSON.parse(data.hero_city_slides)
+        : data.hero_city_slides;
+      return Array.isArray(parsed) ? parsed.filter(s => s.active !== false) : null;
+    },
+    staleTime: 30000,
   });
 
-  const slides = (() => {
-    try {
-      const val = settingsArr[0]?.hero_city_slides;
-      if (val) {
-        const parsed = typeof val === "string" ? JSON.parse(val) : val;
-        if (parsed?.length) return parsed.filter(s => s.active !== false);
-      }
-    } catch {}
-    return CITY_SLIDES;
-  })();
+  const slides = heroSlides?.length ? heroSlides : CITY_SLIDES;
 
   const slide = slides[slideIdx % slides.length] || CITY_SLIDES[0];
 

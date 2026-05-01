@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -145,16 +146,18 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
 export default function DashboardHeroSlides() {
   const qc = useQueryClient();
 
-  // app_settings is a single-row table — load it and use hero_city_slides field
-  const { data: settingsArr = [], isLoading } = useQuery({
-    queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+  // Use Supabase directly — bypasses base44 created_by filter
+  const { data: settingRow, isLoading } = useQuery({
+    queryKey: ["hero-slides-admin"],
+    queryFn: async () => {
+      const { data } = await supabase.from("app_settings").select("id, hero_city_slides").limit(1).single();
+      return data || null;
+    },
   });
-  const setting = settingsArr[0] || null;
 
   const slides = (() => {
     try {
-      const val = setting?.hero_city_slides;
+      const val = settingRow?.hero_city_slides;
       if (val) return typeof val === "string" ? JSON.parse(val) : val;
     } catch {}
     return DEFAULT_SLIDES;
@@ -162,19 +165,21 @@ export default function DashboardHeroSlides() {
 
   const save = useMutation({
     mutationFn: async (newSlides) => {
-      const payload = { hero_city_slides: JSON.stringify(newSlides) };
-      if (setting?.id) {
-        await base44.entities.AppSettings.update(setting.id, payload);
+      const val = JSON.stringify(newSlides);
+      if (settingRow?.id) {
+        const { error } = await supabase.from("app_settings").update({ hero_city_slides: val }).eq("id", settingRow.id);
+        if (error) throw error;
       } else {
-        await base44.entities.AppSettings.create(payload);
+        const { error } = await supabase.from("app_settings").insert({ hero_city_slides: val });
+        if (error) throw error;
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["app_settings"] });
-      qc.invalidateQueries({ queryKey: ["hero-slides"] });
+      qc.invalidateQueries({ queryKey: ["hero-slides-admin"] });
+      qc.invalidateQueries({ queryKey: ["hero-city-slides-public"] });
       toast.success("✅ تم الحفظ");
     },
-    onError: () => toast.error("فشل الحفظ"),
+    onError: (e) => toast.error("فشل الحفظ: " + e.message),
   });
 
   const updateSlide = (idx, field, value) => {
