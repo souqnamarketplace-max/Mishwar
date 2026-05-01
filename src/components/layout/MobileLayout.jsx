@@ -4,6 +4,7 @@ import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
 import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
@@ -153,6 +154,9 @@ export default function MobileLayout({ children, user, showHeader = true, header
           })}
         </div>
       </div>
+
+      {/* Global Booking Request Popup for drivers */}
+      <BookingRequestPopup user={user} />
 
       {/* Mobile Menu Overlay + Drawer */}
       {showMobileMenu && (
