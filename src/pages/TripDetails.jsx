@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import RouteMap from "@/components/shared/RouteMap";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -177,24 +178,14 @@ export default function TripDetails() {
             </div>
 
             {/* Map */}
-            <div className="rounded-xl overflow-hidden h-52 relative bg-muted">
-              <img
-                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&h=400&fit=crop"
-                alt="خريطة المسار"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-black/10" />
-              {/* From pin */}
-              <div className="absolute bottom-6 right-6 bg-white rounded-lg px-2 py-1 shadow text-xs font-bold text-foreground flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                {trip.from_city}
-              </div>
-              {/* To pin */}
-              <div className="absolute top-6 left-6 bg-white rounded-lg px-2 py-1 shadow text-xs font-bold text-foreground flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-destructive" />
-                {trip.to_city}
-              </div>
-            </div>
+            <RouteMap
+              fromCity={trip.from_city}
+              toCity={trip.to_city}
+              stops={trip.stops || []}
+              height="220px"
+              showStats={false}
+              className="mt-2"
+            />
 
             {/* Route stats */}
             <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-border text-center">
@@ -202,7 +193,7 @@ export default function TripDetails() {
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
                   <MapPin className="w-3 h-3" /> {trip.to_city}
                 </p>
-                <p className="text-xs font-medium">{trip.to_location || "دوار الشهداء"}</p>
+                {trip.to_location && <p className="text-xs font-medium">{trip.to_location}</p>}
               </div>
               <div>
                 <p className="text-xs text-muted-foreground mb-1">المسافة</p>
@@ -214,7 +205,7 @@ export default function TripDetails() {
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1 mb-1">
                   <MapPin className="w-3 h-3" /> {trip.from_city}
                 </p>
-                <p className="text-xs font-medium">{trip.from_location || "دوار المنارة"}</p>
+                {trip.from_location && <p className="text-xs font-medium">{trip.from_location}</p>}
               </div>
             </div>
           </div>
@@ -224,13 +215,11 @@ export default function TripDetails() {
             <h3 className="font-bold text-foreground mb-4">تفاصيل الرحلة</h3>
             <div className="space-y-3 text-sm">
               {[
-                { icon: Calendar, label: `${trip.date} • 08:30 – 09:30 صباحاً` },
-                { icon: MapPin, label: `${trip.from_city} – ${trip.from_location || "دوار المنارة"}` },
-                { icon: MapPin, label: `${trip.to_city} – ${trip.to_location || "دوار الشهداء"}` },
-                { icon: Navigation, label: "فوق نوع الرحلة" },
+                { icon: Calendar, label: `${trip.date} • ${trip.time} صباحاً` },
+                trip.from_location && { icon: MapPin, label: `${trip.from_city} – ${trip.from_location}` },
+                trip.to_location && { icon: MapPin, label: `${trip.to_city} – ${trip.to_location}` },
                 { icon: Users, label: `عدد المقاعد المتاحة: ${trip.available_seats || 3}` },
-                { icon: Briefcase, label: "أدنية متوسطة واحدة" },
-              ].map((item, i) => (
+              ].filter(Boolean).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 text-foreground">
                   <item.icon className="w-4 h-4 text-primary shrink-0" />
                   <span>{item.label}</span>
