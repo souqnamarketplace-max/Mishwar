@@ -38,7 +38,15 @@ export default function TripDetails() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
 
-  // Favorites — persisted in localStorage per user
+  // Scroll to top when trip page opens
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
+
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
+
+  // Favorites — persisted in localStorage per user (MUST be after user query to avoid TDZ)
   const favKey = `mishwar-favs-${user?.email || "anon"}`;
   const getFavs = () => { try { return new Set(JSON.parse(localStorage.getItem(favKey) || "[]")); } catch { return new Set(); } };
   const [favorited, setFavorited] = useState(() => getFavs().has(id));
@@ -50,14 +58,6 @@ export default function TripDetails() {
     localStorage.setItem(favKey, JSON.stringify([...favs]));
     setFavorited(!favorited);
   };
-
-  // Scroll to top when trip page opens
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
-
-  const { data: user } = useQuery({
-    queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
-  });
 
   // Fetch single trip by ID — smart, no need to load all trips
   const { data: tripData } = useQuery({
