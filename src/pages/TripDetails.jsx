@@ -35,7 +35,22 @@ export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  // Check if user already has an active booking for this trip (persists across reloads)
+
+  // ── 1. States (no deps) ──────────────────────────────────────
+  const [justBooked, setJustBooked] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState("cash");
+
+  // Scroll to top when trip page opens
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
+
+  // ── 2. User query (must come before anything that uses user) ──
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: () => base44.auth.me(),
+  });
+
+  // ── 3. Existing booking check (depends on user) ──────────────
   const { data: existingBooking } = useQuery({
     queryKey: ["my-booking", id, user?.email],
     queryFn: () => user?.email
@@ -45,18 +60,7 @@ export default function TripDetails() {
   });
   const alreadyBooked = existingBooking?.length > 0 &&
     ["pending", "confirmed"].includes(existingBooking[0]?.status);
-  const [justBooked, setJustBooked] = useState(false);
   const booked = justBooked || alreadyBooked;
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState("cash");
-
-  // Scroll to top when trip page opens
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
-
-  const { data: user } = useQuery({
-    queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
-  });
 
   // Favorites — persisted in localStorage per user (MUST be after user query to avoid TDZ)
   const favKey = `mishwar-favs-${user?.email || "anon"}`;
