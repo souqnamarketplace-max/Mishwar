@@ -129,84 +129,86 @@ export async function geocodeCity(cityName) {
   return null;
 }
 
-/**
- * Calculate route between two cities using OSRM (free, no API key).
- * Returns { distance, duration, geometry }
- *   distance: string like "47 كم"
- *   duration: string like "52 دقيقة"
- *   geometry: GeoJSON LineString coordinates for drawing the route
- */
-export async function calculateRoute(fromCity, toCity) {
-  const [fromCoords, toCoords] = await Promise.all([
-    geocodeCity(fromCity),
-    geocodeCity(toCity),
-  ]);
-
-  if (!fromCoords || !toCoords) {
-    return null;
+// ─── Valhalla polyline decoder (precision 6) ─────────────────────────────────
+function decodePolyline6(encoded) {
+  const coords = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let shift = 0, result = 0, byte;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+    shift = 0; result = 0;
+    do { byte = encoded.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
+    lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+    coords.push([lat / 1e6, lng / 1e6]); // [lat, lng]
   }
+  return coords;
+}
 
-  const [fromLat, fromLng] = fromCoords;
-  const [toLat, toLng] = toCoords;
+function formatDuration(minutes) {
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)} س ${minutes % 60} د`
+    : `${minutes} دقيقة`;
+}
+
+/**
+ * Route via Valhalla (openstreetmap.de) — CORS-enabled, no API key needed.
+ * Supports West Bank roads. Falls back to straight-line estimate if API fails.
+ */
+async function valhallaRoute(locations) {
+  const body = {
+    locations: locations.map(([lat, lng]) => ({ lat, lon: lng })),
+    costing: 'auto',
+    directions_options: { units: 'kilometers' },
+  };
+  const res = await fetch('https://valhalla1.openstreetmap.de/route', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!res.ok) throw new Error(`Valhalla ${res.status}`);
+  return res.json();
+}
+
+export async function calculateRoute(fromCity, toCity) {
+  const [fromCoords, toCoords] = await Promise.all([geocodeCity(fromCity), geocodeCity(toCity)]);
+  if (!fromCoords || !toCoords) return null;
 
   try {
-    // Try multiple OSRM servers in order until one works
-    const waypointStr = `${fromLng},${fromLat};${toLng},${toLat}`;
-    const OSRM_SERVERS = [
-      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
-      `https://router.project-osrm.org/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
-    ];
+    const data = await valhallaRoute([fromCoords, toCoords]);
+    const leg = data?.trip?.legs?.[0];
+    if (!leg) throw new Error('No route');
 
-    let data = null;
-    for (const url of OSRM_SERVERS) {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        const json = await res.json();
-        if (json.code === 'Ok' && json.routes?.[0]) { data = json; break; }
-      } catch { continue; }
-    }
-
-    if (!data) {
-      return { fromCoords, toCoords, distance: null, duration: null, geometry: null };
-    }
-
-    const route = data.routes[0];
-    const distanceKm = Math.round(route.distance / 1000);
-    const durationMin = Math.round(route.duration / 60);
-
-    const distance = `${distanceKm} كم`;
-    const duration = durationMin >= 60
-      ? `${Math.floor(durationMin / 60)} س ${durationMin % 60} د`
-      : `${durationMin} دقيقة`;
+    const distanceKm = Math.round(data.trip.summary.length);
+    const durationMin = Math.round(data.trip.summary.time / 60);
+    const latLngs = decodePolyline6(leg.shape); // [[lat,lng],...]
+    // Convert to GeoJSON geometry [lng, lat] for RouteMap
+    const geometry = { type: 'LineString', coordinates: latLngs.map(([la, ln]) => [ln, la]) };
 
     return {
-      fromCoords,
-      toCoords,
-      distance,
-      duration,
-      distanceKm,
-      durationMin,
-      geometry: route.geometry,
+      fromCoords, toCoords,
+      distance: `${distanceKm} كم`,
+      duration: formatDuration(durationMin),
+      distanceKm, durationMin,
+      geometry,
     };
   } catch (e) {
-    console.warn('OSRM routing failed:', e);
-    // Fallback: straight-line estimate
+    console.warn('Valhalla routing failed:', e);
+    // Straight-line fallback
+    const [fromLat, fromLng] = fromCoords;
+    const [toLat, toLng] = toCoords;
     const R = 6371;
     const dLat = (toLat - fromLat) * Math.PI / 180;
     const dLon = (toLng - fromLng) * Math.PI / 180;
     const a = Math.sin(dLat/2)**2 + Math.cos(fromLat*Math.PI/180)*Math.cos(toLat*Math.PI/180)*Math.sin(dLon/2)**2;
-    const distKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.3); // road factor 1.3
-    const durMin = Math.round(distKm * 1.2); // ~50 km/h average
-
+    const distKm = Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 1.3);
+    const durMin = Math.round(distKm * 1.2);
     return {
-      fromCoords,
-      toCoords,
+      fromCoords, toCoords,
       distance: `${distKm} كم`,
-      duration: durMin >= 60
-        ? `${Math.floor(durMin / 60)} س ${durMin % 60} د`
-        : `${durMin} دقيقة`,
-      distanceKm: distKm,
-      durationMin: durMin,
+      duration: formatDuration(durMin),
+      distanceKm: distKm, durationMin: durMin,
       geometry: null,
     };
   }
@@ -237,50 +239,22 @@ export async function calculateMultiStopRoute(fromCity, toCity, stops = []) {
   const stopCoords  = allCoords.slice(1, -1).filter(Boolean);
 
   try {
-    // Build OSRM waypoints string: lng,lat;lng,lat;...
-    const waypointStr = validCoords
-      .map(([lat, lng]) => `${lng},${lat}`)
-      .join(';');
+    const data = await valhallaRoute(validCoords);
+    if (!data?.trip?.legs?.length) throw new Error('No route');
 
-    const OSRM_SERVERS = [
-      `https://routing.openstreetmap.de/routed-car/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
-      `https://router.project-osrm.org/route/v1/driving/${waypointStr}?overview=full&geometries=geojson`,
-    ];
-
-    let data = null;
-    for (const url of OSRM_SERVERS) {
-      try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        const json = await res.json();
-        if (json.code === 'Ok' && json.routes?.[0]) { data = json; break; }
-      } catch { continue; }
-    }
-
-    if (!data) {
-      return { fromCoords, toCoords, stopCoords, distance: null, duration: null, geometry: null };
-    }
-
-    const route       = data.routes[0];
-    const distanceKm  = Math.round(route.distance / 1000);
-    const durationMin = Math.round(route.duration / 60);
-
-    const distance = `${distanceKm} كم`;
-    const duration = durationMin >= 60
-      ? `${Math.floor(durationMin / 60)} س ${durationMin % 60} د`
-      : `${durationMin} دقيقة`;
+    const distanceKm = Math.round(data.trip.summary.length);
+    const durationMin = Math.round(data.trip.summary.time / 60);
+    const allPts = data.trip.legs.flatMap(leg => decodePolyline6(leg.shape));
+    const geometry = { type: 'LineString', coordinates: allPts.map(([la, ln]) => [ln, la]) };
 
     return {
-      fromCoords,
-      toCoords,
-      stopCoords,
-      distance,
-      duration,
-      distanceKm,
-      durationMin,
-      geometry: route.geometry,
+      fromCoords, toCoords, stopCoords,
+      distance: `${distanceKm} كم`,
+      duration: formatDuration(durationMin),
+      distanceKm, durationMin, geometry,
     };
   } catch (e) {
-    console.warn('OSRM multi-stop routing failed:', e);
+    console.warn('Valhalla multi-stop routing failed:', e);
     return null;
   }
 }
