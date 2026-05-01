@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -103,11 +103,28 @@ export default function MobileLayout({ children, user, showHeader = true, header
       {/* Sticky Header */}
       {showHeader && (
         <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border safe-area-inset-top">
-          <div className="flex items-center justify-between h-14 px-4 gap-2">
+          <div className="flex items-center justify-between h-14 px-4 gap-2" dir="rtl">
+            {/* RIGHT side (RTL start): Hamburger + Bell */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+              >
+                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </button>
+              <NotificationBell userEmail={user?.email} />
+            </div>
+
+            {/* CENTER: Page title */}
+            <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
+              {headerTitle || PAGE_TITLES[location.pathname] || currentTab?.label || "مشوارو"}
+            </h1>
+
+            {/* LEFT side (RTL end): Logo or Back arrow */}
             {location.pathname !== "/" ? (
               <Link to="/">
                 <Button variant="ghost" size="icon" className="h-10 w-10">
-                  <ArrowLeft className="w-5 h-5" />
+                  <ArrowRight className="w-5 h-5" />
                 </Button>
               </Link>
             ) : (
@@ -115,20 +132,6 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <img src="/logo.png" alt="مشوارو" className="h-10 w-10 rounded-xl object-cover" />
               </Link>
             )}
-            
-            <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
-              {headerTitle || PAGE_TITLES[location.pathname] || currentTab?.label || "مشوارو"}
-            </h1>
-            
-            <div className="flex items-center gap-1">
-              <NotificationBell userEmail={user?.email} />
-              <button
-                onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
-              >
-                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -206,8 +209,8 @@ export default function MobileLayout({ children, user, showHeader = true, header
       {showMobileMenu && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileMenu(false)} />
-          <div className="fixed top-0 left-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
-            style={{ borderRadius: "0 24px 24px 0" }}>
+          <div className="fixed top-0 right-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
+            style={{ borderRadius: "24px 0 0 24px" }}>
 
             {/* User Header */}
             <div className="bg-primary px-4 pt-6 pb-3">
