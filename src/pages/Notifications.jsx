@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import EmptyState from "@/components/shared/EmptyState";
+import CityAutocomplete from "@/components/shared/CityAutocomplete";
 
 const emptyForm = {
   from_city: "",
@@ -155,25 +156,25 @@ export default function Notifications() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="text-sm font-medium mb-1 block">من</label>
-              <select
-                value={form.from_city}
-                onChange={(e) => setForm({ ...form, from_city: e.target.value })}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-muted/50 text-sm"
-              >
-                <option value="">اختر مدينة الانطلاق</option>
-                {CITIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <div className="bg-muted/50 rounded-xl border border-input">
+                <CityAutocomplete
+                  value={form.from_city}
+                  onChange={(v) => setForm({ ...form, from_city: v })}
+                  placeholder="ابحث عن مدينة الانطلاق..."
+                  iconColor="primary"
+                />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">إلى</label>
-              <select
-                value={form.to_city}
-                onChange={(e) => setForm({ ...form, to_city: e.target.value })}
-                className="w-full h-10 px-3 rounded-xl border border-input bg-muted/50 text-sm"
-              >
-                <option value="">اختر مدينة الوجهة</option>
-                {CITIES.filter((c) => c !== form.from_city).map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <div className="bg-muted/50 rounded-xl border border-input">
+                <CityAutocomplete
+                  value={form.to_city}
+                  onChange={(v) => setForm({ ...form, to_city: v })}
+                  placeholder="ابحث عن مدينة الوجهة..."
+                  iconColor="accent"
+                />
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">الحد الأقصى للسعر (اختياري)</label>
