@@ -2,6 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,22 +36,19 @@ export default function Messages() {
     queryKey: ["messages", user?.email],
     queryFn: async () => {
       if (!user?.email) return [];
-      // RLS ensures we only get our own messages
-      const [sent, received] = await Promise.all([
-        base44.entities.Message.filter({ sender_email: user.email }, "-created_date", 100),
-        base44.entities.Message.filter({ receiver_email: user.email }, "-created_date", 100),
-      ]);
-      // Merge + dedupe by id
-      const seen = new Set();
-      const merged = [];
-      for (const m of [...sent, ...received]) {
-        if (!seen.has(m.id)) { seen.add(m.id); merged.push(m); }
-      }
-      return merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      // Use Supabase directly — bypasses base44 created_by filtering
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .or(`sender_email.eq.${user.email},receiver_email.eq.${user.email}`)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      if (error) { console.warn("Messages fetch error:", error); return []; }
+      return data || [];
     },
     enabled: !!user?.email,
-    refetchInterval: false,  // realtime subscription handles updates
-    staleTime: 5000,
+    refetchInterval: false,
+    staleTime: 3000,
   });
 
   // Fetch user's bookings to determine conversation status
@@ -187,7 +185,7 @@ export default function Messages() {
       m => m.receiver_email === user.email && !m.is_read
     );
     if (unread.length === 0) return;
-    Promise.all(unread.map(m => base44.entities.Message.update(m.id, { is_read: true })))
+    Promise.all(unread.map(m => supabase.from("messages").update({ is_read: true }).eq("id", m.id)))
       .then(() => {
         // Invalidate the messages cache AND both badge caches so counts update immediately
         qc.invalidateQueries({ queryKey: ["messages", user.email] });

@@ -165,6 +165,25 @@ export default function CityAutocomplete({
                       </button>);
                   })}
                 </div>
+                {/* Request missing city */}
+                {query.trim() && filtered.length === 0 && (
+                  <button type="button"
+                    onClick={() => {
+                      const msg = `طلب إضافة مدينة: ${query.trim()}`;
+                      navigator.clipboard?.writeText?.(msg).catch(() => {});
+                      const wa = `https://wa.me/972599000000?text=${encodeURIComponent(msg)}`;
+                      window.open(wa, "_blank", "noopener,noreferrer");
+                    }}
+                    className="w-full px-4 py-3 flex items-center gap-2 text-right hover:bg-primary/5 border-b border-border/30 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Plus className="w-3.5 h-3.5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-primary">اقتراح إضافة "{query.trim()}"</p>
+                      <p className="text-[10px] text-muted-foreground">أرسل طلباً لإضافة هذه المدينة</p>
+                    </div>
+                  </button>
+                )}
                 <div className="grid grid-cols-2 divide-x divide-border/40 rtl:divide-x-reverse bg-muted/20">
                   <div className="px-3 py-2.5 text-center text-[11px] text-muted-foreground">{CITIES.length}+ مدينة وقرية</div>
                   <button type="button" onClick={() => { setOpen(false); setMapOpen(true); }}

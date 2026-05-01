@@ -4,6 +4,7 @@ import MapCityPicker from "@/components/shared/MapCityPicker";
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -17,6 +18,16 @@ import { toast } from "sonner";
 
 const STEPS_PASSENGER = ["اختيار الدور", "معلوماتك"];
 const STEPS_DRIVER = ["اختيار الدور", "معلوماتك", "بيانات السيارة", "رخصة القيادة"];
+
+
+async function uploadToSupabase(file) {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `public/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
+  return publicUrl;
+}
 
 export default function Onboarding() {
   useSEO({ title: "إعداد الحساب", description: "أكمل إعداد حسابك في مِشوار" });
@@ -126,7 +137,7 @@ export default function Onboarding() {
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 MB"); return; }
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const file_url = await uploadToSupabase(file);
       setAvatarUrl(file_url);
       toast.success("تم رفع الصورة بنجاح ✅");
     } catch (err) {
@@ -393,7 +404,7 @@ export default function Onboarding() {
                       const file = e.target.files?.[0]; if (!file) return;
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
-                      try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, license_image_url: file_url })); toast.success("✅ تم رفع صورة الرخصة"); }
+                      try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, license_image_url: url })); toast.success("✅ تم رفع صورة الرخصة"); }
                       catch (err) { toast.error("فشل رفع الملف. تأكد من الاتصال وحاول مجدداً"); }
                       finally { setUploading(false); }
                     }} />
@@ -422,7 +433,7 @@ export default function Onboarding() {
                       const file = e.target.files?.[0]; if (!file) return;
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
-                      try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, car_reg_url: file_url })); toast.success("✅ تم رفع الاستمارة"); }
+                      try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, car_reg_url: url })); toast.success("✅ تم رفع الاستمارة"); }
                       catch (err) { toast.error("فشل رفع الملف"); }
                       finally { setUploading(false); }
                     }} />
@@ -451,7 +462,7 @@ export default function Onboarding() {
                       const file = e.target.files?.[0]; if (!file) return;
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
-                      try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, insurance_url: file_url })); toast.success("✅ تم رفع وثيقة التأمين"); }
+                      try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, insurance_url: url })); toast.success("✅ تم رفع وثيقة التأمين"); }
                       catch (err) { toast.error("فشل رفع الملف"); }
                       finally { setUploading(false); }
                     }} />
@@ -476,8 +487,11 @@ export default function Onboarding() {
                     const file = e.target.files?.[0]; if (!file) return;
                     if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                     setUploading(true);
-                    try { const { file_url } = await base44.integrations.Core.UploadFile({ file }); setForm(f => ({ ...f, selfie_url: file_url })); toast.success("✅ تم رفع الصورة الشخصية"); }
-                    catch (err) { toast.error("فشل رفع الملف"); }
+                    try {
+                      const url = await uploadToSupabase(file);
+                      setForm(f => ({ ...f, selfie_url: url }));
+                      toast.success("✅ تم رفع الصورة الشخصية");
+                    } catch (err) { toast.error("فشل رفع الصورة: " + (err.message || "")); }
                     finally { setUploading(false); }
                   }} />
                 </div>

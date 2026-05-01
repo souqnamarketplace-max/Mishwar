@@ -229,10 +229,11 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="rounded-lg text-xs text-destructive hover:bg-destructive/10 mr-auto"
+                      className="rounded-lg text-xs text-destructive hover:bg-destructive/10 mr-auto gap-1"
                       onClick={() => setDeleteConfirm(trip.id)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
+                      حذف الرحلة
                     </Button>
                   )}
                 </div>

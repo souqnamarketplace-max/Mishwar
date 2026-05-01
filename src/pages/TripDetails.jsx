@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import RouteMap from "@/components/shared/RouteMap";
-import { isBookingClosed, isLastChance, minutesUntilTrip } from "@/lib/tripScheduling";
+import { isBookingClosed, isLastChance, minutesUntilTrip, isTripExpired } from "@/lib/tripScheduling";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -546,7 +546,19 @@ export default function TripDetails() {
                 </div>
               </div>
             </div>
-          ) : isBookingClosed(trip) ? null : (
+          ) : isTripExpired(trip) ? (
+            <div className="fixed bottom-24 left-4 right-4 z-[999]">
+              <div className="bg-muted rounded-2xl p-3 flex items-center justify-center gap-2 text-sm text-muted-foreground border border-border">
+                ⏰ انتهى وقت هذه الرحلة
+              </div>
+            </div>
+          ) : isBookingClosed(trip) ? (
+            <div className="fixed bottom-24 left-4 right-4 z-[999]">
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl p-3 flex items-center justify-center gap-2 text-sm text-orange-700 font-medium">
+                🔒 الحجز مغلق — أقل من 30 دقيقة للانطلاق
+              </div>
+            </div>
+          ) : (
             <div className="fixed bottom-24 left-4 right-4 z-[999]">
               <div className="bg-card rounded-2xl shadow-2xl shadow-black/20 border border-border/50 overflow-hidden">
                 {isLastChance(trip) && (
