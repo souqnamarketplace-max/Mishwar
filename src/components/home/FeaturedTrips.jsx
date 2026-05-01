@@ -21,14 +21,19 @@ const cityColor = (c) => CITY_COLORS[c?.trim()] || CITY_COLORS.default;
 function formatDate(dateStr) {
   if (!dateStr) return "";
   try {
-    const d = new Date(dateStr);
+    const PS_MONTHS = ["كانون الثاني","شباط","آذار","نيسان","أيار","حزيران","تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"];
+    const d = new Date(dateStr + "T12:00:00");
     if (isNaN(d.getTime())) return dateStr;
     const today = new Date(); today.setHours(0,0,0,0);
-    const t = new Date(d); t.setHours(0,0,0,0);
-    const diff = Math.round((t - today) / 86400000);
+    const diff = Math.round((new Date(d).setHours(0,0,0,0) - today) / 86400000);
     if (diff === 0) return "اليوم";
     if (diff === 1) return "غداً";
-    if (diff > 1 && diff <= 7) return d.toLocaleDateString("ar-EG", { weekday: "long" });
+    if (diff === 2) return "بعد غد";
+    const days = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+    if (diff > 2 && diff <= 6) return days[d.getDay()];
+    return `${d.getDate()} ${PS_MONTHS[d.getMonth()]}`;
+  } catch { return dateStr; }
+});
     return d.toLocaleDateString("ar-EG", { day: "numeric", month: "short" });
   } catch { return dateStr; }
 }
