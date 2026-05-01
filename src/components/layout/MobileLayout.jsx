@@ -231,9 +231,9 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 {[
                   { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
                 { icon: HelpCircle, label: "المساعدة",         path: "/help" },
-                  { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy-policy" },
+                  { icon: Shield,     label: "الخصوصية والأمان", path: "/privacy" },
                   { icon: FileText,   label: "الشروط والأحكام",  path: "/terms" },
-                  { icon: Info,       label: "عن مِشوار",         path: "/about-us" },
+                  { icon: Info,       label: "عن مِشوار",         path: "/about" },
                 ].map(({ icon: Icon, label, path }) => (
                   <Link
                     key={path}

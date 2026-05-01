@@ -81,7 +81,7 @@ const AuthenticatedApp = () => {
   // Public routes — accessible without sign-in
   const PUBLIC_PATHS = new Set([
     "/", "/search", "/how-it-works", "/community", "/help",
-    "/about", "/blog", "/safety", "/privacy", "/terms",
+    "/about", "/about-us", "/blog", "/safety", "/privacy", "/privacy-policy", "/terms", "/terms-of-service",
   ]);
   // /trip/:id is also public (view-only) — handled by prefix
   const isPublicPath = PUBLIC_PATHS.has(location.pathname) || location.pathname.startsWith("/trip/");
@@ -125,10 +125,13 @@ const AuthenticatedApp = () => {
         <Route path="/community" element={<Community />} />
         <Route path="/help" element={<Help />} />
         <Route path="/about" element={<AboutUs />} />
+        <Route path="/about-us" element={<AboutUs />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/safety" element={<Safety />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/terms-of-service" element={<Terms />} />
 
         {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />
