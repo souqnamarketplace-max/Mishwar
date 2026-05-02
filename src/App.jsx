@@ -47,6 +47,7 @@ const AboutUs          = lazy(() => import('./pages/AboutUs'));
 const Blog             = lazy(() => import('./pages/Blog'));
 const Safety           = lazy(() => import('./pages/Safety'));
 const AccountSettings  = lazy(() => import('./pages/AccountSettings'));
+const AccountHub       = lazy(() => import('./components/account/AccountHub'));
 const Login            = lazy(() => import('./pages/Login'));
 const BookingConfirmation = lazy(() => import('./pages/BookingConfirmation'));
 const Feedback = lazy(() => import('./pages/Feedback'));
@@ -141,9 +142,10 @@ const AuthenticatedApp = () => {
         <Route path="/driver" element={<DriverDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<UserProfile />} />
-        <Route path="/settings" element={<AccountSettings />} />
+        <Route path="/settings" element={<AccountHub />} />
         <Route path="/booking-confirmation" element={<BookingConfirmation />} />
-        <Route path="/account-settings" element={<AccountSettings />} />
+        <Route path="/account-settings" element={<AccountHub />} />
+        <Route path="/account-settings/profile" element={<AccountSettings />} />
         <Route path="/feedback" element={<Feedback />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/dashboard" element={<Dashboard />} />
