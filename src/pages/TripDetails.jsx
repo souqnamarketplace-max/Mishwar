@@ -106,21 +106,21 @@ export default function TripDetails() {
       await base44.entities.Trip.update(tripData.id, { available_seats: newSeats });
       return booking;
     },
+    onMutate: () => null,
     onSuccess: () => {
+      setShowConfirm(false);
+      setBooked(true);
       setJustBooked(true);
+      toast.success("تم إرسال طلب الحجز! بانتظار موافقة السائق 🎉");
       qc.invalidateQueries({ queryKey: ["my-booking", id, user?.email] });
+      qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
+      qc.invalidateQueries({ queryKey: ["trips"] });
     },
-    onMutate: () => { return null; },
     onError: (err) => {
+      setShowConfirm(false);
       setBooked(false);
       console.error("Booking error:", err);
-      toast.error("فشل الحجز، حاول مجدداً");
-    },
-    onSuccess: () => {
-      setBooked(true);
-      setShowConfirm(false);
-      toast.success("تم الحجز بنجاح! 🎉");
-      qc.invalidateQueries({ queryKey: ["trips"] });
+      toast.error(err?.message || "فشل الحجز، حاول مجدداً");
     },
   });
 

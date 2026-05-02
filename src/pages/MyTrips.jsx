@@ -26,6 +26,8 @@ const tabs = [
 ];
 
 const statusConfig = {
+  pending:   { label: "بانتظار موافقة السائق", color: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
+  cancelled: { label: "ملغية",                  color: "bg-red-100 text-red-700 hover:bg-red-100" },
   confirmed: { label: "مؤكدة", color: "bg-accent/10 text-accent border-accent/20" },
   in_progress: { label: "مباشر", color: "bg-primary/10 text-primary border-primary/20" },
   completed: { label: "مكتملة", color: "bg-muted text-muted-foreground border-border" },
@@ -55,9 +57,18 @@ export default function MyTrips() {
   // Cancel booking mutation (for passenger bookings)
   const cancelBookingMutation = useMutation({
     mutationFn: async (bookingId) => {
-      const { error } = await supabase.rpc("cancel_booking", { booking_id_param: bookingId });
-      if (error) throw error;
-      return { success: true };
+      // Direct update (bypasses missing/broken cancel_booking RPC)
+      // 1) Mark booking as cancelled
+      const { data: booking, error: bErr } = await supabase
+        .from("bookings")
+        .update({ status: "cancelled" })
+        .eq("id", bookingId)
+        .select()
+        .single();
+      if (bErr) throw bErr;
+      if (!booking) throw new Error("لم يتم العثور على الحجز");
+      // Seat restoration is handled by the bookings_restore_seats DB trigger.
+      return { success: true, booking };
     },
     onSuccess: async (_, bookingId) => {
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
@@ -118,6 +129,8 @@ export default function MyTrips() {
 
   // Merge: driver trips + trips the user booked as passenger (deduplicated)
   const bookedTripIds = new Set(passengerBookings.map(b => b.trip_id));
+  // Map of trip_id → passenger's booking status (so we display BOOKING status, not TRIP status)
+  const bookingStatusByTripId = new Map(passengerBookings.map(b => [b.trip_id, b.status]));
   const bookedTrips = allTrips.filter(t => bookedTripIds.has(t.id));
   const trips = [...driverTrips, ...bookedTrips.filter(t => !driverTrips.find(dt => dt.id === t.id))];
 
@@ -138,7 +151,10 @@ export default function MyTrips() {
     return () => { unsubTrips(); unsubReviews(); unsubBookings(); };
   }, [qc]);
 
-  const filtered = activeTab === "all" ? trips : trips.filter((t) => t.status === activeTab);
+  // For passenger trips, the BOOKING status takes precedence over trip status.
+  // For driver trips (no booking on user's behalf), fall back to the trip status.
+  const effectiveStatus = (t) => bookingStatusByTripId.get(t.id) || t.status;
+  const filtered = activeTab === "all" ? trips : trips.filter((t) => effectiveStatus(t) === activeTab);
   const { data: myReviews = [] } = useQuery({
     queryKey: ["my-reviews", user?.email],
     queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email, review_type: "passenger_rates_driver" }),
@@ -147,9 +163,11 @@ export default function MyTrips() {
   const reviewedTripIds = new Set(myReviews.map((r) => r.trip_id));
 
   const grouped = {
-    confirmed: filtered.filter((t) => t.status === "confirmed"),
-    in_progress: filtered.filter((t) => t.status === "in_progress"),
-    completed: filtered.filter((t) => t.status === "completed"),
+    pending: filtered.filter((t) => effectiveStatus(t) === "pending"),
+    confirmed: filtered.filter((t) => effectiveStatus(t) === "confirmed"),
+    in_progress: filtered.filter((t) => effectiveStatus(t) === "in_progress"),
+    completed: filtered.filter((t) => effectiveStatus(t) === "completed"),
+    cancelled: filtered.filter((t) => effectiveStatus(t) === "cancelled"),
   };
 
   return (
