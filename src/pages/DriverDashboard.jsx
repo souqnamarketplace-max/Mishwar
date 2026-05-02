@@ -13,6 +13,10 @@ import DriverTripsList from "../components/driver/DriverTripsList";
 import DriverPassengers from "../components/driver/DriverPassengers";
 import DriverVehicleEditor from "../components/driver/DriverVehicleEditor";
 import DriverRatePassengers from "../components/driver/DriverRatePassengers";
+import DriverReviewWizard from "../components/reviews/DriverReviewWizard";
+import { useGPSTripCompletion } from "../lib/gpsTracking";
+import { createPortal } from "react-dom";
+import { MapPin, Navigation, Clock } from "lucide-react";
 import DriverPaymentSetup from "../components/driver/DriverPaymentSetup";
 
 // ─── Tab definitions ────────────────────────────────────────────────────────
@@ -167,6 +171,8 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
 
 // ─── Main page ───────────────────────────────────────────────────────────────
 export default function DriverDashboard() {
+  const [reviewWizard, setReviewWizard] = useState(null); // { trip, passengers }
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   useSEO({ title: "لوحة السائق", description: "لوحة قيادة السائق في مِشوار" });
 
   const [searchParams] = useSearchParams();
@@ -248,6 +254,7 @@ export default function DriverDashboard() {
             trips={trips}
             bookings={bookings}
             loading={tripsLoading}
+            driverUser={user}
             onSelectTrip={(id) => { setSelectedTripId(id); setActiveTab("passengers"); }}
           />
         )}

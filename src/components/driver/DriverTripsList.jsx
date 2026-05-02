@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useGPSTripCompletion } from "@/lib/gpsTracking";
+import DriverReviewWizard from "@/components/reviews/DriverReviewWizard";
+import GPSTripTracker from "@/components/driver/GPSTripTracker";
 import { createPortal } from "react-dom";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
@@ -17,7 +20,7 @@ const statusConfig = {
   cancelled: { label: "ملغاة", className: "bg-destructive/10 text-destructive" },
 };
 
-export default function DriverTripsList({ trips, bookings, loading, onSelectTrip }) {
+export default function DriverTripsList({ trips, bookings, loading, onSelectTrip, driverUser }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
@@ -164,7 +167,15 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             const pax = getTripPassengers(trip.id);
             const cfg = statusConfig[trip.status] || statusConfig.confirmed;
             return (
-              <div key={trip.id} className="bg-card rounded-2xl border border-border p-4 hover:shadow-sm transition-all">
+              <div key={trip.id}>
+              {trip.status === "in_progress" && (
+                <GPSTripTracker
+                  trip={trip}
+                  bookings={bookings}
+                  driverUser={driverUser}
+                />
+              )}
+              <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-sm transition-all">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 font-bold text-foreground">
                     <MapPin className="w-4 h-4 text-primary shrink-0" />
@@ -236,6 +247,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     </button>
                   )}
                 </div>
+              </div>
               </div>
             );
           })}
