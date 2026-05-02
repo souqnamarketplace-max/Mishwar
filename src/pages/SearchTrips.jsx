@@ -1,4 +1,5 @@
 import { useSEO } from "@/hooks/useSEO";
+import DateInput from "@/components/shared/DateInput";
 import React, { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
@@ -176,11 +177,15 @@ export default function SearchTrips() {
         <div className="border-t border-border/60 flex items-stretch" dir="rtl">
           {/* Date */}
           <div className="flex-1 flex items-center gap-2.5 px-4 py-3">
-            <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
             <div className="flex-1">
               <p className="text-[10px] font-bold text-muted-foreground mb-0.5 tracking-wider uppercase">التاريخ</p>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                className="w-full bg-transparent text-sm font-medium text-foreground focus:outline-none cursor-pointer" />
+              <DateInput
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                min={new Date().toISOString().split("T")[0]}
+                placeholder="اختر التاريخ"
+                className="w-full"
+              />
             </div>
           </div>
 

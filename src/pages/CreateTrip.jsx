@@ -1,4 +1,5 @@
 import { CITIES } from "@/lib/cities";
+import DateInput from "@/components/shared/DateInput";
 import { checkDriverConflict } from "@/lib/tripScheduling";
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from "react";
@@ -433,12 +434,15 @@ export default function CreateTrip() {
               </div>
               <div>
                 <Label>تاريخ المغادرة <span className="text-destructive">*</span></Label>
-                <Input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => updateField("date", e.target.value)}
-                  className="h-11 rounded-xl mt-1"
-                />
+                <div className="h-11 rounded-xl mt-1 bg-background border border-input px-3 flex items-center">
+                  <DateInput
+                    value={form.date}
+                    onChange={(e) => updateField("date", e.target.value)}
+                    min={new Date().toISOString().split("T")[0]}
+                    placeholder="اختر تاريخ المغادرة"
+                    className="w-full"
+                  />
+                </div>
               </div>
               <div>
                 <Label>وقت المغادرة <span className="text-destructive">*</span></Label>

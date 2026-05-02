@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -226,15 +227,13 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                   )}
 
                   {trip.status !== "completed" && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-lg text-xs text-destructive hover:bg-destructive/10 mr-auto gap-1"
+                    <button
+                      className="rounded-lg text-xs text-destructive hover:bg-destructive/10 mr-auto gap-1 flex items-center px-2 py-1.5 border border-destructive/20 hover:border-destructive/40 transition-colors"
                       onClick={() => setDeleteConfirm(trip.id)}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      حذف الرحلة
-                    </Button>
+                      حذف
+                    </button>
                   )}
                 </div>
               </div>
@@ -251,7 +250,16 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                 <Trash2 className="w-6 h-6 text-destructive" />
               </div>
               <h3 className="font-bold text-lg text-foreground">حذف الرحلة</h3>
-              <p className="text-sm text-muted-foreground mt-1">هل أنت متأكد من حذف هذه الرحلة؟ سيتم إلغاء جميع الحجوزات المرتبطة بها.</p>
+              <p className="text-sm text-muted-foreground mt-1">هل أنت متأكد من حذف هذه الرحلة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+              {deleteConfirm && (() => {
+                const trip = trips?.find(t => t.id === deleteConfirm);
+                const pax = bookings?.filter(b => b.trip_id === deleteConfirm && b.status !== "cancelled").length || 0;
+                return pax > 0 ? (
+                  <div className="mt-2 p-2 bg-destructive/10 rounded-lg text-xs text-destructive font-medium">
+                    ⚠️ يوجد {pax} {pax === 1 ? "راكب محجوز" : "ركاب محجوزون"} — سيتم إلغاء حجوزاتهم
+                  </div>
+                ) : null;
+              })()}
             </div>
             <div className="flex gap-3">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setDeleteConfirm(null)}>
