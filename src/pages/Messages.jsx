@@ -293,33 +293,54 @@ export default function Messages() {
               {filtered.map(conv => {
                 const last = conv.lastMessage;
                 const isMe = last?.sender_email === user?.email;
+                const trip = getConvTrip(conv.otherEmail);
+                const st = getConvStatus(conv.otherEmail);
+                const isApproved = st === "active" && trip;
+                const isCompleted = st === "completed";
                 return (
                   <button
                     key={conv.id}
                     onClick={() => setActiveId(conv.id)}
-                    className={`w-full text-right px-4 py-3 border-b border-border/40 hover:bg-muted/40 transition-colors ${activeId === conv.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+                    className={`w-full text-right px-3 py-3 border-b border-border/40 hover:bg-muted/40 transition-colors ${activeId === conv.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm shrink-0">
-                        {conv.otherName?.[0]?.toUpperCase() || "؟"}
+                      {/* Avatar with price badge overlay (Poparide-style) */}
+                      <div className="relative shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold overflow-hidden">
+                          {conv.otherName?.[0]?.toUpperCase() || "؟"}
+                        </div>
+                        {trip?.price && (
+                          <span className={`absolute -top-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${isApproved ? "bg-green-500 text-white" : "bg-card border border-border text-foreground"}`}>
+                            ₪{trip.price}
+                          </span>
+                        )}
                       </div>
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="font-medium text-sm text-foreground truncate">{conv.otherName}</p>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {(() => {
-                              const st = getConvStatus(conv.otherEmail);
-                              if (st === "completed") return <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />مكتملة</span>;
-                              if (st === "cancelled") return <span className="text-[9px] bg-red-50 text-red-400 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Lock className="w-2.5 h-2.5" />ملغاة</span>;
-                              return <span className="text-[9px] bg-green-50 text-green-600 px-1.5 py-0.5 rounded-full flex items-center gap-0.5"><Circle className="w-2 h-2 fill-green-500" />نشطة</span>;
-                            })()}
-                            {last && <span className="text-[10px] text-muted-foreground">{formatTime(last.created_at)}</span>}
-                          </div>
+                          <p className="font-bold text-sm text-foreground truncate">{conv.otherName}</p>
+                          {last && <span className="text-[10px] text-muted-foreground shrink-0">{formatTime(last.created_at)}</span>}
                         </div>
+
+                        {trip && (
+                          <p className={`text-xs font-medium mb-0.5 ${isApproved ? "text-green-600" : "text-muted-foreground"}`}>
+                            {isApproved && "• تم تأكيد الحجز"}
+                            {isCompleted && "🔒 رحلة مكتملة"}
+                            {st === "cancelled" && "🔒 رحلة ملغاة"}
+                          </p>
+                        )}
+
+                        {trip && (
+                          <p className="text-xs text-foreground truncate mb-0.5">
+                            {trip.from_city} ← {trip.to_city} {trip.date && `· ${trip.date}`}
+                          </p>
+                        )}
+
                         <p className={`text-xs truncate ${conv.unreadCount > 0 && !isMe ? "font-bold text-foreground" : "text-muted-foreground"}`}>
                           {isMe && "أنت: "}{last?.content || ""}
                         </p>
                       </div>
+
                       {conv.unreadCount > 0 && (
                         <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
                           {conv.unreadCount}
