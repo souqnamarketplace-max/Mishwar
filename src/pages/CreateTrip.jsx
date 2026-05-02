@@ -286,6 +286,12 @@ export default function CreateTrip() {
         seats_available:   Number(s.seats_available) || form.available_seats,
       })),
       // Driver identity — UUID link + denormalized display fields
+      // User preferences (denormalized for trip cards)
+      pref_smoking:      user?.pref_smoking || null,
+      pref_chattiness:   user?.pref_chattiness || null,
+      pref_pets:         user?.pref_pets || false,
+      vehicle_luggage:   user?.vehicle_luggage || null,
+      vehicle_back_row:  user?.vehicle_back_row || null,
       driver_id:     user.id,
       driver_name:   user?.full_name || user?.email?.split("@")[0] || "سائق",
       driver_avatar: user?.avatar_url || "",
