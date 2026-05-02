@@ -14,7 +14,8 @@ import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
   Search, CheckCircle, AlertCircle, XCircle, Navigation
 } from "lucide-react";
-import ReviewForm from "../components/reviews/ReviewForm";
+import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
+import { MessageCircle } from "lucide-react";
 
 const tabs = [
   { id: "all", label: "الكل", icon: Car },
@@ -36,7 +37,7 @@ export default function MyTrips() {
 
   const [confirmCancel, setConfirmCancel] = useState({ open: false, bookingId: null });
   const [activeTab, setActiveTab] = useState("all");
-  const [reviewingTrip, setReviewingTrip] = useState(null);
+  const [wizardTrip, setWizardTrip] = useState(null); // trip object for PassengerReviewWizard
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const highlightTripId = searchParams.get("trip");
@@ -267,47 +268,48 @@ export default function MyTrips() {
                         </div>
                       )}
 
-                      {/* Cancel booking button for pending/confirmed trips booked as passenger */}
-                      {(status === "confirmed" || status === "pending") && bookedTripIds.has(trip.id) && (
-                        <div className="mt-2 px-1">
-                          <button
-                            onClick={() => {
-                              const booking = passengerBookings.find(b => b.trip_id === trip.id);
-                              if (booking) {
-                                setConfirmCancel({ open: true, bookingId: booking.id });
-                              }
-                            }}
-                            disabled={cancelBookingMutation.isPending}
-                            className="text-sm text-destructive hover:underline flex items-center gap-1"
+                      {/* Cancel + Message driver buttons for confirmed/in_progress passenger trips */}
+                      {(status === "confirmed" || status === "in_progress" || status === "pending") && bookedTripIds.has(trip.id) && (
+                        <div className="mt-2 px-1 flex items-center justify-between gap-3">
+                          {/* Message driver */}
+                          <Link
+                            to={`/messages?to=${encodeURIComponent(trip.driver_email || trip.created_by)}&name=${encodeURIComponent(trip.driver_name || "السائق")}`}
+                            className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+                            onClick={e => e.stopPropagation()}
                           >
-                            ✕ إلغاء الحجز
-                          </button>
+                            <MessageCircle className="w-4 h-4" />
+                            راسل السائق
+                          </Link>
+
+                          {/* Cancel booking */}
+                          {(status === "confirmed" || status === "pending") && (
+                            <button
+                              onClick={() => {
+                                const booking = passengerBookings.find(b => b.trip_id === trip.id);
+                                if (booking) setConfirmCancel({ open: true, bookingId: booking.id });
+                              }}
+                              disabled={cancelBookingMutation.isPending}
+                              className="text-sm text-destructive hover:underline flex items-center gap-1"
+                            >
+                              ✕ إلغاء الحجز
+                            </button>
+                          )}
                         </div>
                       )}
 
-                      {/* Review Button for completed trips */}
-                      {status === "completed" && !reviewedTripIds.has(trip.id) && isTripExpired(trip) && (
+                      {/* Review Button for completed trips — opens full wizard */}
+                      {status === "completed" && !reviewedTripIds.has(trip.id) && isTripExpired(trip) && bookedTripIds.has(trip.id) && (
                         <div className="mt-3 mx-4">
-                          {reviewingTrip === trip.id ? (
-                            <ReviewForm
-                              trip={trip}
-                              reviewerUser={user}
-                              targetEmail={trip.driver_email || trip.created_by}
-                              targetName={trip.driver_name || "السائق"}
-                              onClose={() => setReviewingTrip(null)}
-                            />
-                          ) : (
-                            <button
-                              onClick={() => setReviewingTrip(trip.id)}
-                              className="w-full flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 hover:bg-yellow-100 transition-colors"
-                            >
-                              <div className="flex gap-0.5">
-                                {[1,2,3,4,5].map(s => <Star key={s} className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />)}
-                              </div>
-                              <span className="text-sm font-bold text-yellow-800">قيّم السائق {trip.driver_name || ""}</span>
-                              <span className="text-xs text-yellow-600 mr-auto">اضغط هنا ←</span>
-                            </button>
-                          )}
+                          <button
+                            onClick={() => setWizardTrip(trip)}
+                            className="w-full flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 hover:bg-yellow-100 transition-colors active:scale-[0.99]"
+                          >
+                            <div className="flex gap-0.5">
+                              {[1,2,3,4,5].map(s => <Star key={s} className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />)}
+                            </div>
+                            <span className="text-sm font-bold text-yellow-800">قيّم السائق {trip.driver_name || ""}</span>
+                            <span className="text-xs text-yellow-600 mr-auto">اضغط هنا ←</span>
+                          </button>
                         </div>
                       )}
                       {status === "completed" && reviewedTripIds.has(trip.id) && (
@@ -324,6 +326,17 @@ export default function MyTrips() {
           })}
         </div>
       )}
+    {/* Passenger review wizard portal */}
+    {wizardTrip && (
+      <PassengerReviewWizard
+        trip={wizardTrip}
+        driverEmail={wizardTrip.driver_email || wizardTrip.created_by}
+        driverName={wizardTrip.driver_name || "السائق"}
+        passengerUser={user}
+        onClose={() => setWizardTrip(null)}
+      />
+    )}
+
     {confirmCancel.open && (
       <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmCancel({ open: false, bookingId: null })}>
         <div onClick={e => e.stopPropagation()} className="bg-card rounded-2xl p-6 max-w-sm w-full shadow-2xl" dir="rtl">
