@@ -332,37 +332,129 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         </div>,
         document.body
       )}
-      {/* Edit Trip Modal */}
+      {/* Edit Trip Modal — expanded */}
       {editingTrip && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm" dir="rtl">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black/50 z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setEditingTrip(null); }}>
+          <div className="bg-card rounded-t-2xl sm:rounded-2xl border border-border w-full sm:max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
+            <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10">
               <h3 className="font-bold text-foreground">تعديل الرحلة</h3>
-              <button onClick={() => setEditingTrip(null)}><X className="w-5 h-5 text-muted-foreground" /></button>
+              <button onClick={() => setEditingTrip(null)} aria-label="إغلاق"><X className="w-5 h-5 text-muted-foreground" /></button>
             </div>
-            <div className="space-y-3">
+
+            {/* Editability indicator */}
+            <div className={`mx-4 mt-4 p-3 rounded-xl text-xs flex items-start gap-2 ${
+              (editForm._bookingsCount || 0) === 0
+                ? "bg-green-500/10 border border-green-500/30 text-green-700"
+                : "bg-yellow-500/10 border border-yellow-500/30 text-yellow-700"
+            }`}>
+              <span>{(editForm._bookingsCount || 0) === 0 ? "🔓" : "🔒"}</span>
+              <span className="flex-1">
+                {(editForm._bookingsCount || 0) === 0
+                  ? "لا يوجد ركاب محجوزون — يمكن تعديل جميع الحقول"
+                  : `يوجد ${editForm._bookingsCount} ركاب محجوزون — لا يمكن تعديل الوجهات أو التاريخ`}
+              </span>
+            </div>
+
+            <div className="p-4 space-y-4">
               <div>
                 <label className="text-sm text-muted-foreground">السعر (₪)</label>
-                <Input type="number" value={editForm.price} onChange={e => setEditForm(f => ({...f, price: parseFloat(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
+                <Input type="number" value={editForm.price ?? ""} onChange={e => setEditForm(f => ({...f, price: parseFloat(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">وقت الانطلاق</label>
-                <Input type="time" value={editForm.time} onChange={e => setEditForm(f => ({...f, time: e.target.value}))} className="mt-1 h-10 rounded-xl" />
+                <Input type="time" value={editForm.time ?? ""} onChange={e => setEditForm(f => ({...f, time: e.target.value}))} className="mt-1 h-10 rounded-xl" />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">المقاعد المتاحة</label>
-                <Input type="number" min="0" max="8" value={editForm.available_seats} onChange={e => setEditForm(f => ({...f, available_seats: parseInt(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
+                <Input type="number" min="0" max="8" value={editForm.available_seats ?? ""} onChange={e => setEditForm(f => ({...f, available_seats: parseInt(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">ملاحظة للركاب</label>
-                <textarea value={editForm.driver_note} onChange={e => setEditForm(f => ({...f, driver_note: e.target.value}))} className="w-full mt-1 px-3 py-2 rounded-xl bg-muted/50 border border-border text-sm resize-none h-16" />
+                <textarea value={editForm.driver_note ?? ""} onChange={e => setEditForm(f => ({...f, driver_note: e.target.value}))} className="w-full mt-1 px-3 py-2 rounded-xl bg-muted/50 border border-border text-sm resize-none h-16" />
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button className="flex-1 rounded-xl" onClick={() => editMutation.mutate({ id: editingTrip, data: editForm })} disabled={editMutation.isPending}>
-                  {editMutation.isPending ? "جاري الحفظ..." : "حفظ التعديلات"}
-                </Button>
-                <Button variant="outline" className="rounded-xl" onClick={() => setEditingTrip(null)}>إلغاء</Button>
+
+              {/* Cities + Date — only when 0 bookings */}
+              {(editForm._bookingsCount || 0) === 0 && (
+                <>
+                  <div className="border-t border-border pt-4">
+                    <p className="text-xs font-bold text-muted-foreground mb-3">الوجهات والتاريخ</p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground">من</label>
+                        <Input value={editForm.from_city ?? ""} onChange={e => setEditForm(f => ({...f, from_city: e.target.value}))} className="mt-1 h-10 rounded-xl" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-muted-foreground">إلى</label>
+                        <Input value={editForm.to_city ?? ""} onChange={e => setEditForm(f => ({...f, to_city: e.target.value}))} className="mt-1 h-10 rounded-xl" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">التاريخ</label>
+                      <Input type="date" value={editForm.date ?? ""} onChange={e => setEditForm(f => ({...f, date: e.target.value}))} className="mt-1 h-10 rounded-xl" />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold text-muted-foreground">المحطات</p>
+                      <button type="button" onClick={() => setEditForm(f => ({...f, stops: [...(f.stops || []), { city: "", location: "", price_from_origin: 0 }]}))} className="text-xs text-primary hover:underline">+ محطة</button>
+                    </div>
+                    {(editForm.stops || []).length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">رحلة مباشرة بدون محطات</p>
+                    )}
+                    {(editForm.stops || []).map((stop, idx) => (
+                      <div key={idx} className="bg-muted/40 rounded-xl p-2 mb-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">محطة {idx + 1}</span>
+                          <button type="button" onClick={() => setEditForm(f => ({...f, stops: f.stops.filter((_, i) => i !== idx)}))} className="text-xs text-destructive hover:underline">حذف</button>
+                        </div>
+                        <Input value={stop.city ?? ""} onChange={e => setEditForm(f => ({...f, stops: f.stops.map((s, i) => i === idx ? {...s, city: e.target.value} : s)}))} placeholder="مدينة المحطة" className="h-9 rounded-lg" />
+                        <Input type="number" value={stop.price_from_origin ?? 0} onChange={e => setEditForm(f => ({...f, stops: f.stops.map((s, i) => i === idx ? {...s, price_from_origin: parseFloat(e.target.value) || 0} : s)}))} placeholder="السعر (₪)" className="h-9 rounded-lg" />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Amenities — always editable */}
+              <div className="border-t border-border pt-4">
+                <p className="text-xs font-bold text-muted-foreground mb-2">المرافق</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: "wifi", label: "Wi-Fi" },
+                    { id: "ac", label: "تكييف" },
+                    { id: "music", label: "موسيقى" },
+                    { id: "smoking", label: "مسموح بالتدخين" },
+                    { id: "luggage", label: "متاح للأمتعة" },
+                  ].map(a => {
+                    const isOn = (editForm.amenities || []).includes(a.id);
+                    return (
+                      <button key={a.id} type="button" onClick={() => setEditForm(f => ({...f, amenities: isOn ? (f.amenities || []).filter(x => x !== a.id) : [...(f.amenities || []), a.id]}))} className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${isOn ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground"}`}>
+                        {a.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+            </div>
+
+            <div className="p-4 border-t border-border flex gap-2 sticky bottom-0 bg-card">
+              <Button className="flex-1 rounded-xl" onClick={() => {
+                const cleanStops = (editForm.stops || []).filter(s => s && s.city && s.city.trim()).map(s => ({
+                  city: s.city.trim(),
+                  location: (s.location || "").trim(),
+                  price_from_origin: Number(s.price_from_origin) || 0,
+                }));
+                const payload = { ...editForm };
+                delete payload._bookingsCount;
+                delete payload._tripData;
+                payload.stops = cleanStops;
+                payload.is_direct = cleanStops.length === 0;
+                editMutation.mutate({ id: editingTrip, data: payload });
+              }} disabled={editMutation.isPending}>
+                {editMutation.isPending ? "جاري الحفظ..." : "حفظ التعديلات"}
+              </Button>
+              <Button variant="outline" className="rounded-xl" onClick={() => setEditingTrip(null)}>إلغاء</Button>
             </div>
           </div>
         </div>
