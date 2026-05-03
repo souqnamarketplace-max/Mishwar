@@ -182,7 +182,7 @@ export default function CreateTrip() {
   const addStop = () => {
     setForm((prev) => ({
       ...prev,
-      stops: [...prev.stops, { city: "", location: "", time: "", price_from_origin: 0, seats_available: prev.available_seats || 4 }],
+      stops: [...prev.stops, { city: "", location: "", price_from_origin: 0, seats_available: prev.available_seats || 4 }],
       // A trip with stops is no longer "direct"
       is_direct: false,
     }));
@@ -213,7 +213,6 @@ export default function CreateTrip() {
       for (let i = 0; i < form.stops.length; i++) {
         const s = form.stops[i];
         if (!s.city) { toast.error(`المحطة ${i + 1}: يرجى اختيار المدينة ⚠️`); return false; }
-        if (!s.time) { toast.error(`المحطة ${i + 1}: يرجى تحديد وقت الوصول ⚠️`); return false; }
         if (s.city === form.from_city || s.city === form.to_city) { toast.error(`المحطة ${i + 1}: لا يمكن أن تكون نفس مدينة الانطلاق أو الوصول ⚠️`); return false; }
       }
     }
@@ -491,6 +490,12 @@ export default function CreateTrip() {
                   + محطة
                 </Button>
               </div>
+              {form.stops.length > 0 && (
+                <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2 mb-2 flex items-start gap-2">
+                  <span>💡</span>
+                  <span>لا حاجة لتحديد وقت الوصول للمحطات — السائق سيتواصل مع الراكب عند الاقتراب</span>
+                </div>
+              )}
               {form.stops.map((stop, idx) => (
                 <div key={idx} className="bg-card rounded-xl border border-border p-3 mb-2 space-y-2">
                   <div className="flex items-center justify-between">
@@ -511,14 +516,7 @@ export default function CreateTrip() {
                       placeholder="مدينة المحطة"
                       iconColor="muted"
                     />
-                    <Input
-                      type="time"
-                      value={stop.time}
-                      onChange={(e) => updateStop(idx, "time", e.target.value)}
-                      className="h-10 rounded-xl"
-                      placeholder="وقت الوصول"
-                    />
-                    <Input
+<Input
                       type="text"
                       value={stop.location}
                       onChange={(e) => updateStop(idx, "location", e.target.value)}
