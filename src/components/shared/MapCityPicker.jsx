@@ -108,10 +108,8 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
       });
 
       // OpenStreetMap tile layer
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 18,
-      }).addTo(map);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {subdomains: "abcd", maxZoom: 20, attribution: "© OpenStreetMap contributors",
+        maxZoom: 18,}).addTo(map);
 
       // Custom icon factory
       const makeIcon = (isSelected) => L.divIcon({

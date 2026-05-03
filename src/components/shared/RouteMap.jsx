@@ -97,10 +97,8 @@ export default function RouteMap({
         mapInstanceRef.current = map;
 
         // OpenStreetMap tile layer
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: '© OpenStreetMap contributors',
-        }).addTo(map);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {subdomains: "abcd", maxZoom: 20, maxZoom: 19,
+          attribution: '© OpenStreetMap contributors',}).addTo(map);
 
         // Small attribution
         L.control.attribution({ prefix: false })
