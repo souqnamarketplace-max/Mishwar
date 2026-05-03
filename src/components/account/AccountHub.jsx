@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import {
   ArrowLeft, ChevronLeft, User, ShieldCheck, Bell, CreditCard,
@@ -20,7 +20,14 @@ export default function AccountHub() {
   const auth = useAuth();
   const user = auth?.user;
   const refreshUser = auth?.refreshUser;
-  const [section, setSection] = useState(null);
+  const [searchParams] = useSearchParams();
+  const [section, setSection] = useState(searchParams.get("section") || null);
+
+  // Sync section state with URL query param when it changes (deep links from menu)
+  React.useEffect(() => {
+    const fromUrl = searchParams.get("section");
+    if (fromUrl) setSection(fromUrl);
+  }, [searchParams]);
 
   if (!user) {
     return (

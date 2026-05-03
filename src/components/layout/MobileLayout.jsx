@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -228,12 +228,52 @@ export default function MobileLayout({ children, user, showHeader = true, header
               </div>
             </div>
 
-            {/* Main Nav — mirrors bottom tabs */}
+            {/* Main Nav — Account section + Quick links */}
             <div className="flex-1 overflow-y-auto" dir="rtl">
+              {/* Account Section */}
               <div className="py-2">
-                {[                  { icon: Heart,         label: "المفضلة",          path: "/favorites" },                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">حسابي</p>
+                {[
+                  { icon: User,          label: "إعدادات الملف الشخصي", path: "/account-settings/profile" },
+                  { icon: ShieldCheck,   label: "التحقق من الهوية",       path: "/account-settings?section=verification" },
+                  { icon: Bell,          label: "إعدادات الإشعارات",       path: "/account-settings?section=notifications" },
+                  { icon: Sparkles,      label: "التفضيلات",                path: "/account-settings?section=preferences" },
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                    ? [{ icon: Car, label: "تفاصيل السيارة", path: "/account-settings?section=vehicle" }]
+                    : []
+                  ),
+                  ...(user?.account_type === "passenger" || user?.account_type === "both" || !user?.account_type
+                    ? [{ icon: CreditCard, label: "سجل المدفوعات", path: "/account-settings?section=payments" }]
+                    : []
+                  ),
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                    ? [{ icon: CreditCard, label: "مدفوعات السائق", path: "/driver?tab=payment" }]
+                    : []
+                  ),
+                  { icon: Settings,      label: "إعدادات متقدمة",          path: "/account-settings/profile#license" },
+                ].map(({ icon: Icon, label, path }) => (
+                  <Link
+                    key={path}
+                    to={path}
+                    onClick={() => setShowMobileMenu(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted transition-colors text-foreground"
+                  >
+                    <Icon className="w-5 h-5 text-primary shrink-0" />
+                    <span className="text-sm font-medium">{label}</span>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="mx-4 my-1 border-t border-border" />
+
+              {/* Quick Links Section */}
+              <div className="py-2">
+                <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">روابط سريعة</p>
+                {[
+                  { icon: Heart,         label: "المفضلة",          path: "/favorites" },
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
                     ? [{ icon: Settings, label: "لوحة تحكم السائق", path: "/driver" }]
-                    : [{ icon: Settings, label: "الإعدادات",         path: "/account-settings" }]
+                    : []
                   ),
                 ].map(({ icon: Icon, label, path }) => (
                   <Link
@@ -251,6 +291,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
               <div className="mx-4 my-1 border-t border-border" />
 
               <div className="py-2">
+                <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">معلومات</p>
                 {[
                   { icon: BookOpen,        label: "كيف يعمل مِشوار",    path: "/how-it-works" },
                 { icon: Bell,           label: "إشعاراتي ومساراتي",  path: "/notifications" },
