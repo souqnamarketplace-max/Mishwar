@@ -454,7 +454,26 @@ export default function TripDetails() {
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="font-bold text-foreground mb-3">تواصل مع السائق</h3>
             <div className="space-y-2">
-              <Button variant="outline" className="w-full rounded-xl gap-2" onClick={() => navigate("/messages")}>
+              <Button
+                variant="outline"
+                className="w-full rounded-xl gap-2"
+                onClick={() => {
+                  if (!trip?.driver_email) {
+                    toast.error("لا يمكن بدء المحادثة الآن");
+                    return;
+                  }
+                  if (user?.email === trip.driver_email) {
+                    toast.info("هذه رحلتك — لا يمكنك مراسلة نفسك");
+                    return;
+                  }
+                  const params = new URLSearchParams({
+                    to: trip.driver_email,
+                    name: trip.driver_name || trip.driver_email.split("@")[0],
+                    trip: trip.id,
+                  });
+                  navigate(`/messages?${params.toString()}`);
+                }}
+              >
                 <MessageCircle className="w-4 h-4" />
                 محادثة
               </Button>
