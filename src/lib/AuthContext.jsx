@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { captureException } from "@/lib/sentry";
 import { supabase } from '@/lib/supabase';
 import { queryClientInstance } from '@/lib/query-client';
+import { invalidateBlockCache } from "@/lib/blockUtils";
 import { base44 } from '@/api/base44Client';
 
 // Read session instantly from localStorage — no network call
@@ -45,6 +46,7 @@ export const AuthProvider = ({ children }) => {
         await loadUserProfile(session.user);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
+        invalidateBlockCache();
         setIsAuthenticated(false);
         setAuthError(null);
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {

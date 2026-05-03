@@ -1,184 +1,139 @@
-import React from "react";
-import { supabase } from "@/lib/supabase";
-import { useQuery } from "@tanstack/react-query";
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { TrendingUp, Car, Users, Star, CalendarCheck } from "lucide-react";
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
+import { Flag, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { REPORT_CATEGORIES } from "@/lib/blockUtils";
+
+const STATUS_LABELS = {
+  pending: { label: "قيد المراجعة", color: "yellow" },
+  reviewed: { label: "تمت المراجعة", color: "blue" },
+  action_taken: { label: "تم اتخاذ إجراء", color: "green" },
+  dismissed: { label: "مرفوض", color: "gray" },
+};
 
 export default function DashboardReports() {
-  // Single aggregation RPC — replaces 3 list() calls of 200 rows each (~600 rows total)
-  const { data: metrics = {}, isLoading } = useQuery({
-    queryKey: ["dashboard-metrics"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_metrics");
-      if (error) throw error;
-      return data || {};
-    },
-    refetchInterval: 30000, // refresh every 30 seconds (cached server-side)
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState("pending");
+
+  const { data: reports = [], isLoading } = useQuery({
+    queryKey: ["reports", filter],
+    queryFn: () => base44.entities.UserReport.filter(
+      filter === "all" ? {} : { status: filter },
+      "-created_at",
+      200
+    ),
   });
 
-  // Time-series data for charts (separate RPC, only when needed)
-  const { data: timeseries = {} } = useQuery({
-    queryKey: ["dashboard-timeseries"],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("dashboard_timeseries");
-      if (error) throw error;
-      return data || {};
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.UserReport.update(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["reports"] });
+      toast.success("تم تحديث البلاغ");
     },
-    staleTime: 60000, // 1 min cache
+    onError: () => toast.error("فشل التحديث"),
   });
 
-  // Transform server data into chart format
-  const cityData = metrics.trips_by_city || [];
-
-  const bookingStatuses = metrics.bookings_by_status || {};
-  const statusData = [
-    { name: "مؤكد",  value: bookingStatuses.confirmed || 0, color: "hsl(90, 35%, 42%)" },
-    { name: "معلق",  value: bookingStatuses.pending || 0,   color: "hsl(40, 80%, 55%)" },
-    { name: "ملغي",  value: bookingStatuses.cancelled || 0, color: "hsl(0, 84%, 60%)" },
-    { name: "مكتمل", value: bookingStatuses.completed || 0, color: "hsl(135, 20%, 30%)" },
-  ];
-
-  const tripStatuses = metrics.trips_by_status || {};
-  const tripStatusData = [
-    { name: "مؤكدة",  value: tripStatuses.confirmed || 0 },
-    { name: "مباشرة", value: tripStatuses.in_progress || 0 },
-    { name: "مكتملة", value: tripStatuses.completed || 0 },
-    { name: "ملغاة",  value: tripStatuses.cancelled || 0 },
-  ];
-
-  const tripsByDay = (timeseries.trips_by_day || []).map(d => ({
-    date: new Date(d.date).toLocaleDateString("ar", { month: "short", day: "numeric" }),
-    count: d.count,
-  }));
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const handleAction = (report, status) => {
+    updateMutation.mutate({
+      id: report.id,
+      data: {
+        status,
+        reviewed_at: new Date().toISOString(),
+      },
+    });
+  };
 
   return (
-    <div className="space-y-6">
-      {/* Summary Cards (server-side counts) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "إجمالي الرحلات",  value: (metrics.total_trips ?? 0).toLocaleString("ar"),    icon: Car,           color: "text-primary",  bg: "bg-primary/10" },
-          { label: "إجمالي الحجوزات", value: (metrics.total_bookings ?? 0).toLocaleString("ar"), icon: CalendarCheck, color: "text-accent",   bg: "bg-accent/10" },
-          { label: "متوسط التقييم",   value: metrics.avg_rating ?? "—",                          icon: Star,          color: "text-yellow-600", bg: "bg-yellow-500/10" },
-          { label: "إجمالي الإيرادات",value: `₪${(metrics.total_revenue ?? 0).toLocaleString()}`, icon: TrendingUp,    color: "text-green-600", bg: "bg-green-500/10" },
-        ].map((s) => (
-          <div key={s.label} className="bg-card rounded-xl border border-border p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-lg ${s.bg} flex items-center justify-center`}>
-              <s.icon className={`w-5 h-5 ${s.color}`} />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">{s.label}</p>
-              <p className="text-xl font-bold">{s.value}</p>
-            </div>
-          </div>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8" dir="rtl">
+      <div className="flex items-center gap-3 mb-6">
+        <Flag className="w-7 h-7 text-yellow-600" />
+        <h1 className="text-2xl font-bold text-foreground">بلاغات المستخدمين</h1>
+      </div>
+
+      <div className="flex gap-2 mb-6 overflow-x-auto">
+        {["pending", "reviewed", "action_taken", "dismissed", "all"].map(f => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={`px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-colors ${
+              filter === f
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted/50 text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {f === "all" ? "الكل" : STATUS_LABELS[f]?.label}
+          </button>
         ))}
       </div>
 
-      {/* This week activity */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: "رحلات هذا الأسبوع",   value: metrics.trips_this_week ?? 0,    icon: "🚗" },
-          { label: "حجوزات هذا الأسبوع",  value: metrics.bookings_this_week ?? 0, icon: "📅" },
-          { label: "تقييمات هذا الأسبوع", value: metrics.reviews_this_week ?? 0,  icon: "⭐" },
-          { label: "مستخدمون جدد",        value: metrics.new_users_this_week ?? 0, icon: "👥" },
-        ].map((s) => (
-          <div key={s.label} className="bg-muted/30 rounded-xl p-3">
-            <div className="text-2xl mb-1">{s.icon}</div>
-            <div className="text-lg font-bold">{(s.value).toLocaleString("ar")}</div>
-            <div className="text-xs text-muted-foreground">{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-card rounded-xl border border-border p-4">
-          <h3 className="font-bold text-sm mb-4">الرحلات حسب المدينة</h3>
-          <div className="h-56">
-            {cityData.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">لا توجد بيانات بعد</div>
-            ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={cityData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(40,10%,90%)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="hsl(135, 20%, 30%)" radius={[4,4,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border p-4">
-          <h3 className="font-bold text-sm mb-4">توزيع حالات الحجوزات</h3>
-          <div className="h-56 flex items-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={statusData} innerRadius={60} outerRadius={90} paddingAngle={3} dataKey="value">
-                  {statusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 shrink-0">
-              {statusData.map((d) => (
-                <div key={d.name} className="flex items-center gap-2 text-xs">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                  <span>{d.name} ({d.value})</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trips over time */}
-      {tripsByDay.length > 0 && (
-        <div className="bg-card rounded-xl border border-border p-4">
-          <h3 className="font-bold text-sm mb-4">الرحلات خلال آخر 30 يوماً</h3>
-          <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={tripsByDay}>
-                <defs>
-                  <linearGradient id="tripGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(135, 20%, 30%)" stopOpacity={0.4} />
-                    <stop offset="100%" stopColor="hsl(135, 20%, 30%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(40,10%,90%)" />
-                <XAxis dataKey="date" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="hsl(135, 20%, 30%)" fill="url(#tripGradient)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      {isLoading && <p className="text-muted-foreground">جارٍ التحميل...</p>}
+      {!isLoading && reports.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground">
+          <CheckCircle2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+          <p>لا توجد بلاغات</p>
         </div>
       )}
 
-      {/* Trip statuses */}
-      <div className="bg-card rounded-xl border border-border p-4">
-        <h3 className="font-bold text-sm mb-4">حالات الرحلات</h3>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={tripStatusData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(40,10%,90%)" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(90, 35%, 42%)" radius={[4,4,0,0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="space-y-3">
+        {reports.map(r => {
+          const cat = REPORT_CATEGORIES.find(c => c.id === r.category);
+          const stat = STATUS_LABELS[r.status] || STATUS_LABELS.pending;
+          return (
+            <div key={r.id} className="bg-card rounded-2xl border border-border p-4">
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    {r.reporter_email} ← <span className="text-destructive">{r.reported_email}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {new Date(r.created_at).toLocaleString("ar-EG")}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full bg-${stat.color}-500/10 text-${stat.color}-700 whitespace-nowrap`}>
+                  {stat.label}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertCircle className="w-4 h-4 text-yellow-600" />
+                <span className="text-sm font-medium">{cat?.label || r.category}</span>
+              </div>
+              {r.details && (
+                <p className="text-sm text-muted-foreground bg-muted/40 rounded-lg p-3 mb-3">
+                  {r.details}
+                </p>
+              )}
+              {r.context_type && r.context_id && (
+                <p className="text-xs text-muted-foreground mb-3">
+                  السياق: {r.context_type} #{r.context_id}
+                </p>
+              )}
+              {r.status === "pending" && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg text-xs"
+                    onClick={() => handleAction(r, "action_taken")}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 ml-1" />
+                    تم اتخاذ إجراء
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-lg text-xs"
+                    onClick={() => handleAction(r, "dismissed")}
+                  >
+                    <XCircle className="w-3.5 h-3.5 ml-1" />
+                    رفض
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

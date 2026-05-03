@@ -530,6 +530,8 @@ export const base44 = {
     AppSettings:    createEntityClient('app_settings'),
     Announcement:   createEntityClient('announcements'),
     SupportTicket:  createEntityClient('support_tickets'),
+    UserBlock:      createEntityClient('user_blocks'),
+    UserReport:     createEntityClient('user_reports'),
     TripPreference: createEntityClient('trip_preferences'),
     User:           createEntityClient('profiles'),
   },

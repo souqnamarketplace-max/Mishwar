@@ -14,6 +14,7 @@ import {
   Headphones, X, Check, CreditCard, Wallet, Building2, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import UserActionsMenu from "@/components/shared/UserActionsMenu";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -452,7 +453,17 @@ export default function TripDetails() {
 
           {/* Contact */}
           <div className="bg-card rounded-2xl border border-border p-5">
-            <h3 className="font-bold text-foreground mb-3">تواصل مع السائق</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-foreground">تواصل مع السائق</h3>
+              {trip?.driver_email && user?.email !== trip.driver_email && (
+                <UserActionsMenu
+                  targetEmail={trip.driver_email}
+                  targetName={trip.driver_name}
+                  contextType="trip"
+                  contextId={trip.id}
+                />
+              )}
+            </div>
             <div className="space-y-2">
               <Button
                 variant="outline"
