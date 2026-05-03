@@ -16,6 +16,44 @@ import { captureException } from "@/lib/sentry";
 import { MapPin, Clock, Navigation, Loader2 } from 'lucide-react';
 import { calculateRoute, calculateMultiStopRoute } from '@/lib/mapUtils';
 
+const ARABIC_CITY_LABELS = [
+  // Major cities — visible at low zoom (z>=8)
+  ['رام الله',     31.9038, 35.2034, 8],
+  ['نابلس',        32.2211, 35.2544, 8],
+  ['الخليل',       31.5326, 35.0998, 8],
+  ['بيت لحم',      31.7054, 35.2024, 8],
+  ['القدس',        31.7683, 35.2137, 8],
+  ['جنين',         32.4597, 35.2972, 8],
+  ['طولكرم',       32.3104, 35.0286, 8],
+  ['قلقيلية',      32.1894, 34.9706, 8],
+  ['أريحا',        31.8567, 35.4611, 8],
+  ['غزة',          31.5018, 34.4669, 8],
+  ['طوباس',        32.3219, 35.3692, 9],
+  ['سلفيت',        32.0844, 35.1797, 9],
+  ['البيرة',       31.9123, 35.2209, 9],
+  // Mid-size — visible at z>=10
+  ['عزون',         32.1894, 35.0125, 10],
+  ['بيتين',        31.9417, 35.2375, 10],
+  ['بيتونيا',      31.8960, 35.1669, 10],
+  ['دير دبوان',    31.9381, 35.2992, 10],
+  ['سلواد',        31.9558, 35.2622, 10],
+  ['عنبتا',        32.3097, 35.1153, 10],
+  ['يعبد',         32.4261, 35.1736, 10],
+  ['بيت جالا',     31.7194, 35.1856, 10],
+  ['بيت ساحور',    31.6981, 35.2231, 10],
+  ['دورا',         31.5081, 35.0264, 10],
+  ['يطا',          31.4467, 35.0883, 10],
+  ['الظاهرية',     31.4067, 34.9678, 10],
+  ['عرابة',        32.4117, 35.3267, 10],
+  ['سعير',         31.5606, 35.1419, 10],
+  ['حلحول',        31.5783, 35.1006, 10],
+  ['عبوين',        32.0078, 35.1739, 10],
+  ['دير شرف',      32.2331, 35.1858, 10],
+  ['بديا',         32.1078, 35.0494, 10],
+  ['أبو ديس',      31.7672, 35.2844, 10],
+  ['العيزرية',     31.7750, 35.2726, 10],
+];
+
 // Fix Leaflet default marker icons (broken in Vite)
 function fixLeafletIcons(L) {
   delete L.Icon.Default.prototype._getIconUrl;
@@ -99,6 +137,39 @@ export default function RouteMap({
         // OpenStreetMap tile layer
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {subdomains: "abcd", maxZoom: 20, maxZoom: 19,
           attribution: '© OpenStreetMap contributors',}).addTo(map);
+        // ── Arabic city label overlay ─────────────────────────────────
+        const labelsLayer = L.layerGroup();
+        const renderArabicLabels = () => {
+          labelsLayer.clearLayers();
+          const z = map.getZoom();
+          ARABIC_CITY_LABELS.forEach(([name, lat, lng, minZ]) => {
+            if (z < minZ) return;
+            const fontSize = z >= 11 ? 13 : z >= 9 ? 12 : 11;
+            const icon = L.divIcon({
+              className: 'mishwar-ar-city-label',
+              html: `<div style="
+                font-family: 'Cairo', 'Tajawal', system-ui, sans-serif;
+                font-size: ${fontSize}px;
+                font-weight: 700;
+                color: #1a3322;
+                text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff,
+                             -2px 0 0 #fff, 2px 0 0 #fff, 0 -2px 0 #fff, 0 2px 0 #fff;
+                white-space: nowrap;
+                pointer-events: none;
+                user-select: none;
+                direction: rtl;
+              ">${name}</div>`,
+              iconSize: [80, 16],
+              iconAnchor: [40, 8],
+            });
+            L.marker([lat, lng], { icon, interactive: false, keyboard: false, zIndexOffset: -1000 }).addTo(labelsLayer);
+          });
+        };
+        labelsLayer.addTo(map);
+        renderArabicLabels();
+        map.on('zoomend', renderArabicLabels);
+        // ──────────────────────────────────────────────────────────────
+
 
         // Small attribution
         L.control.attribution({ prefix: false })
