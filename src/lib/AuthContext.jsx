@@ -81,6 +81,23 @@ export const AuthProvider = ({ children }) => {
         if (r.ok) {
           const rows = await r.json();
           profile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+          // ─── Deleted account guard ───
+          // If profile.deleted_at is set, this account was soft-deleted.
+          // Sign the user out immediately and prevent re-entry.
+          if (profile?.deleted_at) {
+            await supabase.auth.signOut();
+            setUser(null);
+            if (typeof window !== "undefined") {
+              setTimeout(() => {
+                if (window.toast?.error) {
+                  window.toast.error("هذا الحساب تم حذفه. للاسترداد، تواصل مع الدعم.");
+                } else {
+                  alert("هذا الحساب تم حذفه. للاسترداد، تواصل مع الدعم.");
+                }
+              }, 100);
+            }
+            return;
+          }
         }
       } finally {
         clearTimeout(timer);

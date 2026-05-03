@@ -275,14 +275,80 @@ export default function AccountSettings() {
   const deleteAccount = async () => {
     setDeletionLoading(true);
     try {
-      await base44.auth.deleteMe?.();
+      const today = new Date().toISOString().split("T")[0];
+
+      // Pre-flight: block deletion if user has active trips/bookings
+      const [activeDriverTrips, activeBookings] = await Promise.all([
+        base44.entities.Trip.filter(
+          { driver_email: user.email, status: "confirmed" },
+          "-date",
+          50
+        ).then((trips) => (trips || []).filter((t) => t.date >= today)),
+        base44.entities.Booking.filter(
+          { passenger_email: user.email, status: "confirmed" },
+          "-created_date",
+          50
+        ),
+      ]);
+
+      if (activeDriverTrips.length > 0) {
+        toast.error(
+          `لا يمكن حذف الحساب — لديك ${activeDriverTrips.length} رحلة قادمة كسائق. يرجى إلغاؤها أولاً.`
+        );
+        setDeletionLoading(false);
+        return;
+      }
+      if (activeBookings.length > 0) {
+        toast.error(
+          `لا يمكن حذف الحساب — لديك ${activeBookings.length} حجز قادم كراكب. يرجى إلغاؤها أولاً.`
+        );
+        setDeletionLoading(false);
+        return;
+      }
+
+      // Anonymize PII + mark as deleted
+      await base44.entities.Profile.update(user.id, {
+        full_name: "[حساب محذوف]",
+        avatar_url: null,
+        phone: null,
+        bio: null,
+        bank_iban: null,
+        jawwal_pay_number: null,
+        reflect_number: null,
+        credit_card_enabled: false,
+        pref_smoking: null,
+        pref_chattiness: null,
+        pref_pets: null,
+        vehicle_luggage: null,
+        vehicle_back_row: null,
+        car_model: null,
+        car_year: null,
+        car_color: null,
+        car_plate: null,
+        car_image: null,
+        driver_note: null,
+        notif_push: false,
+        notif_email: false,
+        notif_sms: false,
+        notif_marketing: false,
+        deleted_at: new Date().toISOString(),
+      });
+
+      try {
+        await base44.auth.deleteMe?.();
+      } catch (_) {
+        /* ignore — soft delete is the source of truth */
+      }
       toast.success("تم حذف حسابك بنجاح");
-      setTimeout(() => base44.auth.logout?.("/"), 1500);
+      setTimeout(() => {
+        if (base44.auth.logout) base44.auth.logout("/");
+        else window.location.href = "/";
+      }, 1500);
     } catch (err) {
       captureException(err, { msg: "Delete error:" });
       toast.error("فشل حذف الحساب. يرجى الاتصال بالدعم");
+      setDeletionLoading(false);
     }
-    setDeletionLoading(false);
     setShowDeleteModal(false);
   };
 
