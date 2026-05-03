@@ -43,7 +43,7 @@ function NotifIcon({ type, title }) {
 
 export default function NotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 60, right: 8 });
+  const [pos, setPos] = useState({ top: 60, left: 8, width: 340 });
   const btnRef = useRef(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -101,7 +101,12 @@ export default function NotificationBell({ userEmail }) {
   const handleToggle = () => {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right - 4) });
+      const desiredWidth = Math.min(380, window.innerWidth - 16);
+      // Anchor dropdown so its RIGHT edge aligns with the bell's right edge (RTL-friendly)
+      // then clamp within viewport so it never overflows.
+      let left = rect.right - desiredWidth;
+      left = Math.max(8, Math.min(left, window.innerWidth - desiredWidth - 8));
+      setPos({ top: rect.bottom + 8, left, width: desiredWidth });
     }
     setOpen(v => !v);
   };
@@ -136,8 +141,8 @@ export default function NotificationBell({ userEmail }) {
               style={{
                 position: "fixed",
                 top: pos.top,
-                right: pos.right,
-                width: Math.min(340, window.innerWidth - 16),
+                left: pos.left,
+                width: pos.width,
                 zIndex: 9999,
               }}
               className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
