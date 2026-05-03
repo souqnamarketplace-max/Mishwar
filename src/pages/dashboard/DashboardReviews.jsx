@@ -21,7 +21,7 @@ export default function DashboardReviews() {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Review.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-reviews"] }); toast.success("تم حذف التقييم"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["reviews"] }); toast.success("تم حذف التقييم"); },
   });
 
   if (isLoading) return <div className="p-8 text-center text-muted-foreground">جاري التحميل...</div>;

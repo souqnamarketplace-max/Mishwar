@@ -43,12 +43,12 @@ export default function DashboardSupport() {
 
   const updateMutation = useMutation({
     mutationFn: ({ id, status, resolution_note }) => base44.entities.SupportTicket.update(id, { status, ...(resolution_note ? { description: resolution_note } : {}) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["support_tickets"] }); setReplyingTo(null); setReplyNote(""); toast.success("تم تحديث الحالة"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tickets"] }); setReplyingTo(null); setReplyNote(""); toast.success("تم تحديث الحالة"); },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.SupportTicket.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["support_tickets"] }); toast.success("تم حذف التذكرة"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tickets"] }); toast.success("تم حذف التذكرة"); },
   });
 
   const open = tickets.filter((t) => t.status === "open").length;

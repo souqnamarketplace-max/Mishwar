@@ -22,8 +22,8 @@ export default function DashboardTrips() {
 
   // Realtime — admin sees trip changes instantly
   React.useEffect(() => {
-    const u1 = base44.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-trips"] }));
-    const u2 = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-trips"] }));
+    const u1 = base44.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["trips"] }));
+    const u2 = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["trips"] }));
     return () => { u1(); u2(); };
   }, []);
 
@@ -40,7 +40,7 @@ export default function DashboardTrips() {
   const deleteMutation = useMutation({
     mutationFn: (id) => base44.entities.Trip.delete(id),
     onSuccess: (_, tripId) => {
-      qc.invalidateQueries({ queryKey: ["admin-trips"] });
+      qc.invalidateQueries({ queryKey: ["trips"] });
       toast.success("تم حذف الرحلة");
       const trip = trips?.find(t => t.id === tripId);
       logAdminAction("admin_delete_trip", "trip", tripId, {
@@ -53,7 +53,7 @@ export default function DashboardTrips() {
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Trip.update(id, { status }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-trips"] }); toast.success("تم تحديث الحالة"); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["trips"] }); toast.success("تم تحديث الحالة"); },
   });
 
   const filtered = trips.filter((t) =>

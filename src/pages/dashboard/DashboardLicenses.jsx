@@ -17,7 +17,7 @@ export default function DashboardLicenses() {
   const qc = useQueryClient();
 
   React.useEffect(() => {
-    const u = base44.entities.DriverLicense.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-licenses"] }));
+    const u = base44.entities.DriverLicense.subscribe(() => qc.invalidateQueries({ queryKey: ["licenses"] }));
     return () => u();
   }, []);
 

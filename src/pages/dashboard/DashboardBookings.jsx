@@ -20,7 +20,7 @@ export default function DashboardBookings() {
   const qc = useQueryClient();
 
   React.useEffect(() => {
-    const u = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-bookings"] }));
+    const u = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["bookings"] }));
     return () => u();
   }, []);
 
@@ -36,7 +36,7 @@ export default function DashboardBookings() {
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }) => base44.entities.Booking.update(id, { status }),
-    onSuccess: (_, { id, status }) => { qc.invalidateQueries({ queryKey: ["admin-bookings"] }); toast.success("تم تحديث الحالة"); logAdminAction("admin_update_booking_status", "booking", id, { new_status: status }); },
+    onSuccess: (_, { id, status }) => { qc.invalidateQueries({ queryKey: ["bookings"] }); toast.success("تم تحديث الحالة"); logAdminAction("admin_update_booking_status", "booking", id, { new_status: status }); },
   });
 
   const filtered = bookings.filter((b) =>

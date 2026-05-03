@@ -23,7 +23,7 @@ export default function DashboardUsers() {
   const qc = useQueryClient();
 
   React.useEffect(() => {
-    const u = base44.entities.Profile.subscribe(() => qc.invalidateQueries({ queryKey: ["admin-users"] }));
+    const u = base44.entities.Profile.subscribe(() => qc.invalidateQueries({ queryKey: ["users"] }));
     return () => u();
   }, []);
 
