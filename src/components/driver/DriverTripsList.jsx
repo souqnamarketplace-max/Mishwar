@@ -33,6 +33,33 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
     mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
     onMutate: async ({ id, data }) => {
       await qc.cancelQueries({ queryKey: ["trips"] });
+
+  const cancelMutation = useMutation({
+    mutationFn: async (tripId) => {
+      // 1. Mark trip as cancelled
+      await base44.entities.Trip.update(tripId, { status: "cancelled" });
+
+      // 2. Cancel all confirmed bookings for this trip
+      const bookings = await base44.entities.Booking.filter({ trip_id: tripId, status: "confirmed" }, "-created_date", 100);
+      for (const b of bookings) {
+        try {
+          await base44.entities.Booking.update(b.id, { status: "cancelled_by_driver" });
+        } catch (e) {
+          console.warn("Failed to cancel booking:", b.id, e);
+        }
+      }
+      return tripId;
+    },
+    onSuccess: () => {
+      toast.success("تم إلغاء الرحلة وإعلام الركاب");
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+    },
+    onError: () => toast.error("فشل إلغاء الرحلة"),
+  });
+
+  const [confirmCancel, setConfirmCancel] = useState(null);
       const prev = qc.getQueryData(["trips"]);
       qc.setQueryData(["trips"], old => 
         old?.map(t => t.id === id ? { ...t, ...data } : t) || []
@@ -207,7 +234,23 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                       size="sm"
                       variant="outline"
                       className="rounded-lg text-xs gap-1"
-                      onClick={() => { setEditingTrip(trip.id); setEditForm({ price: trip.price, time: trip.time, available_seats: trip.available_seats, driver_note: trip.driver_note || "" }); }}
+                      onClick={() => {
+                        setEditingTrip(trip.id);
+                        setEditForm({
+                          price: trip.price,
+                          time: trip.time,
+                          date: trip.date,
+                          available_seats: trip.available_seats,
+                          driver_note: trip.driver_note || "",
+                          from_city: trip.from_city,
+                          to_city: trip.to_city,
+                          stops: Array.isArray(trip.stops) ? trip.stops : [],
+                          amenities: Array.isArray(trip.amenities) ? trip.amenities : [],
+                          payment_methods: Array.isArray(trip.payment_methods) ? trip.payment_methods : ["cash"],
+                          _bookingsCount: trip.bookings_count || 0, // not sent — used to gate UI
+                          _tripData: trip, // keep ref to original for reset
+                        });
+                      }}
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       تعديل
