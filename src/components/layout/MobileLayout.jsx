@@ -231,14 +231,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             {/* Main Nav — mirrors bottom tabs */}
             <div className="flex-1 overflow-y-auto" dir="rtl">
               <div className="py-2">
-                {[
-                  { icon: Home,          label: "الرئيسية",        path: "/" },
-                  { icon: Search,        label: "بحث عن رحلة",     path: "/search" },
-                  { icon: MapPin,        label: "رحلاتي",           path: "/my-trips" },
-                  { icon: MessageSquare, label: "الرسائل",          path: "/messages" },
-                  { icon: Heart,         label: "المفضلة",          path: "/favorites" },
-                  { icon: User,          label: "الملف الشخصي",    path: user?.email ? `/profile?email=${user.email}` : "/profile" },
-                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                {[                  { icon: Heart,         label: "المفضلة",          path: "/favorites" },                  ...(user?.account_type === "driver" || user?.account_type === "both"
                     ? [{ icon: Settings, label: "لوحة تحكم السائق", path: "/driver" }]
                     : [{ icon: Settings, label: "الإعدادات",         path: "/account-settings" }]
                   ),
