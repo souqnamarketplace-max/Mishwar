@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
@@ -23,6 +24,7 @@ const RATING_LABELS = { 0:"اختر تقييماً", 1:"سيء جداً 😞", 2
 
 // ── Main Wizard ───────────────────────────────────────────────────────────────
 export default function DriverReviewWizard({ trip, passengers, driverUser, onClose }) {
+  const qc = useQueryClient();
   const [step, setStep] = useState(1); // 1=showup 2=stars 3=review 4=confirm 5=done
   const [submitting, setSubmitting] = useState(false);
 

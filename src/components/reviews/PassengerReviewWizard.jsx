@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ function StarPicker({ value, onChange }) {
 const RATING_LABELS = { 0:"اختر تقييماً", 1:"سيء جداً 😞", 2:"سيء 😕", 3:"مقبول 😐", 4:"جيد 😊", 5:"ممتاز! 🌟" };
 
 export default function PassengerReviewWizard({ trip, driverEmail, driverName, passengerUser, onClose }) {
+  const qc = useQueryClient();
   const [step, setStep] = useState(1); // 1=arrived? 2=stars 3=review 4=confirm 5=done
   const [arrived, setArrived] = useState(true);
   const [rating, setRating] = useState(5);

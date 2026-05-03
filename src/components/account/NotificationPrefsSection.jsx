@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Bell, Mail, MessageSquare, Megaphone } from "lucide-react";
@@ -9,6 +10,7 @@ import { toast } from "sonner";
  * Saves to profiles: notif_push, notif_email, notif_sms, notif_marketing
  */
 export default function NotificationPrefsSection({ user, onSaved }) {
+  const qc = useQueryClient();
   const [push, setPush]            = useState(user?.notif_push !== false);
   const [email, setEmail]          = useState(user?.notif_email !== false);
   const [sms, setSms]              = useState(user?.notif_sms === true);
@@ -32,6 +34,7 @@ export default function NotificationPrefsSection({ user, onSaved }) {
         .eq("email", user.email);
       if (error) throw error;
       toast.success("تم حفظ الإعدادات ✅");
+      qc.invalidateQueries({ queryKey: ["me"] });
       onSaved?.();
     } catch {
       toast.error("تعذر الحفظ");

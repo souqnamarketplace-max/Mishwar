@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Cigarette, MessageCircle, MessageSquare, Moon, Dog } from "lucide-react";
@@ -9,6 +10,7 @@ import { toast } from "sonner";
  * Saves to profiles: pref_smoking, pref_chattiness, pref_pets
  */
 export default function PreferencesSection({ user, onSaved }) {
+  const qc = useQueryClient();
   const [smoking, setSmoking] = useState(user?.pref_smoking || "no");
   const [chat, setChat] = useState(user?.pref_chattiness || "okay");
   const [pets, setPets] = useState(user?.pref_pets || false);
@@ -30,6 +32,7 @@ export default function PreferencesSection({ user, onSaved }) {
         .eq("email", user.email);
       if (error) throw error;
       toast.success("تم حفظ التفضيلات ✅");
+      qc.invalidateQueries({ queryKey: ["me"] });
       onSaved?.();
     } catch (e) {
       toast.error("تعذر الحفظ");

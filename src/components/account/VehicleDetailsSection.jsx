@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Users } from "lucide-react";
@@ -9,6 +10,7 @@ import { toast } from "sonner";
  * Saves to profiles: vehicle_luggage, vehicle_back_row
  */
 export default function VehicleDetailsSection({ user, onSaved }) {
+  const qc = useQueryClient();
   const [luggage, setLuggage] = useState(user?.vehicle_luggage || "m");
   const [backRow, setBackRow] = useState(user?.vehicle_back_row || 3);
   const [saving, setSaving] = useState(false);
@@ -28,6 +30,7 @@ export default function VehicleDetailsSection({ user, onSaved }) {
         .eq("email", user.email);
       if (error) throw error;
       toast.success("تم حفظ تفاصيل السيارة ✅");
+      qc.invalidateQueries({ queryKey: ["me"] });
       onSaved?.();
     } catch {
       toast.error("تعذر الحفظ");
