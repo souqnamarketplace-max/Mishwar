@@ -280,6 +280,15 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     </Button>
                   )}
 
+                  {trip.status !== "completed" && trip.status !== "cancelled" && (
+                    <button
+                      className="rounded-lg text-xs text-yellow-700 hover:bg-yellow-500/10 gap-1 flex items-center px-2 py-1.5 border border-yellow-500/30 hover:border-yellow-500/50 transition-colors"
+                      onClick={() => setConfirmCancel(trip.id)}
+                    >
+                      <span>⚠️</span>
+                      إلغاء الرحلة
+                    </button>
+                  )}
                   {trip.status !== "completed" && (
                     <button
                       className="rounded-lg text-xs text-destructive hover:bg-destructive/10 mr-auto gap-1 flex items-center px-2 py-1.5 border border-destructive/20 hover:border-destructive/40 transition-colors"
@@ -326,6 +335,45 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                 disabled={deleteMutation.isPending}
               >
                 {deleteMutation.isPending ? "جاري الحذف..." : "حذف نهائياً"}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {confirmCancel && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/50" dir="rtl" onClick={(e) => { if (e.target === e.currentTarget) setConfirmCancel(null); }}>
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <h3 className="font-bold text-lg text-foreground">إلغاء الرحلة</h3>
+              <p className="text-sm text-muted-foreground mt-1">هل أنت متأكد من إلغاء هذه الرحلة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+              {(() => {
+                const trip = trips?.find(t => t.id === confirmCancel);
+                const pax = bookings?.filter(b => b.trip_id === confirmCancel && b.status === "confirmed").length || 0;
+                return pax > 0 ? (
+                  <div className="mt-2 p-2 bg-yellow-500/10 rounded-lg text-xs text-yellow-700 font-medium">
+                    ⚠️ سيتم إعلام {pax} {pax === 1 ? "راكب محجوز" : "ركاب محجوزون"} وسيُسترد المبلغ المدفوع
+                  </div>
+                ) : (
+                  <div className="mt-2 p-2 bg-muted/40 rounded-lg text-xs text-muted-foreground">
+                    لا يوجد ركاب محجوزون — سيتم إخفاء الرحلة من نتائج البحث
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setConfirmCancel(null)}>
+                تراجع
+              </Button>
+              <Button
+                className="flex-1 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={() => { cancelMutation.mutate(confirmCancel); setConfirmCancel(null); }}
+                disabled={cancelMutation.isPending}
+              >
+                {cancelMutation.isPending ? "جاري الإلغاء..." : "نعم، إلغاء الرحلة"}
               </Button>
             </div>
           </div>
