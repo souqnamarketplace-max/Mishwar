@@ -12,7 +12,7 @@ const menuItems = [
   { id: "bookings", icon: CalendarCheck, label: "إدارة الحجوزات" },
   { id: "reviews", icon: Star, label: "التقييمات والمراجعات" },
   { id: "payments", icon: CreditCard, label: "المعاملات والمدفوعات" },
-  { id: "reports", icon: BarChart3, label: "التقارير والإحصائيات" },
+  { id: "reports", icon: Flag, label: "بلاغات المستخدمين" },
   { id: "notifications", icon: Bell, label: "الإشعارات" },
   { id: "support", icon: Headphones, label: "الدعم والشكاوى" },
   { id: "feedback", icon: MessageSquarePlus, label: "الاقتراحات والشكاوى" },
