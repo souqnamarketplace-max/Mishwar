@@ -177,7 +177,7 @@ export default function TripDetails() {
               {isOwnTrip ? (
                 <Button
                   className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
-                  onClick={() => navigate("/driver?tab=passengers")}
+                  onClick={() => navigate(`/driver?tab=passengers&trip=${id}`)}
                 >
                   <Users className="w-4 h-4" /> إدارة حجوزات هذه الرحلة
                 </Button>
