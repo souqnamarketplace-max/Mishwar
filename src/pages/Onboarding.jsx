@@ -30,6 +30,7 @@ async function uploadToSupabase(file) {
 }
 
 export default function Onboarding() {
+  const qc = useQueryClient();
   useSEO({ title: "إعداد الحساب", description: "أكمل إعداد حسابك في مِشوار" });
 
   const navigate = useNavigate();
@@ -539,7 +540,8 @@ export default function Onboarding() {
                 setStep(step - 1);
               } else {
                 // On the first step, go back to home (lets user abandon onboarding)
-                navigate("/");
+                      qc.invalidateQueries({ queryKey: ["me"] });
+      navigate("/");
               }
             }}
             disabled={save.isPending}

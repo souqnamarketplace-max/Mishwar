@@ -76,6 +76,7 @@ async function notifyMatchingPreferences(trip) {
 }
 
 export default function CreateTrip() {
+  const qc = useQueryClient();
   useSEO({ title: "أنشر رحلتك", description: "انشر رحلتك واكسب من طريقك اليومي" });
 
   const navigate = useNavigate();
@@ -324,6 +325,10 @@ export default function CreateTrip() {
       try {
         const newTrip = await base44.entities.Trip.create(baseData);
         toast.success("تم نشر الرحلة بنجاح! 🎉");
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["featured-trips"] });
         // Notify users with matching route preferences (fire & forget)
         notifyMatchingPreferences({ ...baseData, id: newTrip?.id || newTrip });
       } catch (err) {
