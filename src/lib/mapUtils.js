@@ -103,13 +103,62 @@ export const CITY_COORDS = {
  * Get coordinates for a city name.
  * Tries static table first, falls back to Nominatim.
  */
+/**
+ * Normalize an Arabic city name for robust dictionary lookup.
+ * Handles: surrounding whitespace, RTL/LTR marks, zero-width chars,
+ * tatweel, and common Arabic letter variants.
+ */
+function normalizeCityKey(s) {
+  if (!s) return "";
+  return String(s)
+    .trim()
+    // Remove invisible characters (RTL/LTR marks, ZWJ, ZWNJ, BOM, tatweel)
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u0640]/g, "")
+    // Normalize alef variants → ا
+    .replace(/[\u0622\u0623\u0625]/g, "\u0627")
+    // Normalize ya variants → ي
+    .replace(/[\u0649]/g, "\u064A")
+    // Normalize ta marbuta → ه (some sources use ة, some ه)
+    // .replace(/\u0629/g, "\u0647")  // optional — keep ة as-is for now
+    // Strip diacritics (fatha, kasra, damma, sukun, shadda, tanwins)
+    .replace(/[\u064B-\u0652\u0670]/g, "")
+    // Collapse multiple spaces
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Build a normalized lookup map at module load time (one-time cost)
+const _NORMALIZED_CITY_COORDS = (() => {
+  const map = {};
+  for (const key in CITY_COORDS) {
+    map[normalizeCityKey(key)] = CITY_COORDS[key];
+  }
+  return map;
+})();
+
 export async function geocodeCity(cityName) {
   if (!cityName) return null;
 
-  // Static lookup (instant, no API call)
+  // 1. Direct exact match (fast path)
   if (CITY_COORDS[cityName]) {
     return CITY_COORDS[cityName]; // [lat, lng]
   }
+
+  // 2. Normalized lookup — handles whitespace, RTL marks, alef variants, etc.
+  const normalized = normalizeCityKey(cityName);
+  if (_NORMALIZED_CITY_COORDS[normalized]) {
+    return _NORMALIZED_CITY_COORDS[normalized];
+  }
+
+  // 3. Substring match — handles "نابلس - البلدة القديمة" → "نابلس"
+  for (const key in _NORMALIZED_CITY_COORDS) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return _NORMALIZED_CITY_COORDS[key];
+    }
+  }
+
+  // Log the cache miss so we can see what slipped through
+  console.warn("[geocodeCity] Cache miss, falling back to Nominatim:", JSON.stringify(cityName), "normalized:", JSON.stringify(normalized));
 
   // Nominatim fallback
   try {
