@@ -101,11 +101,15 @@ export default function NotificationBell({ userEmail }) {
   const handleToggle = () => {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
-      const desiredWidth = Math.min(380, window.innerWidth - 16);
-      // Anchor dropdown so its RIGHT edge aligns with the bell's right edge (RTL-friendly)
-      // then clamp within viewport so it never overflows.
+      const isMobile = window.innerWidth < 640;
+      // On mobile keep ~16px gutter both sides; on desktop a fixed 360px works well
+      const desiredWidth = isMobile
+        ? Math.min(window.innerWidth - 32, 320)
+        : 360;
+      // Anchor dropdown so its RIGHT edge aligns with the bell's right edge (RTL-friendly),
+      // then clamp within viewport with 16px margin on both sides.
       let left = rect.right - desiredWidth;
-      left = Math.max(8, Math.min(left, window.innerWidth - desiredWidth - 8));
+      left = Math.max(16, Math.min(left, window.innerWidth - desiredWidth - 16));
       setPos({ top: rect.bottom + 8, left, width: desiredWidth });
     }
     setOpen(v => !v);
