@@ -147,6 +147,21 @@ export default function CreateTrip() {
   // Pre-fill car details from user profile once loaded
   useEffect(() => {
     if (user && !formInitialized) {
+      // Auto-populate amenities from driver's saved preferences
+      // Driver can still toggle these per trip
+      const amenitiesFromPrefs = [];
+      if (user.pref_smoking === "yes" || user.pref_smoking === "allowed") amenitiesFromPrefs.push("smoking");
+      if (user.vehicle_luggage && user.vehicle_luggage !== "none" && user.vehicle_luggage !== "no") amenitiesFromPrefs.push("luggage");
+      // Common amenities most cars have — pre-select for convenience
+      amenitiesFromPrefs.push("ac");
+
+      // Auto-populate payment methods based on what driver set up in profile
+      const paymentFromProfile = ["cash"]; // cash always available
+      if (user.bank_iban) paymentFromProfile.push("bank_transfer");
+      if (user.jawwal_pay_number) paymentFromProfile.push("jawwal_pay");
+      if (user.reflect_number) paymentFromProfile.push("reflect");
+      if (user.credit_card_enabled) paymentFromProfile.push("credit_card");
+
       setForm((prev) => ({
         ...prev,
         car_model: user.car_model || "",
@@ -154,6 +169,8 @@ export default function CreateTrip() {
         car_color: user.car_color || "",
         car_plate: user.car_plate || "",
         driver_note: user.driver_note || "",
+        amenities: amenitiesFromPrefs,
+        payment_methods: paymentFromProfile,
       }));
       setFormInitialized(true);
     }
