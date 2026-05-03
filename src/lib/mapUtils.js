@@ -205,36 +205,50 @@ function formatDuration(minutes) {
  * Supports West Bank roads. Falls back to straight-line estimate if API fails.
  */
 // Multiple routing servers — try in order, skip on rate limit or CORS
-const VALHALLA_SERVERS = [
-  'https://valhalla1.openstreetmap.de/route',
-  'https://valhalla2.openstreetmap.de/route',
+// Routing servers — try in order. OSRM (OSM Germany) is CORS-enabled, no key needed,
+// no rate limit issues. Valhalla openstreetmap.de servers got CORS-locked + heavily rate-limited.
+const ROUTING_SERVERS = [
+  // OSRM via OSM Germany — CORS-enabled, public, no key, ~100M requests/year
+  { type: 'osrm', url: 'https://routing.openstreetmap.de/routed-car/route/v1/driving' },
 ];
 
-async function valhallaRoute(locations) {
-  const body = {
-    locations: locations.map(([lat, lng]) => ({ lat, lon: lng })),
-    costing: 'auto',
-    directions_options: { units: 'kilometers' },
-  };
+async function osrmRoute(locations) {
+  // OSRM expects coordinates as lng,lat;lng,lat;... in the URL path
+  const coordsStr = locations.map(([lat, lng]) => `${lng},${lat}`).join(';');
 
-  for (const server of VALHALLA_SERVERS) {
+  for (const server of ROUTING_SERVERS) {
     try {
-      const res = await fetch(server, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const url = `${server.url}/${coordsStr}?overview=full&geometries=geojson`;
+      const res = await fetch(url, {
+        method: 'GET',
         signal: AbortSignal.timeout(8000),
       });
       if (res.status === 429) continue; // rate limited — try next server
-      if (!res.ok) throw new Error(`Valhalla ${res.status}`);
-      return res.json();
+      if (!res.ok) throw new Error(`OSRM ${res.status}`);
+
+      const data = await res.json();
+      if (!data.routes || !data.routes[0]) throw new Error('No route in response');
+
+      const route = data.routes[0];
+      // Convert GeoJSON [lng,lat] → Leaflet [lat,lng]
+      const coordinates = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+
+      return {
+        distanceKm: route.distance / 1000,
+        durationMin: Math.round(route.duration / 60),
+        coordinates,
+      };
     } catch (e) {
-      // CORS or network error — try next server
-      if (e?.name === 'AbortError') throw e; // timeout — stop trying
+      console.warn(`Routing via ${server.url} failed:`, e.message);
       continue;
     }
   }
-  throw new Error('All Valhalla servers unavailable');
+  throw new Error('All routing servers unavailable');
+}
+
+// Backward-compat alias so existing callers keep working
+async function valhallaRoute(locations) {
+  return osrmRoute(locations);
 }
 
 export async function calculateRoute(fromCity, toCity) {
