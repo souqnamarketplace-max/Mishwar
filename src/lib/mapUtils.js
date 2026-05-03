@@ -256,15 +256,16 @@ export async function calculateRoute(fromCity, toCity) {
   if (!fromCoords || !toCoords) return null;
 
   try {
-    const data = await valhallaRoute([fromCoords, toCoords]);
-    const leg = data?.trip?.legs?.[0];
-    if (!leg) throw new Error('No route');
+    const data = await osrmRoute([fromCoords, toCoords]);
+    if (!data?.coordinates?.length) throw new Error('No route');
 
-    const distanceKm = Math.round(data.trip.summary.length);
-    const durationMin = Math.round(data.trip.summary.time / 60);
-    const latLngs = decodePolyline6(leg.shape); // [[lat,lng],...]
-    // Convert to GeoJSON geometry [lng, lat] for RouteMap
-    const geometry = { type: 'LineString', coordinates: latLngs.map(([la, ln]) => [ln, la]) };
+    const distanceKm = Math.round(data.distanceKm);
+    const durationMin = data.durationMin;
+    // osrmRoute returns coordinates as [[lat,lng],...]; GeoJSON wants [[lng,lat],...]
+    const geometry = {
+      type: 'LineString',
+      coordinates: data.coordinates.map(([la, ln]) => [ln, la]),
+    };
 
     return {
       fromCoords, toCoords,
@@ -274,7 +275,7 @@ export async function calculateRoute(fromCity, toCity) {
       geometry,
     };
   } catch (e) {
-    console.warn('Valhalla routing failed:', e);
+    console.warn('Routing failed, using straight-line fallback:', e?.message || e);
     // Straight-line fallback
     const [fromLat, fromLng] = fromCoords;
     const [toLat, toLng] = toCoords;
@@ -319,13 +320,16 @@ export async function calculateMultiStopRoute(fromCity, toCity, stops = []) {
   const stopCoords  = allCoords.slice(1, -1).filter(Boolean);
 
   try {
-    const data = await valhallaRoute(validCoords);
-    if (!data?.trip?.legs?.length) throw new Error('No route');
+    const data = await osrmRoute(validCoords);
+    if (!data?.coordinates?.length) throw new Error('No route');
 
-    const distanceKm = Math.round(data.trip.summary.length);
-    const durationMin = Math.round(data.trip.summary.time / 60);
-    const allPts = data.trip.legs.flatMap(leg => decodePolyline6(leg.shape));
-    const geometry = { type: 'LineString', coordinates: allPts.map(([la, ln]) => [ln, la]) };
+    const distanceKm = Math.round(data.distanceKm);
+    const durationMin = data.durationMin;
+    // osrmRoute returns full multi-stop polyline as [[lat,lng],...]
+    const geometry = {
+      type: 'LineString',
+      coordinates: data.coordinates.map(([la, ln]) => [ln, la]),
+    };
 
     return {
       fromCoords, toCoords, stopCoords,
@@ -334,7 +338,7 @@ export async function calculateMultiStopRoute(fromCity, toCity, stops = []) {
       distanceKm, durationMin, geometry,
     };
   } catch (e) {
-    console.warn('Valhalla multi-stop routing failed:', e);
+    console.warn('Multi-stop routing failed:', e?.message || e);
     return null;
   }
 }
