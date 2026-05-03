@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import RouteMap from "@/components/shared/RouteMap";
 import { sanitizeText } from "@/lib/validation";
 
+import { checkDriverEligibility, daysUntil } from "@/lib/driverEligibility";
 const steps = [
   { id: 1, label: "تفاصيل الرحلة", icon: MapPin },
   { id: 2, label: "المقاعد والسعر", icon: Users },
@@ -107,17 +108,18 @@ export default function CreateTrip() {
   }
 
 
-  const { data: license } = useQuery({
-    queryKey: ["driver-license", user?.email],
+  const { data: licenses = [] } = useQuery({
+    queryKey: ["driver-licenses-all", user?.email],
     queryFn: () =>
       user?.email
-        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
         : [],
     enabled: !!user?.email,
   });
 
-  const driverLicense = license?.[0];
-  const isLicenseApproved = driverLicense?.status === "approved";
+  // Determine eligibility based on full license history
+  const eligibility = React.useMemo(() => checkDriverEligibility(licenses), [licenses]);
+  const driverLicense = eligibility.latest || licenses?.[0]; // for prefilling form fields
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
     from_city: "",
@@ -345,43 +347,45 @@ export default function CreateTrip() {
     navigate("/my-trips");
   };
 
-  const hasExpiredDocuments = () => {
-    const today = new Date().toISOString().split('T')[0];
-    return (
-      (driverLicense?.expiry_date && driverLicense.expiry_date < today) ||
-      (driverLicense?.car_registration_expiry_date && driverLicense.car_registration_expiry_date < today) ||
-      (driverLicense?.insurance_expiry_date && driverLicense.insurance_expiry_date < today)
-    );
-  };
+  // Eligibility-based block: only block if driver truly cannot publish
+  if (!eligibility.allowed) {
+    const reasonMap = {
+      no_docs: {
+        icon: "📄",
+        title: "لم تقدم وثائق بعد",
+        message: "لرفع وثائق قيادتك ومركبتك، يرجى إكمال الإعداد من صفحة الحساب.",
+      },
+      expired_no_pending: {
+        icon: "⚠️",
+        title: "انتهت صلاحية وثائقك",
+        message: eligibility.lastRejected
+          ? `وثائقك السابقة انتهت ولم تتم الموافقة على آخر تحديث: ${eligibility.lastRejected.rejection_reason || "بدون سبب"}. يرجى رفع وثائق محدثة.`
+          : "صلاحية وثائقك انتهت ولم ترفع وثائق جديدة. يرجى تحديثها لتتمكن من نشر الرحلات.",
+      },
+    };
+    const info = reasonMap[eligibility.reason] || reasonMap.expired_no_pending;
 
-  if (!isLicenseApproved || hasExpiredDocuments()) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
         <div className="bg-card rounded-2xl border border-border p-8 text-center">
           <div className="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">{hasExpiredDocuments() ? "⚠️" : "⏳"}</span>
+            <span className="text-2xl">{info.icon}</span>
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">
-            {hasExpiredDocuments() ? "انتهت صلاحية المستندات" : "انتظر موافقة رخصة القيادة"}
-          </h2>
-          <p className="text-muted-foreground mb-4">
-            {hasExpiredDocuments()
-              ? "صلاحية المستندات الخاصة بك انتهت. يرجى تحديثها من الإعدادات لتتمكن من نشر الرحلات."
-              : driverLicense?.status === "pending"
-              ? "رخصتك قيد المراجعة. سيتم إخطارك بمجرد الموافقة عليها."
-              : driverLicense?.status === "rejected"
-              ? `تم رفض رخصتك: ${driverLicense.rejection_reason}. يمكنك تحديثها من الإعدادات.`
-              : "لم تقدم رخصة قيادة بعد. يرجى إكمال الإعداد أولاً."}
-          </p>
-          <a href="/settings">
+          <h2 className="text-xl font-bold text-foreground mb-2">{info.title}</h2>
+          <p className="text-muted-foreground mb-4">{info.message}</p>
+          <a href="/account-settings/profile#license">
             <Button className="bg-primary text-primary-foreground rounded-xl mt-4">
-              {hasExpiredDocuments() ? "تحديث المستندات" : "تحديث الرخصة"}
+              رفع وثائق جديدة
             </Button>
           </a>
         </div>
       </div>
     );
   }
+
+  // Eligibility allowed but with caveats: show banner above the form
+  const showPendingBanner = eligibility.reason === "pending_grace" || eligibility.reason === "valid_with_pending";
+  const showExpiringSoonBanner = eligibility.expiringSoon && !showPendingBanner;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">

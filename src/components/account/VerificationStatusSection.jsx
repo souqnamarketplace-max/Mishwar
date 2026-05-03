@@ -1,67 +1,140 @@
 import React from "react";
-import { ShieldCheck, Clock, Camera } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { useAuth } from "@/lib/AuthContext";
+import { checkDriverEligibility, daysUntil } from "@/lib/driverEligibility";
+import { ShieldCheck, Clock, AlertTriangle, XCircle, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-/**
- * VerificationStatusSection — shows the user their ID verification status.
- */
-export default function VerificationStatusSection({ user }) {
-  const isVerified = user?.is_verified === true;
-  const isPending = user?.verification_pending === true;
+export default function VerificationStatusSection() {
+  const { user } = useAuth();
 
-  if (isVerified) {
-    return (
-      <div className="text-center py-6">
-        <div className="w-20 h-20 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-4">
-          <ShieldCheck className="w-10 h-10 text-blue-500" />
-        </div>
-        <h3 className="text-xl font-bold text-foreground mb-2">تم التحقق من هويتك! ✓</h3>
-        <p className="text-sm text-muted-foreground mb-2">مبارك، تم التحقق من هويتك بنجاح.</p>
-        <p className="text-sm text-muted-foreground mb-6">شارة التحقق تظهر الآن على ملفك الشخصي ورحلاتك ونتائج البحث.</p>
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-right">
-          <p className="text-xs font-bold text-blue-900 mb-1">ماذا يعني ذلك؟</p>
-          <ul className="text-xs text-blue-800 space-y-1 list-disc pr-4">
-            <li>الركاب يثقون بك أكثر</li>
-            <li>تظهر في نتائج البحث بشكل أفضل</li>
-            <li>أكثر حجوزات وأمان</li>
-          </ul>
-        </div>
-      </div>
-    );
+  const { data: licenses = [], isLoading } = useQuery({
+    queryKey: ["driver-licenses-all", user?.email],
+    queryFn: () =>
+      user?.email
+        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
+        : [],
+    enabled: !!user?.email,
+  });
+
+  if (isLoading) {
+    return <div className="p-6 text-muted-foreground text-sm">جارٍ التحميل…</div>;
   }
 
-  if (isPending) {
-    return (
-      <div className="text-center py-6">
-        <div className="w-20 h-20 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
-          <Clock className="w-10 h-10 text-yellow-500" />
-        </div>
-        <h3 className="text-xl font-bold text-foreground mb-2">قيد المراجعة...</h3>
-        <p className="text-sm text-muted-foreground mb-6">استلمنا طلب التحقق وسيراجعه فريق الإدارة خلال 24-48 ساعة.</p>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-right">
-          <p className="text-xs text-yellow-900">في هذه الأثناء يمكنك استخدام التطبيق بشكل طبيعي. ستحصل على شارة التحقق بمجرد الموافقة.</p>
-        </div>
-      </div>
-    );
-  }
+  const eligibility = checkDriverEligibility(licenses);
+  const { latest, pending, lastRejected } = eligibility;
 
   return (
-    <div className="text-center py-6">
-      <div className="w-20 h-20 rounded-full bg-muted/60 flex items-center justify-center mx-auto mb-4">
-        <Camera className="w-10 h-10 text-muted-foreground" />
-      </div>
-      <h3 className="text-xl font-bold text-foreground mb-2">تحقق من هويتك</h3>
-      <p className="text-sm text-muted-foreground mb-6">احصل على شارة التحقق الزرقاء لزيادة ثقة الركاب وحجوزاتك.</p>
-      <div className="bg-card border border-border rounded-2xl p-4 mb-4 text-right">
-        <p className="text-xs font-bold text-foreground mb-2">ما تحتاجه:</p>
-        <ul className="text-xs text-muted-foreground space-y-1 list-disc pr-4">
-          <li>صورة سيلفي واضحة لوجهك</li>
-          <li>صورة هوية شخصية (اختياري)</li>
-        </ul>
-      </div>
-      <Link to="/account-settings/profile#license" className="inline-block w-full bg-primary text-primary-foreground rounded-xl py-3 font-bold text-sm">
-        ابدأ التحقق الآن ←
+    <div className="p-6 space-y-4" dir="rtl">
+      {/* State 1: Has pending submission */}
+      {pending && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground mb-1">قيد المراجعة</h3>
+              <p className="text-sm text-muted-foreground">
+                وثائقك الجديدة قيد مراجعة الإدارة. سيتم إعلامك بمجرد اعتمادها.
+              </p>
+              {latest && eligibility.allowed && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  ✓ يمكنك نشر الرحلات حالياً باستخدام وثائقك السابقة الموافق عليها.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* State 2: Last submission was rejected */}
+      {lastRejected && !pending && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground mb-1">تم رفض آخر تحديث</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                سبب الرفض: {lastRejected.rejection_reason || "لم يحدد سبب"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                يمكنك إعادة رفع وثائق جديدة في أي وقت.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* State 3: Active approved with expiry status */}
+      {latest && eligibility.allowed && !pending && (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="w-5 h-5 text-green-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground mb-1">موثَّق</h3>
+              <ExpiryRows license={latest} />
+              {eligibility.expiringSoon && (
+                <p className="text-xs text-yellow-600 mt-2 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  بعض الوثائق ستنتهي قريباً — يُنصح بالتحديث
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* State 4: Expired or no docs */}
+      {!eligibility.allowed && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-bold text-foreground mb-1">
+                {eligibility.reason === "no_docs" ? "لم ترفع وثائق بعد" : "انتهت صلاحية الوثائق"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                لا يمكنك نشر رحلات حالياً. يرجى رفع وثائق محدثة.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload button — always visible so driver can upload renewals anytime */}
+      <Link to="/account-settings/profile#license">
+        <Button className="w-full bg-primary text-primary-foreground rounded-xl">
+          <Upload className="w-4 h-4 ml-2" />
+          {eligibility.allowed ? "رفع وثائق محدثة" : "رفع وثائق جديدة"}
+        </Button>
       </Link>
+    </div>
+  );
+}
+
+function ExpiryRows({ license }) {
+  const rows = [
+    { label: "رخصة القيادة", date: license.expiry_date },
+    { label: "رخصة المركبة", date: license.car_registration_expiry_date },
+    { label: "تأمين المركبة", date: license.insurance_expiry_date },
+  ].filter((r) => r.date);
+
+  return (
+    <div className="space-y-1 mt-2">
+      {rows.map(({ label, date }) => {
+        const days = daysUntil(date);
+        const color = days < 0 ? "text-red-600" : days <= 30 ? "text-yellow-600" : "text-muted-foreground";
+        const status = days < 0 ? "منتهية" : days === 0 ? "تنتهي اليوم" : `${days} يوم`;
+        return (
+          <div key={label} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">{label}</span>
+            <span className={`font-medium ${color}`}>
+              {date} · {status}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
