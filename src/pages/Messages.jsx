@@ -86,15 +86,46 @@ export default function Messages() {
     staleTime: 30000,
   });
 
+  // ─── Bookings made BY OTHER PEOPLE on MY driver trips ───
+  // (so we can show banner when I'm the driver and they're the passenger)
+  const myDriverTripIds = useMemo(
+    () => (myBookings.driverTrips || []).map(t => t.id),
+    [myBookings.driverTrips]
+  );
+  const { data: bookingsOnMyTrips = [] } = useQuery({
+    queryKey: ["bookings-on-my-trips", myDriverTripIds.join(",")],
+    queryFn: async () => {
+      if (myDriverTripIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .in("trip_id", myDriverTripIds);
+      if (error) { console.warn("bookingsOnMyTrips error:", error); return []; }
+      return data || [];
+    },
+    enabled: myDriverTripIds.length > 0,
+    staleTime: 30000,
+  });
+
   // ─── Collect all trip_ids referenced in messages + URL param ───
   const tripIdsRef = useMemo(() => {
     const ids = new Set();
+    // From messages (most accurate — explicit link)
     for (const m of rawMessages) {
       if (m.trip_id) ids.add(m.trip_id);
     }
+    // From URL param (for __new__ conversations)
     if (paramTrip) ids.add(paramTrip);
+    // Fallback: from MY bookings (where I'm passenger)
+    for (const b of (myBookings.asPassenger || [])) {
+      if (b.trip_id) ids.add(b.trip_id);
+    }
+    // Fallback: from MY driver trips (where I'm driver)
+    for (const t of (myBookings.driverTrips || [])) {
+      ids.add(t.id);
+    }
     return Array.from(ids).sort();
-  }, [rawMessages, paramTrip]);
+  }, [rawMessages, paramTrip, myBookings]);
 
   // ─── Fetch trip metadata for those ids ───
   const { data: relatedTrips = [] } = useQuery({
@@ -213,12 +244,29 @@ export default function Messages() {
   }, [activeId, activeConv, user?.email, qc]);
 
   // ─── Find trip for a conversation ───
+  // Priority order:
+  // 1. trip_id explicitly saved on a message
+  // 2. ?trip= URL param (for new conversations being started)
+  // 3. Fallback: I'm passenger → find my booking with this driver
+  // 4. Fallback: I'm driver → find this passenger's booking on one of my trips
   const getTripIdForConv = (conv) => {
     if (!conv) return null;
-    if (conv.id === "__new__" && paramTrip) return paramTrip;
+    // 1. Explicit trip_id on a message (most accurate)
     for (let i = conv.messages.length - 1; i >= 0; i--) {
       if (conv.messages[i].trip_id) return conv.messages[i].trip_id;
     }
+    // 2. URL param for fresh conversations
+    if (conv.id === "__new__" && paramTrip) return paramTrip;
+    // 3. Fallback: am I a passenger with this driver?
+    const myBookingWithThem = (myBookings.asPassenger || []).find(b =>
+      b.driver_email === conv.otherEmail || b.created_by === conv.otherEmail
+    );
+    if (myBookingWithThem?.trip_id) return myBookingWithThem.trip_id;
+    // 4. Fallback: am I the driver and they booked one of my trips?
+    const theirBookingOnMyTrip = (bookingsOnMyTrips || []).find(b =>
+      b.passenger_email === conv.otherEmail
+    );
+    if (theirBookingOnMyTrip?.trip_id) return theirBookingOnMyTrip.trip_id;
     return null;
   };
   const getTripForConv = (conv) => {
