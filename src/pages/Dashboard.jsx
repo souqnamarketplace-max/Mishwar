@@ -333,7 +333,7 @@ export default function Dashboard() {
         </div>
         <h2 className="text-xl font-bold">وصول مرفوض</h2>
         <p className="text-sm text-muted-foreground">هذه الصفحة مخصصة للمديرين فقط</p>
-        <a href="/" className="text-primary text-sm hover:underline">العودة للرئيسية</a>
+        <Link to="/" className="text-primary text-sm hover:underline">العودة للرئيسية</Link>
       </div>
     );
   }

@@ -27,6 +27,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import AppLayout from './components/layout/AppLayout';
 import { lazy, Suspense } from 'react';
 
+import ScrollToTop from "@/components/shared/ScrollToTop";
 // Code splitting — each page loads on demand
 const Home             = lazy(() => import('./pages/Home'));
 const SearchTrips      = lazy(() => import('./pages/SearchTrips'));
@@ -160,6 +161,7 @@ function App() {
     <ErrorBoundary><AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ScrollToTop />
           <Routes>
             {/* Public login route — always accessible */}
             <Route path="/login" element={<Login />} />

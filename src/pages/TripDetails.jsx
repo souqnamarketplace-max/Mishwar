@@ -140,11 +140,18 @@ export default function TripDetails() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-      {/* Back */}
-      <Link to="/search" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
+      {/* Back — true browser back if there's history, else fall back to /search */}
+      <button
+        type="button"
+        onClick={() => {
+          if (window.history.length > 1) navigate(-1);
+          else navigate("/search");
+        }}
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
+      >
         <ChevronLeft className="w-4 h-4" />
-        العودة إلى النتائج
-      </Link>
+        العودة
+      </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 

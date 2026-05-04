@@ -100,9 +100,9 @@ export default function CreateTrip() {
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
           لنشر الرحلات تحتاج لتفعيل حساب السائق وإكمال التحقق من الوثائق.
         </p>
-        <a href="/settings" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
+        <Link to="/settings" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
           تفعيل حساب السائق
-        </a>
+        </Link>
       </div>
     );
   }
@@ -389,11 +389,11 @@ export default function CreateTrip() {
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">{info.title}</h2>
           <p className="text-muted-foreground mb-4">{info.message}</p>
-          <a href="/account-settings/profile#license">
+          <Link to="/account-settings/profile#license">
             <Button className="bg-primary text-primary-foreground rounded-xl mt-4">
               رفع وثائق جديدة
             </Button>
-          </a>
+          </Link>
         </div>
       </div>
     );

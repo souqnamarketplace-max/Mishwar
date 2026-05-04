@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useLocation, Link } from "react-router-dom";
+import { useLocation, Link, useNavigate } from "react-router-dom";
 import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ const PAGE_TITLES = {
 };
 
 export default function MobileLayout({ children, user, showHeader = true, headerTitle = "" }) {
+  const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -166,7 +167,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             const handleTabClick = (e) => {
               if (isActive && location.pathname !== tab.path.split("?")[0]) {
                 e.preventDefault();
-                window.location.href = tab.path.split("?")[0];
+                navigate(tab.path);
               }
               setShowMobileMenu(false);
             };
