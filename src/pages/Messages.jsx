@@ -27,12 +27,46 @@ import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
  * Privacy: RLS already restricts SELECT to messages where user is sender or receiver.
  */
 
-const QUICK_REPLIES = [
-  "👍",
-  "في الطريق 🚗",
-  "لا أستطيع الكتابة، أنا أقود",
-  "وصلت 📍",
-];
+/**
+ * Returns quick reply chips appropriate for the user's role in this conversation.
+ *
+ * - "driver"   → I am the driver of this trip → reassure passenger I'm en route
+ * - "approved" / "pending" → I am the passenger (booking confirmed or pending) →
+ *                            tell driver I'm ready, on my way, etc.
+ * - "none"     → No booking yet, likely an inquiry → ask common questions
+ * - default    → small set of universal chips
+ */
+function getQuickReplies(bookingStatus) {
+  if (bookingStatus === "driver") {
+    return [
+      "👍",
+      "في الطريق إليك 🚗",
+      "وصلت 📍",
+      "تأخرت قليلاً ⏰",
+      "لا أستطيع الكتابة، أنا أقود",
+    ];
+  }
+  if (bookingStatus === "approved" || bookingStatus === "pending") {
+    return [
+      "👍",
+      "أنا جاهز/ة 👋",
+      "في الطريق 🚶",
+      "وصلت لنقطة اللقاء 📍",
+      "شكراً 🙏",
+    ];
+  }
+  if (bookingStatus === "none") {
+    return [
+      "👍",
+      "هل المقعد لا يزال متوفراً؟",
+      "ما نقطة الالتقاء؟",
+      "هل يمكن الدفع نقداً؟",
+      "شكراً 🙏",
+    ];
+  }
+  // Fallback — should rarely render since completed/cancelled chats are locked
+  return ["👍", "شكراً 🙏"];
+}
 
 export default function Messages() {
   useSEO({ title: "الرسائل", description: "محادثاتك مع السائقين والركاب" });
@@ -469,7 +503,7 @@ export default function Messages() {
                   <ClosedNotice status={activeBookingStatus} />
                 ) : (
                   <>
-                    <QuickReplies onPick={sendQuick} disabled={send.isPending} />
+                    <QuickReplies onPick={sendQuick} disabled={send.isPending} bookingStatus={activeBookingStatus} />
                     <MessageInput
                       draft={draft}
                       setDraft={setDraft}
@@ -670,13 +704,14 @@ function MessageBubble({ message, mine, otherName }) {
   );
 }
 
-function QuickReplies({ onPick, disabled }) {
+function QuickReplies({ onPick, disabled, bookingStatus }) {
+  const replies = getQuickReplies(bookingStatus);
   return (
     <div
       className="px-3 pt-3 pb-1 flex items-center gap-2 overflow-x-auto bg-card border-t border-border"
       style={{ scrollbarWidth: "none" }}
     >
-      {QUICK_REPLIES.map((q, i) => (
+      {replies.map((q, i) => (
         <button
           key={i}
           type="button"
