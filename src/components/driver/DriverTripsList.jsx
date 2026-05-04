@@ -28,6 +28,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [editForm, setEditForm] = useState({});
   const [confirmDialog, setConfirmDialog] = useState(null); // { tripId, action: "start"|"complete" }
   const [deleteConfirm, setDeleteConfirm] = useState(null); // tripId to delete
+  const [confirmCancel, setConfirmCancel] = useState(null); // tripId to cancel
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
@@ -57,10 +58,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
     },
     onError: () => toast.error("فشل إلغاء الرحلة"),
-  });
-
-  const [confirmCancel, setConfirmCancel] = useState(null);
-      const prev = qc.getQueryData(["trips"]);
+  });const prev = qc.getQueryData(["trips"]);
       qc.setQueryData(["trips"], old => 
         old?.map(t => t.id === id ? { ...t, ...data } : t) || []
       );
