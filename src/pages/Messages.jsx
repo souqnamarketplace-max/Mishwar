@@ -141,6 +141,41 @@ export default function Messages() {
     staleTime: 30000,
   });
 
+  // ─── Fetch profile pictures for all chat participants ───
+  const chatEmails = useMemo(() => {
+    const set = new Set();
+    if (user?.email) set.add(user.email);
+    for (const m of rawMessages) {
+      if (m.sender_email) set.add(m.sender_email);
+      if (m.receiver_email) set.add(m.receiver_email);
+    }
+    return Array.from(set);
+  }, [user?.email, rawMessages]);
+
+  const { data: profilesByEmail = {} } = useQuery({
+    queryKey: ["chat-profiles", chatEmails.sort().join(",")],
+    queryFn: async () => {
+      if (chatEmails.length === 0) return {};
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .in("email", chatEmails);
+        if (error) { console.warn("chat profiles error:", error); return {}; }
+        const map = {};
+        (data || []).forEach(p => {
+          if (p.email) map[p.email] = p;
+        });
+        return map;
+      } catch (e) {
+        console.warn("chat profiles exception:", e);
+        return {};
+      }
+    },
+    enabled: chatEmails.length > 0,
+    staleTime: 60000,
+  });
+
   // ─── Collect all trip_ids referenced in messages + URL param ───
   const tripIdsRef = useMemo(() => {
     const ids = new Set();
@@ -426,6 +461,7 @@ export default function Messages() {
                       active={activeId === conv.id}
                       mineEmail={user?.email}
                       onClick={() => setActiveId(conv.id)}
+                      imgSrc={getProfilePic(profilesByEmail[conv.otherEmail])}
                     />
                   );
                 })}
@@ -449,7 +485,7 @@ export default function Messages() {
                   <button onClick={() => setActiveId(null)} className="md:hidden p-2 -m-2 rounded-lg hover:bg-muted/50" aria-label="رجوع">
                     <ArrowLeft className="w-5 h-5 rotate-180" />
                   </button>
-                  <Avatar name={activeConv.otherName} size={40} />
+                  <Avatar name={activeConv.otherName} size={40} imgSrc={getProfilePic(profilesByEmail[activeConv.otherEmail])} />
                   <div className="flex-1 min-w-0">
                     <Link
                       to={`/profile?email=${encodeURIComponent(activeConv.otherEmail)}`}
@@ -492,6 +528,7 @@ export default function Messages() {
                         message={m}
                         mine={mine}
                         otherName={activeConv.otherName}
+                        otherImgSrc={getProfilePic(profilesByEmail[activeConv.otherEmail])}
                       />
                     );
                   })}
@@ -537,18 +574,42 @@ export default function Messages() {
 // SUB-COMPONENTS
 // ============================================================
 
-function Avatar({ name, size = 40, className = "" }) {
+function Avatar({ name, size = 40, className = "", imgSrc = null }) {
+  const [imgErr, setImgErr] = React.useState(false);
+  const showImg = imgSrc && !imgErr;
   return (
     <div
-      className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 ${className}`}
+      className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 overflow-hidden ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
     >
-      {(name?.[0] || "؟").toUpperCase()}
+      {showImg ? (
+        <img
+          src={imgSrc}
+          alt={name || ""}
+          className="w-full h-full object-cover"
+          onError={() => setImgErr(true)}
+          loading="lazy"
+        />
+      ) : (
+        (name?.[0] || "؟").toUpperCase()
+      )}
     </div>
   );
 }
 
-function ConversationListItem({ conv, trip, bookingStatus, active, mineEmail, onClick }) {
+// Helper: try multiple common profile-picture field names
+function getProfilePic(profile) {
+  if (!profile) return null;
+  return profile.profile_picture
+      || profile.avatar
+      || profile.avatar_url
+      || profile.photo_url
+      || profile.selfie_url
+      || profile.picture
+      || null;
+}
+
+function ConversationListItem({ conv, trip, bookingStatus, active, mineEmail, onClick, imgSrc }) {
   const last = conv.lastMessage;
   const isMe = last?.sender_email === mineEmail;
   const dotColor = {
@@ -575,7 +636,7 @@ function ConversationListItem({ conv, trip, bookingStatus, active, mineEmail, on
     >
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
-          <Avatar name={conv.otherName} size={48} />
+          <Avatar name={conv.otherName} size={48} imgSrc={imgSrc} />
           {trip?.price && (
             <span className={`absolute -top-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${priceBadgeColor}`}>
               ₪{trip.price}
@@ -686,10 +747,10 @@ function DateSeparator({ iso }) {
   );
 }
 
-function MessageBubble({ message, mine, otherName }) {
+function MessageBubble({ message, mine, otherName, otherImgSrc }) {
   return (
     <div className={`flex items-end gap-2 ${mine ? "justify-start" : "justify-end flex-row-reverse"}`}>
-      {!mine && <Avatar name={otherName} size={28} className="mb-1" />}
+      {!mine && <Avatar name={otherName} size={28} className="mb-1" imgSrc={otherImgSrc} />}
       <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
         mine
           ? "bg-primary text-primary-foreground rounded-br-md"
@@ -784,7 +845,11 @@ function formatDateShort(iso) {
   if (!iso) return "";
   const d = typeof iso === "string" && iso.length === 10 ? new Date(iso + "T00:00:00") : new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("ar", { day: "numeric", month: "short" });
+  // Palestinian standard: DD/MM/YYYY
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 function formatDateLabel(iso) {
@@ -796,5 +861,14 @@ function formatDateLabel(iso) {
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
   if (d.toDateString() === yesterday.toDateString()) return "أمس";
-  return d.toLocaleDateString("ar", { weekday: "long", day: "numeric", month: "long" });
+  // Within last 7 days: show weekday name (e.g. الأحد)
+  const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+  if (diffDays >= 0 && diffDays < 7) {
+    return d.toLocaleDateString("ar", { weekday: "long" });
+  }
+  // Older: Palestinian DD/MM/YYYY format
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
