@@ -416,8 +416,14 @@ export default function Messages() {
       if (msgErr) { console.error("Message insert error:", msgErr); throw new Error(msgErr.message); }
       setDraft("");
       setNewConv(null);
-      const newConvId = [user.email, activeConv.otherEmail].sort().join("__");
-      setActiveId(newConvId);
+      // Only change activeId if we just transitioned out of "__new__".
+      // Otherwise we'd overwrite the trip-scoped id (trip_X__a__b) with the
+      // legacy email-pair id (a__b), which doesn't match any conversation
+      // key in trip-scoped grouping — making activeConv go null and the
+      // chat pane appear to "close" immediately on send.
+      if (activeConv.id === "__new__") {
+        setActiveId(convId);
+      }
       qc.invalidateQueries({ queryKey: ["messages", user?.email] });
     },
     onError: () => toast.error("تعذر إرسال الرسالة. حاول مجدداً"),
