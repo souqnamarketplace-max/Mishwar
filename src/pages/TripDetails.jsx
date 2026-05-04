@@ -199,9 +199,15 @@ export default function TripDetails() {
                 </div>
               ) : booked ? (
                 <div className="space-y-2 mt-2">
-                  <div className="flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl h-9">
-                    <CheckCircle className="w-4 h-4" /> تم الحجز بنجاح
-                  </div>
+                  {activeBooking?.status === "confirmed" ? (
+                    <div className="flex items-center justify-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl h-9">
+                      <CheckCircle className="w-4 h-4" /> تم تأكيد الحجز
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl h-9">
+                      <span>⏳</span> بانتظار موافقة السائق
+                    </div>
+                  )}
                   <Button
                     className="w-full h-11 rounded-xl font-bold bg-primary text-primary-foreground"
                     onClick={() => navigate(`/my-trips?trip=${id}`)}
@@ -566,10 +572,17 @@ export default function TripDetails() {
           ) : booked ? (
             <div className="fixed bottom-24 left-4 right-4 z-[999]">
               <div className="bg-card rounded-2xl shadow-2xl shadow-black/20 border border-border/50 overflow-hidden">
-                <div className="bg-green-500/10 border-b border-green-200 px-3 py-1.5 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                  <span className="text-xs font-bold text-green-700">تم الحجز بنجاح</span>
-                </div>
+                {activeBooking?.status === "confirmed" ? (
+                  <div className="bg-green-500/10 border-b border-green-200 px-3 py-1.5 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                    <span className="text-xs font-bold text-green-700">تم تأكيد الحجز</span>
+                  </div>
+                ) : (
+                  <div className="bg-amber-500/10 border-b border-amber-200 px-3 py-1.5 flex items-center gap-2">
+                    <span className="text-base">⏳</span>
+                    <span className="text-xs font-bold text-amber-700">بانتظار موافقة السائق</span>
+                  </div>
+                )}
                 <div className="p-3">
                   <Button
                     className="w-full h-12 rounded-xl font-black text-base bg-primary text-primary-foreground"
