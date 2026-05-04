@@ -234,7 +234,13 @@ export default function Messages() {
       const otherEmail = msg.sender_email === user?.email ? msg.receiver_email : msg.sender_email;
       const otherName  = msg.sender_email === user?.email ? msg.receiver_name : msg.sender_name;
       if (!otherEmail) continue;
-      const key = msg.conversation_id || otherEmail;
+      // Per-trip grouping: when a message has trip_id, key by trip+emailPair so
+      // trip A and trip B between the same two users render as separate threads.
+      // Falls back to conversation_id (legacy) then email (oldest legacy).
+      const emailPairKey = [user?.email || "", otherEmail].sort().join("__");
+      const key = msg.trip_id
+        ? `trip_${msg.trip_id}__${emailPairKey}`
+        : (msg.conversation_id || otherEmail);
       if (!groups.has(key)) {
         groups.set(key, {
           id: key,
@@ -283,17 +289,29 @@ export default function Messages() {
   useEffect(() => {
     if (!paramTo || !user?.email) return;
     if (paramTo === user.email) return;
-    // Prefer a per-trip conversation if ?trip= is present and a matching thread exists
-    const tripScopedExisting = paramTrip
-      ? conversations.find(c => c.otherEmail === paramTo && c.messages?.some(m => m.trip_id === paramTrip))
-      : null;
-    const existing = tripScopedExisting || conversations.find(c => c.otherEmail === paramTo);
-    if (existing) {
-      setActiveId(existing.id);
-      setNewConv(null);
+    if (paramTrip) {
+      // STRICT per-trip mode: only open existing thread if it's about THIS trip.
+      // Otherwise force a fresh "__new__" — never fall back to email-pair convo.
+      const tripScoped = conversations.find(c =>
+        c.otherEmail === paramTo && c.messages?.some(m => m.trip_id === paramTrip)
+      );
+      if (tripScoped) {
+        setActiveId(tripScoped.id);
+        setNewConv(null);
+      } else {
+        setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+        setActiveId("__new__");
+      }
     } else {
-      setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
-      setActiveId("__new__");
+      // No trip context — legacy behavior, prefer existing email-pair convo.
+      const existing = conversations.find(c => c.otherEmail === paramTo);
+      if (existing) {
+        setActiveId(existing.id);
+        setNewConv(null);
+      } else {
+        setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+        setActiveId("__new__");
+      }
     }
   }, [paramTo, paramTrip, user?.email, conversations.length]);
 
