@@ -1,8 +1,20 @@
 /**
  * Comprehensive Palestinian cities, towns and villages list.
  * Covers West Bank governorates with all major localities.
- * ~400+ localities — single source of truth for the entire app.
+ *
+ * SINGLE SOURCE OF TRUTH FOR CITIES.
+ * The exported CITIES array is the union of three sources:
+ *   1. RAW_CITIES below — the curated, hand-maintained list (the "admin" set).
+ *   2. CITY_COORDS keys from mapUtils.js — every city the router knows about.
+ *   3. (At runtime, via the useAllCities hook) — every city actually used
+ *      in posted trips, so user-added cities appear in autocomplete too.
+ *
+ * Without this union, a city like "قصرة" that exists in CITY_COORDS but was
+ * never added to RAW_CITIES would be invisible in the autocomplete dropdown
+ * even though drivers post real trips departing from it.
  */
+
+import { CITY_COORDS } from "./mapUtils";
 
 const RAW_CITIES = [
   // رام الله والبيرة
@@ -93,8 +105,15 @@ const RAW_CITIES = [
   "بيرنبالا","عين كارم","قلنديا","أبو شخيدم",
 ];
 
-// Deduplicate + sort
-export const CITIES = [...new Set(RAW_CITIES)].sort((a, b) => a.localeCompare(b, "ar"));
+// Deduplicate + sort. CITIES = union of curated list + every city the router
+// has coordinates for. Adding 100+ cities that drivers actually post trips
+// from but were missing from the hand-maintained list. The Arabic locale
+// sort keeps the dropdown alphabetical for native readers.
+export const CITIES = (() => {
+  const set = new Set(RAW_CITIES);
+  for (const k of Object.keys(CITY_COORDS || {})) set.add(k);
+  return [...set].sort((a, b) => a.localeCompare(b, "ar"));
+})();
 
 // ── Arabic text normalisation ─────────────────────────────────────────────────
 export function normalizeArabic(text) {

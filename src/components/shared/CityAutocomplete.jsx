@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { MapPin, X, Clock, TrendingUp, Map as MapIcon, Search } from "lucide-react";
 import { CITIES, normalizeArabic } from "@/lib/cities";
+import { useAllCities } from "@/hooks/useAllCities";
 import { cn } from "@/lib/utils";
 import MapCityPicker from "@/components/shared/MapCityPicker";
 
@@ -35,8 +36,13 @@ export default function CityAutocomplete({
 
   useEffect(() => { setQuery(value || ""); }, [value]);
 
+  // Unified city pool: static curated list + map-coords cities + cities pulled
+  // live from posted trips (so user-added cities appear in autocomplete too).
+  // CITIES alone gives the static + coords union; the hook layers on the DB.
+  const ALL_CITIES = useAllCities();
+
   const filtered = query.trim()
-    ? CITIES.filter(city => {
+    ? ALL_CITIES.filter(city => {
         const normCity  = normalizeArabic(city);
         const normQuery = normalizeArabic(query.trim());
         return normCity.includes(normQuery) || normQuery.includes(normalizeArabic(city).split(" ")[0]);
@@ -44,7 +50,7 @@ export default function CityAutocomplete({
     : [];
 
   const recent  = getRecent();
-  const popular = POPULAR.filter(c => CITIES.includes(c));
+  const popular = POPULAR.filter(c => ALL_CITIES.includes(c));
 
   useEffect(() => {
     if (!open) return;
