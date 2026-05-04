@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import DateInput from "@/components/shared/DateInput";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo} from "react";
 import { useSearchParams } from "react-router-dom";
 import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
@@ -14,6 +14,7 @@ import CityAutocomplete from "@/components/shared/CityAutocomplete";
 import TripCard from "../components/shared/TripCard";
 import { CITIES, cityMatches } from "@/lib/cities";
 
+import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
 export default function SearchTrips() {
   useSEO({ title: "البحث عن رحلة", description: "ابحث عن رحلات بين المدن الفلسطينية واحجز مقعدك بسهولة" });
 
@@ -51,7 +52,7 @@ export default function SearchTrips() {
   const setSortBy     = v => _updateFilter("sort",   v);
 
   const qc = useQueryClient();
-  const { data: trips = [], isLoading, error } = useQuery({
+  const { data: trips_unfiltered = [], isLoading, error } = useQuery({
     queryKey: ["trips"],
     queryFn: async () => {
       // Fetch ALL confirmed trips via Supabase directly (base44 adds created_by filter)
@@ -69,6 +70,13 @@ export default function SearchTrips() {
     retry: 1,
     staleTime: 30000,  // 30s — refresh in background, don't refetch on every mount
   });
+
+  const blockedSet = useBlockedEmails();
+  const trips = useMemo(
+    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email"),
+    [trips_unfiltered, blockedSet]
+  );
+
 
   useEffect(() => {
     const unsubscribe = base44.entities.Trip.subscribe(() => {

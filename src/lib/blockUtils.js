@@ -51,3 +51,30 @@ export const REPORT_CATEGORIES = [
   { id: "safety",        label: "مخاوف تتعلق بالسلامة" },
   { id: "other",         label: "أخرى" },
 ];
+
+
+// ─────────────────────────────────────────────────────────────
+// React hook: returns Set<email> of users involved in blocks
+// with the current user. Cached via React Query for the session.
+// Use with filterByBlocks() to drop blocked users from any list:
+//
+//   const { data: trips = [] } = useQuery({...});
+//   const blockedSet = useBlockedEmails();
+//   const visibleTrips = useMemo(
+//     () => filterByBlocks(trips, blockedSet, "driver_email"),
+//     [trips, blockedSet]
+//   );
+// ─────────────────────────────────────────────────────────────
+import { useQuery as _useQuery } from "@tanstack/react-query";
+import { useAuth as _useAuth } from "@/lib/AuthContext";
+
+export function useBlockedEmails() {
+  const { user } = _useAuth();
+  const { data } = _useQuery({
+    queryKey: ["my-blocks", user?.email],
+    queryFn: () => getBlockedEmails(user?.email),
+    enabled: !!user?.email,
+    staleTime: 60_000, // 1 minute
+  });
+  return data || new Set();
+}

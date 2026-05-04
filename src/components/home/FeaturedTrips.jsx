@@ -1,4 +1,5 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo} from "react";
+import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2 } from "lucide-react";
@@ -176,10 +177,17 @@ function FeaturedCard({ trip, index }) {
 // ── Section ────────────────────────────────────────────────────────────────────
 export default function FeaturedTrips() {
   const qc = useQueryClient();
-  const { data: trips = [] } = useQuery({
+  const { data: trips_unfiltered = [] } = useQuery({
     queryKey: ["featured-trips"],
     queryFn: () => base44.entities.Trip.filter({ status: "confirmed" }, "-created_date", 4),
   });
+
+  const blockedSet = useBlockedEmails();
+  const trips = useMemo(
+    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email"),
+    [trips_unfiltered, blockedSet]
+  );
+
 
   useEffect(() => {
     const unsub = base44.entities.Trip.subscribe((ev) => {
