@@ -37,7 +37,12 @@ function withTimeout(promise, ms = 7000, label = 'query') {
 
 // ─── Entity factory ───────────────────────────────────────────
 
-// Read auth token directly from localStorage — bypasses supabase-js client (which hangs)
+// Read auth token directly from localStorage — bypasses supabase-js client (which hangs).
+// IMPORTANT: only use the token if it's still valid. An expired access_token sent as
+// Bearer causes Supabase to return 401 on every request — including polling queries
+// like the driver booking popup, which then floods the console and toasts the user
+// every 15 seconds. Falling back to ANON_KEY when expired lets RLS handle authz
+// properly (anonymous reads succeed for public tables, denied for protected ones).
 function getRestHeaders() {
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
   const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -47,7 +52,12 @@ function getRestHeaders() {
     const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.access_token) userToken = parsed.access_token;
+      // Only use the access_token if it's still valid (not expired).
+      // expires_at is a UNIX timestamp in seconds.
+      const notExpired = parsed?.expires_at && parsed.expires_at * 1000 > Date.now();
+      if (parsed?.access_token && notExpired) {
+        userToken = parsed.access_token;
+      }
     }
   } catch {}
   return {

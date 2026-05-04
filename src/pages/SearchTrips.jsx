@@ -96,7 +96,9 @@ export default function SearchTrips() {
 
   // Filter + sort
   const filtered = trips
-    .filter((t) => t.status === "confirmed")
+    // Note: query already restricts to ['confirmed','in_progress'] — no second status
+    // filter here. Including in_progress keeps trips visible to search even after
+    // the driver presses "start trip", which previously made them disappear.
     .filter((t) => !isTripExpired(t))
     // Note: isBookingClosed is enforced in TripDetails booking button, not hidden from search
     .filter((t) => {
@@ -119,11 +121,22 @@ export default function SearchTrips() {
         const toIdx   = sequence.findIndex(s => cityMatches(s, activeFilters.to));
         if (fromIdx === -1 || toIdx === -1 || fromIdx >= toIdx) return false;
       }
-      if (activeFilters.date && t.date       !== activeFilters.date) return false;
+      if (activeFilters.date) {
+        // Compare YYYY-MM-DD prefix so trips stored with a time component
+        // (e.g. "2025-12-15T00:00:00") still match a date-only filter.
+        const tripDate = String(t.date || "").slice(0, 10);
+        const filterDate = String(activeFilters.date).slice(0, 10);
+        if (tripDate !== filterDate) return false;
+      }
       if (maxPrice && t.price > parseFloat(maxPrice)) return false;
       if (genderPref && t.driver_gender !== genderPref) return false;
-      if (t.available_seats < minSeats) return false;
-      if (t.available_seats <= 0) return false; // fully booked
+      // Only filter by seats when the trip has an explicit numeric value.
+      // Older trips may have null available_seats — treat those as "unknown,
+      // don't hide" rather than silently excluding them from results.
+      if (typeof t.available_seats === "number") {
+        if (t.available_seats < minSeats) return false;
+        if (t.available_seats <= 0) return false; // fully booked
+      }
       return true;
     })
     .sort((a, b) => {
