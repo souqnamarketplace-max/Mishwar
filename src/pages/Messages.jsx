@@ -1,5 +1,5 @@
 import { useSEO } from "@/hooks/useSEO";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
@@ -8,37 +8,55 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sanitizeText, getContactViolation } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
-import { Search, Send, ArrowLeft, MessageCircle, Lock, CheckCircle2, Circle } from "lucide-react";
+import {
+  Search, Send, ArrowLeft, MessageCircle, Lock,
+  MapPin, ChevronLeft
+} from "lucide-react";
 import { toast } from "sonner";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
-import { MapPin, ArrowLeft as ArrowDir, Users, DollarSign } from "lucide-react";
 
 /**
- * Messages page — real DB-backed chat list.
- * Lists conversations the current user is part of (sender or receiver).
- * Privacy: RLS already restricts SELECT to messages where the user is sender or receiver.
+ * Messages page — Poparide-style chat.
+ * - Per-conversation trip context banner (green/amber/blue/grey/etc by booking status)
+ * - Top status bar when trip is completed/cancelled/in-progress
+ * - Message bubbles with avatars + date separators
+ * - Quick-reply chips above input
+ * - Locked composer when trip is completed/cancelled
+ *
+ * Privacy: RLS already restricts SELECT to messages where user is sender or receiver.
  */
+
+const QUICK_REPLIES = [
+  "👍",
+  "في الطريق 🚗",
+  "لا أستطيع الكتابة، أنا أقود",
+  "وصلت 📍",
+];
+
 export default function Messages() {
   useSEO({ title: "الرسائل", description: "محادثاتك مع السائقين والركاب" });
 
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);
   const [draft, setDraft] = useState("");
   const [search, setSearch] = useState("");
   const [searchParams] = useSearchParams();
-  const [newConv, setNewConv] = useState(null); // { email, name } for a not-yet-created conversation
+  const [newConv, setNewConv] = useState(null);
+  const [pendingReview, setPendingReview] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // Current user — from AuthContext (instant, no hang)
   const { user } = useAuth();
+  const paramTo   = searchParams.get("to");
+  const paramName = searchParams.get("name");
+  const paramTrip = searchParams.get("trip");
 
-  // Fetch all messages where user is sender or receiver (parallel for speed)
+  // ─── Fetch all messages where user is sender or receiver ───
   const { data: rawMessages = [], isLoading } = useQuery({
     queryKey: ["messages", user?.email],
     queryFn: async () => {
       if (!user?.email) return [];
-      // Use Supabase directly — bypasses base44 created_by filtering
       const { data, error } = await supabase
         .from("messages")
         .select("*")
@@ -53,71 +71,55 @@ export default function Messages() {
     staleTime: 3000,
   });
 
-  // Fetch user's bookings to determine conversation status
-  const { data: myBookings = [] } = useQuery({
+  // ─── Fetch user's bookings (for booking-status determination) ───
+  const { data: myBookings = { asPassenger: [], driverTrips: [] } } = useQuery({
     queryKey: ["my-bookings-msgs", user?.email],
     queryFn: async () => {
-      if (!user?.email) return [];
-      const [asPassenger, asDriver] = await Promise.all([
+      if (!user?.email) return { asPassenger: [], driverTrips: [] };
+      const [asPassenger, driverTrips] = await Promise.all([
         base44.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 100),
         base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 100),
       ]);
-      return { asPassenger, driverTrips: asDriver };
+      return { asPassenger: asPassenger || [], driverTrips: driverTrips || [] };
     },
     enabled: !!user?.email,
     staleTime: 30000,
   });
 
-  // Pending review state
-  const [pendingReview, setPendingReview] = React.useState(null); // { trip, driverEmail, driverName }
-
-  // Get trip linked to active conversation
-  const getConvTrip = React.useCallback((otherEmail) => {
-    if (!myBookings?.asPassenger) return null;
-    const { asPassenger = [], driverTrips = [] } = myBookings;
-    // As passenger: find booking with this driver
-    const asPass = asPassenger.find(b => b.driver_email === otherEmail || b.created_by === otherEmail);
-    if (asPass) return asPass;
-    // As driver: find booking of this passenger
-    const myTripWithPassenger = driverTrips.find(t =>
-      asPassenger.some(b => b.trip_id === t.id && b.passenger_email === otherEmail)
-    );
-    return myTripWithPassenger || null;
-  }, [myBookings]);
-
-  // Determine if a conversation with otherEmail is closed (trip completed/cancelled)
-  const getConvStatus = (otherEmail) => {
-    if (!myBookings?.asPassenger) return "active";
-    const { asPassenger = [], driverTrips = [] } = myBookings;
-
-    // Check as passenger: did I book a trip driven by otherEmail?
-    const asPassengerMatch = asPassenger.find(b =>
-      b.passenger_email === user?.email &&
-      (b.driver_email === otherEmail || b.created_by === otherEmail)
-    );
-    if (asPassengerMatch) {
-      if (["completed"].includes(asPassengerMatch.status)) return "completed";
-      if (["cancelled"].includes(asPassengerMatch.status)) return "cancelled";
-      return "active";
+  // ─── Collect all trip_ids referenced in messages + URL param ───
+  const tripIdsRef = useMemo(() => {
+    const ids = new Set();
+    for (const m of rawMessages) {
+      if (m.trip_id) ids.add(m.trip_id);
     }
+    if (paramTrip) ids.add(paramTrip);
+    return Array.from(ids).sort();
+  }, [rawMessages, paramTrip]);
 
-    // Check as driver: does otherEmail have a booking on my trips?
-    const myTrip = driverTrips.find(t =>
-      ["completed", "cancelled"].includes(t.status)
-    );
-    // Simple check: if any of my trips involving this person is done
-    const driverMatch = asPassenger.find(b => b.passenger_email === otherEmail);
-    if (myTrip && driverMatch) return myTrip.status;
+  // ─── Fetch trip metadata for those ids ───
+  const { data: relatedTrips = [] } = useQuery({
+    queryKey: ["chat-trips", tripIdsRef.join(",")],
+    queryFn: async () => {
+      if (tripIdsRef.length === 0) return [];
+      const { data, error } = await supabase
+        .from("trips")
+        .select("*")
+        .in("id", tripIdsRef);
+      if (error) { console.warn("Chat trips fetch error:", error); return []; }
+      return data || [];
+    },
+    enabled: tripIdsRef.length > 0,
+    staleTime: 30000,
+  });
 
-    return "active";
-  };
+  const tripById = useMemo(() => {
+    const m = new Map();
+    for (const t of relatedTrips) m.set(t.id, t);
+    return m;
+  }, [relatedTrips]);
 
-  // URL params — read here (no deps issue since we just read strings)
-  const paramTo   = searchParams.get("to");
-  const paramName = searchParams.get("name");
-
-  // Realtime subscription — new/updated messages appear instantly
-  React.useEffect(() => {
+  // ─── Realtime subscription ───
+  useEffect(() => {
     if (!user?.email) return;
     const unsub = base44.entities.Message.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["messages", user.email] });
@@ -125,8 +127,8 @@ export default function Messages() {
     return () => unsub();
   }, [user?.email]);
 
-  // Group messages by conversation_id (or fall back to "other person's email")
-  const conversations = React.useMemo(() => {
+  // ─── Group messages into conversations ───
+  const conversations = useMemo(() => {
     const groups = new Map();
     for (const msg of rawMessages) {
       const otherEmail = msg.sender_email === user?.email ? msg.receiver_email : msg.sender_email;
@@ -152,7 +154,6 @@ export default function Messages() {
         conv.unreadCount += 1;
       }
     }
-    // Sort messages within each conversation oldest-to-newest for display
     for (const conv of groups.values()) {
       conv.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     }
@@ -161,7 +162,7 @@ export default function Messages() {
     );
   }, [rawMessages, user?.email]);
 
-  // Filter by search
+  // ─── Filter ───
   const filtered = search.trim()
     ? conversations.filter(c =>
         c.otherName?.toLowerCase().includes(search.toLowerCase()) ||
@@ -169,17 +170,17 @@ export default function Messages() {
       )
     : conversations;
 
-  // activeConv: resolve from existing conversations OR from the pending newConv state
-  const activeConv = React.useMemo(() => {
+  // ─── Active conversation (existing OR new pending) ───
+  const activeConv = useMemo(() => {
     if (activeId === "__new__" && newConv) {
       return { id: "__new__", otherEmail: newConv.email, otherName: newConv.name, messages: [], unreadCount: 0 };
     }
     return conversations.find(c => c.id === activeId) || null;
   }, [activeId, newConv, conversations]);
 
-  // Auto-open conversation from URL params — runs AFTER conversations is defined
+  // ─── Auto-open from URL params ───
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  React.useEffect(() => {
+  useEffect(() => {
     if (!paramTo || !user?.email) return;
     if (paramTo === user.email) return;
     const existing = conversations.find(c => c.otherEmail === paramTo);
@@ -192,21 +193,18 @@ export default function Messages() {
     }
   }, [paramTo, user?.email, conversations.length]);
 
-  // Auto-scroll to bottom when conversation changes or new message arrives
+  // ─── Auto-scroll ───
   useEffect(() => {
     if (activeConv) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeId, activeConv?.messages?.length]);
 
-  // Mark messages as read when opening a conversation
+  // ─── Mark as read ───
   useEffect(() => {
     if (!activeConv || !user?.email) return;
-    const unread = activeConv.messages.filter(
-      m => m.receiver_email === user.email && !m.is_read
-    );
+    const unread = activeConv.messages.filter(m => m.receiver_email === user.email && !m.is_read);
     if (unread.length === 0) return;
     Promise.all(unread.map(m => supabase.from("messages").update({ is_read: true }).eq("id", m.id)))
       .then(() => {
-        // Invalidate the messages cache AND both badge caches so counts update immediately
         qc.invalidateQueries({ queryKey: ["messages", user.email] });
         qc.invalidateQueries({ queryKey: ["unread-messages-count", user.email] });
         qc.invalidateQueries({ queryKey: ["mobile-msg-badge", user.email] });
@@ -214,278 +212,232 @@ export default function Messages() {
       .catch(() => {});
   }, [activeId, activeConv, user?.email, qc]);
 
-  // Send message
+  // ─── Find trip for a conversation ───
+  const getTripIdForConv = (conv) => {
+    if (!conv) return null;
+    if (conv.id === "__new__" && paramTrip) return paramTrip;
+    for (let i = conv.messages.length - 1; i >= 0; i--) {
+      if (conv.messages[i].trip_id) return conv.messages[i].trip_id;
+    }
+    return null;
+  };
+  const getTripForConv = (conv) => {
+    const tid = getTripIdForConv(conv);
+    return tid ? tripById.get(tid) || null : null;
+  };
+
+  // ─── Booking status (drives banner color) ───
+  const getBookingStatus = (trip) => {
+    if (!trip) return "none";
+    if (trip.status === "completed") return "completed";
+    if (trip.status === "cancelled") return "cancelled";
+    if (trip.driver_email === user?.email || trip.created_by === user?.email) return "driver";
+    const myBooking = (myBookings.asPassenger || []).find(b => b.trip_id === trip.id);
+    if (myBooking?.status === "confirmed") return "approved";
+    if (myBooking?.status === "pending") return "pending";
+    return "none";
+  };
+
+  // ─── Send mutation ───
   const send = useMutation({
-    mutationFn: async () => {
-      if (!draft.trim() || !activeConv || !user?.email) return;
-      const cleaned = sanitizeText(draft).slice(0, 5000);
-      // Block phone/contact sharing in chat
+    mutationFn: async (overrideText) => {
+      const text = (overrideText !== undefined ? overrideText : draft).trim();
+      if (!text || !activeConv || !user?.email) return;
+      const cleaned = sanitizeText(text).slice(0, 5000);
       const violation = getContactViolation(cleaned);
-      if (violation) {
-        toast.error(violation, { duration: 5000 });
-        return;
-      }
-      // Generate a stable conversation_id for new conversations
+      if (violation) { toast.error(violation, { duration: 5000 }); return; }
       const convId = activeConv.id === "__new__"
         ? [user.email, activeConv.otherEmail].sort().join("__")
         : activeConv.id;
+      const tripIdToPersist = paramTrip || getTripIdForConv(activeConv);
       const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: convId,
         sender_email:   user.email,
-        sender_name:    user.full_name || user.full_name || user.email.split("@")[0],
+        sender_name:    user.full_name || user.email.split("@")[0],
         receiver_email: activeConv.otherEmail,
         receiver_name:  activeConv.otherName || activeConv.otherEmail.split("@")[0],
         content:        cleaned,
         is_read:        false,
         message_type:   "text",
-        trip_id:        activeConv.tripId || null,
+        trip_id:        tripIdToPersist || null,
       });
-      if (msgErr) {
-        console.error("Message insert error:", msgErr);
-        throw new Error(msgErr.message);
-      }
+      if (msgErr) { console.error("Message insert error:", msgErr); throw new Error(msgErr.message); }
       setDraft("");
       setNewConv(null);
-      // Switch to real conversation after first message sent
       const newConvId = [user.email, activeConv.otherEmail].sort().join("__");
       setActiveId(newConvId);
       qc.invalidateQueries({ queryKey: ["messages", user?.email] });
     },
     onError: () => toast.error("تعذر إرسال الرسالة. حاول مجدداً"),
   });
+  const sendQuick = (text) => send.mutate(text);
+
+  // ─── Group active messages by date for separators ───
+  const groupedMessages = useMemo(() => {
+    if (!activeConv?.messages?.length) return [];
+    const groups = [];
+    let lastDateKey = null;
+    for (const m of activeConv.messages) {
+      const dateKey = new Date(m.created_at).toDateString();
+      if (dateKey !== lastDateKey) {
+        groups.push({ type: "separator", date: m.created_at, key: `s-${dateKey}` });
+        lastDateKey = dateKey;
+      }
+      groups.push({ type: "msg", message: m, key: `m-${m.id}` });
+    }
+    return groups;
+  }, [activeConv]);
+
+  const activeTrip = activeConv ? getTripForConv(activeConv) : null;
+  const activeBookingStatus = getBookingStatus(activeTrip);
+  const isChatLocked =
+    activeBookingStatus === "completed" ||
+    activeBookingStatus === "cancelled" ||
+    activeTrip?.status === "completed" ||
+    activeTrip?.status === "cancelled";
 
   return (
     <>
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8" dir="rtl">
-      <div className="text-center mb-6">
-        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
-          <MessageCircle className="w-6 h-6 text-primary" />
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-foreground">الرسائل</h1>
-        <p className="text-muted-foreground text-sm mt-1">محادثاتك مع السائقين والركاب</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-card rounded-2xl border border-border overflow-hidden" style={{ minHeight: "60vh" }}>
-        {/* ── Sidebar: conversation list ── */}
-        <div className={`md:col-span-1 border-l border-border ${activeConv ? "hidden md:block" : ""}`}>
-          <div className="p-3 border-b border-border sticky top-0 bg-card">
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="ابحث في المحادثات..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pr-10 h-10 rounded-xl"
-              />
-            </div>
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8" dir="rtl">
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+            <MessageCircle className="w-6 h-6 text-primary" />
           </div>
-
-          {isLoading ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">جاري التحميل...</div>
-          ) : filtered.length === 0 ? (
-            <EmptyState
-              emoji="💬"
-              title={search ? "لا توجد نتائج" : "لا توجد محادثات بعد"}
-              description={search ? "جرب اسماً آخر" : "ستظهر محادثاتك مع السائقين والركاب هنا بعد الحجز"}
-            />
-          ) : (
-            <div>
-              {filtered.map(conv => {
-                const last = conv.lastMessage;
-                const isMe = last?.sender_email === user?.email;
-                const trip = getConvTrip(conv.otherEmail);
-                const st = getConvStatus(conv.otherEmail);
-                const isApproved = st === "active" && trip;
-                const isCompleted = st === "completed";
-                return (
-                  <button
-                    key={conv.id}
-                    onClick={() => setActiveId(conv.id)}
-                    className={`w-full text-right px-3 py-3 border-b border-border/40 hover:bg-muted/40 transition-colors ${activeId === conv.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Avatar with price badge overlay (Poparide-style) */}
-                      <div className="relative shrink-0">
-                        <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold overflow-hidden">
-                          {conv.otherName?.[0]?.toUpperCase() || "؟"}
-                        </div>
-                        {trip?.price && (
-                          <span className={`absolute -top-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${isApproved ? "bg-green-500 text-white" : "bg-card border border-border text-foreground"}`}>
-                            ₪{trip.price}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="font-bold text-sm text-foreground truncate">{conv.otherName}</p>
-                          {last && <span className="text-[10px] text-muted-foreground shrink-0">{formatTime(last.created_at)}</span>}
-                        </div>
-
-                        {trip && (
-                          <p className={`text-xs font-medium mb-0.5 ${isApproved ? "text-green-600" : "text-muted-foreground"}`}>
-                            {isApproved && "• تم تأكيد الحجز"}
-                            {isCompleted && "🔒 رحلة مكتملة"}
-                            {st === "cancelled" && "🔒 رحلة ملغاة"}
-                          </p>
-                        )}
-
-                        {trip && (
-                          <p className="text-xs text-foreground truncate mb-0.5">
-                            {trip.from_city} ← {trip.to_city} {trip.date && `· ${trip.date}`}
-                          </p>
-                        )}
-
-                        <p className={`text-xs truncate ${conv.unreadCount > 0 && !isMe ? "font-bold text-foreground" : "text-muted-foreground"}`}>
-                          {isMe && "أنت: "}{last?.content || ""}
-                        </p>
-                      </div>
-
-                      {conv.unreadCount > 0 && (
-                        <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
-                          {conv.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">الرسائل</h1>
+          <p className="text-muted-foreground text-sm mt-1">محادثاتك مع السائقين والركاب</p>
         </div>
 
-        {/* ── Active chat pane ── */}
-        <div className={`md:col-span-2 flex flex-col ${activeConv ? "" : "hidden md:flex"}`}>
-          {!activeConv ? (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
-              <div className="text-center">
-                <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">اختر محادثة لعرضها</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 bg-card rounded-2xl border border-border overflow-hidden" style={{ minHeight: "70vh" }}>
+          {/* ── Sidebar ── */}
+          <div className={`md:col-span-1 border-l border-border ${activeConv ? "hidden md:block" : ""}`}>
+            <div className="p-3 border-b border-border sticky top-0 bg-card z-10">
+              <div className="relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="ابحث في المحادثات..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pr-10 h-10 rounded-xl"
+                />
               </div>
             </div>
-          ) : (
-            <>
-              {/* Chat header */}
-              <div className="px-4 py-3 border-b border-border flex items-center gap-3 sticky top-0 bg-card">
-                <button onClick={() => setActiveId(null)} className="md:hidden p-1.5 rounded-lg hover:bg-muted">
-                  <ArrowLeft className="w-4 h-4 rotate-180" />
-                </button>
-                <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-sm">
-                  {activeConv.otherName?.[0]?.toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <Link to={`/profile?email=${encodeURIComponent(activeConv.otherEmail)}`}
-                        className="font-medium text-sm text-foreground hover:underline truncate block">
-                    {activeConv.otherName}
-                  </Link>
-                  <p className="text-[10px] text-muted-foreground truncate">{activeConv.otherEmail}</p>
-                </div>
-              </div>
 
-              {/* Trip banner */}
-              {(() => {
-                const trip = getConvTrip(activeConv.otherEmail);
-                if (!trip) return null;
-                const isBooked = trip.status === "confirmed" || trip.status === "in_progress" || trip.status === "completed";
-                const isCompleted = trip.status === "completed";
-                const bgColor = isCompleted
-                  ? "bg-gray-500/10 border-gray-200"
-                  : isBooked
-                  ? "bg-green-600 text-white"
-                  : "bg-muted/60 border-border";
-                const textColor = isBooked && !isCompleted ? "text-white" : "text-foreground";
-                return (
-                  <div className={`mx-3 mb-2 rounded-xl border px-4 py-2.5 ${bgColor}`}>
-                    <div className={`flex items-center justify-between gap-2 text-sm font-bold ${textColor}`}>
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 shrink-0" />
-                        {trip.from_city}
-                        <ArrowDir className="w-3 h-3 opacity-60" />
-                        {trip.to_city}
-                      </span>
-                      <span className={`text-xs font-semibold ${isBooked && !isCompleted ? "text-white/90" : "text-muted-foreground"}`}>
-                        {isCompleted ? "مكتملة ✓" : isBooked ? "محجوزة ✓" : "لم تُحجز بعد"}
-                      </span>
-                    </div>
-                    <div className={`flex items-center gap-3 mt-1 text-xs ${isBooked && !isCompleted ? "text-white/80" : "text-muted-foreground"}`}>
-                      <span>{trip.date}</span>
-                      {trip.time && <span>· {trip.time}</span>}
-                      {trip.price && <span>· ₪{trip.price} للمقعد</span>}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-muted/20" style={{ maxHeight: "60vh" }}>
-                {activeConv.messages.map(msg => {
-                  const mine = msg.sender_email === user?.email;
+            {isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">جاري التحميل...</div>
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                emoji="💬"
+                title={search ? "لا توجد نتائج" : "لا توجد محادثات بعد"}
+                description={search ? "جرب اسماً آخر" : "ستظهر محادثاتك مع السائقين والركاب هنا بعد الحجز"}
+              />
+            ) : (
+              <div>
+                {filtered.map(conv => {
+                  const trip = getTripForConv(conv);
+                  const status = getBookingStatus(trip);
                   return (
-                    <div key={msg.id} className={`flex ${mine ? "justify-start" : "justify-end"}`}>
-                      <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${mine ? "bg-primary text-primary-foreground" : "bg-card border border-border"}`}>
-                        <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
-                        <p className={`text-[10px] mt-1 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                          {formatTime(msg.created_at)}
-                        </p>
-                      </div>
-                    </div>
+                    <ConversationListItem
+                      key={conv.id}
+                      conv={conv}
+                      trip={trip}
+                      bookingStatus={status}
+                      active={activeId === conv.id}
+                      mineEmail={user?.email}
+                      onClick={() => setActiveId(conv.id)}
+                    />
                   );
                 })}
-                <div ref={messagesEndRef} />
               </div>
+            )}
+          </div>
 
-              {/* Composer — locked if trip is completed/cancelled */}
-              {(() => {
-                const convStatus = getConvStatus(activeConv?.otherEmail);
-                const isClosed = convStatus === "completed" || convStatus === "cancelled";
-                if (isClosed) {
-                  return (
-                    <div className="p-4 border-t border-border bg-muted/30 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <Lock className="w-4 h-4 shrink-0" />
-                      {convStatus === "completed"
-                        ? "انتهت الرحلة — المحادثة مغلقة 🏁"
-                        : "تم إلغاء الرحلة — المحادثة مغلقة"}
+          {/* ── Active chat ── */}
+          <div className={`md:col-span-2 flex flex-col ${activeConv ? "" : "hidden md:flex"}`}>
+            {!activeConv ? (
+              <div className="flex-1 flex items-center justify-center text-muted-foreground p-8">
+                <div className="text-center">
+                  <MessageCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">اختر محادثة لعرضها</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Chat header */}
+                <div className="px-4 py-3 border-b border-border flex items-center gap-3 bg-card">
+                  <button onClick={() => setActiveId(null)} className="md:hidden p-2 -m-2 rounded-lg hover:bg-muted/50" aria-label="رجوع">
+                    <ArrowLeft className="w-5 h-5 rotate-180" />
+                  </button>
+                  <Avatar name={activeConv.otherName} size={40} />
+                  <div className="flex-1 min-w-0">
+                    <Link
+                      to={`/profile?email=${encodeURIComponent(activeConv.otherEmail)}`}
+                      className="font-semibold text-base text-foreground hover:underline truncate block"
+                    >
+                      {activeConv.otherName}
+                    </Link>
+                    <p className="text-xs text-muted-foreground truncate">{activeConv.otherEmail}</p>
+                  </div>
+                </div>
+
+                {/* Trip Status Bar (dark navy / red / amber) */}
+                {activeTrip && <TripStatusBar trip={activeTrip} />}
+
+                {/* Trip Context Banner (green / amber / blue / grey) */}
+                {activeTrip && (
+                  <TripContextBanner
+                    trip={activeTrip}
+                    bookingStatus={activeBookingStatus}
+                    otherName={activeConv.otherName}
+                    onClick={() => navigate(`/trip/${activeTrip.id}`)}
+                  />
+                )}
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-muted/10" style={{ maxHeight: "55vh" }}>
+                  {groupedMessages.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground text-sm">
+                      ابدأ المحادثة بإرسال أول رسالة
                     </div>
-                  );
-                }
-                return (
-                  <form
-                    onSubmit={(e) => { e.preventDefault(); if (draft.trim()) send.mutate(); }}
-                    className="p-3 border-t border-border sticky bottom-0 bg-card"
-                  >
-                    {getContactViolation(draft) && (
-                      <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-2 text-right">
-                        {getContactViolation(draft)}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={draft}
-                        onChange={e => setDraft(e.target.value)}
-                        placeholder="اكتب رسالة..."
-                        className={`rounded-xl h-10 flex-1 ${getContactViolation(draft) ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                        disabled={send.isPending}
+                  ) : groupedMessages.map(item => {
+                    if (item.type === "separator") {
+                      return <DateSeparator key={item.key} iso={item.date} />;
+                    }
+                    const m = item.message;
+                    const mine = m.sender_email === user?.email;
+                    return (
+                      <MessageBubble
+                        key={item.key}
+                        message={m}
+                        mine={mine}
+                        otherName={activeConv.otherName}
                       />
-                      <Button
-                        type="submit"
-                        size="icon"
-                        disabled={!draft.trim() || send.isPending || !!getContactViolation(draft)}
-                        className="rounded-xl bg-primary text-primary-foreground"
-                        aria-label="إرسال"
-                      >
-                        <Send className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </form>
-                );
-              })()}
-            </>
-          )}
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Locked notice OR quick replies + input */}
+                {isChatLocked ? (
+                  <ClosedNotice status={activeBookingStatus} />
+                ) : (
+                  <>
+                    <QuickReplies onPick={sendQuick} disabled={send.isPending} />
+                    <MessageInput
+                      draft={draft}
+                      setDraft={setDraft}
+                      onSend={() => send.mutate()}
+                      disabled={send.isPending}
+                      violation={getContactViolation(draft)}
+                      otherName={activeConv.otherName}
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
 
-      {/* Passenger review wizard — uses createPortal, renders in body */}
       {pendingReview && (
         <PassengerReviewWizard
           trip={pendingReview.trip}
@@ -499,15 +451,267 @@ export default function Messages() {
   );
 }
 
-function formatTime(iso) {
+// ============================================================
+// SUB-COMPONENTS
+// ============================================================
+
+function Avatar({ name, size = 40, className = "" }) {
+  return (
+    <div
+      className={`rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 ${className}`}
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
+      {(name?.[0] || "؟").toUpperCase()}
+    </div>
+  );
+}
+
+function ConversationListItem({ conv, trip, bookingStatus, active, mineEmail, onClick }) {
+  const last = conv.lastMessage;
+  const isMe = last?.sender_email === mineEmail;
+  const dotColor = {
+    approved:  "bg-green-500",
+    pending:   "bg-amber-500",
+    driver:    "bg-blue-500",
+    completed: "bg-slate-500",
+    cancelled: "bg-red-500",
+    none:      "bg-muted-foreground/40",
+  }[bookingStatus];
+  const priceBadgeColor = {
+    approved:  "bg-green-500 text-white",
+    pending:   "bg-amber-500 text-white",
+    driver:    "bg-blue-500 text-white",
+    completed: "bg-slate-700 text-white",
+    cancelled: "bg-red-500 text-white",
+    none:      "bg-card border border-border text-foreground",
+  }[bookingStatus];
+
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full text-right px-3 py-3 border-b border-border/40 hover:bg-muted/40 transition-colors ${active ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="relative shrink-0">
+          <Avatar name={conv.otherName} size={48} />
+          {trip?.price && (
+            <span className={`absolute -top-1 -right-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm ${priceBadgeColor}`}>
+              ₪{trip.price}
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <p className="font-bold text-sm text-foreground truncate">{conv.otherName}</p>
+            {last && <span className="text-[10px] text-muted-foreground shrink-0">{formatTimeShort(last.created_at)}</span>}
+          </div>
+          {trip && (
+            <p className="text-xs text-foreground truncate mb-0.5 flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+              <span className="truncate">{trip.from_city} ← {trip.to_city}</span>
+              {trip.date && <span className="text-muted-foreground shrink-0">• {formatDateShort(trip.date)}</span>}
+            </p>
+          )}
+          <p className={`text-xs truncate ${conv.unreadCount > 0 && !isMe ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+            {isMe && "أنت: "}{last?.content || ""}
+          </p>
+        </div>
+        {conv.unreadCount > 0 && (
+          <span className="bg-primary text-primary-foreground text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shrink-0">
+            {conv.unreadCount}
+          </span>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function TripStatusBar({ trip }) {
+  if (trip.status === "completed") {
+    return (
+      <div className="px-4 py-2 bg-slate-800 text-white text-sm font-semibold flex items-center justify-between">
+        <span>🏁 الرحلة مكتملة</span>
+      </div>
+    );
+  }
+  if (trip.status === "cancelled") {
+    return (
+      <div className="px-4 py-2 bg-red-600 text-white text-sm font-semibold flex items-center justify-between">
+        <span>❌ تم إلغاء الرحلة</span>
+      </div>
+    );
+  }
+  if (trip.status === "in_progress") {
+    return (
+      <div className="px-4 py-2 bg-amber-600 text-white text-sm font-semibold flex items-center justify-between">
+        <span>🚗 الرحلة قيد التنفيذ</span>
+      </div>
+    );
+  }
+  return null;
+}
+
+function TripContextBanner({ trip, bookingStatus, otherName, onClick }) {
+  const cfg = {
+    approved:  { bg: "bg-green-600",   text: "text-white",      label: "تم تأكيد الحجز" },
+    pending:   { bg: "bg-amber-500",   text: "text-white",      label: "بانتظار الموافقة" },
+    driver:    { bg: "bg-blue-600",    text: "text-white",      label: "أنت السائق" },
+    completed: { bg: "bg-slate-700",   text: "text-white",      label: "رحلة مكتملة" },
+    cancelled: { bg: "bg-red-600",     text: "text-white",      label: "ملغاة" },
+    none:      { bg: "bg-muted",       text: "text-foreground", label: "لم يُحجز بعد" },
+  }[bookingStatus] || { bg: "bg-muted", text: "text-foreground", label: "" };
+
+  const isLight = bookingStatus === "none";
+  const subTextColor = isLight ? "text-muted-foreground" : "text-white/85";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full ${cfg.bg} ${cfg.text} px-4 py-3 text-right hover:opacity-95 transition-opacity flex items-center gap-3 border-b border-black/10`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-bold flex items-center gap-1.5 flex-wrap">
+          <span className="truncate">{otherName}</span>
+          <span className={subTextColor}>•</span>
+          <span className="text-xs font-medium">{cfg.label}</span>
+          {trip.price && (
+            <>
+              <span className={subTextColor}>•</span>
+              <span className="text-xs font-medium">₪{trip.price} للمقعد</span>
+            </>
+          )}
+        </div>
+        <div className={`text-xs mt-0.5 ${subTextColor} truncate flex items-center gap-1.5`}>
+          <MapPin className="w-3 h-3 shrink-0" />
+          <span className="truncate">{trip.from_city} إلى {trip.to_city}</span>
+          {trip.date && <span> • {formatDateShort(trip.date)}</span>}
+          {trip.time && <span> {trip.time}</span>}
+        </div>
+      </div>
+      <ChevronLeft className="w-5 h-5 opacity-80 shrink-0" />
+    </button>
+  );
+}
+
+function DateSeparator({ iso }) {
+  return (
+    <div className="flex items-center justify-center my-3">
+      <span className="text-[11px] text-muted-foreground bg-card px-3 py-1 rounded-full border border-border/50">
+        {formatDateLabel(iso)}
+      </span>
+    </div>
+  );
+}
+
+function MessageBubble({ message, mine, otherName }) {
+  return (
+    <div className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+      {!mine && <Avatar name={otherName} size={28} className="mb-1" />}
+      <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
+        mine
+          ? "bg-primary text-primary-foreground rounded-br-md"
+          : "bg-card border border-border rounded-bl-md"
+      }`}>
+        <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+        <p className={`text-[10px] mt-0.5 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"} text-left`}>
+          {formatTimeShort(message.created_at)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function QuickReplies({ onPick, disabled }) {
+  return (
+    <div
+      className="px-3 pt-3 pb-1 flex items-center gap-2 overflow-x-auto bg-card border-t border-border"
+      style={{ scrollbarWidth: "none" }}
+    >
+      {QUICK_REPLIES.map((q, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => onPick(q)}
+          disabled={disabled}
+          className="shrink-0 text-xs whitespace-nowrap px-3 py-1.5 rounded-full bg-muted/60 hover:bg-muted text-foreground border border-border/50 disabled:opacity-50 min-h-[36px]"
+        >
+          {q}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MessageInput({ draft, setDraft, onSend, disabled, violation, otherName }) {
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (draft.trim()) onSend(); }}
+      className="p-3 border-t border-border sticky bottom-0 bg-card"
+    >
+      {violation && (
+        <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-2 text-right">
+          {violation}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <Input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          placeholder={`رسالة إلى ${otherName}...`}
+          className={`rounded-full h-11 flex-1 ${violation ? "border-destructive focus-visible:ring-destructive" : ""}`}
+          disabled={disabled}
+        />
+        <Button
+          type="submit"
+          size="icon"
+          disabled={!draft.trim() || disabled || !!violation}
+          className="rounded-full bg-primary text-primary-foreground h-11 w-11 shrink-0"
+          aria-label="إرسال"
+        >
+          <Send className="w-4 h-4" />
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function ClosedNotice({ status }) {
+  return (
+    <div className="p-4 border-t border-border bg-muted/30 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+      <Lock className="w-4 h-4 shrink-0" />
+      {status === "completed"
+        ? "انتهت الرحلة — المحادثة مغلقة 🏁"
+        : "تم إلغاء الرحلة — المحادثة مغلقة"}
+    </div>
+  );
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function formatTimeShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDateShort(iso) {
+  if (!iso) return "";
+  const d = typeof iso === "string" && iso.length === 10 ? new Date(iso + "T00:00:00") : new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("ar", { day: "numeric", month: "short" });
+}
+
+function formatDateLabel(iso) {
   if (!iso) return "";
   const d = new Date(iso);
   const now = new Date();
-  const diffMs = now - d;
-  const diffH = diffMs / (1000 * 60 * 60);
-  if (diffH < 24 && d.getDate() === now.getDate()) {
-    return d.toLocaleTimeString("ar", { hour: "2-digit", minute: "2-digit" });
-  }
-  if (diffH < 48) return "أمس";
-  return d.toLocaleDateString("ar", { day: "numeric", month: "short" });
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return "اليوم";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "أمس";
+  return d.toLocaleDateString("ar", { weekday: "long", day: "numeric", month: "long" });
 }
