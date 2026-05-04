@@ -284,11 +284,19 @@ export default function Messages() {
     return conversations.find(c => c.id === activeId) || null;
   }, [activeId, newConv, conversations]);
 
-  // ─── Auto-open from URL params ───
+  // ─── Auto-open from URL params (fires ONCE per to+trip URL combo) ───
+  const autoOpenedRef = useRef(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!paramTo || !user?.email) return;
     if (paramTo === user.email) return;
+    // Guard: only auto-open once per unique URL combo.
+    // Without this, conversations.length changing (e.g. after send) re-fires
+    // this effect and forces UI back to the URL's trip — closing the conv
+    // the user just switched to.
+    const urlKey = `${paramTo}__${paramTrip || ''}`;
+    if (autoOpenedRef.current === urlKey) return;
+    autoOpenedRef.current = urlKey;
     if (paramTrip) {
       // STRICT per-trip mode: only open existing thread if it's about THIS trip.
       // Otherwise force a fresh "__new__" — never fall back to email-pair convo.
@@ -387,7 +395,9 @@ export default function Messages() {
       if (violation) { toast.error(violation, { duration: 5000 }); return; }
       // Per-trip conversation IDs: a passenger booking 2 different trips with the
       // same driver gets 2 separate threads. Falls back to email-pair if no trip context.
-      const tripIdToPersist = paramTrip || getTripIdForConv(activeConv);
+      // Use the active conv's trip context, NOT the stale URL paramTrip.
+      // getTripIdForConv() already falls back to paramTrip when conv.id === '__new__'.
+      const tripIdToPersist = getTripIdForConv(activeConv);
       const emailPair = [user.email, activeConv.otherEmail].sort().join("__");
       const convId = activeConv.id === "__new__"
         ? (tripIdToPersist ? `trip_${tripIdToPersist}__${emailPair}` : emailPair)
