@@ -325,7 +325,18 @@ export default function Messages() {
 
   // ─── Auto-scroll ───
   useEffect(() => {
-    if (activeConv) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Scroll only the messages list, NEVER the whole page.
+    // scrollIntoView() walks up the parent chain to make the target visible,
+    // which scrolls the page itself on mobile and pushes header/banner/composer
+    // out of view. Setting scrollTop on the immediate scrollable parent
+    // guarantees only THAT element scrolls — standard messaging-app pattern.
+    if (!activeConv) return;
+    const sentinel = messagesEndRef.current;
+    if (!sentinel) return;
+    const container = sentinel.parentElement;
+    if (container && container.scrollHeight > container.clientHeight) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [activeId, activeConv?.messages?.length]);
 
   // ─── Mark as read ───
