@@ -4,11 +4,10 @@ import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu,
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
-import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
 import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 const MOBILE_TABS = [
   { id: "home",     label: "الرئيسية", icon: Home,          path: "/" },
@@ -57,37 +56,6 @@ export default function MobileLayout({ children, user, showHeader = true, header
   
   // Detect if viewport is mobile
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
-
-  // ─── Unread messages count (drives red badge on الرسائل tab) ───
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-messages-count", user?.email],
-    queryFn: async () => {
-      if (!user?.email) return 0;
-      const { count, error } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("receiver_email", user.email)
-        .eq("is_read", false);
-      if (error) { console.warn("unread count error:", error); return 0; }
-      return count || 0;
-    },
-    enabled: !!user?.email,
-    staleTime: 15000,
-  });
-
-  // Realtime: bump unread count when a new message arrives, drop it when read
-  useEffect(() => {
-    if (!user?.email) return;
-    const channel = supabase
-      .channel(`unread-msgs-${user.email}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "messages",
-          filter: `receiver_email=eq.${user.email}` },
-        () => qc.invalidateQueries({ queryKey: ["unread-messages-count", user.email] })
-      )
-      .subscribe();
-    return () => { try { supabase.removeChannel(channel); } catch {} };
-  }, [user?.email, qc]);
 
   const currentTab = MOBILE_TABS.find(tab => location.pathname.startsWith(tab.path.split("?")[0]));
 
@@ -225,17 +193,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <div className="relative">
-                  <Icon className="w-6 h-6 mb-1" />
-                  {tab.id === "messages" && unreadCount > 0 && (
-                    <span
-                      className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
-                      aria-label={`${unreadCount} رسائل غير مقروءة`}
-                    >
-                      {unreadCount > 9 ? "9+" : unreadCount}
-                    </span>
-                  )}
-                </div>
+                <Icon className="w-6 h-6 mb-1" />
                 <span className="text-[10px] font-medium">{tab.label}</span>
               </Link>
               </React.Fragment>
