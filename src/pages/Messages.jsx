@@ -688,7 +688,7 @@ function DateSeparator({ iso }) {
 
 function MessageBubble({ message, mine, otherName }) {
   return (
-    <div className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
+    <div className={`flex items-end gap-2 ${mine ? "justify-start" : "justify-end flex-row-reverse"}`}>
       {!mine && <Avatar name={otherName} size={28} className="mb-1" />}
       <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
         mine

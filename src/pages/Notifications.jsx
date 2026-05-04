@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import EmptyState from "@/components/shared/EmptyState";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/lib/supabase";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 
 const emptyForm = {
@@ -26,6 +28,7 @@ export default function Notifications() {
   const [form, setForm] = useState(emptyForm);
   const [activeTab, setActiveTab] = useState("preferences");
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   // Fetch user
   const { data: user } = useQuery({
@@ -89,14 +92,31 @@ export default function Notifications() {
   const markAllRead = useMutation({
     mutationFn: async () => {
       const unread = notifications.filter((n) => !n.is_read);
-      await Promise.all(unread.map((n) => base44.entities.Notification.update(n.id, { is_read: true })));
+      if (unread.length === 0) return;
+      const ids = unread.map((n) => n.id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .in("id", ids);
+      if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", user?.email] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: () => toast.error("تعذر تحديث الإشعارات"),
   });
 
   const deleteNotif = useMutation({
-    mutationFn: (id) => base44.entities.Notification.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", user?.email] }),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("notifications").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: () => toast.error("تعذر حذف الإشعار"),
   });
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
@@ -319,10 +339,13 @@ export default function Notifications() {
                   key={notif.id}
                   className={`bg-card rounded-2xl border p-4 transition-all cursor-pointer hover:shadow-sm ${!notif.is_read ? "border-primary/30 bg-primary/5" : "border-border"}`}
                   onClick={async () => {
-                    // Mark as read
+                    // Mark as read via supabase (base44 created_by filter blocks this)
                     if (!notif.is_read) {
-                      try { await base44.entities.Notification.update(notif.id, { is_read: true }); } catch {}
+                      try {
+                        await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
+                      } catch (e) { console.warn("notif markRead error:", e); }
                       qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
+                      qc.invalidateQueries({ queryKey: ["notifications"] });
                     }
                     // Type-based routing
                     const link = notif.link;

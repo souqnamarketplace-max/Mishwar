@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, X, CheckCheck, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -67,20 +68,47 @@ export default function NotificationBell({ userEmail }) {
   }, [userEmail]);
 
   const markRead = useMutation({
-    mutationFn: (id) => base44.entities.Notification.update(id, { is_read: true }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
+    mutationFn: async (id) => {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    // Optimistic update so the dot disappears instantly even before navigate
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["notifications", userEmail] });
+      const prev = qc.getQueryData(["notifications", userEmail]);
+      qc.setQueryData(["notifications", userEmail], (old) =>
+        Array.isArray(old) ? old.map(n => n.id === id ? { ...n, is_read: true } : n) : old
+      );
+      return { prev };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["notifications", userEmail], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
   });
 
   const markAllRead = useMutation({
     mutationFn: async () => {
       const unread = notifications.filter(n => !n.is_read);
-      await Promise.all(unread.map(n => base44.entities.Notification.update(n.id, { is_read: true })));
+      if (unread.length === 0) return;
+      const ids = unread.map(n => n.id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .in("id", ids);
+      if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
   });
 
   const deleteNotif = useMutation({
-    mutationFn: (id) => base44.entities.Notification.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("notifications").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
   });
 
@@ -116,7 +144,7 @@ export default function NotificationBell({ userEmail }) {
   };
 
   const handleNotifClick = (notif) => {
-    markRead.mutate(notif.id);
+    if (!notif.is_read) markRead.mutate(notif.id);
     setOpen(false);
     navigate(getNotifTarget(notif));
   };
