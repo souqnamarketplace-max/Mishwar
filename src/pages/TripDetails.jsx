@@ -602,6 +602,23 @@ export default function TripDetails() {
                   >
                     احجز الآن
                   </Button>
+                  {trip?.driver_email && user?.email !== trip.driver_email && (
+                    <button
+                      type="button"
+                      aria-label="محادثة السائق"
+                      onClick={() => {
+                        const params = new URLSearchParams({
+                          to: trip.driver_email,
+                          name: trip.driver_name || trip.driver_email.split("@")[0],
+                          trip: trip.id,
+                        });
+                        navigate(`/messages?${params.toString()}`);
+                      }}
+                      className="shrink-0 w-12 h-12 rounded-xl border-2 border-primary/30 bg-primary/5 text-primary flex items-center justify-center active:scale-95 transition-transform hover:bg-primary/10"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
