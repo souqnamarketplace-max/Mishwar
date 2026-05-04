@@ -275,7 +275,7 @@ const pageTitles = {
   bookings: { title: "إدارة الحجوزات", subtitle: "عرض وإدارة جميع الحجوزات" },
   reviews: { title: "التقييمات والمراجعات", subtitle: "إدارة تقييمات المستخدمين" },
   payments: { title: "المعاملات والمدفوعات", subtitle: "تتبع الإيرادات والمعاملات المالية" },
-  reports: { title: "التقارير والإحصائيات", subtitle: "تحليل بيانات المنصة" },
+  reports: { title: "بلاغات المستخدمين", subtitle: "مراجعة البلاغات والإجراءات الإدارية" },
   notifications: { title: "الإشعارات", subtitle: "سجل أحداث المنصة" },
   support: { title: "الدعم والشكاوى", subtitle: "إدارة تذاكر الدعم الفني" },
   feedback: { title: "الاقتراحات والشكاوى", subtitle: "ملاحظات المستخدمين" },
