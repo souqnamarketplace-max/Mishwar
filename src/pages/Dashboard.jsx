@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardUsers from "./dashboard/DashboardUsers";
 import DashboardTrips from "./dashboard/DashboardTrips";
@@ -63,18 +63,27 @@ function Overview() {
   const totalTrips = trips.length;
   const totalBookings = bookings.length;
   const totalUsers = users.length;
-  const totalRevenue = bookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
+  // Revenue counts only bookings that actually represent realised value:
+  // confirmed (driver accepted, money owed) or completed (trip done). The
+  // pre-fix code summed ALL bookings — cancelled ones inflated the total
+  // and disagreed with DashboardPayments which excluded them via RPC.
+  // Eventually this should also gate on payment_status === 'paid' once the
+  // payment-tracking flow has been in production long enough that drivers/
+  // admins are reliably marking transactions paid.
+  const totalRevenue = bookings
+    .filter((b) => b.status === "confirmed" || b.status === "completed")
+    .reduce((sum, b) => sum + (b.total_price || 0), 0);
   const confirmedBookings = bookings.filter((b) => b.status === "confirmed").length;
 
   // Helper to format dates safely (handles created_at from Supabase)
   const safeDate = (d) => d ? new Date(d) : new Date();
 
   const statCards = [
-    { title: "المستخدمين النشطين اليوم", value: totalUsers.toString(), change: "+9.1%", up: true, icon: Users, bg: "bg-primary/10", iconColor: "text-primary" },
-    { title: "الحجوزات اليوم", value: confirmedBookings.toString(), change: "+8.4%", up: true, icon: CalendarCheck, bg: "bg-accent/10", iconColor: "text-accent" },
-    { title: "إجمالي المستخدمين", value: totalUsers.toString(), change: "+12.6%", up: true, icon: Users, bg: "bg-primary/10", iconColor: "text-primary" },
-    { title: "إجمالي الرحلات", value: totalTrips.toString(), change: "+15.3%", up: true, icon: Car, bg: "bg-accent/10", iconColor: "text-accent" },
-    { title: "إجمالي الإيرادات", value: `₪${totalRevenue.toLocaleString()}`, change: "+18.7%", up: true, icon: DollarSign, bg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
+    { title: "المستخدمين النشطين اليوم", value: totalUsers.toString(), change: "—", up: true, icon: Users, bg: "bg-primary/10", iconColor: "text-primary" },
+    { title: "الحجوزات اليوم", value: confirmedBookings.toString(), change: "—", up: true, icon: CalendarCheck, bg: "bg-accent/10", iconColor: "text-accent" },
+    { title: "إجمالي المستخدمين", value: totalUsers.toString(), change: "—", up: true, icon: Users, bg: "bg-primary/10", iconColor: "text-primary" },
+    { title: "إجمالي الرحلات", value: totalTrips.toString(), change: "—", up: true, icon: Car, bg: "bg-accent/10", iconColor: "text-accent" },
+    { title: "إجمالي الإيرادات", value: `₪${totalRevenue.toLocaleString()}`, change: "—", up: true, icon: DollarSign, bg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
   ];
 
   // Chart data from recent trips
@@ -291,16 +300,40 @@ const pageTitles = {
 export default function Dashboard() {
   useSEO({ title: "لوحة الإدارة", description: "لوحة إدارة منصة مِشوار" });
   const { user, isLoadingAuth } = useAuth();
-  const [activePage, setActivePage] = useState("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // URL-driven tab state. Bookmarking /dashboard?tab=payments now lands
+  // on the payments tab instead of crashing the error boundary, and back/
+  // forward navigation moves between tabs.
+  const initialTab = searchParams.get("tab") || "overview";
+  const [activePage, _setActivePage] = useState(initialTab);
+  const setActivePage = (next) => {
+    _setActivePage(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === "overview") params.delete("tab");
+    else params.set("tab", next);
+    setSearchParams(params, { replace: true });
+  };
+  // Catch URL changes from outside (back button, paste a deep link, etc.)
+  React.useEffect(() => {
+    const t = searchParams.get("tab") || "overview";
+    if (t !== activePage) _setActivePage(t);
+  }, [searchParams]);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [broadcastMsg, setBroadcastMsg] = useState("");
   const [broadcasting, setBroadcasting] = useState(false);
 
+  // Two-stage broadcast: message composer → explicit "are you sure?" →
+  // RPC. Without the second step, one click reaches every user with no
+  // undo — too easy to misfire.
+  const [broadcastConfirm, setBroadcastConfirm] = useState(false);
+  const requestBroadcast = () => {
+    if (!broadcastMsg.trim()) return;
+    setBroadcastConfirm(true);
+  };
   const sendBroadcast = async () => {
     if (!broadcastMsg.trim()) return;
     setBroadcasting(true);
     try {
-      // Single bulk insert via RPC — replaces N individual inserts (was: 1 query per user, 1000+ queries)
       const { data: count, error } = await supabase.rpc("broadcast_notification", {
         title_text: "📢 إشعار من الإدارة",
         message_text: broadcastMsg,
@@ -309,6 +342,7 @@ export default function Dashboard() {
       toast.success(`تم إرسال الإشعار لـ ${count ?? 0} مستخدم ✅`);
       setBroadcastMsg("");
       setShowBroadcast(false);
+      setBroadcastConfirm(false);
     } catch (e) {
       toast.error("فشل الإرسال: " + e.message);
     } finally {
@@ -381,10 +415,37 @@ export default function Dashboard() {
                   className="w-full h-28 px-3 py-2 rounded-xl bg-muted/50 border border-border text-sm resize-none mb-3"
                 />
                 <div className="flex gap-2">
-                  <button onClick={sendBroadcast} disabled={broadcasting || !broadcastMsg.trim()} className="flex-1 bg-primary text-primary-foreground rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
+                  <button onClick={requestBroadcast} disabled={broadcasting || !broadcastMsg.trim()} className="flex-1 bg-primary text-primary-foreground rounded-xl py-2.5 text-sm font-medium disabled:opacity-50">
                     {broadcasting ? "جاري الإرسال..." : "إرسال الآن"}
                   </button>
                   <button onClick={() => setShowBroadcast(false)} className="px-4 py-2.5 rounded-xl bg-muted text-muted-foreground text-sm">إلغاء</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Second-stage broadcast confirmation — final guard before
+              fan-out RPC fires a notification at every user in the DB. */}
+          {broadcastConfirm && (
+            <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+              <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md" dir="rtl">
+                <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center mb-3">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <h3 className="font-bold text-lg mb-1">إرسال إلى جميع المستخدمين؟</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  هذا الإشعار سيظهر لكل المستخدمين المسجلين في التطبيق ولا يمكن استرجاعه.
+                </p>
+                <div className="bg-muted/40 rounded-xl p-3 mb-4 text-sm border border-border whitespace-pre-wrap">
+                  {broadcastMsg}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={sendBroadcast} disabled={broadcasting} className="flex-1 bg-destructive text-destructive-foreground rounded-xl py-2.5 text-sm font-bold disabled:opacity-50">
+                    {broadcasting ? "جاري الإرسال..." : "نعم، أرسل للجميع"}
+                  </button>
+                  <button onClick={() => setBroadcastConfirm(false)} disabled={broadcasting} className="px-4 py-2.5 rounded-xl bg-muted text-muted-foreground text-sm">
+                    تراجع
+                  </button>
                 </div>
               </div>
             </div>

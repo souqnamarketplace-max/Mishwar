@@ -2,7 +2,9 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import Pagination from "@/components/dashboard/Pagination";
 import { supabase } from "@/lib/supabase";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { logAdminAction } from "@/lib/adminAudit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { CreditCard, TrendingUp, DollarSign, CheckCircle, XCircle, Clock, Download, Users } from "lucide-react";
@@ -20,6 +22,16 @@ const statusConfig = {
   pending: { label: "معلق", color: "bg-yellow-500/10 text-yellow-600" },
   cancelled: { label: "ملغي", color: "bg-destructive/10 text-destructive" },
   completed: { label: "مكتمل", color: "bg-primary/10 text-primary" },
+};
+
+// Payment status badge — separate from booking status. A booking can be
+// status=confirmed but payment_status=pending (driver accepted but cash
+// not yet received). Marking it paid is a manual admin/driver action.
+const paymentStatusConfig = {
+  paid:     { label: "مدفوع",          color: "bg-green-500/10 text-green-600" },
+  pending:  { label: "بانتظار الدفع",   color: "bg-yellow-500/10 text-yellow-600" },
+  refunded: { label: "مسترد",          color: "bg-blue-500/10 text-blue-600" },
+  failed:   { label: "فشل",            color: "bg-destructive/10 text-destructive" },
 };
 
 export default function DashboardPayments() {
@@ -46,6 +58,29 @@ export default function DashboardPayments() {
       return data || { totals: {}, drivers: [] };
     },
     staleTime: 60000,
+  });
+
+  // Mark a booking as paid (or revert to pending). Until tonight the entire
+  // payment_status column was dead weight — created bookings defaulted to
+  // "pending" and nothing in the app ever wrote any other value, so admins
+  // and drivers had no way to reconcile cash collected, transfers received,
+  // or Jawwal Pay confirmations. This mutation is the missing write path.
+  const qc = useQueryClient();
+  const markPaid = useMutation({
+    mutationFn: async ({ id, paid }) => {
+      await base44.entities.Booking.update(id, {
+        payment_status: paid ? "paid" : "pending",
+        paid_at: paid ? new Date().toISOString() : null,
+      });
+    },
+    onSuccess: (_, { id, paid }) => {
+      qc.invalidateQueries({ queryKey: ["payments-bookings"] });
+      qc.invalidateQueries({ queryKey: ["payments-summary"] });
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      toast.success(paid ? "تم تسجيل الدفع" : "تم إعادة الحالة إلى بانتظار الدفع");
+      logAdminAction("admin_mark_payment", "booking", id, { paid });
+    },
+    onError: (e) => toast.error("فشل التحديث: " + (e?.message || "")),
   });
 
   const filtered = bookings.filter((b) =>
@@ -162,14 +197,16 @@ export default function DashboardPayments() {
                 <th className="p-3">المقاعد</th>
                 <th className="p-3">طريقة الدفع</th>
                 <th className="p-3">الحالة</th>
+                <th className="p-3">حالة الدفع</th>
                 <th className="p-3">التاريخ</th>
+                <th className="p-3">الإجراءات</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">جاري التحميل...</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">جاري التحميل...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">لا توجد معاملات</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-muted-foreground">لا توجد معاملات</td></tr>
               ) : filtered.map((b) => (
                 <tr key={b.id} className="border-b border-border/50 hover:bg-muted/30">
                   <td className="p-3">
@@ -184,8 +221,29 @@ export default function DashboardPayments() {
                       {statusConfig[b.status]?.label || b.status}
                     </Badge>
                   </td>
+                  <td className="p-3">
+                    <Badge className={paymentStatusConfig[b.payment_status]?.color || paymentStatusConfig.pending.color}>
+                      {paymentStatusConfig[b.payment_status]?.label || paymentStatusConfig.pending.label}
+                    </Badge>
+                  </td>
                   <td className="p-3 text-muted-foreground text-xs">
                     {((b.created_at) ? new Date(b.created_at).toLocaleDateString("ar") : "—")}
+                  </td>
+                  <td className="p-3">
+                    {b.payment_status === "paid" ? (
+                      <Button size="sm" variant="ghost" className="h-7 text-xs"
+                              disabled={markPaid.isPending}
+                              onClick={() => markPaid.mutate({ id: b.id, paid: false })}>
+                        إلغاء
+                      </Button>
+                    ) : b.status !== "cancelled" && b.status !== "cancelled_by_driver" ? (
+                      <Button size="sm" className="h-7 text-xs gap-1"
+                              disabled={markPaid.isPending}
+                              onClick={() => markPaid.mutate({ id: b.id, paid: true })}>
+                        <CheckCircle className="w-3 h-3" />
+                        تأكيد الدفع
+                      </Button>
+                    ) : null}
                   </td>
                 </tr>
               ))}

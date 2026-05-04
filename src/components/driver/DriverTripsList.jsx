@@ -33,10 +33,21 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const cancelMutation = useMutation({
     mutationFn: async (tripId) => {
       await base44.entities.Trip.update(tripId, { status: "cancelled" });
+      // Pull confirmed bookings on this trip so we can flip them to the
+      // driver-cancelled state. If a passenger had already paid (cash or
+      // transfer), set refund_required so admins can see the open obligation
+      // in the payments tab. Without this flag, paid bookings on cancelled
+      // trips were invisible to the refund queue.
       const bookings = await base44.entities.Booking.filter({ trip_id: tripId, status: "confirmed" }, "-created_date", 100);
       for (const b of bookings) {
         try {
-          await base44.entities.Booking.update(b.id, { status: "cancelled_by_driver" });
+          const refundFields = b.payment_status === "paid"
+            ? { refund_required: true, refund_status: "pending" }
+            : {};
+          await base44.entities.Booking.update(b.id, {
+            status: "cancelled_by_driver",
+            ...refundFields,
+          });
         } catch (e) {
           console.warn("Failed to cancel booking:", b.id, e);
         }

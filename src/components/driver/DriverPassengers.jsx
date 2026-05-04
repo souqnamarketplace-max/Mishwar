@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { DollarSign } from "lucide-react";
 
 const statusConfig = {
   pending: { label: "معلق", className: "bg-yellow-500/10 text-yellow-600" },
@@ -90,6 +91,26 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
         toast.success("تم تحديث الحجز");
       }
     },
+  });
+
+  // Driver marks a confirmed booking as paid (cash received in person).
+  // Until this session, payment_status was a dead column that never moved
+  // off "pending". This is the missing write path on the driver side —
+  // the matching admin-side write lives in DashboardPayments.
+  const markPaid = useMutation({
+    mutationFn: async ({ id, paid }) => {
+      await base44.entities.Booking.update(id, {
+        payment_status: paid ? "paid" : "pending",
+        paid_at: paid ? new Date().toISOString() : null,
+      });
+    },
+    onSuccess: (_, { paid }) => {
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+      qc.invalidateQueries({ queryKey: ["payments-summary"] });
+      toast.success(paid ? "تم تسجيل الدفع ✓" : "تم التراجع عن تسجيل الدفع");
+    },
+    onError: () => toast.error("فشل التحديث، حاول مجدداً"),
   });
 
   // Realtime: booking list updates when any booking changes
@@ -198,6 +219,31 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
                             <MessageCircle className="w-3.5 h-3.5" />
                             محادثة
                           </Button>
+                        )}
+                        {booking.status === "confirmed" && (
+                          booking.payment_status === "paid" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-lg text-xs gap-1 text-green-600 border-green-500/30 bg-green-500/5"
+                              disabled={markPaid.isPending}
+                              onClick={() => markPaid.mutate({ id: booking.id, paid: false })}
+                              title="تم استلام الدفع — اضغط للتراجع"
+                            >
+                              <DollarSign className="w-3.5 h-3.5" />
+                              مدفوع
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="rounded-lg text-xs gap-1 bg-green-600 text-white hover:bg-green-700"
+                              disabled={markPaid.isPending}
+                              onClick={() => markPaid.mutate({ id: booking.id, paid: true })}
+                            >
+                              <DollarSign className="w-3.5 h-3.5" />
+                              تأكيد استلام الدفع
+                            </Button>
+                          )
                         )}
                         {booking.status === "pending" && (
                           <>

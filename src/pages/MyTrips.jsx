@@ -37,7 +37,7 @@ const statusConfig = {
 export default function MyTrips() {
   useSEO({ title: "رحلاتي", description: "شاهد رحلاتك السابقة والقادمة" });
 
-  const [confirmCancel, setConfirmCancel] = useState({ open: false, bookingId: null });
+  const [confirmCancel, setConfirmCancel] = useState({ open: false, bookingId: null, reason: "" });
   const [activeTab, setActiveTab] = useState("all");
   const [wizardTrip, setWizardTrip] = useState(null); // trip object for PassengerReviewWizard
   const qc = useQueryClient();
@@ -56,12 +56,18 @@ export default function MyTrips() {
 
   // Cancel booking mutation (for passenger bookings)
   const cancelBookingMutation = useMutation({
-    mutationFn: async (bookingId) => {
-      // Direct update (bypasses missing/broken cancel_booking RPC)
-      // 1) Mark booking as cancelled
+    mutationFn: async (input) => {
+      // Accept either the legacy bookingId-only signature or { bookingId, reason }
+      // so the UI can pass an optional human-readable cancellation reason that
+      // gets persisted alongside the status flip. Old callers that pass just an
+      // id keep working — reason just stays null in that case.
+      const bookingId = typeof input === "string" ? input : input?.bookingId;
+      const reason = typeof input === "string" ? null : (input?.reason || null);
+      const updatePayload = { status: "cancelled" };
+      if (reason) updatePayload.cancel_reason = reason;
       const { data: booking, error: bErr } = await supabase
         .from("bookings")
-        .update({ status: "cancelled" })
+        .update(updatePayload)
         .eq("id", bookingId)
         .select()
         .single();
@@ -70,7 +76,8 @@ export default function MyTrips() {
       // Seat restoration is handled by the bookings_restore_seats DB trigger.
       return { success: true, booking };
     },
-    onSuccess: async (_, bookingId) => {
+    onSuccess: async (_, input) => {
+      const bookingId = typeof input === "string" ? input : input?.bookingId;
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
       qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
       logAudit("booking_cancelled_by_passenger", "booking", bookingId, { passenger_email: user?.email });
@@ -367,18 +374,45 @@ export default function MyTrips() {
     )}
 
     {confirmCancel.open && (
-      <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmCancel({ open: false, bookingId: null })}>
+      <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmCancel({ open: false, bookingId: null, reason: "" })}>
         <div onClick={e => e.stopPropagation()} className="bg-card rounded-2xl p-6 max-w-sm w-full shadow-2xl" dir="rtl">
           <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
             <span className="text-2xl">⚠️</span>
           </div>
           <h3 className="text-lg font-bold text-foreground mb-2">إلغاء الحجز؟</h3>
-          <p className="text-sm text-muted-foreground mb-6">هل أنت متأكد من إلغاء هذا الحجز؟ لا يمكن التراجع عن هذا الإجراء.</p>
+          <p className="text-sm text-muted-foreground mb-3">هل أنت متأكد من إلغاء هذا الحجز؟ لا يمكن التراجع عن هذا الإجراء.</p>
+
+          {/* Optional reason — collected so admins can analyse cancel
+              patterns later. Six common buckets cover most cases; an
+              "other" option falls through to free text. */}
+          <label className="block text-xs font-medium text-muted-foreground mb-1.5">سبب الإلغاء (اختياري)</label>
+          <select
+            value={confirmCancel.reason}
+            onChange={(e) => setConfirmCancel(c => ({ ...c, reason: e.target.value }))}
+            className="w-full mb-4 px-3 py-2.5 rounded-xl bg-muted/50 border border-border text-sm outline-none"
+          >
+            <option value="">— اختر سبباً —</option>
+            <option value="changed_plans">تغيرت خططي</option>
+            <option value="found_alternative">وجدت وسيلة نقل أخرى</option>
+            <option value="trip_time_no_longer_works">وقت الرحلة لم يعد مناسباً</option>
+            <option value="driver_unresponsive">السائق لم يرد</option>
+            <option value="price_too_high">السعر مرتفع</option>
+            <option value="emergency">حالة طارئة</option>
+            <option value="other">سبب آخر</option>
+          </select>
+
           <div className="flex gap-3">
-            <button onClick={() => setConfirmCancel({ open: false, bookingId: null })} className="flex-1 px-4 py-2.5 bg-muted text-foreground rounded-xl font-medium text-sm">
+            <button onClick={() => setConfirmCancel({ open: false, bookingId: null, reason: "" })} className="flex-1 px-4 py-2.5 bg-muted text-foreground rounded-xl font-medium text-sm">
               تراجع
             </button>
-            <button onClick={() => { cancelBookingMutation.mutate(confirmCancel.bookingId); setConfirmCancel({ open: false, bookingId: null }); }} className="flex-1 px-4 py-2.5 bg-destructive text-destructive-foreground rounded-xl font-bold text-sm" disabled={cancelBookingMutation.isPending}>
+            <button
+              onClick={() => {
+                cancelBookingMutation.mutate({ bookingId: confirmCancel.bookingId, reason: confirmCancel.reason || null });
+                setConfirmCancel({ open: false, bookingId: null, reason: "" });
+              }}
+              className="flex-1 px-4 py-2.5 bg-destructive text-destructive-foreground rounded-xl font-bold text-sm"
+              disabled={cancelBookingMutation.isPending}
+            >
               نعم، ألغِ الحجز
             </button>
           </div>
