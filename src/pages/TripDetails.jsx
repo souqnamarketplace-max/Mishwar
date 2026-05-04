@@ -52,15 +52,21 @@ export default function TripDetails() {
   });
 
   // ── 3. Existing booking check (depends on user) ──────────────
-  const { data: existingBooking } = useQuery({
+  // Fetch ALL bookings this user has made for this trip — newest first.
+  // Filter to active (non-cancelled) on the client so a stale cancelled booking
+  // doesn't shadow a fresh re-booking. Limit 5 is plenty.
+  const { data: existingBookings = [] } = useQuery({
     queryKey: ["my-booking", id, user?.email],
     queryFn: () => user?.email
-      ? base44.entities.Booking.filter({ trip_id: id, passenger_email: user.email }, "-created_date", 1)
+      ? base44.entities.Booking.filter({ trip_id: id, passenger_email: user.email }, "-created_date", 5)
       : [],
     enabled: !!user?.email && !!id,
   });
-  const alreadyBooked = existingBooking?.length > 0 &&
-    ["pending", "confirmed"].includes(existingBooking[0]?.status);
+  // Only consider non-cancelled bookings as "already booked"
+  const activeBooking = (existingBookings || []).find(b =>
+    ["pending", "confirmed"].includes(b?.status)
+  );
+  const alreadyBooked = !!activeBooking;
   const booked = justBooked || alreadyBooked;
 
   // Favorites — persisted in localStorage per user (MUST be after user query to avoid TDZ)
@@ -110,7 +116,6 @@ export default function TripDetails() {
     onMutate: () => null,
     onSuccess: () => {
       setShowConfirm(false);
-      setBooked(true);
       setJustBooked(true);
       toast.success("تم إرسال طلب الحجز! بانتظار موافقة السائق 🎉");
       qc.invalidateQueries({ queryKey: ["my-booking", id, user?.email] });
@@ -119,7 +124,6 @@ export default function TripDetails() {
     },
     onError: (err) => {
       setShowConfirm(false);
-      setBooked(false);
       console.error("Booking error:", err);
       toast.error(err?.message || "فشل الحجز، حاول مجدداً");
     },
@@ -495,15 +499,8 @@ export default function TripDetails() {
                 <MessageCircle className="w-4 h-4" />
                 محادثة
               </Button>
-              {trip.status === "confirmed" && trip.driver_phone && (
-                <Button variant="outline" className="w-full rounded-xl gap-2">
-                  <Phone className="w-4 h-4" />
-                  {trip.driver_phone}
-                </Button>
-              )}
-              {trip.status !== "confirmed" && (
-                <p className="text-xs text-muted-foreground text-center py-2">رقم الهاتف متاح بعد تأكيد الحجز</p>
-              )}
+              {/* Phone number intentionally NOT shown to passengers — privacy + App Store policy.
+                   All driver communication happens via in-app chat. */}
             </div>
           </div>
 

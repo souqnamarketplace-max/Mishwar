@@ -2,7 +2,8 @@ import React from "react";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, MapPin, ArrowLeft, Phone, Star, CheckCircle, XCircle } from "lucide-react";
+import { Users, MapPin, ArrowLeft, Phone, Star, CheckCircle, XCircle, MessageCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ const statusConfig = {
 
 export default function DriverPassengers({ trips, bookings, selectedTripId, onSelectTrip }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const updateBooking = useMutation({
     mutationFn: async ({ id, status }) => {
@@ -177,27 +179,48 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
                         <span>{booking.payment_method || "نقداً"}</span>
                       </div>
 
-                      {booking.status === "pending" && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            className="rounded-lg text-xs gap-1 bg-primary text-primary-foreground"
-                            onClick={() => updateBooking.mutate({ id: booking.id, status: "confirmed" })}
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            قبول
-                          </Button>
+                      <div className="flex gap-2 flex-wrap">
+                        {/* Always-available chat button — driver can initiate conversation */}
+                        {booking.passenger_email && booking.status !== "cancelled" && (
                           <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-lg text-xs gap-1 text-destructive border-destructive/20"
-                            onClick={() => updateBooking.mutate({ id: booking.id, status: "cancelled" })}
+                            className="rounded-lg text-xs gap-1"
+                            onClick={() => {
+                              const params = new URLSearchParams({
+                                to: booking.passenger_email,
+                                name: booking.passenger_name || booking.passenger_email.split("@")[0],
+                                trip: booking.trip_id || selectedTrip?.id || "",
+                              });
+                              navigate(`/messages?${params.toString()}`);
+                            }}
                           >
-                            <XCircle className="w-3.5 h-3.5" />
-                            رفض
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            محادثة
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        {booking.status === "pending" && (
+                          <>
+                            <Button
+                              size="sm"
+                              className="rounded-lg text-xs gap-1 bg-primary text-primary-foreground"
+                              onClick={() => updateBooking.mutate({ id: booking.id, status: "confirmed" })}
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              قبول
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="rounded-lg text-xs gap-1 text-destructive border-destructive/20"
+                              onClick={() => updateBooking.mutate({ id: booking.id, status: "cancelled" })}
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                              رفض
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   );
                 })}

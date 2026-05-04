@@ -30,17 +30,9 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [deleteConfirm, setDeleteConfirm] = useState(null); // tripId to delete
   const [confirmCancel, setConfirmCancel] = useState(null); // tripId to cancel
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
-    onMutate: async ({ id, data }) => {
-      await qc.cancelQueries({ queryKey: ["trips"] });
-
   const cancelMutation = useMutation({
     mutationFn: async (tripId) => {
-      // 1. Mark trip as cancelled
       await base44.entities.Trip.update(tripId, { status: "cancelled" });
-
-      // 2. Cancel all confirmed bookings for this trip
       const bookings = await base44.entities.Booking.filter({ trip_id: tripId, status: "confirmed" }, "-created_date", 100);
       for (const b of bookings) {
         try {
@@ -58,7 +50,13 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
     },
     onError: () => toast.error("فشل إلغاء الرحلة"),
-  });const prev = qc.getQueryData(["trips"]);
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
+    onMutate: async ({ id, data }) => {
+      await qc.cancelQueries({ queryKey: ["trips"] });
+      const prev = qc.getQueryData(["trips"]);
       qc.setQueryData(["trips"], old => 
         old?.map(t => t.id === id ? { ...t, ...data } : t) || []
       );

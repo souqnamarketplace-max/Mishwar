@@ -283,7 +283,11 @@ export default function Messages() {
   useEffect(() => {
     if (!paramTo || !user?.email) return;
     if (paramTo === user.email) return;
-    const existing = conversations.find(c => c.otherEmail === paramTo);
+    // Prefer a per-trip conversation if ?trip= is present and a matching thread exists
+    const tripScopedExisting = paramTrip
+      ? conversations.find(c => c.otherEmail === paramTo && c.messages?.some(m => m.trip_id === paramTrip))
+      : null;
+    const existing = tripScopedExisting || conversations.find(c => c.otherEmail === paramTo);
     if (existing) {
       setActiveId(existing.id);
       setNewConv(null);
@@ -291,7 +295,7 @@ export default function Messages() {
       setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
       setActiveId("__new__");
     }
-  }, [paramTo, user?.email, conversations.length]);
+  }, [paramTo, paramTrip, user?.email, conversations.length]);
 
   // ─── Auto-scroll ───
   useEffect(() => {
@@ -363,10 +367,13 @@ export default function Messages() {
       const cleaned = sanitizeText(text).slice(0, 5000);
       const violation = getContactViolation(cleaned);
       if (violation) { toast.error(violation, { duration: 5000 }); return; }
-      const convId = activeConv.id === "__new__"
-        ? [user.email, activeConv.otherEmail].sort().join("__")
-        : activeConv.id;
+      // Per-trip conversation IDs: a passenger booking 2 different trips with the
+      // same driver gets 2 separate threads. Falls back to email-pair if no trip context.
       const tripIdToPersist = paramTrip || getTripIdForConv(activeConv);
+      const emailPair = [user.email, activeConv.otherEmail].sort().join("__");
+      const convId = activeConv.id === "__new__"
+        ? (tripIdToPersist ? `trip_${tripIdToPersist}__${emailPair}` : emailPair)
+        : activeConv.id;
       const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: convId,
         sender_email:   user.email,

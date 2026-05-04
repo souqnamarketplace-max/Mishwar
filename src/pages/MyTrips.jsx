@@ -127,10 +127,21 @@ export default function MyTrips() {
     queryFn: () => base44.entities.Trip.list("-created_date", 200),
   });
 
-  // Merge: driver trips + trips the user booked as passenger (deduplicated)
-  const bookedTripIds = new Set(passengerBookings.map(b => b.trip_id));
-  // Map of trip_id → passenger's booking status (so we display BOOKING status, not TRIP status)
-  const bookingStatusByTripId = new Map(passengerBookings.map(b => [b.trip_id, b.status]));
+  // Filter out cancelled bookings entirely — once a passenger cancels, the trip
+  // should disappear from "رحلاتي" immediately. If they re-book, a new (active)
+  // booking row exists and the trip reappears.
+  const activePassengerBookings = (passengerBookings || []).filter(b => b.status !== "cancelled");
+  // Merge: driver trips + trips the user has an ACTIVE booking on (deduplicated)
+  const bookedTripIds = new Set(activePassengerBookings.map(b => b.trip_id));
+  // Map of trip_id → passenger's booking status. Use the NEWEST active booking per trip
+  // so re-bookings after cancellation correctly show the new pending/confirmed status.
+  const bookingStatusByTripId = new Map();
+  for (const b of activePassengerBookings) {
+    // passengerBookings is already sorted -created_date, so first hit per trip is newest
+    if (!bookingStatusByTripId.has(b.trip_id)) {
+      bookingStatusByTripId.set(b.trip_id, b.status);
+    }
+  }
   const bookedTrips = allTrips.filter(t => bookedTripIds.has(t.id));
   const trips = [...driverTrips, ...bookedTrips.filter(t => !driverTrips.find(dt => dt.id === t.id))];
 
