@@ -7,7 +7,7 @@ import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
 import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
 import { useAuth } from "@/lib/AuthContext";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

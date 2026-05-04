@@ -12,11 +12,13 @@ import NotificationPrefsSection from "./NotificationPrefsSection";
 import VerificationStatusSection from "./VerificationStatusSection";
 import PassengerPaymentsSection from "./PassengerPaymentsSection";
 
+import { useSEO } from "@/hooks/useSEO";
 /**
  * AccountHub — Poparide-style hub view.
  * Renders a master list when no section selected, or the selected section's content.
  */
 export default function AccountHub() {
+  useSEO({ title: "الحساب", description: "إدارة إعدادات حسابك في مِشوار" });
   const auth = useAuth();
   const user = auth?.user;
   const refreshUser = auth?.refreshUser;

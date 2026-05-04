@@ -30,6 +30,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
+import { useSEO } from "@/hooks/useSEO";
 const statusColors = {
   "completed": "bg-accent/10 text-accent",
   "confirmed": "bg-primary/10 text-primary",
@@ -288,6 +289,7 @@ const pageTitles = {
 };
 
 export default function Dashboard() {
+  useSEO({ title: "لوحة الإدارة", description: "لوحة إدارة منصة مِشوار" });
   const { user, isLoadingAuth } = useAuth();
   const [activePage, setActivePage] = useState("overview");
   const [showBroadcast, setShowBroadcast] = useState(false);
