@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { toast } from "sonner";
 import { captureException } from "@/lib/sentry";
 import { supabase } from '@/lib/supabase';
 import { queryClientInstance } from '@/lib/query-client';
@@ -89,15 +90,9 @@ export const AuthProvider = ({ children }) => {
           if (profile?.deleted_at) {
             await supabase.auth.signOut();
             setUser(null);
-            if (typeof window !== "undefined") {
-              setTimeout(() => {
-                if (window.toast?.error) {
-                  window.toast.error("هذا الحساب تم حذفه. للاسترداد، تواصل مع الدعم.");
-                } else {
-                  alert("هذا الحساب تم حذفه. للاسترداد، تواصل مع الدعم.");
-                }
-              }, 100);
-            }
+            setTimeout(() => {
+              toast.error("هذا الحساب تم حذفه. للاسترداد، تواصل مع الدعم.");
+            }, 100);
             return;
           }
         }
