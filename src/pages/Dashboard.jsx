@@ -75,6 +75,26 @@ function Overview() {
     .reduce((sum, b) => sum + (b.total_price || 0), 0);
   const confirmedBookings = bookings.filter((b) => b.status === "confirmed").length;
 
+  // Completion / cancellation rates derived from the live bookings list.
+  // Used in the bottom stat row instead of the previous hardcoded
+  // "96.3%" / "3.7%" placeholders that bore no relation to actual data.
+  const completedCount = bookings.filter((b) => b.status === "completed").length;
+  const cancelledCount = bookings.filter((b) =>
+    b.status === "cancelled" || b.status === "cancelled_by_driver"
+  ).length;
+  const completionRate = totalBookings > 0
+    ? Math.round((completedCount / totalBookings) * 1000) / 10
+    : 0;
+  const cancellationRate = totalBookings > 0
+    ? Math.round((cancelledCount / totalBookings) * 1000) / 10
+    : 0;
+  const bottomStats = [
+    { title: "إجمالي المعاملات", value: totalBookings.toLocaleString(), change: "—", icon: CreditCard },
+    { title: "متوسط تقييم الرحلات", value: "—", change: "—", icon: Star },
+    { title: "نسبة الرحلات المكتملة", value: `${completionRate}%`, change: "—", icon: CalendarCheck },
+    { title: "نسبة الإلغاء", value: `${cancellationRate}%`, change: "—", icon: AlertCircle },
+  ];
+
   // Helper to format dates safely (handles created_at from Supabase)
   const safeDate = (d) => d ? new Date(d) : new Date();
 
@@ -270,24 +290,7 @@ function Overview() {
           we have a rating/cancellation pipeline rich enough to compute
           them honestly; that's better than showing invented numbers. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {(() => {
-          const completedCount = bookings.filter((b) => b.status === "completed").length;
-          const cancelledCount = bookings.filter((b) =>
-            b.status === "cancelled" || b.status === "cancelled_by_driver"
-          ).length;
-          const completionRate = totalBookings > 0
-            ? Math.round((completedCount / totalBookings) * 1000) / 10
-            : 0;
-          const cancellationRate = totalBookings > 0
-            ? Math.round((cancelledCount / totalBookings) * 1000) / 10
-            : 0;
-          return [
-            { title: "إجمالي المعاملات", value: totalBookings.toLocaleString(), change: "—", icon: CreditCard },
-            { title: "متوسط تقييم الرحلات", value: "—", change: "—", icon: Star },
-            { title: "نسبة الرحلات المكتملة", value: `${completionRate}%`, change: "—", icon: CalendarCheck },
-            { title: "نسبة الإلغاء", value: `${cancellationRate}%`, change: "—", icon: AlertCircle },
-          ];
-        })().map((stat) => (
+        {bottomStats.map((stat) => (
           <div key={stat.title} className="bg-card rounded-xl border border-border p-4 text-center">
             <stat.icon className="w-5 h-5 text-primary mx-auto mb-2" />
             <p className="text-2xl font-bold text-foreground">{stat.value}</p>
