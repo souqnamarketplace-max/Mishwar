@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MoreVertical, Shield, Flag, X } from "lucide-react";
+import { MoreVertical, Shield, Flag, X, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { invalidateBlockCache, REPORT_CATEGORIES } from "@/lib/blockUtils";
+import { logAdminAction } from "@/lib/adminAudit";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 /**
  * Drop-in 3-dot menu for "Block user" + "Report user".
@@ -21,32 +23,63 @@ import { createPortal } from "react-dom";
 export default function UserActionsMenu({ targetEmail, targetName, contextType, contextId }) {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [showBlock, setShowBlock] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showReportSuccess, setShowReportSuccess] = useState(false);
   const [reportCategory, setReportCategory] = useState("");
 
   // Don't show menu if targeting self or no user
   if (!user || !targetEmail || user.email === targetEmail) return null;
 
+  // Helper: invalidate every cache that depends on the block list. Pulled
+  // out so block-from-report and explicit-block both go through the same
+  // refresh path and we don't drift between them.
+  const invalidateBlockDependents = () => {
+    invalidateBlockCache();
+    qc.invalidateQueries({ queryKey: ["trips"] });
+    qc.invalidateQueries({ queryKey: ["search-trips"] });
+    qc.invalidateQueries({ queryKey: ["conversations"] });
+    qc.invalidateQueries({ queryKey: ["messages"] });
+    qc.invalidateQueries({ queryKey: ["my-blocks", user.email] });
+    qc.invalidateQueries({ queryKey: ["my-blocks-list", user.email] });
+  };
+
+  // Idempotent block: tries to insert; swallows uniqueness violation so a
+  // user who already manually blocked the target before reporting them
+  // doesn't see "فشل" on what is, from their perspective, a no-op.
+  const tryBlock = async () => {
+    try {
+      await base44.entities.UserBlock.create({
+        blocker_email: user.email,
+        blocked_email: targetEmail,
+      });
+    } catch (e) {
+      const msg = String(e?.message || "");
+      // PG unique-violation surfaces in PostgREST as 23505 / 409. If we
+      // already blocked, that's success for our purposes.
+      if (!/duplicate|23505|409|unique/i.test(msg)) throw e;
+    }
+  };
+
   const blockMutation = useMutation({
-    mutationFn: () => base44.entities.UserBlock.create({
-      blocker_email: user.email,
-      blocked_email: targetEmail,
-    }),
-    onSuccess: () => {
-      invalidateBlockCache();
+    mutationFn: tryBlock,
+    onSuccess: async () => {
+      invalidateBlockDependents();
+      // Audit trail: explicit user-side block. Without this, the admin
+      // panel's audit log shows admin actions on reports but nothing about
+      // the user-driven block that often precedes them. Helpful when the
+      // admin team is reconstructing what happened around an incident.
+      try {
+        await logAdminAction("user_block", "user", null, {
+          blocker_email: user.email,
+          blocked_email: targetEmail,
+          context_type: contextType || null,
+          context_id: contextId || null,
+        });
+      } catch {}
       toast.success("تم حظر المستخدم");
-      qc.invalidateQueries({ queryKey: ["trips"] });
-      qc.invalidateQueries({ queryKey: ["search-trips"] });
-      qc.invalidateQueries({ queryKey: ["conversations"] });
-      // Existing chat threads + per-thread message lists must vanish
-      // immediately. Without these invalidations the message inbox keeps
-      // showing the conversation, the thread keeps loading, and the user
-      // can keep typing into someone they just blocked.
-      qc.invalidateQueries({ queryKey: ["messages"] });
-      qc.invalidateQueries({ queryKey: ["my-blocks", user.email] });
-      qc.invalidateQueries({ queryKey: ["my-blocks-list", user.email] });
       setShowBlock(false);
       setOpen(false);
     },
@@ -65,7 +98,25 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
         context_id: contextId || null,
       });
 
-      // 2) Notify admins so reports don't sit unseen in the dashboard.
+      // 2) Auto-block the reported user.
+      // The reporter just told us this person harassed/scammed/threatened
+      // them — leaving the message thread open so they can keep doing it
+      // while admin works through the queue is unsafe. Auto-blocking:
+      //   * locks the chat composer instantly (Messages.jsx watches the
+      //     blockedSet and renders the "أحدكما حظر الآخر" banner)
+      //   * hides the reported user's trips from search results
+      //   * server-side guards in send mutation refuse new messages
+      // The block is fully reversible from /settings?section=blocked if
+      // the reporter changes their mind. tryBlock() is idempotent so a
+      // pre-existing manual block doesn't break the flow.
+      try {
+        await tryBlock();
+      } catch {
+        // Block failure shouldn't poison the report itself — the report
+        // is the safety-critical thing here.
+      }
+
+      // 3) Notify admins so reports don't sit unseen in the dashboard.
       // The notif goes to the souqnamarketplace@gmail.com admin account
       // (same channel already used for license-verification submissions
       // in Onboarding.jsx). Wrapped in try/catch so a notification failure
@@ -78,19 +129,39 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
           type: "system",
           is_read: false,
         });
-      } catch {
-        // The report is already saved — silent failure here just means
-        // admins find it via the dashboard's pending filter instead of
-        // the bell. Acceptable.
-      }
+      } catch {}
+
+      // 4) Audit-trail entry on the report submission itself. The admin
+      // dashboard already logs `report_action_taken` etc. when the admin
+      // resolves a report — but until now there was no audit row for the
+      // initial filing, leaving a gap from "user reported X" to "admin
+      // dismissed it" with nothing in between. With this entry the trail
+      // is continuous: filed → (any state changes) → resolved.
+      try {
+        await logAdminAction("report_filed", "report", report?.id || null, {
+          reporter_email: user.email,
+          reported_email: targetEmail,
+          category: data.category,
+          context_type: contextType || null,
+          context_id: contextId || null,
+          auto_blocked: true,
+        });
+      } catch {}
+
       return report;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["my-reports", user.email] });
-      toast.success("تم إرسال البلاغ — شكراً لك");
+      // The auto-block above also touched these caches.
+      invalidateBlockDependents();
       setShowReport(false);
       setOpen(false);
       setReportCategory("");
+      // Replace the previous one-line toast with a small success modal that
+      // tells the user what just happened and where to follow up. The bare
+      // toast was the last UX gap — users would file a report, see "تم
+      // إرسال البلاغ", then have no idea where their reports lived.
+      setShowReportSuccess(true);
     },
     onError: () => toast.error("فشل إرسال البلاغ"),
   });
@@ -227,6 +298,57 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
               </Button>
             </div>
           </form>
+        </div>,
+        document.body
+      )}
+
+      {/* Report-submitted success modal.
+          Replaces the old one-line toast with a real confirmation that
+          tells the user (a) we got their report, (b) we already blocked
+          the person on their behalf, (c) where to follow up. The 'بلاغاتي'
+          button drops them straight into MyReportsSection at
+          /settings?section=reports so they can watch the status change. */}
+      {showReportSuccess && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/50"
+          dir="rtl"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowReportSuccess(false); }}
+        >
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              </div>
+              <h3 className="font-bold text-lg text-foreground">تم إرسال البلاغ ✓</h3>
+              <div className="text-sm text-muted-foreground mt-3 space-y-2 text-right">
+                <p>شكراً لمساعدتنا في الحفاظ على بيئة آمنة.</p>
+                <p>
+                  <span className="font-medium text-foreground">تم حظر المستخدم تلقائياً</span> لمنع المراسلات معه.
+                  يمكنك إلغاء الحظر لاحقاً من <Link to="/settings?section=blocked" className="text-primary underline" onClick={() => setShowReportSuccess(false)}>إعدادات الحظر</Link>.
+                </p>
+                <p>سيراجع فريق الإدارة بلاغك وسيصلك إشعار بالنتيجة.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => setShowReportSuccess(false)}
+              >
+                إغلاق
+              </Button>
+              <Button
+                className="flex-1 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground gap-1"
+                onClick={() => {
+                  setShowReportSuccess(false);
+                  navigate("/settings?section=reports");
+                }}
+              >
+                <ArrowRight className="w-4 h-4" />
+                بلاغاتي
+              </Button>
+            </div>
+          </div>
         </div>,
         document.body
       )}

@@ -56,7 +56,9 @@ export default function MyReportsSection({ user }) {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground mb-4">
-        نراجع جميع البلاغات. ستُشعر هنا وفي جرس الإشعارات عندما يتم اتخاذ إجراء.
+        نراجع جميع البلاغات. عند الإبلاغ يتم حظر المستخدم تلقائياً لحمايتك،
+        ويمكنك إلغاء الحظر من <a href="/settings?section=blocked" className="text-primary underline">قائمة المحظورين</a>.
+        ستُشعر هنا وفي جرس الإشعارات عندما يتم اتخاذ إجراء.
       </p>
       {reports.map((r) => {
         const status = STATUS_DISPLAY[r.status] || STATUS_DISPLAY.pending;
