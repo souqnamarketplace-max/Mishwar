@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
+import { useBlockedEmails } from "@/lib/blockUtils";
 
 /**
  * Messages page — Poparide-style chat.
@@ -268,13 +269,24 @@ export default function Messages() {
     );
   }, [rawMessages, user?.email]);
 
+  // ─── Block-aware filtering ───
+  // Drop conversations with anyone the user has blocked (or who blocked them)
+  // before search filtering. The conversation rows still exist in the DB —
+  // we just refuse to surface them as long as the block is in place.
+  // Unblocking via /settings → "المستخدمون المحظورون" makes them reappear.
+  const blockedSet = useBlockedEmails();
+  const blockHidden = useMemo(() => {
+    if (!blockedSet || blockedSet.size === 0) return conversations;
+    return conversations.filter((c) => !blockedSet.has(c.otherEmail));
+  }, [conversations, blockedSet]);
+
   // ─── Filter ───
   const filtered = search.trim()
-    ? conversations.filter(c =>
+    ? blockHidden.filter(c =>
         c.otherName?.toLowerCase().includes(search.toLowerCase()) ||
         c.otherEmail?.toLowerCase().includes(search.toLowerCase())
       )
-    : conversations;
+    : blockHidden;
 
   // ─── Active conversation (existing OR new pending) ───
   const activeConv = useMemo(() => {
@@ -283,6 +295,12 @@ export default function Messages() {
     }
     return conversations.find(c => c.id === activeId) || null;
   }, [activeId, newConv, conversations]);
+
+  // True if the currently-open conversation is with someone in the block set
+  // (either I blocked them or they blocked me). Used to lock the composer
+  // and show an inline notice — no more "I typed but my message went into
+  // the void after I blocked them" surprise.
+  const activeIsBlocked = !!(activeConv?.otherEmail && blockedSet.has(activeConv.otherEmail));
 
   // ─── Auto-open from URL params (fires ONCE per to+trip URL combo) ───
   const autoOpenedRef = useRef(null);
@@ -401,6 +419,14 @@ export default function Messages() {
     mutationFn: async (overrideText) => {
       const text = (overrideText !== undefined ? overrideText : draft).trim();
       if (!text || !activeConv || !user?.email) return;
+      // Last line of defense — even if the composer somehow got rendered
+      // (race on the block being added in another tab, optimistic UI, etc.),
+      // refuse to insert the row. The user sees the error but the message
+      // never reaches the recipient's inbox.
+      if (activeConv.otherEmail && blockedSet.has(activeConv.otherEmail)) {
+        toast.error("لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر");
+        return;
+      }
       const cleaned = sanitizeText(text).slice(0, 5000);
       const violation = getContactViolation(cleaned);
       if (violation) { toast.error(violation, { duration: 5000 }); return; }
@@ -588,7 +614,16 @@ export default function Messages() {
                 </div>
 
                 {/* Locked notice OR quick replies + input */}
-                {isChatLocked ? (
+                {activeIsBlocked ? (
+                  <div className="px-4 py-3 border-t border-border bg-destructive/5">
+                    <p className="text-sm text-destructive font-medium text-center">
+                      🚫 لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر
+                    </p>
+                    <p className="text-xs text-muted-foreground text-center mt-1">
+                      يمكنك إدارة قائمة الحظر من <Link to="/settings?section=blocked" className="text-primary underline">الإعدادات</Link>
+                    </p>
+                  </div>
+                ) : isChatLocked ? (
                   <ClosedNotice status={activeBookingStatus} />
                 ) : (
                   <>

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import {
   ArrowLeft, ChevronLeft, User, ShieldCheck, Bell, CreditCard,
-  Sparkles, Car, Settings as SettingsIcon
+  Sparkles, Car, Settings as SettingsIcon, Shield, Flag
 } from "lucide-react";
 import AccountHubItem from "./AccountHubItem";
 import PreferencesSection from "./PreferencesSection";
@@ -11,6 +11,8 @@ import VehicleDetailsSection from "./VehicleDetailsSection";
 import NotificationPrefsSection from "./NotificationPrefsSection";
 import VerificationStatusSection from "./VerificationStatusSection";
 import PassengerPaymentsSection from "./PassengerPaymentsSection";
+import BlockedUsersSection from "./BlockedUsersSection";
+import MyReportsSection from "./MyReportsSection";
 
 import { useSEO } from "@/hooks/useSEO";
 /**
@@ -49,6 +51,8 @@ export default function AccountHub() {
       notifications:"إعدادات الإشعارات",
       verification: "التحقق من الهوية",
       payments:     "سجل المدفوعات",
+      blocked:      "المستخدمون المحظورون",
+      reports:      "بلاغاتي",
     };
 
     return (
@@ -68,6 +72,8 @@ export default function AccountHub() {
           {section === "notifications"&& <NotificationPrefsSection user={user} onSaved={refreshUser} />}
           {section === "verification" && <VerificationStatusSection user={user} />}
           {section === "payments"     && <PassengerPaymentsSection user={user} />}
+          {section === "blocked"      && <BlockedUsersSection user={user} />}
+          {section === "reports"      && <MyReportsSection user={user} />}
         </div>
       </div>
     );
@@ -136,6 +142,19 @@ export default function AccountHub() {
             <AccountHubItem icon={CreditCard} label="مدفوعات السائق" sublabel="حسابك المصرفي، Jawwal Pay، Reflect" onClick={() => {}} />
           </Link>
         )}
+
+        <AccountHubItem
+          icon={Flag}
+          label="بلاغاتي"
+          sublabel="البلاغات التي قدمتها وحالتها"
+          onClick={() => setSection("reports")}
+        />
+        <AccountHubItem
+          icon={Shield}
+          label="المستخدمون المحظورون"
+          sublabel="إدارة قائمة الحظر وإلغاء الحظر"
+          onClick={() => setSection("blocked")}
+        />
 
         <Link to="/account-settings/profile#license">
           <AccountHubItem icon={SettingsIcon} label="إعدادات متقدمة" sublabel="كلمة المرور، رخصة القيادة، حذف الحساب" onClick={() => {}} />

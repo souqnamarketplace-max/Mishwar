@@ -40,6 +40,13 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["search-trips"] });
       qc.invalidateQueries({ queryKey: ["conversations"] });
+      // Existing chat threads + per-thread message lists must vanish
+      // immediately. Without these invalidations the message inbox keeps
+      // showing the conversation, the thread keeps loading, and the user
+      // can keep typing into someone they just blocked.
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      qc.invalidateQueries({ queryKey: ["my-blocks", user.email] });
+      qc.invalidateQueries({ queryKey: ["my-blocks-list", user.email] });
       setShowBlock(false);
       setOpen(false);
     },
@@ -47,15 +54,39 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
   });
 
   const reportMutation = useMutation({
-    mutationFn: (data) => base44.entities.UserReport.create({
-      reporter_email: user.email,
-      reported_email: targetEmail,
-      category: data.category,
-      details: data.details || null,
-      context_type: contextType || null,
-      context_id: contextId || null,
-    }),
+    mutationFn: async (data) => {
+      // 1) Persist the report itself
+      const report = await base44.entities.UserReport.create({
+        reporter_email: user.email,
+        reported_email: targetEmail,
+        category: data.category,
+        details: data.details || null,
+        context_type: contextType || null,
+        context_id: contextId || null,
+      });
+
+      // 2) Notify admins so reports don't sit unseen in the dashboard.
+      // The notif goes to the souqnamarketplace@gmail.com admin account
+      // (same channel already used for license-verification submissions
+      // in Onboarding.jsx). Wrapped in try/catch so a notification failure
+      // doesn't poison the report submission itself.
+      try {
+        await base44.entities.Notification.create({
+          user_email: "souqnamarketplace@gmail.com",
+          title: "بلاغ جديد من مستخدم 🚩",
+          message: `${user.full_name || user.email} قدّم بلاغاً ضد ${targetEmail}. السبب: ${data.category}`,
+          type: "system",
+          is_read: false,
+        });
+      } catch {
+        // The report is already saved — silent failure here just means
+        // admins find it via the dashboard's pending filter instead of
+        // the bell. Acceptable.
+      }
+      return report;
+    },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["my-reports", user.email] });
       toast.success("تم إرسال البلاغ — شكراً لك");
       setShowReport(false);
       setOpen(false);
