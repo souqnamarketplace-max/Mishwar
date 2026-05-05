@@ -142,13 +142,19 @@ export default function HeroSection() {
       <section className="sm:hidden flex flex-col">
         {/* Compact hero banner */}
         <div className="relative h-48 overflow-hidden">
-          {/* Slideshow - only load current + next image */}
-          {CITY_SLIDES.map((s, i) => {
+          {/* Slideshow - only load current + next image.
+              Iterates `slides` (the live admin-uploaded list, falling back to
+              CITY_SLIDES only when nothing loads), NOT CITY_SLIDES. The
+              previous code rendered the hardcoded fallback unconditionally —
+              the caption would update from `slide.city` but the actual <img>
+              tags always showed Jerusalem/Bethlehem/Nablus from the bundled
+              defaults, so admin uploads never surfaced on the home page. */}
+          {slides.map((s, i) => {
             const isCurrent = i === slideIdx;
-            const isNext = i === (slideIdx + 1) % CITY_SLIDES.length;
+            const isNext = i === (slideIdx + 1) % slides.length;
             if (!isCurrent && !isNext) return null;
             return (
-              <img key={s.city}
+              <img key={(s.img || s.city) + i}
                 src={s.img.replace('w=1400&h=800', 'w=800&h=500')}
                 alt={s.city}
                 className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ${isCurrent ? "opacity-100" : "opacity-0"}`} />
@@ -168,9 +174,9 @@ export default function HeroSection() {
               <span className="text-white/90 text-xs font-bold">{slide.city}</span>
               <span className="text-white/50 text-[10px]">— {slide.subtitle}</span>
             </div>
-            {/* Dot indicators */}
+            {/* Dot indicators — count must match the rendered slideshow above */}
             <div className="flex gap-1.5 mt-2">
-              {CITY_SLIDES.map((_, i) => (
+              {slides.map((_, i) => (
                 <button key={i} onClick={() => setSlideIdx(i)}
                   className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-4 bg-accent" : "w-1.5 bg-white/40"}`} />
               ))}
@@ -203,12 +209,15 @@ export default function HeroSection() {
       {/* ── DESKTOP LAYOUT ── */}
       <section className="hidden sm:block relative overflow-hidden" style={{ minHeight: "560px" }}>
         <div className="absolute inset-0">
-          {CITY_SLIDES.map((s, i) => {
+          {/* Same fix as mobile: iterate the live `slides` array so admin uploads
+              actually appear here. Without this the desktop hero stays stuck on
+              the bundled defaults. */}
+          {slides.map((s, i) => {
             const isCurrent = i === slideIdx;
-            const isNext = i === (slideIdx + 1) % CITY_SLIDES.length;
+            const isNext = i === (slideIdx + 1) % slides.length;
             if (!isCurrent && !isNext) return null;
             return (
-              <img key={s.city}
+              <img key={(s.img || s.city) + i}
                 src={s.img.replace('w=1400&h=800', 'w=1200&h=700')}
                 alt={s.city}
                 className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ${isCurrent ? "opacity-100" : "opacity-0"}`} />
@@ -223,7 +232,7 @@ export default function HeroSection() {
               <span className="text-white/60 text-xs">{slide.subtitle}</span>
             </div>
             <div className="flex gap-1.5 mr-2">
-              {CITY_SLIDES.map((_, i) => (
+              {slides.map((_, i) => (
                 <button key={i} onClick={() => setSlideIdx(i)}
                   className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-accent" : "w-1.5 bg-white/40"}`} />
               ))}
