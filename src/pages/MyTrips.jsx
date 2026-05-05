@@ -3,7 +3,7 @@ import { logAudit } from "@/lib/adminAudit";
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { isTripExpired } from "@/lib/tripScheduling";
+import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -333,8 +333,20 @@ export default function MyTrips() {
                         </div>
                       )}
 
-                      {/* Review Button for completed trips — opens full wizard */}
-                      {status === "completed" && !reviewedTripIds.has(trip.id) && isTripExpired(trip) && bookedTripIds.has(trip.id) && (
+                      {/* Review button — appears as soon as the trip's
+                          actual time window has elapsed (start + 30 min),
+                          for any booking the user actually made on that
+                          trip and hasn't already reviewed. Earlier we
+                          required `status === "completed"`, but that
+                          status only flips when the driver explicitly
+                          taps "complete" in their dashboard — so most
+                          real trips never became reviewable. Cancelled
+                          bookings are explicitly excluded. */}
+                      {bookedTripIds.has(trip.id)
+                        && !reviewedTripIds.has(trip.id)
+                        && isTripCompleted(trip)
+                        && status !== "cancelled"
+                        && status !== "cancelled_by_driver" && (
                         <div className="mt-3 mx-4">
                           <button
                             onClick={() => setWizardTrip(trip)}
@@ -348,7 +360,7 @@ export default function MyTrips() {
                           </button>
                         </div>
                       )}
-                      {status === "completed" && reviewedTripIds.has(trip.id) && (
+                      {bookedTripIds.has(trip.id) && reviewedTripIds.has(trip.id) && isTripCompleted(trip) && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1 px-5 mt-2 pb-1">
                           <CheckCircle className="w-3 h-3 text-accent" />
                           شكراً — تم تقييم هذه الرحلة ✅

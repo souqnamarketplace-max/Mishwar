@@ -518,9 +518,36 @@ export default function TripDetails() {
 
               <button
                 className="bg-muted text-foreground px-3 py-1.5 rounded-lg text-xs font-medium hover:opacity-80 transition-opacity"
-                onClick={() => {
-                  navigator.clipboard.writeText(window.location.href);
-                  toast.success("تم نسخ الرابط! 📋");
+                onClick={async () => {
+                  // navigator.clipboard.writeText fails silently on http
+                  // contexts, in some embedded WebViews, and inside iframes
+                  // without explicit clipboard-write permission. Fall back
+                  // to the legacy execCommand approach via a temporary
+                  // textarea so the share button works everywhere — App
+                  // Store WebViews especially.
+                  const url = window.location.href;
+                  try {
+                    if (navigator.clipboard?.writeText) {
+                      await navigator.clipboard.writeText(url);
+                      toast.success("تم نسخ الرابط! 📋");
+                      return;
+                    }
+                  } catch {}
+                  try {
+                    const ta = document.createElement("textarea");
+                    ta.value = url;
+                    ta.style.position = "fixed";
+                    ta.style.opacity = "0";
+                    document.body.appendChild(ta);
+                    ta.focus();
+                    ta.select();
+                    const ok = document.execCommand("copy");
+                    document.body.removeChild(ta);
+                    if (ok) toast.success("تم نسخ الرابط! 📋");
+                    else toast.error("تعذر نسخ الرابط — انسخه يدوياً من شريط العنوان");
+                  } catch {
+                    toast.error("تعذر نسخ الرابط — انسخه يدوياً من شريط العنوان");
+                  }
                 }}
               >
                 نسخ الرابط
@@ -539,8 +566,32 @@ export default function TripDetails() {
                       if (err.name !== "AbortError") toast.error("فشلت المشاركة");
                     }
                   } else {
-                    navigator.clipboard.writeText(window.location.href);
-                    toast.success("تم نسخ الرابط! 📋");
+                    // Same fallback as the dedicated copy-link button
+                    // above — see comment there for why this matters in
+                    // App Store WebView and non-HTTPS contexts.
+                    const url = window.location.href;
+                    try {
+                      if (navigator.clipboard?.writeText) {
+                        await navigator.clipboard.writeText(url);
+                        toast.success("تم نسخ الرابط! 📋");
+                        return;
+                      }
+                    } catch {}
+                    try {
+                      const ta = document.createElement("textarea");
+                      ta.value = url;
+                      ta.style.position = "fixed";
+                      ta.style.opacity = "0";
+                      document.body.appendChild(ta);
+                      ta.focus();
+                      ta.select();
+                      const ok = document.execCommand("copy");
+                      document.body.removeChild(ta);
+                      if (ok) toast.success("تم نسخ الرابط! 📋");
+                      else toast.error("تعذر النسخ — انسخه يدوياً");
+                    } catch {
+                      toast.error("تعذر النسخ — انسخه يدوياً");
+                    }
                   }
                 }}
               >
