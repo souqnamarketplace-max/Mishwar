@@ -186,11 +186,18 @@ function Overview() {
         <div className="bg-card rounded-xl border border-border p-4">
           <h3 className="font-bold text-sm mb-2">الإيرادات</h3>
           <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-2xl font-bold text-primary">₪1,248,560</span>
+            {/* Mirrors the totalRevenue stat at the top of the page —
+                filtered to confirmed/completed bookings so the number
+                here agrees with the Payments tab and the top stat row. */}
+            <span className="text-2xl font-bold text-primary">₪{totalRevenue.toLocaleString()}</span>
           </div>
           <div className="flex items-center gap-1 mb-4">
-            <TrendingUp className="w-3 h-3 text-green-500" />
-            <span className="text-xs text-green-500">+18.2% مقارنة بالشهر الماضي</span>
+            <TrendingUp className="w-3 h-3 text-muted-foreground" />
+            {/* Real period-over-period delta lands when we have at least
+                one previous full period to compare against. Until then
+                a static label keeps the UI honest instead of a fabricated
+                "+18.2%" growth claim. */}
+            <span className="text-xs text-muted-foreground">— مقارنة بالشهر الماضي</span>
           </div>
           <div className="h-36">
             <ResponsiveContainer width="100%" height="100%">
@@ -258,19 +265,34 @@ function Overview() {
         </div>
       </div>
 
-      {/* Bottom Stats */}
+      {/* Bottom Stats — computed from live booking + trip data instead
+          of fabricated metrics. Some values are placeholders ("—") until
+          we have a rating/cancellation pipeline rich enough to compute
+          them honestly; that's better than showing invented numbers. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { title: "المعاملات هذا الشهر", value: "2,451", change: "+14.2%", icon: CreditCard },
-          { title: "متوسط تقييم الرحلات", value: "4.7/5", change: "0.2 نقاط", icon: Star },
-          { title: "نسبة الرحلات المكتملة", value: "96.3%", change: "+2.8%", icon: CalendarCheck },
-          { title: "نسبة الإلغاء", value: "3.7%", change: "-1.2%", icon: AlertCircle },
-        ].map((stat) => (
+        {(() => {
+          const completedCount = bookings.filter((b) => b.status === "completed").length;
+          const cancelledCount = bookings.filter((b) =>
+            b.status === "cancelled" || b.status === "cancelled_by_driver"
+          ).length;
+          const completionRate = totalBookings > 0
+            ? Math.round((completedCount / totalBookings) * 1000) / 10
+            : 0;
+          const cancellationRate = totalBookings > 0
+            ? Math.round((cancelledCount / totalBookings) * 1000) / 10
+            : 0;
+          return [
+            { title: "إجمالي المعاملات", value: totalBookings.toLocaleString(), change: "—", icon: CreditCard },
+            { title: "متوسط تقييم الرحلات", value: "—", change: "—", icon: Star },
+            { title: "نسبة الرحلات المكتملة", value: `${completionRate}%`, change: "—", icon: CalendarCheck },
+            { title: "نسبة الإلغاء", value: `${cancellationRate}%`, change: "—", icon: AlertCircle },
+          ];
+        })().map((stat) => (
           <div key={stat.title} className="bg-card rounded-xl border border-border p-4 text-center">
             <stat.icon className="w-5 h-5 text-primary mx-auto mb-2" />
             <p className="text-2xl font-bold text-foreground">{stat.value}</p>
             <p className="text-xs text-muted-foreground">{stat.title}</p>
-            <p className="text-xs text-green-500 mt-1">{stat.change}</p>
+            <p className="text-xs text-muted-foreground mt-1">{stat.change}</p>
           </div>
         ))}
       </div>
