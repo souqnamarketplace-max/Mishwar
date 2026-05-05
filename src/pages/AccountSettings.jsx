@@ -2,6 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
+import { logAdminAction } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
@@ -66,6 +67,11 @@ export default function AccountSettings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletionLoading, setDeletionLoading] = useState(false);
+  // New: capture *why* the user is leaving + a typed-confirmation guard so
+  // the modal copy ("type 'حذف حسابي' to continue") is no longer a lie.
+  const [deletionReason, setDeletionReason] = useState("");
+  const [deletionReasonOther, setDeletionReasonOther] = useState("");
+  const [deletionConfirmText, setDeletionConfirmText] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -306,33 +312,91 @@ export default function AccountSettings() {
         return;
       }
 
-      // Anonymize PII + mark as deleted
-      await base44.entities.Profile.update(user.id, {
-        full_name: "[حساب محذوف]",
-        avatar_url: null,
-        phone: null,
-        bio: null,
-        bank_iban: null,
-        jawwal_pay_number: null,
-        reflect_number: null,
-        credit_card_enabled: false,
-        pref_smoking: null,
-        pref_chattiness: null,
-        pref_pets: null,
-        vehicle_luggage: null,
-        vehicle_back_row: null,
-        car_model: null,
-        car_year: null,
-        car_color: null,
-        car_plate: null,
-        car_image: null,
-        driver_note: null,
-        notif_push: false,
-        notif_email: false,
-        notif_sms: false,
-        notif_marketing: false,
-        deleted_at: new Date().toISOString(),
-      });
+      // Build the anonymisation payload. We persist a deletion_reason so
+      // the admin team can see why people are leaving (the column already
+      // exists in profiles; the previous code just never wrote to it).
+      const reasonToPersist =
+        deletionReason === "other"
+          ? deletionReasonOther.trim().slice(0, 500) || "other"
+          : deletionReason || null;
+
+      // Record intent BEFORE we touch the row, so even if the next step
+      // silently fails (e.g. expired session vs RLS), the admin team sees
+      // that this user attempted to delete.
+      await logAdminAction(
+        "account_self_delete_initiated",
+        "user",
+        user.id,
+        {
+          email: user.email,
+          full_name: user.full_name,
+          reason: reasonToPersist,
+        }
+      );
+
+      // Anonymize PII + mark as deleted.
+      // Use supabase-js directly (not base44) for two reasons:
+      //   1. base44.entities.Profile.update goes through restFetch which
+      //      falls back to the anon key when JWT is expired. With anon,
+      //      the profiles_update RLS policy (id = auth.uid()) matches 0
+      //      rows; PostgREST returns 200 with [] and the old code treated
+      //      that as success. The user saw "تم حذف حسابك بنجاح" but the
+      //      DB never changed.
+      //   2. .select() forces PostgREST to return the updated row(s) so
+      //      we can VERIFY the write actually persisted before logging
+      //      out and showing the success toast.
+      const { data: updatedRows, error: updateErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: "[حساب محذوف]",
+          avatar_url: null,
+          phone: null,
+          bio: null,
+          bank_iban: null,
+          jawwal_pay_number: null,
+          reflect_number: null,
+          credit_card_enabled: false,
+          pref_smoking: null,
+          pref_chattiness: null,
+          pref_pets: null,
+          vehicle_luggage: null,
+          vehicle_back_row: null,
+          car_model: null,
+          car_year: null,
+          car_color: null,
+          car_plate: null,
+          car_image: null,
+          driver_note: null,
+          notif_push: false,
+          notif_email: false,
+          notif_sms: false,
+          notif_marketing: false,
+          deleted_at: new Date().toISOString(),
+          deletion_reason: reasonToPersist,
+        })
+        .eq("id", user.id)
+        .select("id, deleted_at");
+
+      if (updateErr) throw updateErr;
+      if (!updatedRows || updatedRows.length === 0) {
+        // RLS blocked the update — almost always means the JWT expired
+        // mid-session. Don't pretend the deletion worked.
+        throw new Error(
+          "session_expired_no_rows_updated"
+        );
+      }
+
+      // Confirm to the audit trail that the soft-delete actually persisted.
+      await logAdminAction(
+        "account_self_deleted",
+        "user",
+        user.id,
+        {
+          email: user.email,
+          reason: reasonToPersist,
+          confirmed_deleted_at: updatedRows[0].deleted_at,
+        }
+      );
 
       try {
         await base44.auth.deleteMe?.();
@@ -346,7 +410,13 @@ export default function AccountSettings() {
       }, 1500);
     } catch (err) {
       captureException(err, { msg: "Delete error:" });
-      toast.error("فشل حذف الحساب. يرجى الاتصال بالدعم");
+      // Distinguish the silent-failure case so the user knows what happened
+      // instead of seeing a generic "support" message they can't act on.
+      if (err?.message === "session_expired_no_rows_updated") {
+        toast.error("انتهت الجلسة — يرجى تسجيل الدخول مجدداً ثم إعادة المحاولة");
+      } else {
+        toast.error("فشل حذف الحساب. يرجى الاتصال بالدعم");
+      }
       setDeletionLoading(false);
     }
     setShowDeleteModal(false);
@@ -901,20 +971,74 @@ export default function AccountSettings() {
                 </Button>
               ) : (
                 <div className="space-y-3 bg-destructive/5 p-4 rounded-xl border border-destructive/20">
-                  <p className="text-sm font-medium text-destructive">
-                    تأكيد أخير: اكتب "حذف حسابي" للمتابعة
-                  </p>
+                  {/* Reason picker — optional but lets the team learn why
+                      people leave. The selected value is persisted to
+                      profiles.deletion_reason and to the audit log. */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-foreground">
+                      سبب الحذف (اختياري — يساعدنا في التحسين)
+                    </label>
+                    <select
+                      value={deletionReason}
+                      onChange={(e) => setDeletionReason(e.target.value)}
+                      disabled={deletionLoading}
+                      className="w-full h-10 px-3 rounded-lg bg-card border border-border text-sm text-foreground"
+                    >
+                      <option value="">— لا أرغب بذكره —</option>
+                      <option value="no_longer_needed">لم أعد بحاجة للتطبيق</option>
+                      <option value="found_alternative">وجدت بديلاً أفضل</option>
+                      <option value="privacy">مخاوف تتعلق بالخصوصية</option>
+                      <option value="duplicate_account">لدي حساب آخر</option>
+                      <option value="too_many_notifications">إشعارات كثيرة</option>
+                      <option value="bad_experience">تجربة سيئة</option>
+                      <option value="other">سبب آخر</option>
+                    </select>
+                    {deletionReason === "other" && (
+                      <textarea
+                        value={deletionReasonOther}
+                        onChange={(e) => setDeletionReasonOther(e.target.value)}
+                        placeholder="أخبرنا المزيد..."
+                        maxLength={500}
+                        rows={2}
+                        disabled={deletionLoading}
+                        className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm text-foreground resize-none"
+                      />
+                    )}
+                  </div>
+
+                  {/* Typed-confirmation guard — modal previously claimed to
+                      require typing "حذف حسابي" but had no input field. */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-destructive">
+                      للتأكيد، اكتب <span className="font-bold">حذف حسابي</span> أدناه
+                    </label>
+                    <input
+                      type="text"
+                      value={deletionConfirmText}
+                      onChange={(e) => setDeletionConfirmText(e.target.value)}
+                      disabled={deletionLoading}
+                      autoComplete="off"
+                      className="w-full h-10 px-3 rounded-lg bg-card border border-destructive/40 text-sm text-foreground"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <Button
                       onClick={deleteAccount}
-                      disabled={deletionLoading}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl"
+                      disabled={deletionLoading || deletionConfirmText.trim() !== "حذف حسابي"}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white rounded-xl disabled:opacity-50"
                     >
                       {deletionLoading ? "جاري الحذف..." : "حذف الحساب نهائياً"}
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => { setShowDeleteConfirm(false); setShowDeleteModal(false); }}
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setShowDeleteModal(false);
+                        setDeletionReason("");
+                        setDeletionReasonOther("");
+                        setDeletionConfirmText("");
+                      }}
                       className="w-full rounded-xl"
                       disabled={deletionLoading}
                     >
