@@ -1,14 +1,19 @@
 import React, { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Car, CalendarCheck, Star, Users, Filter } from "lucide-react";
+import { Activity, Car, CalendarCheck, Star, Users, Filter, MessageSquarePlus, Flag } from "lucide-react";
 import Pagination from "@/components/dashboard/Pagination";
 
 const typeConfig = {
-  booking: { label: "حجز",     icon: CalendarCheck, color: "text-accent bg-accent/10" },
-  trip:    { label: "رحلة",    icon: Car,           color: "text-primary bg-primary/10" },
-  review:  { label: "تقييم",   icon: Star,          color: "text-yellow-600 bg-yellow-500/10" },
-  user:    { label: "مستخدم",  icon: Users,         color: "text-blue-600 bg-blue-500/10" },
+  booking:  { label: "حجز",      icon: CalendarCheck,     color: "text-accent bg-accent/10" },
+  trip:     { label: "رحلة",     icon: Car,               color: "text-primary bg-primary/10" },
+  review:   { label: "تقييم",    icon: Star,              color: "text-yellow-600 bg-yellow-500/10" },
+  user:     { label: "مستخدم",   icon: Users,             color: "text-blue-600 bg-blue-500/10" },
+  // Added so suggestions/complaints from /feedback show up in the activity feed
+  // alongside booking and trip events. The activity_log RPC unions both
+  // support_tickets (feedback) and user_reports (report) into the unified result.
+  feedback: { label: "اقتراح/شكوى", icon: MessageSquarePlus, color: "text-purple-600 bg-purple-500/10" },
+  report:   { label: "بلاغ",     icon: Flag,              color: "text-red-600 bg-red-500/10" },
 };
 
 export default function DashboardLogs() {
@@ -45,11 +50,13 @@ export default function DashboardLogs() {
       {/* Filter */}
       <div className="flex flex-wrap gap-2 mb-4">
         {[
-          { id: "all",     label: "الكل" },
-          { id: "booking", label: "الحجوزات" },
-          { id: "trip",    label: "الرحلات" },
-          { id: "review",  label: "التقييمات" },
-          { id: "user",    label: "المستخدمون" },
+          { id: "all",      label: "الكل" },
+          { id: "booking",  label: "الحجوزات" },
+          { id: "trip",     label: "الرحلات" },
+          { id: "review",   label: "التقييمات" },
+          { id: "user",     label: "المستخدمون" },
+          { id: "feedback", label: "الاقتراحات والشكاوى" },
+          { id: "report",   label: "البلاغات" },
         ].map((f) => (
           <button
             key={f.id}
