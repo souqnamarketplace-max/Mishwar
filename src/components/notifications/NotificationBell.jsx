@@ -6,6 +6,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, X, CheckCheck, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  ensurePermission,
+  showIncomingNotification,
+} from "@/lib/pushNotifications";
 
 // Determine where each notification should navigate
 function getNotifTarget(notif) {
@@ -59,13 +63,61 @@ export default function NotificationBell({ userEmail }) {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
+  // Track the latest seen notification id so the realtime handler can decide
+  // whether the inbound payload is genuinely new (vs. an echo of something we
+  // already showed). useRef so updates don't re-run the realtime effect.
+  const seenIdsRef = useRef(new Set());
+  useEffect(() => {
+    notifications.forEach(n => seenIdsRef.current.add(n.id));
+  }, [notifications]);
+
+  useEffect(() => {
+    if (!userEmail) return;
+    // Distinct channel from the entity-level subscribe so we get the row
+    // payload directly — Notification.subscribe just invalidates the query
+    // cache and doesn't expose the new row to us.
+    const channel = supabase
+      .channel(`notif-push-${userEmail}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_email=eq.${userEmail}`,
+        },
+        (payload) => {
+          const row = payload?.new;
+          if (!row) return;
+          if (seenIdsRef.current.has(row.id)) return;
+          seenIdsRef.current.add(row.id);
+          // Refresh the inbox so the bell badge updates.
+          qc.invalidateQueries({ queryKey: ["notifications", userEmail] });
+          // Fire the toast / native banner. Click jumps to the right page.
+          showIncomingNotification(row, {
+            onClick: (n) => {
+              const target = getNotifTarget(n);
+              if (target) navigate(target);
+            },
+          });
+        }
+      )
+      .subscribe();
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+    };
+  }, [userEmail, navigate, qc]);
+
+  // Keep the older entity-level subscribe too for cache invalidation when an
+  // INSERT goes through a path that doesn't hit the filtered channel above
+  // (e.g. another tab marking-as-read causes UPDATEs we still want to reflect).
   useEffect(() => {
     if (!userEmail) return;
     const unsub = base44.entities.Notification.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["notifications", userEmail] });
     });
     return () => unsub();
-  }, [userEmail]);
+  }, [userEmail, qc]);
 
   const markRead = useMutation({
     mutationFn: async (id) => {
@@ -130,17 +182,23 @@ export default function NotificationBell({ userEmail }) {
     if (btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
       const isMobile = window.innerWidth < 640;
-      // On mobile keep ~16px gutter both sides; on desktop a fixed 360px works well
       const desiredWidth = isMobile
         ? Math.min(window.innerWidth - 32, 320)
         : 360;
-      // Anchor dropdown so its RIGHT edge aligns with the bell's right edge (RTL-friendly),
-      // then clamp within viewport with 16px margin on both sides.
       let left = rect.right - desiredWidth;
       left = Math.max(16, Math.min(left, window.innerWidth - desiredWidth - 16));
       setPos({ top: rect.bottom + 8, left, width: desiredWidth });
     }
-    setOpen(v => !v);
+    setOpen(v => {
+      const next = !v;
+      // Lazy ask for OS notification permission — only when the user actually
+      // engages with the bell, never on first page load. ensurePermission() is
+      // idempotent and self-throttling so it's safe to call on every open.
+      if (next) {
+        ensurePermission().catch(() => {});
+      }
+      return next;
+    });
   };
 
   const handleNotifClick = (notif) => {
