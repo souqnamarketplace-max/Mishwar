@@ -142,15 +142,37 @@ export default function CreateTrip() {
     recurring_days: [],
     // Multi-stop support: array of {city, location, time, price_from_origin, seats_available}
     stops: [],
+    // Driver preferences applied to THIS trip. Default to the safer/quieter
+    // option so a driver who never edits the form still publishes a
+    // reasonable trip (no smoking, no pets, neutral chat). The pre-fill
+    // effect below overwrites these from the driver's profile when loaded
+    // so account-level prefs become per-trip defaults.
+    pref_smoking: "no",
+    pref_chattiness: "okay",
+    pref_pets: false,
   });
 
-  // Pre-fill car details from user profile once loaded
+  // Pre-fill car details + driver preferences from user profile once loaded.
+  // Driver-level prefs (smoking / chattiness / pets) become per-trip defaults
+  // here. The form lets the driver override per trip — useful for "I usually
+  // don't allow smoking but for this airport run with friends it's fine".
   useEffect(() => {
     if (user && !formInitialized) {
-      // Auto-populate amenities from driver's saved preferences
-      // Driver can still toggle these per trip
+      // Resolve each pref with explicit fallback. The `??` operator preserves
+      // explicit `false` for pref_pets — we want a driver who set "no pets" to
+      // see that selection mirrored, not get reset to the default true.
+      const profileSmoking    = user.pref_smoking    || "no";
+      const profileChattiness = user.pref_chattiness || "okay";
+      const profilePets       = user.pref_pets       ?? false;
+
+      // Auto-populate amenities from driver's saved preferences.
+      // Smoking amenity stays in sync with pref_smoking — if the driver's
+      // profile says "yes/allowed", the amenity chip is auto-selected; if
+      // "no", it stays off. The form lets them flip either way per trip,
+      // and the submit handler re-syncs them so they can't disagree on
+      // the trip row.
       const amenitiesFromPrefs = [];
-      if (user.pref_smoking === "yes" || user.pref_smoking === "allowed") amenitiesFromPrefs.push("smoking");
+      if (profileSmoking === "yes" || profileSmoking === "allowed") amenitiesFromPrefs.push("smoking");
       if (user.vehicle_luggage && user.vehicle_luggage !== "none" && user.vehicle_luggage !== "no") amenitiesFromPrefs.push("luggage");
       // Common amenities most cars have — pre-select for convenience
       amenitiesFromPrefs.push("ac");
@@ -171,6 +193,9 @@ export default function CreateTrip() {
         driver_note: user.driver_note || "",
         amenities: amenitiesFromPrefs,
         payment_methods: paymentFromProfile,
+        pref_smoking: profileSmoking,
+        pref_chattiness: profileChattiness,
+        pref_pets: profilePets,
       }));
       setFormInitialized(true);
     }
@@ -285,7 +310,18 @@ export default function CreateTrip() {
       is_direct:       form.is_direct,
       is_recurring:    form.is_recurring,
       recurring_days:  form.recurring_days || [],
-      amenities:       form.amenities || [],
+      // Re-sync the smoking amenity with pref_smoking before submit.
+      // Without this, a driver could set pref_smoking="no" but leave the
+      // smoking amenity chip ON (or vice versa) and the trip row would
+      // ship contradictory data — the chip below the car would say
+      // "ممنوع التدخين" while the amenities list still showed
+      // "مسموح بالتدخين". Authoritative source: form.pref_smoking.
+      amenities: (() => {
+        const a = new Set(form.amenities || []);
+        const allowsSmoking = form.pref_smoking === "yes" || form.pref_smoking === "allowed";
+        if (allowsSmoking) a.add("smoking"); else a.delete("smoking");
+        return Array.from(a);
+      })(),
       payment_methods: form.payment_methods || ["cash"],
       has_checkpoint:  form.has_checkpoint || false,
       checkpoint_note: form.checkpoint_note || "",
@@ -305,10 +341,13 @@ export default function CreateTrip() {
         seats_available:   Number(s.seats_available) || form.available_seats,
       })),
       // Driver identity — UUID link + denormalized display fields
-      // User preferences (denormalized for trip cards)
-      pref_smoking:      user?.pref_smoking || null,
-      pref_chattiness:   user?.pref_chattiness || null,
-      pref_pets:         user?.pref_pets || false,
+      // Driver preferences for THIS trip (form values, not profile values).
+      // The form was pre-filled from the profile but the driver may have
+      // overridden any of these per trip. Use what they actually saw on
+      // screen at submit time so the published trip matches their intent.
+      pref_smoking:      form.pref_smoking,
+      pref_chattiness:   form.pref_chattiness,
+      pref_pets:         !!form.pref_pets,
       vehicle_luggage:   user?.vehicle_luggage || null,
       vehicle_back_row:  user?.vehicle_back_row || null,
       driver_id:     user.id,
@@ -693,6 +732,94 @@ export default function CreateTrip() {
                     {a.label}
                   </button>
                 ))}
+              </div>
+            </div>
+            {/* Driver preferences for this trip.
+                Pre-filled from the driver's profile but overridable per trip.
+                Each value is also saved on the trip row (pref_smoking,
+                pref_chattiness, pref_pets) so passengers see the actual
+                rules for THIS ride on the trip-details page chips —
+                independent of any later profile changes. */}
+            <div>
+              <Label className="mb-2 block">تفضيلات الرحلة</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                مأخوذة من إعداداتك — يمكنك تعديلها لهذه الرحلة فقط.
+                {" "}
+                <Link to="/settings?section=preferences" className="text-primary hover:underline">
+                  عدّل التفضيلات الافتراضية
+                </Link>
+              </p>
+              <div className="space-y-3">
+                {/* Smoking */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">التدخين</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "no",      label: "🚭 ممنوع" },
+                      { id: "yes",     label: "🚬 مسموح" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => updateField("pref_smoking", opt.id)}
+                        className={`px-4 py-2 rounded-xl text-sm transition-all border ${
+                          form.pref_smoking === opt.id
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-card border-border text-muted-foreground hover:border-primary/30"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Pets */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">الحيوانات الأليفة</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: false, label: "🚫 بدون حيوانات" },
+                      { id: true,  label: "🐾 مرحب بها" },
+                    ].map((opt) => (
+                      <button
+                        key={String(opt.id)}
+                        type="button"
+                        onClick={() => updateField("pref_pets", opt.id)}
+                        className={`px-4 py-2 rounded-xl text-sm transition-all border ${
+                          !!form.pref_pets === !!opt.id
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-card border-border text-muted-foreground hover:border-primary/30"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Chattiness */}
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1.5">الدردشة في الرحلة</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: "quiet",  label: "🤫 هادئة" },
+                      { id: "okay",   label: "🙂 معتدلة" },
+                      { id: "chatty", label: "💬 دردشة" },
+                    ].map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => updateField("pref_chattiness", opt.id)}
+                        className={`px-4 py-2 rounded-xl text-sm transition-all border ${
+                          form.pref_chattiness === opt.id
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "bg-card border-border text-muted-foreground hover:border-primary/30"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
             <div>
