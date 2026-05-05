@@ -355,7 +355,6 @@ export default function AccountSettings() {
           bank_iban: null,
           jawwal_pay_number: null,
           reflect_number: null,
-          credit_card_enabled: false,
           pref_smoking: null,
           pref_chattiness: null,
           pref_pets: null,

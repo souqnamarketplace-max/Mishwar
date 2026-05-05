@@ -33,6 +33,16 @@ const TYPE_FILTERS = [
   { id: "report",   label: "البلاغات" },
 ];
 
+// Audit-only type chips — these target_type values only appear in the
+// admin-trail RPC, never in the user-activity feed. They were already
+// recognised by typeConfig for icon/colour rendering, but couldn't be
+// filtered by because no chip existed. Added separately so the activity
+// view doesn't surface filters that would always return zero.
+const AUDIT_TYPE_FILTERS = [
+  { id: "payment", label: "المدفوعات" },
+  { id: "system",  label: "النظام" },
+];
+
 // View toggle: the existing user-activity feed vs the admin audit trail.
 // They use different RPCs and have different schemas — separating them is
 // clearer than trying to unify. Activity = "what users did". Audit =
@@ -184,7 +194,17 @@ export default function DashboardLogs() {
         {VIEWS.map((v) => (
           <button
             key={v.id}
-            onClick={() => { setView(v.id); resetPage(); setExpanded(null); }}
+            onClick={() => {
+              // If we're leaving audit view while a payment/system chip is
+              // active, reset to "all" — those types don't exist in the
+              // activity feed, so otherwise the list would silently
+              // come back empty.
+              const auditOnlyIds = AUDIT_TYPE_FILTERS.map((x) => x.id);
+              if (v.id === "activity" && auditOnlyIds.includes(filterType)) {
+                setFilterType("all");
+              }
+              setView(v.id); resetPage(); setExpanded(null);
+            }}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               view === v.id ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:bg-muted"
             }`}
@@ -196,9 +216,26 @@ export default function DashboardLogs() {
 
       {/* Filters block */}
       <div className="bg-card border border-border rounded-xl p-3 mb-3 space-y-3">
-        {/* Type chips — always shown */}
+        {/* Type chips — TYPE_FILTERS always show, AUDIT_TYPE_FILTERS only in
+            audit view (those types only appear there). When the user
+            switches from audit to activity with a payment/system filter
+            selected, fall back to "all" so they're not stuck looking at
+            an empty list with no obvious cause. */}
         <div className="flex flex-wrap gap-2">
           {TYPE_FILTERS.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => { setFilterType(f.id); resetPage(); }}
+              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                filterType === f.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background border border-border text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+          {view === "audit" && AUDIT_TYPE_FILTERS.map((f) => (
             <button
               key={f.id}
               onClick={() => { setFilterType(f.id); resetPage(); }}
