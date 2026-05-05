@@ -45,13 +45,22 @@ export default function HeroSection() {
   const navigate = useNavigate();
   const [slideIdx, setSlideIdx] = useState(0);
 
-  // Load slides directly from Supabase (bypasses base44 created_by filter)
+  // Load slides directly from Supabase (bypasses base44 created_by filter).
+  //
+  // app_settings has historically accumulated multiple rows (no UNIQUE constraint
+  // on the table — it's effectively a singleton-by-convention, not by schema).
+  // Without an explicit ORDER, Postgres can return any of them, so admins would
+  // upload a new image and the home page would silently keep showing the old
+  // one because the read landed on a stale row. Order by updated_at DESC so we
+  // deterministically pick the most recently saved settings — matching the
+  // admin page's read pattern.
   const { data: heroSlides } = useQuery({
     queryKey: ["hero-city-slides-public"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_settings")
         .select("hero_city_slides")
+        .order("updated_at", { ascending: false })
         .limit(1);
       if (error || !data?.[0]?.hero_city_slides) return null;
       const raw = data[0].hero_city_slides;
@@ -65,11 +74,17 @@ export default function HeroSection() {
 
   const slide = slides[slideIdx % slides.length] || CITY_SLIDES[0];
 
-  // Auto-advance every 4 seconds
+  // Auto-advance every 4 seconds. Cycle length must come from the live
+  // `slides` array, not the hardcoded CITY_SLIDES fallback — otherwise an
+  // admin who uploads, say, 8 slides would only see indices 0-5 cycle through
+  // (because CITY_SLIDES has 6) and slides 6, 7 would never display. Conversely
+  // an admin who keeps only 3 active slides would see ghost indices 3-5 hit
+  // the modulus fallback at runtime. Using slides.length keeps it correct.
   useEffect(() => {
-    const t = setInterval(() => setSlideIdx(i => (i + 1) % CITY_SLIDES.length), 4000);
+    if (slides.length <= 1) return;
+    const t = setInterval(() => setSlideIdx(i => (i + 1) % slides.length), 4000);
     return () => clearInterval(t);
-  }, []);
+  }, [slides.length]);
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");

@@ -146,11 +146,22 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
 export default function DashboardHeroSlides() {
   const qc = useQueryClient();
 
-  // Use Supabase directly — bypasses base44 created_by filter
+  // Use Supabase directly — bypasses base44 created_by filter.
+  //
+  // Order by updated_at DESC to match HeroSection.jsx's read pattern: both
+  // sides agree on which row is "the active settings row", so saves here
+  // become visible on the home page on the next read. Previously the admin
+  // ordered by created_at while the home page read with no order, which
+  // could land them on different rows of app_settings (the table has
+  // accumulated multiple rows over time, no UNIQUE constraint).
   const { data: settingRow, isLoading } = useQuery({
     queryKey: ["hero-slides-admin"],
     queryFn: async () => {
-      const { data } = await supabase.from("app_settings").select("id, hero_city_slides").limit(1).order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("app_settings")
+        .select("id, hero_city_slides")
+        .order("updated_at", { ascending: false })
+        .limit(1);
       return data?.[0] || null;
     },
   });
@@ -167,7 +178,13 @@ export default function DashboardHeroSlides() {
     mutationFn: async (newSlides) => {
       const val = JSON.stringify(newSlides);
       if (settingRow?.id) {
-        const { error } = await supabase.from("app_settings").update({ hero_city_slides: val }).eq("id", settingRow.id);
+        // Bumping updated_at explicitly so HeroSection's `ORDER BY updated_at DESC`
+        // unambiguously points at this row immediately after save — without
+        // depending on a DB trigger that we don't control.
+        const { error } = await supabase
+          .from("app_settings")
+          .update({ hero_city_slides: val, updated_at: new Date().toISOString() })
+          .eq("id", settingRow.id);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("app_settings").insert({ hero_city_slides: val });
