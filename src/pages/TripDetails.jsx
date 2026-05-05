@@ -420,20 +420,30 @@ export default function TripDetails() {
                 CreateTrip denormalises pref_smoking / pref_chattiness /
                 pref_pets onto the trip row at publish time, so what we render
                 is what the driver wanted FOR THIS TRIP — even if they've
-                changed prefs since. Hidden entirely when no prefs are set so
-                older trips don't grow an empty row. */}
+                changed prefs since. Older trips published before that
+                denormalization existed still have the legacy "smoking" entry
+                in their amenities array; we check that as a fallback so the
+                chip surfaces for them too. Hidden entirely when no signal at
+                all is available so empty rows don't appear. */}
             {(() => {
               const chips = [];
+              const amenities = Array.isArray(trip.amenities) ? trip.amenities : [];
+              const smokingInAmenities = amenities.includes("smoking");
+              const petsInAmenities = amenities.includes("pets");
+
+              // Smoking — pref column wins, amenities fallback for legacy trips
               if (trip.pref_smoking === "no" || trip.pref_smoking === "not_allowed") {
                 chips.push({ icon: "🚭", label: "ممنوع التدخين" });
-              } else if (trip.pref_smoking === "yes" || trip.pref_smoking === "allowed") {
+              } else if (trip.pref_smoking === "yes" || trip.pref_smoking === "allowed" || smokingInAmenities) {
                 chips.push({ icon: "🚬", label: "مسموح بالتدخين" });
               }
-              if (trip.pref_pets === true) {
+              // Pets — explicit booleans from the column, plus amenities fallback
+              if (trip.pref_pets === true || petsInAmenities) {
                 chips.push({ icon: "🐾", label: "الحيوانات الأليفة مرحب بها" });
-              } else if (trip.pref_pets === false && trip.pref_pets !== null) {
+              } else if (trip.pref_pets === false) {
                 chips.push({ icon: "🐾", label: "بدون حيوانات أليفة" });
               }
+              // Chattiness — no amenities fallback, only show if explicitly set
               if (trip.pref_chattiness === "quiet") {
                 chips.push({ icon: "🤫", label: "رحلة هادئة" });
               } else if (trip.pref_chattiness === "chatty" || trip.pref_chattiness === "very_chatty") {
