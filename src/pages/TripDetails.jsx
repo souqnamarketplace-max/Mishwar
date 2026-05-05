@@ -415,6 +415,48 @@ export default function TripDetails() {
               </div>
             </div>
 
+            {/* Driver preferences chips — sibling row below the car so it sits
+                on its own line, not as a flex item of the car block.
+                CreateTrip denormalises pref_smoking / pref_chattiness /
+                pref_pets onto the trip row at publish time, so what we render
+                is what the driver wanted FOR THIS TRIP — even if they've
+                changed prefs since. Hidden entirely when no prefs are set so
+                older trips don't grow an empty row. */}
+            {(() => {
+              const chips = [];
+              if (trip.pref_smoking === "no" || trip.pref_smoking === "not_allowed") {
+                chips.push({ icon: "🚭", label: "ممنوع التدخين" });
+              } else if (trip.pref_smoking === "yes" || trip.pref_smoking === "allowed") {
+                chips.push({ icon: "🚬", label: "مسموح بالتدخين" });
+              }
+              if (trip.pref_pets === true) {
+                chips.push({ icon: "🐾", label: "الحيوانات الأليفة مرحب بها" });
+              } else if (trip.pref_pets === false && trip.pref_pets !== null) {
+                chips.push({ icon: "🐾", label: "بدون حيوانات أليفة" });
+              }
+              if (trip.pref_chattiness === "quiet") {
+                chips.push({ icon: "🤫", label: "رحلة هادئة" });
+              } else if (trip.pref_chattiness === "chatty" || trip.pref_chattiness === "very_chatty") {
+                chips.push({ icon: "💬", label: "أحب الدردشة" });
+              } else if (trip.pref_chattiness === "okay") {
+                chips.push({ icon: "🙂", label: "دردشة معتدلة" });
+              }
+              if (chips.length === 0) return null;
+              return (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {chips.map((c) => (
+                    <span
+                      key={c.label}
+                      className="inline-flex items-center gap-1.5 bg-muted/40 text-foreground text-xs font-medium px-2.5 py-1 rounded-full border border-border/50"
+                    >
+                      <span aria-hidden="true">{c.icon}</span>
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
+
             {/* Payment Methods */}
             <div className="mt-3">
               <p className="text-xs text-muted-foreground mb-2">طرق الدفع المقبولة</p>

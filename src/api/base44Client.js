@@ -188,6 +188,52 @@ function createEntityClient(tableName) {
     create: async (data) => {
       // Use direct REST instead of supabase-js (which hangs on writes after token refresh)
       const email = await getCurrentUserEmail();
+
+      // Honour recipient notification preferences for the notifications table.
+      // Until now `notif_push` / `notif_marketing` toggles in /account were
+      // saved to profiles but never consulted before sending — turning them
+      // off did nothing. This intercepts notifications writes here, in ONE
+      // place, instead of editing 16+ call sites that already wrap their
+      // inserts in `try{}catch{}` so any new failure mode is silently swallowed.
+      //
+      // Rules:
+      //   - if recipient has notif_push === false → drop entirely
+      //   - if data.type === 'broadcast' or 'marketing' AND recipient has
+      //     notif_marketing === false → drop
+      // Lookup uses anon-readable profiles (RLS already permits public reads
+      // on profiles for the join cases). Failure to look up the profile (e.g.
+      // network blip) falls THROUGH and lets the insert proceed — better to
+      // over-notify in a degraded state than under-notify.
+      if (tableName === 'notifications' && data?.user_email) {
+        try {
+          const { data: prefRows } = await supabase
+            .from('profiles')
+            .select('notif_push, notif_marketing')
+            .eq('email', data.user_email)
+            .limit(1);
+          const prefs = prefRows?.[0];
+          if (prefs) {
+            if (prefs.notif_push === false) {
+              // User opted out of all in-app notifications. Pretend it succeeded
+              // so the caller's optimistic UI doesn't break, but write nothing.
+              return null;
+            }
+            const isMarketing =
+              data.type === 'broadcast' ||
+              data.type === 'marketing' ||
+              data.type === 'announcement';
+            if (isMarketing && prefs.notif_marketing === false) {
+              return null;
+            }
+          }
+        } catch {
+          // Profile lookup failed — proceed with the insert. The user's
+          // preference is "don't notify" but we can't confirm it; defaulting
+          // to send is the less-bad outcome (notifications can be dismissed,
+          // missed ones cannot be undone).
+        }
+      }
+
       const insertData = {
         ...data,
         created_by: email,

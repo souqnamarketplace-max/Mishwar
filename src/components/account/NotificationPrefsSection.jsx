@@ -43,24 +43,26 @@ export default function NotificationPrefsSection({ user, onSaved }) {
     }
   };
 
-  const Toggle = ({ checked, onChange, icon: Icon, title, desc, recommended }) => (
-    <div className="flex items-start gap-3 py-4 border-b border-border/50">
+  const Toggle = ({ checked, onChange, icon: Icon, title, desc, recommended, comingSoon }) => (
+    <div className={`flex items-start gap-3 py-4 border-b border-border/50 ${comingSoon ? "opacity-60" : ""}`}>
       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
         <Icon className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
+        <div className="flex items-center gap-2 mb-0.5 flex-wrap">
           <p className="font-bold text-sm text-foreground">{title}</p>
           {recommended && <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">⭐ موصى به</span>}
+          {comingSoon && <span className="text-[9px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">قريباً</span>}
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
       </div>
       <button
-        onClick={() => onChange(!checked)}
-        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${checked ? "bg-primary" : "bg-muted"}`}
-        role="switch" aria-checked={checked}
+        onClick={() => !comingSoon && onChange(!checked)}
+        disabled={comingSoon}
+        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${checked && !comingSoon ? "bg-primary" : "bg-muted"} ${comingSoon ? "cursor-not-allowed" : ""}`}
+        role="switch" aria-checked={checked} aria-disabled={comingSoon || undefined}
       >
-        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${checked ? "right-0.5" : "right-[1.4rem]"}`} />
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${checked && !comingSoon ? "right-0.5" : "right-[1.4rem]"}`} />
       </button>
     </div>
   );
@@ -70,8 +72,13 @@ export default function NotificationPrefsSection({ user, onSaved }) {
       <p className="text-sm text-muted-foreground mb-4">اختر كيف تود أن نتواصل معك</p>
 
       <Toggle checked={push} onChange={setPush} icon={Bell} title="الإشعارات داخل التطبيق" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" recommended />
-      <Toggle checked={sms} onChange={setSms} icon={MessageSquare} title="الرسائل النصية SMS" desc="للحجوزات الجديدة والإلغاءات فقط" />
-      <Toggle checked={email} onChange={setEmail} icon={Mail} title="البريد الإلكتروني" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" />
+      {/* SMS and Email are intentionally marked "قريباً" — there is no SMS
+          gateway (Twilio/local provider) or transactional email sender wired
+          into the backend yet. Showing the toggle as actionable would let
+          users disable a delivery channel that doesn't exist, then wonder
+          why they aren't getting messages they never could have received. */}
+      <Toggle checked={sms} onChange={setSms} icon={MessageSquare} title="الرسائل النصية SMS" desc="للحجوزات الجديدة والإلغاءات فقط" comingSoon />
+      <Toggle checked={email} onChange={setEmail} icon={Mail} title="البريد الإلكتروني" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" comingSoon />
       <Toggle checked={marketing} onChange={setMarketing} icon={Megaphone} title="العروض والتسويق" desc="عروض خاصة، ميزات جديدة، أخبار مِشوارو" />
 
       <Button onClick={save} disabled={saving} className="w-full rounded-xl bg-primary text-primary-foreground mt-4">
