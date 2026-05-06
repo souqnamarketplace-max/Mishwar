@@ -3,9 +3,9 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (post-launch-polish session — share links, driver onboarding, OG images, car wiring)
-**HEAD at update:** `b22f9ab`
-**SQL applied to production:** migrations `002`, `003`, `006` ✓ — `007` pending
+**Last updated:** 2026-05-06 (storage hardening session — migrations 004 + 005 applied, C-03 closed)
+**HEAD at update:** `18e1186`
+**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006` ✓ — `007` still pending
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied to production
@@ -20,7 +20,7 @@ Status legend:
 |---|---|---|---|
 | C-01 | Privilege escalation via user-editable `role` | ✅ | Migration `002` applied 2026-05-06. Privilege escalation via PATCH role=admin returns 42501. |
 | C-02 | Reflected XSS in `/api/og` | ✅ | Shipped in `77f8da3` — proper esc() + length caps + nosniff/DENY headers. |
-| C-03 | Driver license images in PUBLIC bucket | 🟡 | Code half ✅: UUID-prefixed paths (`9816411`), admin signed URLs (`d1f7501`). SQL: migration `004` ready (NOT applied — needs backfill plan). Backfill template in migration `005` (`7b41951`). New uploads are safe; existing leaked URLs persist until backfill. |
+| C-03 | Driver license images in PUBLIC bucket | ✅ | Migration `004` applied 2026-05-06 — `uploads-private` bucket created, ownership-based RLS on `storage.objects` (users can only write to `<auth.uid>/...`, owner-or-admin reads on private bucket). Migration `005` audit returned 10 leaked URLs, all from test accounts (souqnamarketplace + testdriver). Storage objects deleted via Dashboard UI, driver_license rows deleted via SQL. Verification: leaked_url_count = 0. New uploads via /become-driver wizard go to UUID-prefixed paths. |
 | C-04 | Bookings UPDATE column-level integrity | ✅ | Migration `002` applied — `guard_booking_updates` trigger live. Passengers can only set status to `cancelled`; drivers control everything else. |
 | C-04b | Trips UPDATE column-level integrity (H-12) | ✅ | Migration `002` applied — `guard_trip_updates` trigger live. Driver can't change driver_email; can't change critical fields after first booking. |
 | C-05 | Account deletion doesn't anonymize email | ✅ | Migration `003` applied. `delete_user_account_v2` RPC anonymizes email + sets deleted_at. Pre-existing UI (commit `921c445`) calls supabase.auth.signOut + soft-delete via base44 — works against the new RPC implicitly. |
@@ -117,10 +117,9 @@ Status legend:
 
 ## What's left to launch
 
-After the 2026-05-06 SQL session, **31 of 47 audit findings are fully
-closed and 2 more are partial** (code shipped, awaiting human-loop
-finishing — lawyer review, storage backfill). The 14 remaining items
-are listed below; most need a third-party signup or a deliberate
+After the 2026-05-06 storage-hardening session, **32 of 47 audit findings are fully
+closed and 1 is partial** (privacy text accurate; lawyer review pending). The 14
+remaining items are listed below; most need a third-party signup or a deliberate
 post-launch deferral.
 
 Everything deployable from this repo without a human-loop step is shipped.
@@ -133,14 +132,6 @@ Everything deployable from this repo without a human-loop step is shipped.
 - Engage a Palestinian lawyer with GDPR + privacy experience
 - After review, update the text in those files and bump `LAST_UPDATED_ISO`
 - This is the only remaining critical-severity audit item
-
-**🔥 C-03 storage backfill** (when you have a service-role key + 2 hours)
-- New uploads are already safe (UUID-prefixed, code shipped)
-- Existing license URLs still publicly readable until backfill
-- Steps: apply `migrations/004_storage_hardening.sql` → run section 1
-  of `migrations/005_storage_backfill.sql` to audit leaked URLs → run
-  the Node template in section 2 with service-role key → verify with
-  section 3 (count should be zero)
 
 ### Remaining high-severity work
 
