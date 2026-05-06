@@ -176,7 +176,7 @@ export default function UserProfile() {
           <div className="flex items-start justify-between -mt-12 sm:-mt-14 mb-4">
             <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl border-4 border-card bg-primary text-primary-foreground flex items-center justify-center text-3xl font-black shadow-xl overflow-hidden shrink-0 relative">
               {avatarUrl ? (
-                <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
               ) : (
                 <span>{initials || displayName[0]}</span>
               )}

@@ -686,7 +686,7 @@ export default function CreateTrip() {
               {/* Car image preview */}
               {user?.car_image && (
                 <div className="mb-3 rounded-xl overflow-hidden h-32 bg-muted relative">
-                  <img src={user.car_image} alt="المركبة" className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={user.car_image} alt="المركبة" className="w-full h-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                   {user.car_model && (
                     <div className="absolute bottom-2 right-3 text-white">

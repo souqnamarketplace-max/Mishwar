@@ -96,7 +96,7 @@ export default function AccountHub() {
           <div className="relative shrink-0">
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-lg overflow-hidden">
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt="" className="w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src={user.avatar_url} alt="" className="w-full h-full object-cover" />
               ) : (
                 user.full_name?.[0] || "م"
               )}

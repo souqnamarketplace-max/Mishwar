@@ -213,7 +213,7 @@ function PhoneFrame({ children, headerTitle, headerColor = "bg-primary" }) {
           </div>
           {/* App header */}
           <div className={`${headerColor} px-3 py-1.5 flex items-center gap-2 shrink-0`}>
-            <img src="/logo.png" alt="" className="w-5 h-5 rounded-md object-cover" />
+            <img loading="lazy" decoding="async" src="/logo.png" alt="" className="w-5 h-5 rounded-md object-cover" />
             <div>
               <p className="text-white font-black text-[9px] leading-none">مشوارو</p>
               <p className="text-white/70 text-[7px]">{headerTitle}</p>

@@ -71,7 +71,7 @@ function FeaturedCard({ trip, index }) {
           <div className="relative h-20 flex items-center justify-between px-4 overflow-hidden" style={{ background: bg }}>
             {trip.car_image && (
               <>
-                <img src={trip.car_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                <img loading="lazy" decoding="async" src={trip.car_image} alt="" className="absolute inset-0 w-full h-full object-cover" />
                 <div className={`absolute inset-0 ${isFemale ? "bg-rose-900/50" : "bg-black/55"}`} />
               </>
             )}

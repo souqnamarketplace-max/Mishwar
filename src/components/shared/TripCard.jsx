@@ -232,7 +232,7 @@ function Card({ t, noSeats, urgentSeats }) {
         {/* Car image strip (if available) */}
         {t.car_image && (
           <div className="mt-2.5 -mx-3 -mb-3 h-16 relative overflow-hidden rounded-b-2xl">
-            <img src={t.car_image} alt="" className="w-full h-full object-cover" />
+            <img loading="lazy" decoding="async" src={t.car_image} alt="" className="w-full h-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
             <div className="absolute bottom-1.5 right-3 text-white text-[10px] font-medium opacity-90">
               {t.car_model}{t.car_color ? ` • ${t.car_color}` : ""}

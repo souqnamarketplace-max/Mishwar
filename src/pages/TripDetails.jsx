@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
+import { useSEO } from "@/hooks/useSEO";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -174,6 +175,19 @@ export default function TripDetails() {
   const carImage = driverProfile?.car_image || tripData?.car_image || null;
   // Detect if current user is the driver of this trip
   const isOwnTrip = !!user?.email && !!trip?.created_by && user.email === trip.created_by;
+
+  // Per-trip SEO. Each trip page becomes an indexable landing page for the
+  // route — drives organic traffic for queries like "رام الله إلى نابلس
+  // مشاركة سيارة". The OG meta is also set server-side by /api/trip when
+  // a bot crawls; this hook covers in-app navigations.
+  const seoTitle = trip
+    ? `رحلة من ${trip.from_city} إلى ${trip.to_city} — ₪${trip.price}`
+    : "تفاصيل الرحلة";
+  const seoDescription = trip
+    ? `احجز مقعدك في رحلة ${trip.from_city} ← ${trip.to_city} بسعر ${trip.price} شيكل. ${trip.available_seats || 0} مقاعد متاحة. السائق ${trip.driver_name || "موثوق"}.`
+    : "تفاصيل الرحلة في مِشوار";
+  const seoCanonical = trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined;
+  useSEO({ title: seoTitle, description: seoDescription, canonical: seoCanonical });
 
   if (!trip) {
     return (
@@ -404,7 +418,7 @@ export default function TripDetails() {
             <div className="flex items-center gap-3 mb-4">
               <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary shrink-0 overflow-hidden">
                 {trip.driver_avatar ? (
-                  <img src={trip.driver_avatar} alt="" className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={trip.driver_avatar} alt="" className="w-full h-full object-cover" />
                 ) : (
                   trip.driver_name?.[0] || "م"
                 )}
@@ -444,7 +458,7 @@ export default function TripDetails() {
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
               <div className="w-20 h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
                 {carImage ? (
-                  <img src={carImage} alt="سيارة السائق" className="w-full h-full object-cover" />
+                  <img loading="lazy" decoding="async" src={carImage} alt="سيارة السائق" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">🚗</div>
                 )}

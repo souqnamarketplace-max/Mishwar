@@ -1,15 +1,65 @@
 {
   "name": "مِشوار — مشاركة الرحلات",
   "short_name": "مِشوار",
-  "description": "منصة فلسطينية لمشاركة رحلات السيارة",
-  "start_url": "/",
+  "description": "منصة فلسطينية لمشاركة رحلات السيارة بين المدن. سافر بأمان، وفر المال.",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "id": "/?source=pwa",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2d6a4f",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#faf5e6",
+  "theme_color": "#1a3d2a",
   "dir": "rtl",
   "lang": "ar",
+  "categories": ["travel", "navigation", "lifestyle", "social"],
+  "prefer_related_applications": false,
+
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+
+  "shortcuts": [
+    {
+      "name": "ابحث عن رحلة",
+      "short_name": "بحث",
+      "description": "ابحث عن رحلات بين المدن الفلسطينية",
+      "url": "/search?source=pwa-shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "أنشئ رحلة",
+      "short_name": "إنشاء",
+      "description": "اعرض رحلتك على المنصة",
+      "url": "/create-trip?source=pwa-shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "رحلاتي",
+      "short_name": "رحلاتي",
+      "description": "حجوزاتك ورحلاتك القادمة",
+      "url": "/my-trips?source=pwa-shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "الرسائل",
+      "short_name": "رسائل",
+      "description": "محادثاتك مع السائقين والركاب",
+      "url": "/messages?source=pwa-shortcut",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "مِشوار — منصة مشاركة الرحلات الفلسطينية"
+    }
   ]
 }
