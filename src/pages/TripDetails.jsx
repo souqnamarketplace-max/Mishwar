@@ -49,9 +49,13 @@ export default function TripDetails() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
 
   // ── 2. User query (must come before anything that uses user) ──
+  // For anonymous share-link visitors, base44.auth.me() throws
+  // "Not authenticated" — set retry: false so we fail fast instead
+  // of triggering 3 retries before settling.
   const { data: user } = useQuery({
     queryKey: ["me"],
     queryFn: () => base44.auth.me(),
+    retry: false,
   });
 
   // ── 3. Existing booking check (depends on user) ──────────────
@@ -86,11 +90,12 @@ export default function TripDetails() {
   };
 
   // Fetch single trip by ID — smart, no need to load all trips
-  const { data: tripData } = useQuery({
+  const { data: tripData, isLoading: tripLoading, isError: tripError } = useQuery({
     queryKey: ["trip", id],
     queryFn: () => base44.entities.Trip.get(id),
     enabled: !!id,
     staleTime: 30000,
+    retry: 1,
   });
 
   const { data: driverProfile } = useQuery({
@@ -149,10 +154,58 @@ export default function TripDetails() {
   const seoCanonical = trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined;
   useSEO({ title: seoTitle, description: seoDescription, canonical: seoCanonical });
 
-  if (!trip) {
+  // ── Render states ──────────────────────────────────────────
+  // The previous code had a single `if (!trip) return <loading>` —
+  // but Trip.get() returns null (not throws) for a non-existent ID,
+  // so the query succeeds with null and the page would show "loading…"
+  // forever for shared links to deleted/missing trips. Now we
+  // distinguish: loading vs error vs not-found, and show a useful
+  // empty state with a path forward (search instead of dead-end).
+  if (tripLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-20 text-center">
-        <p className="text-muted-foreground">جاري التحميل...</p>
+        <div className="inline-block w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-muted-foreground text-sm">جاري التحميل...</p>
+      </div>
+    );
+  }
+
+  if (tripError) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-8 h-8 text-destructive" />
+        </div>
+        <h2 className="text-xl font-bold text-foreground mb-2">تعذّر تحميل الرحلة</h2>
+        <p className="text-sm text-muted-foreground mb-6">حدث خطأ في الاتصال. تحقق من شبكتك وحاول مجدداً.</p>
+        <div className="flex gap-2 justify-center">
+          <button onClick={() => window.location.reload()} className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold">
+            إعادة المحاولة
+          </button>
+          <Link to="/search" className="px-5 py-2.5 bg-muted text-foreground rounded-xl text-sm font-bold">
+            البحث عن رحلات
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!trip) {
+    // Trip not found — most common reasons: trip was deleted by the
+    // driver, the share link was mistyped, or trip data was purged.
+    // Give the user a path forward (search) rather than a dead end.
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4 text-3xl">
+          🚗
+        </div>
+        <h2 className="text-xl font-bold text-foreground mb-2">هذه الرحلة لم تعد متاحة</h2>
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+          ربما تم حذف الرحلة من قِبل السائق، أو أن الرابط غير صحيح. يمكنك البحث عن رحلات أخرى متاحة.
+        </p>
+        <Link to="/search" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
+          ابحث عن رحلة
+        </Link>
       </div>
     );
   }
