@@ -3,8 +3,8 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (content audit + admin UI session)
-**HEAD at update:** `9ca3ee5`
+**Last updated:** 2026-05-06 (post-launch-polish session — share links, driver onboarding, OG images, car wiring)
+**HEAD at update:** `b22f9ab`
 **SQL applied to production:** migrations `002`, `003`, `006` ✓ — `007` pending
 
 Status legend:
@@ -225,6 +225,26 @@ Status:
 3. Open `/dashboard?tab=settings` to set `hero_badge_text` and toggle stats bar
 4. All four sections render NOTHING until populated — that's the correct
    launch-day state. No fake content will ship.
+
+---
+
+## Post-launch polish (real-world testing fixes)
+
+These items came up during live testing after the main audit work — bugs
+found by actually using the app rather than scanning the code. All
+shipped, none pending.
+
+| # | Issue | Status | Commit |
+|---|---|---|---|
+| P-01 | Driver payment link 404 — `/driver-dashboard?tab=payment` (wrong path + wrong tab id `payment` vs canonical `payments`) | ✅ | `d76e759` |
+| P-02 | Passenger → driver upgrade flow had 10-field scroll wall, 800ms `window.location.reload()`, and was buried in `/settings`. Replaced with a 5-step wizard at `/become-driver` accessible from AccountHub, AccountSettings, and CreateTrip. All 9 fields preserved. | ✅ | `ec6001d` |
+| P-03 | Hero slide city label ("مدينة جديدة") showed corrupted text overlaid on slides | ✅ | `0b5d2b4` |
+| P-04 | Favorites page heart button absolute-positioned over the price chip in RTL — `₪50` was hidden behind the icon. Moved to a labeled pill below the card. | ✅ | `38ba569` |
+| P-05 | Trip share link to a deleted/missing trip showed "جاري التحميل..." forever (no error/empty state). Added proper loading / error / not-found branches with a path forward. | ✅ | `a5faae7` |
+| P-06 | Trip share URL got polluted when forwarded across platforms — share text concatenated into URL path made the trip ID unparseable. Switched all `navigator.share()` callsites to URL-only (no `text` field), and added a UUID-extraction sanitizer in TripDetails so corrupted URLs still resolve. | ✅ | `283bac1` |
+| P-07 | App OG preview image — refreshed with custom mid-century-modern flat illustration (Palestinian terraced hills, olive groves, white sedan). 1200×630, 346 KB. | ✅ | `89b22ad` |
+| P-08 | Trip-share OG preview image — refreshed with companion illustration (two villages connected by winding road, golden hour). Same brand palette. | ✅ | `bcf800d` |
+| P-09 | `car_image` not shown in MyTrips, UserProfile vehicle card, or BookingConfirmation — even though the data was already captured at trip-create time and shown elsewhere (TripCard, FeaturedTrips, TripDetails). Added thumbnails to all three. | ✅ | `b22f9ab` |
 
 ---
 
