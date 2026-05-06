@@ -12,9 +12,14 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-const SUPA_URL = process.env.VITE_SUPABASE_URL || "https://dimtdwahtwaslmnuakij.supabase.co";
-const SUPA_KEY = process.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_LlK5ig0ruElVt3Z6j0FNkQ_MAGvKRC_";
-const APP_URL  = "https://mishwar-nu.vercel.app";
+// Configuration. SUPA_URL and SUPA_KEY are required at runtime; the
+// previous version of this file shipped a hardcoded anon-key fallback
+// which made credential rotation a code change. Now we fail loud and
+// continue serving the SPA without OG enrichment if the env is missing,
+// instead of silently using a baked-in key.
+const SUPA_URL = process.env.VITE_SUPABASE_URL || "";
+const SUPA_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
+const APP_URL  = process.env.VITE_APP_URL || "https://mishwar-nu.vercel.app";
 
 // Palestinian cities → Arabic weekday dates helper
 function formatDate(dateStr) {
@@ -63,6 +68,17 @@ export default async function handler(req, res) {
     // Invalid ID — just serve the SPA
     const html = getIndexHtml();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    return res.status(200).send(html);
+  }
+
+  // If Supabase env is unset (e.g., a preview deploy missing vars), serve
+  // the SPA without OG enrichment instead of hitting a hardcoded fallback.
+  if (!SUPA_URL || !SUPA_KEY) {
+    const html = getIndexHtml();
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).send(html);
   }
 
@@ -134,8 +150,11 @@ export default async function handler(req, res) {
     }
   }
 
-  // Cache: 60s fresh, 5min stale-while-revalidate
+  // Cache: 30s fresh, 60s stale-while-revalidate (lowered from 60/300 so
+  // driver edits propagate to OG previews faster — see audit M-11)
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.setHeader("Cache-Control", "s-maxage=60, stale-while-revalidate=300");
+  res.setHeader("Cache-Control", "s-maxage=30, stale-while-revalidate=60");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
   res.status(200).send(html);
 }
