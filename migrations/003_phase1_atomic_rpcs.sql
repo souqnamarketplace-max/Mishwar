@@ -66,6 +66,13 @@ BEGIN
 
   SELECT full_name INTO v_name FROM public.profiles WHERE email = v_email;
 
+  -- Status starts at 'pending' to preserve the existing UX where the driver
+  -- explicitly accepts each booking request from DriverPassengers.jsx. The
+  -- seat is reserved immediately (we decrement available_seats below) so the
+  -- next concurrent booker correctly sees the lower count, but the booking
+  -- itself stays in 'pending' until the driver clicks accept. This matches
+  -- the BlaBlaCar-style flow the app already implements; auto-confirming
+  -- would remove driver choice and could surprise drivers.
   INSERT INTO public.bookings (
     trip_id, passenger_email, passenger_name, seats_booked,
     pickup_city, dropoff_city, notes, status, payment_status, payment_method,
@@ -73,7 +80,7 @@ BEGIN
   ) VALUES (
     p_trip_id::text, v_email, COALESCE(v_name, v_email), p_seats,
     p_pickup_city, p_dropoff_city, p_notes,
-    'confirmed', 'pending', p_payment_method,
+    'pending', 'pending', p_payment_method,
     v_email
   ) RETURNING * INTO v_book;
 

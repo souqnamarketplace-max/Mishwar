@@ -338,57 +338,94 @@ export default function AccountSettings() {
       );
 
       // Anonymize PII + mark as deleted.
-      // Use supabase-js directly (not base44) for two reasons:
-      //   1. base44.entities.Profile.update goes through restFetch which
-      //      falls back to the anon key when JWT is expired. With anon,
-      //      the profiles_update RLS policy (id = auth.uid()) matches 0
-      //      rows; PostgREST returns 200 with [] and the old code treated
-      //      that as success. The user saw "تم حذف حسابك بنجاح" but the
-      //      DB never changed.
-      //   2. .select() forces PostgREST to return the updated row(s) so
-      //      we can VERIFY the write actually persisted before logging
-      //      out and showing the success toast.
-      const { data: updatedRows, error: updateErr } = await supabase
-        .from("profiles")
-        .update({
-          full_name: "[حساب محذوف]",
-          avatar_url: null,
-          phone: null,
-          bio: null,
-          bank_iban: null,
-          jawwal_pay_number: null,
-          reflect_number: null,
-          pref_smoking: null,
-          pref_chattiness: null,
-          pref_pets: null,
-          vehicle_luggage: null,
-          vehicle_back_row: null,
-          car_model: null,
-          car_year: null,
-          car_color: null,
-          car_plate: null,
-          car_image: null,
-          driver_note: null,
-          notif_push: false,
-          notif_email: false,
-          notif_sms: false,
-          notif_marketing: false,
-          deleted_at: new Date().toISOString(),
-          deletion_reason: reasonToPersist,
-        })
-        .eq("id", user.id)
-        .select("id, deleted_at");
+      // Strategy:
+      //   1. Try the delete_user_account_v2 RPC (migration 003). It does
+      //      a server-side cascade: anonymizes the profile, rotates the
+      //      auth.users email so the user can't log back in, and updates
+      //      every denormalized email column on messages/bookings/trips/
+      //      notifications/reviews/blocks/reports/support_tickets.
+      //   2. If the RPC isn't deployed yet (function-not-found), fall
+      //      through to the legacy direct UPDATE path. The legacy path is
+      //      worse for GDPR (email survives on profiles + denormalized
+      //      columns) but we keep it so deletion works through the rollout
+      //      window. After migration 003 lands and is verified, this
+      //      legacy block can be removed.
 
-      if (updateErr) throw updateErr;
-      if (!updatedRows || updatedRows.length === 0) {
-        // RLS blocked the update — almost always means the JWT expired
-        // mid-session. Don't pretend the deletion worked.
-        throw new Error(
-          "session_expired_no_rows_updated"
-        );
+      let rpcSucceeded = false;
+      let rpcResult = null;
+      const { data: rpcOut, error: rpcErr } = await supabase.rpc("delete_user_account_v2", {
+        p_reason: reasonToPersist,
+      });
+      const rpcMissing =
+        rpcErr && (rpcErr.code === "PGRST202"
+          || /function .* does not exist/i.test(rpcErr.message || "")
+          || /could not find the function/i.test(rpcErr.message || ""));
+      if (rpcErr && !rpcMissing) {
+        const msg = rpcErr.message || "";
+        if (/upcoming trips as driver/i.test(msg))     throw new Error("لا يمكن حذف الحساب — لديك رحلات قادمة كسائق");
+        if (/upcoming bookings as passenger/i.test(msg)) throw new Error("لا يمكن حذف الحساب — لديك حجوزات قادمة كراكب");
+        if (/not authenticated/i.test(msg))            throw new Error("انتهت جلستك — يرجى إعادة تسجيل الدخول");
+        throw new Error(msg.slice(0, 200) || "تعذر حذف الحساب");
+      }
+      if (!rpcMissing) {
+        rpcSucceeded = true;
+        rpcResult = rpcOut;
       }
 
-      // Confirm to the audit trail that the soft-delete actually persisted.
+      let updatedRows = null;
+      if (!rpcSucceeded) {
+        // Legacy path — only when RPC is unavailable.
+        // Use supabase-js directly (not base44) for two reasons:
+        //   1. base44.entities.Profile.update goes through restFetch which
+        //      falls back to the anon key when JWT is expired. With anon,
+        //      the profiles_update RLS policy (id = auth.uid()) matches 0
+        //      rows; PostgREST returns 200 with [] and the old code treated
+        //      that as success. The user saw "تم حذف حسابك بنجاح" but the
+        //      DB never changed.
+        //   2. .select() forces PostgREST to return the updated row(s) so
+        //      we can VERIFY the write actually persisted before logging
+        //      out and showing the success toast.
+        const { data: rows, error: updateErr } = await supabase
+          .from("profiles")
+          .update({
+            full_name: "[حساب محذوف]",
+            avatar_url: null,
+            phone: null,
+            bio: null,
+            bank_iban: null,
+            jawwal_pay_number: null,
+            reflect_number: null,
+            pref_smoking: null,
+            pref_chattiness: null,
+            pref_pets: null,
+            vehicle_luggage: null,
+            vehicle_back_row: null,
+            car_model: null,
+            car_year: null,
+            car_color: null,
+            car_plate: null,
+            car_image: null,
+            driver_note: null,
+            notif_push: false,
+            notif_email: false,
+            notif_sms: false,
+            notif_marketing: false,
+            deleted_at: new Date().toISOString(),
+            deletion_reason: reasonToPersist,
+          })
+          .eq("id", user.id)
+          .select("id, deleted_at");
+
+        if (updateErr) throw updateErr;
+        if (!rows || rows.length === 0) {
+          // RLS blocked the update — almost always means the JWT expired
+          // mid-session. Don't pretend the deletion worked.
+          throw new Error("session_expired_no_rows_updated");
+        }
+        updatedRows = rows;
+      }
+
+      // Confirm to the audit trail that the deletion actually persisted.
       await logAdminAction(
         "account_self_deleted",
         "user",
@@ -396,7 +433,10 @@ export default function AccountSettings() {
         {
           email: user.email,
           reason: reasonToPersist,
-          confirmed_deleted_at: updatedRows[0].deleted_at,
+          path: rpcSucceeded ? "rpc_v2" : "legacy_direct_update",
+          confirmed_deleted_at: rpcSucceeded
+            ? (rpcResult?.deleted_at || new Date().toISOString())
+            : updatedRows[0].deleted_at,
         }
       );
 

@@ -4,6 +4,7 @@ import RouteMap from "@/components/shared/RouteMap";
 import { isBookingClosed, isLastChance, minutesUntilTrip, isTripExpired } from "@/lib/tripScheduling";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,45 @@ export default function TripDetails() {
 
   const bookingMutation = useMutation({
     mutationFn: async (tripData) => {
+      // Prefer the atomic `book_seat` RPC (added in migration 003) which
+      // does SELECT FOR UPDATE → INSERT → UPDATE in one transaction so two
+      // concurrent passengers can't both succeed on the last seat.
+      //
+      // If the RPC isn't deployed yet (migration 003 not applied), fall
+      // through to the legacy two-step flow so the UI keeps working through
+      // the rollout window. PostgREST returns code PGRST202 for "function
+      // not found"; any other RPC error is a real booking failure and we
+      // surface a translated message.
+      const { data: rpcData, error: rpcErr } = await supabase.rpc("book_seat", {
+        p_trip_id:        tripData.id,
+        p_seats:          1,
+        p_payment_method: selectedPayment,
+      });
+
+      const rpcMissing =
+        rpcErr && (rpcErr.code === "PGRST202"
+          || /function .* does not exist/i.test(rpcErr.message || "")
+          || /could not find the function/i.test(rpcErr.message || ""));
+
+      if (rpcErr && !rpcMissing) {
+        // Real failure — translate the most common RAISE EXCEPTION strings
+        // from the RPC into friendly Arabic. Anything we don't recognize
+        // gets the original message (truncated).
+        const msg = rpcErr.message || "";
+        if (/not enough seats/i.test(msg))            throw new Error("لم يتبقَ عدد كافٍ من المقاعد");
+        if (/cannot book your own trip/i.test(msg))   throw new Error("لا يمكنك حجز رحلتك الخاصة");
+        if (/trip not bookable/i.test(msg))           throw new Error("الرحلة غير متاحة للحجز حالياً");
+        if (/trip is in the past/i.test(msg))         throw new Error("هذه الرحلة قد انتهت");
+        if (/trip not found/i.test(msg))              throw new Error("الرحلة غير موجودة");
+        if (/not authenticated/i.test(msg))           throw new Error("يرجى تسجيل الدخول أولاً");
+        throw new Error(msg.slice(0, 200) || "فشل الحجز");
+      }
+
+      if (!rpcMissing && rpcData) {
+        return rpcData;
+      }
+
+      // Legacy two-step path — only when RPC is unavailable.
       const booking = await base44.entities.Booking.create({
         trip_id: tripData.id,
         passenger_name: user?.full_name || user?.email?.split("@")[0] || "راكب",
@@ -108,7 +148,8 @@ export default function TripDetails() {
         status: "pending",
         payment_method: selectedPayment,
       });
-      // Decrement available_seats immediately on booking
+      // Decrement available_seats immediately on booking (legacy flow only;
+      // the RPC handles this atomically on the RPC path).
       const newSeats = Math.max(0, (tripData.available_seats || 1) - 1);
       await base44.entities.Trip.update(tripData.id, { available_seats: newSeats });
       return booking;
@@ -121,10 +162,10 @@ export default function TripDetails() {
       qc.invalidateQueries({ queryKey: ["my-booking", id, user?.email] });
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["trip", id] });
     },
     onError: (err) => {
       setShowConfirm(false);
-      console.error("Booking error:", err);
       toast.error(err?.message || "فشل الحجز، حاول مجدداً");
     },
   });
