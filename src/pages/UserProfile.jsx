@@ -332,23 +332,39 @@ export default function UserProfile() {
             />
           </div>
 
-          {/* Car info (drivers only) */}
+          {/* Car info (drivers only) — now shows the vehicle photo
+              (profile.car_image) above the model + plate when available.
+              Falls back to the icon-only layout when the driver hasn't
+              uploaded a photo yet. */}
           {showCarInfo && (
-            <div className="mt-4 flex flex-wrap items-center gap-3 px-4 py-3 bg-muted/40 rounded-xl">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                <Car className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">السيارة</p>
-                <p className="text-sm font-medium text-foreground">
-                  {carModel || "—"}
-                  {carPlate && (
-                    <span className="text-muted-foreground"> · </span>
-                  )}
-                  {carPlate && (
-                    <span className="font-mono text-xs bg-card px-2 py-0.5 rounded border border-border">{carPlate}</span>
-                  )}
-                </p>
+            <div className="mt-4 bg-muted/40 rounded-xl overflow-hidden">
+              {profile?.car_image && (
+                <div className="aspect-[3/1] bg-muted overflow-hidden border-b border-border/40">
+                  <img
+                    loading="lazy"
+                    decoding="async"
+                    src={profile.car_image}
+                    alt={`سيارة ${displayName}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Car className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">السيارة</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {carModel || "—"}
+                    {carPlate && (
+                      <span className="text-muted-foreground"> · </span>
+                    )}
+                    {carPlate && (
+                      <span className="font-mono text-xs bg-card px-2 py-0.5 rounded border border-border">{carPlate}</span>
+                    )}
+                  </p>
+                </div>
               </div>
             </div>
           )}

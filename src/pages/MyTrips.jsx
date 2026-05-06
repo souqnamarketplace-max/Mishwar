@@ -267,6 +267,21 @@ export default function MyTrips() {
                               <p className="text-2xl font-bold text-foreground">{trip.date?.split(" ")[1] || "25"}</p>
                               <p className="text-xs text-muted-foreground">{trip.time || "08:30"}</p>
                             </div>
+                            {/* Car thumbnail — only renders when the trip has a
+                                car_image. Reinforces visual identity of the
+                                vehicle and matches what TripCard / TripDetails
+                                already show, so users see consistent imagery. */}
+                            {trip.car_image && (
+                              <div className="w-20 h-14 rounded-xl overflow-hidden bg-muted shrink-0 ring-1 ring-border/40">
+                                <img
+                                  loading="lazy"
+                                  decoding="async"
+                                  src={trip.car_image}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            )}
                             <div className="flex-1">
                               <div className="flex items-center gap-2 font-bold text-foreground mb-1 flex-wrap">
                                 <MapPin className="w-4 h-4 text-primary" />

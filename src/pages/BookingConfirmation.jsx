@@ -126,16 +126,29 @@ export default function BookingConfirmation() {
           </span>
         </div>
 
-        {/* Driver */}
+        {/* Driver + Car */}
         <div className="flex items-center gap-3 border-t border-border pt-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0">
             {(trip.driver_name || "س")[0]}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <p className="font-medium text-sm">{trip.driver_name}</p>
             <p className="text-xs text-muted-foreground">{trip.car_model}{trip.car_color ? ` · ${trip.car_color}` : ""}</p>
           </div>
-          <div className="mr-auto text-left">
+          {/* Car photo (right side) — shows passengers what vehicle to
+              look for at pickup. Renders only when set. */}
+          {trip.car_image && (
+            <div className="w-14 h-10 rounded-lg overflow-hidden bg-muted shrink-0 ring-1 ring-border/40">
+              <img
+                loading="lazy"
+                decoding="async"
+                src={trip.car_image}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+          <div className="text-left shrink-0">
             <p className="text-xl font-black text-primary">₪{amount}</p>
             <p className="text-xs text-muted-foreground">المجموع</p>
           </div>
