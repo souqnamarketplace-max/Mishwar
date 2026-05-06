@@ -3,8 +3,8 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (overnight remediation session)
-**HEAD at update:** `09ae8c2`
+**Last updated:** 2026-05-06 (overnight remediation session, complete)
+**HEAD at update:** `7b41951`
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied
@@ -19,7 +19,7 @@ Status legend:
 |---|---|---|---|
 | C-01 | Privilege escalation via user-editable `role` | 📦 | Migration `002` ready. Apply in Supabase SQL Editor. |
 | C-02 | Reflected XSS in `/api/og` | ✅ | Shipped in `77f8da3` — proper esc() + length caps + nosniff/DENY headers. |
-| C-03 | Driver license images in PUBLIC bucket | 📦 | Code: upload paths now UUID-prefixed (`9816411`). SQL: migration `004` ready. Backfill: not yet written. |
+| C-03 | Driver license images in PUBLIC bucket | 📦 | Code: upload paths now UUID-prefixed (`9816411`). SQL: migration `004` ready; backfill audit + Node template in migration `005` (`7b41951`). |
 | C-04 | Bookings UPDATE column-level integrity | 📦 | Migration `002` includes guard_booking_updates trigger. |
 | C-04b | Trips UPDATE column-level integrity (H-12) | 📦 | Migration `002` includes guard_trip_updates. |
 | C-05 | Account deletion doesn't anonymize email | 📦 | RPC `delete_user_account_v2` ready in migration `003`. UI cutover pending — old flow still runs until cutover commit. |
@@ -67,7 +67,7 @@ Status legend:
 | M-11 | OG cache too aggressive | ✅ | Shipped in `77f8da3` — lowered to s-maxage=30, swr=60. |
 | M-12 | available_seats negative-clamp | 📦 | Migration `002` verifies/adds CHECK constraint. |
 | M-13 | Hardcoded test driver emails | ⏳ | Audit prod for `*@mishware.com` accounts. |
-| M-14 | No dependency update strategy | ⏳ | Add Dependabot config. |
+| M-14 | No dependency update strategy | ✅ | `.github/dependabot.yml` (`5ee5f52`) — weekly npm + monthly Actions, grouped minor/patch. |
 
 ---
 
@@ -81,9 +81,9 @@ Status legend:
 | L-04 | Static OG placeholder for trips | ⏳ | Per-trip generated images is bigger work. |
 | L-05 | "Cookies" in privacy policy when localStorage used | ⏳ | Reword during lawyer pass. |
 | L-06 | No `lang` on body | — | Already on `<html>`; sufficient. |
-| L-07 | Static "Last updated" date on legal pages | ⏳ | Auto-stamp from build. |
+| L-07 | Static "Last updated" date on legal pages | ✅ | `LAST_UPDATED_ISO` const + Intl.DateTimeFormat in PrivacyPolicy.jsx and Terms.jsx (`de555f7`). Lawyer pass = update one constant per file. |
 | L-08 | Inconsistent localStorage parse error handling | ✅ | `src/lib/session.js` helper added (`42a5d4e`). Existing call sites still work; new code uses helper. |
-| L-09 | Raw error strings in toasts | ⏳ | Whitelist friendly messages by error code. |
+| L-09 | Raw error strings in toasts | ✅ | `src/lib/errors.js` `friendlyError()` (`de555f7`); wired to 6 high-traffic sites (`bcff865`). |
 | L-10 | useStoreReview presence in web-only mode | ⏳ | Audit when wiring Capacitor. |
 | L-11 | Manifest icons missing maskable / sizes | ✅ | Shipped in `09ae8c2` — manifest now declares both `any` and `maskable` purposes. |
 
@@ -106,6 +106,11 @@ Status legend:
 | Per-trip dynamic SEO | `src/pages/TripDetails.jsx` | Each trip URL is now its own indexable landing page. |
 | Richer PWA manifest | `public/manifest.json` | 4 shortcuts, categories, screenshots, maskable icons, scope. |
 | 7 below-fold images lazy-loaded | various | Faster initial paint on trip lists, profile, settings. |
+| Lawyer-friendly date stamps | Privacy + Terms | Single ISO-date constant per file, formatted via Intl.DateTimeFormat. |
+| friendlyError() helper | new `src/lib/errors.js` | Translates Postgres / RLS-trigger errors to safe Arabic UI strings. Wired to 6 toast sites. |
+| GitHub Actions CI | new `.github/workflows/ci.yml` | Build + console-leak + credential-leak checks on every push and PR. |
+| Dependabot config | new `.github/dependabot.yml` | Weekly npm + monthly Actions; grouped minor/patch. |
+| Storage backfill helper | new `migrations/005_storage_backfill.sql` | Audit + Node template + verification SQL for migrating leaked KYC URLs. |
 
 ---
 
