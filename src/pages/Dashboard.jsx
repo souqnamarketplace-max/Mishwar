@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { Navigate, useSearchParams, Link } from "react-router-dom";
-import DashboardSidebar from "../components/dashboard/DashboardSidebar";
+import DashboardSidebar, { DashboardMobileTabSelector } from "../components/dashboard/DashboardSidebar";
 import DashboardUsers from "./dashboard/DashboardUsers";
 import DashboardTrips from "./dashboard/DashboardTrips";
 import DashboardBookings from "./dashboard/DashboardBookings";
@@ -481,6 +481,11 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* Mobile-only tab selector — at <1024px the desktop sidebar is
+            hidden and admins had no way to switch sections. This dropdown
+            replicates every menuItem the sidebar exposes. */}
+        <DashboardMobileTabSelector activePage={activePage} setActivePage={setActivePage} />
 
         {activePage === "overview" && <Overview />}
         {activePage === "users" && <DashboardUsers />}

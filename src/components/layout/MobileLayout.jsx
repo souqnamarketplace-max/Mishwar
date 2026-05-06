@@ -26,6 +26,7 @@ const PAGE_TITLES = {
   "/favorites":            "المفضلة",
   "/notifications":        "الإشعارات",
   "/account-settings":     "الإعدادات",
+  "/settings":             "الحساب",
   "/create-trip":          "نشر رحلة",
   "/driver":               "لوحة السائق",
   "/how-it-works":         "كيف يعمل مشوارو؟",
@@ -45,14 +46,31 @@ const PAGE_TITLES = {
   "/dashboard":            "لوحة الإدارة",
 };
 
+// Resolve the mobile header title for routes that aren't a perfect literal
+// match in PAGE_TITLES — dynamic paths like /trip/:id and /profile must
+// not fall through to the bottom-tab's label, which (because the home tab
+// is "الرئيسية") incorrectly displayed the word "الرئيسية" everywhere
+// the route wasn't in the static map. Returns null when no rule applies
+// so the existing fallback chain still runs.
+function resolveDynamicTitle(pathname) {
+  if (pathname.startsWith("/trip/"))            return "تفاصيل الرحلة";
+  if (pathname.startsWith("/profile"))          return "الملف الشخصي";
+  if (pathname.startsWith("/account-settings")) return "الإعدادات";
+  if (pathname.startsWith("/booking/"))         return "الحجز";
+  if (pathname.startsWith("/edit-trip/"))       return "تعديل الرحلة";
+  return null;
+}
+
 export default function MobileLayout({ children, user, showHeader = true, headerTitle = "" }) {
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  // contentRef is the inner scroll container — kept around so sub-components
+  // can read the DOM if needed. PTR moved out to the dedicated
+  // PullToRefresh wrapper in AppLayout (which finds this element by walking
+  // up from the touch target to the nearest y-scrollable ancestor).
   const contentRef = useRef(null);
-  const pullStartRef = useRef(0);
   const tabHistoryRef = useRef({});
   
   // Detect if viewport is mobile
@@ -106,30 +124,11 @@ export default function MobileLayout({ children, user, showHeader = true, header
 
   if (!isMobile) return children;
 
-  // Pull-to-refresh handler
-  const handleTouchStart = (e) => {
-    if (contentRef.current?.scrollTop === 0) {
-      pullStartRef.current = e.touches[0].clientY;
-    }
-  };
-
-  const handleTouchMove = (e) => {
-    if (contentRef.current?.scrollTop === 0 && pullStartRef.current > 0) {
-      const pullDistance = e.touches[0].clientY - pullStartRef.current;
-      if (pullDistance > 60 && !isRefreshing) {
-        setIsRefreshing(true);
-        pullStartRef.current = 0;
-      }
-    }
-  };
-
-  const handleTouchEnd = async () => {
-    if (isRefreshing) {
-      await qc.refetchQueries();
-      setIsRefreshing(false);
-    }
-    pullStartRef.current = 0;
-  };
+  // Pull-to-refresh used to be implemented inline here with a 60px hair
+  // trigger that was easy to fire by accident, AND it raced with the
+  // dedicated PullToRefresh component AppLayout wraps around the page —
+  // two handlers fighting for the same gesture meant neither worked
+  // reliably. PullToRefresh now owns the gesture exclusively.
 
   return (
     <div className="fixed inset-0 bg-background flex flex-col">
@@ -150,7 +149,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
 
             {/* CENTER: Page title */}
             <h1 className="flex-1 text-center font-bold text-foreground text-sm truncate">
-              {headerTitle || PAGE_TITLES[location.pathname] || currentTab?.label || "مشوارو"}
+              {headerTitle || PAGE_TITLES[location.pathname] || resolveDynamicTitle(location.pathname) || currentTab?.label || "مشوارو"}
             </h1>
 
             {/* LEFT side (RTL end): Logo or Back arrow */}
@@ -172,16 +171,8 @@ export default function MobileLayout({ children, user, showHeader = true, header
       {/* Main Content */}
       <div
         ref={contentRef}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         className="flex-1 overflow-y-auto pb-20 relative"
       >
-        {isRefreshing && (
-          <div className="sticky top-0 left-0 right-0 z-20 bg-primary/10 border-b border-primary/20 px-4 py-2 text-center text-xs text-primary font-medium">
-            🔄 جاري التحديث...
-          </div>
-        )}
         {children}
         {/* Emergency / SOS strip — desktop has this in <Footer />, mobile
             wasn't rendering it anywhere, leaving people on phones with no

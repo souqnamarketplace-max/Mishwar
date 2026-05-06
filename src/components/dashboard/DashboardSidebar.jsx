@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard,
-  Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag
+  Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown
 } from "lucide-react";
 
 const menuItems = [
@@ -23,6 +23,69 @@ const menuItems = [
   { id: "settings", icon: Settings, label: "إعدادات النظام" },
   { id: "logs", icon: Activity, label: "سجل النشاطات" },
 ];
+
+/**
+ * Mobile-only dropdown picker for the 16 admin tabs.
+ *
+ * Without this, mobile admins lost ALL navigation between admin sections
+ * — the desktop <aside> sidebar is `hidden lg:flex` (≥1024px) and nothing
+ * replaced it below that breakpoint. So an admin on a phone could land on
+ * the overview page but had no way to reach Users / Trips / Bookings /
+ * Reports / Logs / etc. Mirrors the pattern used by DriverDashboard's
+ * MobileTabSelector for consistency.
+ */
+export function DashboardMobileTabSelector({ activePage, setActivePage }) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef(null);
+  const active = menuItems.find(m => m.id === activePage) || menuItems[0];
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="lg:hidden mb-4 relative" dir="rtl">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-3 bg-card border border-border rounded-2xl px-4 py-3 text-right shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <active.icon className="w-4 h-4 text-primary" />
+          </div>
+          <span className="font-semibold text-foreground text-sm">{active.label}</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full right-0 left-0 mt-1.5 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[70vh] overflow-y-auto">
+          {menuItems.map((item, i) => (
+            <button
+              key={item.id}
+              onClick={() => { setActivePage(item.id); setOpen(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 text-right transition-colors ${
+                i < menuItems.length - 1 ? "border-b border-border/50" : ""
+              } ${item.id === activePage ? "bg-primary/5" : "hover:bg-muted/50"}`}
+            >
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                item.id === activePage ? "bg-primary/10" : "bg-muted"
+              }`}>
+                <item.icon className={`w-4 h-4 ${item.id === activePage ? "text-primary" : "text-muted-foreground"}`} />
+              </div>
+              <span className={`font-medium text-sm ${item.id === activePage ? "text-foreground" : "text-muted-foreground"}`}>
+                {item.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function DashboardSidebar({ activePage, setActivePage }) {
   return (
