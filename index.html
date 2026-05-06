@@ -15,7 +15,24 @@
     <meta name="apple-mobile-web-app-title" content="مِشوار" />
     <meta name="application-name" content="مِشوار" />
     <meta name="theme-color" content="#2d6a4f" />
+    <meta name="color-scheme" content="light dark" />
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- iOS auto-detects digit sequences as phone numbers and links them. In
+         Arabic UI with Hindi/Arabic-Indic numerals this can mangle layout
+         (numbers turn blue and underlined, sometimes break RTL flow). Disable
+         that — the app provides explicit "اتصال" buttons where calling makes sense. -->
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- ── Fonts (hoisted out of @import for better LCP) ── -->
+    <!-- Two preconnects are required: googleapis serves the CSS manifest,
+         gstatic serves the woff2 files. crossorigin is required on
+         gstatic per CORS rules for fonts. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" />
+
 
     <!-- ── SEO ───────────────────────────────────── -->
     <title>مِشوار — شارك الطريق، وفر أكثر 🇵🇸</title>
@@ -44,6 +61,46 @@
     <meta name="twitter:image" content="https://mishwar-nu.vercel.app/og-image.png" />
 
     <!-- ── Schema.org Structured Data ───────────── -->
+    <!-- Three separate JSON-LD blocks: Google reads each independently and
+         picks the one that matches the SERP feature. WebSite enables the
+         sitelinks search box; Organization powers the knowledge-panel badge;
+         MobileApplication powers the install prompt for branded queries. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "مِشوار",
+      "alternateName": "Mishwar",
+      "url": "https://mishwar-nu.vercel.app",
+      "inLanguage": "ar",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://mishwar-nu.vercel.app/search?from={from_city}&to={to_city}"
+        },
+        "query-input": [
+          "required name=from_city",
+          "required name=to_city"
+        ]
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "مِشوار",
+      "alternateName": "Mishwar",
+      "url": "https://mishwar-nu.vercel.app",
+      "logo": "https://mishwar-nu.vercel.app/icon-512.png",
+      "description": "منصة فلسطينية لمشاركة رحلات السيارة بين المدن",
+      "areaServed": { "@type": "Country", "name": "Palestine" },
+      "sameAs": [
+        "https://twitter.com/mishwarps"
+      ]
+    }
+    </script>
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -80,6 +137,23 @@
     </script> -->
   </head>
   <body>
+    <!-- noscript fallback: Googlebot renders JS, but Bing/Yandex/social
+         previewers often don't. Give them at least the brand and a link. -->
+    <noscript>
+      <div style="font-family: 'Tajawal', sans-serif; max-width: 600px; margin: 60px auto; padding: 0 24px; text-align: center; direction: rtl;">
+        <h1 style="font-size: 28px; color: #1a3d2a; margin-bottom: 12px;">مِشوار 🇵🇸</h1>
+        <p style="color: #555; line-height: 1.7;">
+          منصة فلسطينية لمشاركة رحلات السيارة بين المدن.
+          سافر بأمان، وفر المال، وتعرف على ناس جديدة.
+        </p>
+        <p style="color: #555; margin-top: 16px;">
+          يحتاج هذا التطبيق إلى JavaScript للعمل. يرجى تفعيله في إعدادات متصفحك.
+        </p>
+        <p style="margin-top: 24px;">
+          <a href="https://mishwar-nu.vercel.app" style="color: #1a3d2a; font-weight: bold;">https://mishwar-nu.vercel.app</a>
+        </p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

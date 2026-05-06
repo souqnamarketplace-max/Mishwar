@@ -1,48 +1,97 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sitemap for مِشوار.
+
+  IMPORTANT: the URLs below MUST match the canonical href in index.html.
+  Currently the production canonical is `mishwar-nu.vercel.app`. Once a
+  custom domain (e.g. mishwar.ps) is configured in Vercel and pointed at
+  this deployment, do TWO things in sync:
+    1. Update <link rel="canonical"> in index.html
+    2. Update every <loc> here
+
+  <lastmod> values are intentionally rough — refresh on substantive
+  content updates, not on every commit.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 
   <url>
-    <loc>https://mishwar.ps/</loc>
+    <loc>https://mishwar-nu.vercel.app/</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="ar" href="https://mishwar.ps/"/>
+    <xhtml:link rel="alternate" hreflang="ar" href="https://mishwar-nu.vercel.app/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://mishwar-nu.vercel.app/"/>
   </url>
 
   <url>
-    <loc>https://mishwar.ps/search</loc>
+    <loc>https://mishwar-nu.vercel.app/search</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://mishwar.ps/how-it-works</loc>
+    <loc>https://mishwar-nu.vercel.app/how-it-works</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://mishwar.ps/about</loc>
+    <loc>https://mishwar-nu.vercel.app/about</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://mishwar.ps/help</loc>
+    <loc>https://mishwar-nu.vercel.app/community</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://mishwar.ps/safety</loc>
+    <loc>https://mishwar-nu.vercel.app/help</loc>
+    <lastmod>2026-05-06</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://mishwar-nu.vercel.app/safety</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://mishwar.ps/blog</loc>
+    <loc>https://mishwar-nu.vercel.app/blog</loc>
+    <lastmod>2026-05-06</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
+  </url>
+
+  <url>
+    <loc>https://mishwar-nu.vercel.app/privacy</loc>
+    <lastmod>2026-05-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <url>
+    <loc>https://mishwar-nu.vercel.app/terms</loc>
+    <lastmod>2026-05-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.4</priority>
+  </url>
+
+  <url>
+    <loc>https://mishwar-nu.vercel.app/login</loc>
+    <lastmod>2026-05-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 
 </urlset>

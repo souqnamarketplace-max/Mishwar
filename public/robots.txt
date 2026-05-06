@@ -1,19 +1,47 @@
+# robots.txt for مِشوار
+#
+# Production indexing policy:
+#   - Public marketing/info pages: allowed
+#   - Individual trip details (/trip/:id): allowed — these are public listings,
+#     server-rendered with OG meta tags via /api/trip
+#   - Authenticated routes (booking flows, settings, dashboards): disallowed
+#   - The /api/* surface is disallowed because it returns either OG-decorated
+#     HTML (cached separately) or function endpoints
+#
+# When migrating to a custom domain, update the Sitemap line below.
+
 User-agent: *
 Allow: /
 Allow: /search
 Allow: /how-it-works
 Allow: /about
+Allow: /about-us
+Allow: /community
 Allow: /help
 Allow: /safety
 Allow: /blog
+Allow: /privacy
+Allow: /privacy-policy
+Allow: /terms
+Allow: /terms-of-service
+Allow: /trip/
 
+Disallow: /api/
 Disallow: /dashboard
 Disallow: /onboarding
 Disallow: /settings
+Disallow: /account-settings
 Disallow: /messages
 Disallow: /notifications
 Disallow: /create-trip
 Disallow: /profile
 Disallow: /my-trips
+Disallow: /favorites
+Disallow: /driver
+Disallow: /booking-confirmation
+Disallow: /feedback
 
-Sitemap: https://mishwar.ps/sitemap.xml
+# Be polite to small servers
+Crawl-delay: 2
+
+Sitemap: https://mishwar-nu.vercel.app/sitemap.xml

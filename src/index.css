@@ -1,5 +1,8 @@
 @import "leaflet/dist/leaflet.css";
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+/* Tajawal font is loaded via <link rel="preload"> in index.html so it can
+   be discovered by the browser's preload scanner before the CSS is parsed.
+   Importing it here a second time would cost an extra HTTP request and
+   delay LCP by ~150ms on cold loads. */
 
 @tailwind base;
 @tailwind components;
