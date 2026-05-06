@@ -62,7 +62,11 @@
 
     <!-- ── Twitter Card ──────────────────────────── -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@mishwarps" />
+    <!-- twitter:site is intentionally omitted until brand handle ownership
+         is confirmed. Adding an unverified handle here points search-engine
+         and social-card trust signals at an account that may not be ours.
+         When you confirm/create the official @mishwar handle, uncomment:
+         <meta name="twitter:site" content="@your_handle" />  -->
     <meta name="twitter:title" content="مِشوار — شارك الطريق، وفر أكثر" />
     <meta name="twitter:description" content="منصة فلسطينية لمشاركة رحلات السيارة. سافر بأمان واحجز مقعدك." />
     <meta name="twitter:image" content="https://mishwar-nu.vercel.app/og-image.png" />
@@ -102,10 +106,7 @@
       "url": "https://mishwar-nu.vercel.app",
       "logo": "https://mishwar-nu.vercel.app/icon-512.png",
       "description": "منصة فلسطينية لمشاركة رحلات السيارة بين المدن",
-      "areaServed": { "@type": "Country", "name": "Palestine" },
-      "sameAs": [
-        "https://twitter.com/mishwarps"
-      ]
+      "areaServed": { "@type": "Country", "name": "Palestine" }
     }
     </script>
     <script type="application/ld+json">

@@ -385,7 +385,7 @@ export default function TripDetails() {
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="font-bold">{trip.driver_name || "محمد درويش"}</h4>
+                  <h4 className="font-bold">{trip.driver_name || "السائق"}</h4>
                   <Badge className="bg-accent/10 text-accent text-xs">موثق</Badge>
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">

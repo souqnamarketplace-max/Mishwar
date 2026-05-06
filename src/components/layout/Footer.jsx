@@ -1,5 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
 import { Mail, Phone, MapPin } from "lucide-react";
 
 const quickLinks = [
@@ -21,6 +23,19 @@ const supportLinks = [
 ];
 
 export default function Footer() {
+  // Pull support contact + brand info from app_settings (same pattern as
+  // src/pages/Help.jsx) so an admin can edit these without a deploy.
+  // Falls back to neutral generic strings so the section never looks
+  // broken on a fresh DB.
+  const { data: settingsArr = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+    staleTime: 5 * 60 * 1000, // 5 min — settings change rarely
+  });
+  const settings = settingsArr[0] || {};
+  const supportEmail = settings.support_email || "";
+  const supportPhone = settings.support_phone || "";
+
   return (
     <footer className="bg-primary text-primary-foreground" dir="rtl">
 
@@ -109,26 +124,30 @@ export default function Footer() {
               تواصل معنا
             </h3>
             <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <Mail className="w-4 h-4 mt-0.5 text-accent shrink-0" />
-                <div>
-                  <p className="text-xs text-primary-foreground/50 mb-0.5">البريد الإلكتروني</p>
-                  <a href="mailto:support@mishwaro.com"
-                    className="text-sm text-primary-foreground/75 hover:text-primary-foreground transition-colors">
-                    support@mishwaro.com
-                  </a>
+              {supportEmail && (
+                <div className="flex items-start gap-3">
+                  <Mail className="w-4 h-4 mt-0.5 text-accent shrink-0" />
+                  <div>
+                    <p className="text-xs text-primary-foreground/50 mb-0.5">البريد الإلكتروني</p>
+                    <a href={`mailto:${supportEmail}`}
+                      className="text-sm text-primary-foreground/75 hover:text-primary-foreground transition-colors">
+                      {supportEmail}
+                    </a>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Phone className="w-4 h-4 mt-0.5 text-accent shrink-0" />
-                <div>
-                  <p className="text-xs text-primary-foreground/50 mb-0.5">هاتف الدعم</p>
-                  <a href="tel:+970599000000"
-                    className="text-sm text-primary-foreground/75 hover:text-primary-foreground transition-colors">
-                    0599-000-000
-                  </a>
+              )}
+              {supportPhone && (
+                <div className="flex items-start gap-3">
+                  <Phone className="w-4 h-4 mt-0.5 text-accent shrink-0" />
+                  <div>
+                    <p className="text-xs text-primary-foreground/50 mb-0.5">هاتف الدعم</p>
+                    <a href={`tel:${supportPhone.replace(/[^0-9+]/g, "")}`}
+                      className="text-sm text-primary-foreground/75 hover:text-primary-foreground transition-colors">
+                      {supportPhone}
+                    </a>
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 mt-0.5 text-accent shrink-0" />
                 <div>
