@@ -61,12 +61,6 @@ SELECT 'driver_licenses', id::text, driver_email, 'selfie_2_url', selfie_2_url
 FROM public.driver_licenses
 WHERE selfie_2_url LIKE '%/object/public/uploads/%'
 
--- Profile-level KYC fields (legacy, may not all exist)
-UNION ALL
-SELECT 'profiles', id::text, email, 'license_image_url', license_image_url
-FROM public.profiles
-WHERE license_image_url LIKE '%/object/public/uploads/%'
-
 ORDER BY source_table, row_id;
 
 
