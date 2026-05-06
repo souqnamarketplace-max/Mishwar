@@ -34,9 +34,14 @@ Go to: **Vercel → Project → Settings → Environment Variables**
 Add these 2 variables (apply to **Production**, **Preview**, and **Development**):
 
 ```
-VITE_SUPABASE_URL       = https://dimtdwahtwaslmnuakij.supabase.co
-VITE_SUPABASE_ANON_KEY  = sb_publishable_LlK5ig0ruElVt3Z6j0FNkQ_MAGvKRC_
+VITE_SUPABASE_URL       = https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY  = <copy from Supabase Dashboard → Settings → API → "anon public" key>
 ```
+
+The anon key is intentionally public-facing (it's bundled into the client
+JavaScript regardless), but documenting the literal value here makes
+rotation harder. Read the value out of the Supabase dashboard each time
+you need it.
 
 Optional (only if you set up Sentry later):
 ```
@@ -82,7 +87,7 @@ Build settings in Vercel UI should be:
 1. Visit https://your-app.vercel.app — Home should load **without sign-in**
 2. Click "ابحث عن رحلة" — should show trips from seeded DB
 3. Click a trip card → should show details (no booking yet, redirects to login)
-4. Sign in as engallam27@gmail.com — should land on home with profile loaded
+4. Sign in as your test account — should land on home with profile loaded
 5. Visit /my-trips — should show 4 bookings
 6. Visit /messages — should show conversation with souqnamarketplace
 

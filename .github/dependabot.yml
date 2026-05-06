@@ -1,0 +1,46 @@
+# Dependabot — keeps dependencies fresh + flags CVEs early.
+# See https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Asia/Jerusalem"
+    open-pull-requests-limit: 5
+    # Group minor + patch bumps together so the inbox doesn't fill up.
+    # Major bumps come as individual PRs since they need attention.
+    groups:
+      radix-ui:
+        patterns:
+          - "@radix-ui/*"
+        update-types:
+          - "minor"
+          - "patch"
+      vendor-minor:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@radix-ui/*"
+        update-types:
+          - "minor"
+          - "patch"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
