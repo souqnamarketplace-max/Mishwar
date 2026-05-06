@@ -9,6 +9,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Strip console.* and debugger statements from production builds.
+  // Dev builds keep them so debugging stays comfortable.
+  // (audit M-05) — pairs with the captureException sentry helper which
+  // continues to console.error in dev only.
+  esbuild: {
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+  },
   build: {
     // Chunk splitting for better caching
     rollupOptions: {

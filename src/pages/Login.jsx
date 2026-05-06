@@ -1,7 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { passwordStrength, isValidPalestinianPhone, isValidEmail } from "@/lib/validation";
+import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail } from "@/lib/validation";
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,7 +90,14 @@ export default function Login() {
     e.preventDefault();
     if (!form.email || !form.password || !form.fullName) { toast.error('يرجى ملء جميع الحقول'); return; }
     if (form.password !== form.confirmPassword) { toast.error('كلمتا المرور غير متطابقتين'); return; }
-    if (form.password.length < 6) { toast.error('كلمة المرور 6 أحرف على الأقل'); return; }
+    if (form.password.length < PASSWORD_MIN_LENGTH) {
+      toast.error(`كلمة المرور يجب أن تكون ${PASSWORD_MIN_LENGTH} أحرف على الأقل`);
+      return;
+    }
+    if (isCommonPassword(form.password)) {
+      toast.error('هذه كلمة مرور شائعة جداً وغير آمنة. اختر كلمة مرور أصعب');
+      return;
+    }
     setLoading(true);
     try {
       if (form.phone && !isValidPalestinianPhone(form.phone)) {
@@ -98,8 +105,8 @@ export default function Login() {
         setLoading(false);
         return;
       }
-      if (passwordStrength(form.password).score < 2) {
-        toast.error("كلمة المرور ضعيفة جداً. استخدم 8 أحرف على الأقل مع أرقام");
+      if (passwordStrength(form.password).score < PASSWORD_MIN_SCORE) {
+        toast.error("كلمة المرور ضعيفة. استخدم خليطاً من حروف كبيرة وصغيرة وأرقام");
         setLoading(false);
         return;
       }
@@ -222,7 +229,7 @@ export default function Login() {
                 <Label className="mb-1.5 block">كلمة المرور</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="6 أحرف على الأقل"
+                  <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="8 أحرف على الأقل مع أرقام"
                     value={form.password} onChange={handleChange} className="pr-10 pl-10" autoComplete="new-password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">

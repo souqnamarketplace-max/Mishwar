@@ -70,12 +70,16 @@ export function sanitizeText(input, maxLength = 2000) {
 // ─── PASSWORD STRENGTH
 // Returns { score: 0..4, label: 'weak'|'fair'|'good'|'strong' }
 // Used by signup forms to gate weak passwords.
+//
+// Minimum acceptable score for new accounts is 3 (raised from 2 in audit
+// H-04). Combined with the 8-char minimum length check at the form level,
+// this rejects passwords like "Abc123" that previously squeaked through.
 export function passwordStrength(password) {
   if (!password || typeof password !== "string") {
     return { score: 0, label: "empty" };
   }
   let score = 0;
-  if (password.length >= 8) score++;
+  if (password.length >= 8)  score++;
   if (password.length >= 12) score++;
   if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
   if (/\d/.test(password)) score++;
@@ -84,6 +88,29 @@ export function passwordStrength(password) {
   score = Math.min(score, 4);
   const labels = ["very-weak", "weak", "fair", "good", "strong"];
   return { score, label: labels[score] };
+}
+
+// Minimum password configuration. Centralized so all forms agree.
+export const PASSWORD_MIN_LENGTH = 8;
+export const PASSWORD_MIN_SCORE  = 3;
+
+// Common-password blocklist (top 50 most-leaked passwords ever; the long
+// tail is left to passwordStrength scoring + Supabase Auth's own breach
+// detection if enabled). Lowercased for comparison.
+const COMMON_PASSWORDS = new Set([
+  "password","12345678","123456789","qwerty123","password1","12345678910",
+  "1234567890","qwerty1234","password123","welcome1","admin123","letmein1",
+  "iloveyou1","football1","monkey123","dragon123","master123","sunshine1",
+  "princess1","password!","qwertyuiop","abc12345","11111111","123123123",
+  "00000000","baseball1","superman1","trustno11","whatever1","jennifer1",
+  "jordan123","michael1","tinkle12","passw0rd","password!1","p@ssw0rd",
+  "qazwsxedc","1q2w3e4r5t","zxcvbnm123","asdfghjkl1","qwerty12345",
+  "starwars1","princess123","123qweasd","1qaz2wsx","welcome123","admin@123",
+]);
+
+export function isCommonPassword(password) {
+  if (!password) return false;
+  return COMMON_PASSWORDS.has(String(password).toLowerCase());
 }
 
 // Alias for forward-compat with possible older imports
