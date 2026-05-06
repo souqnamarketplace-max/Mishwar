@@ -264,9 +264,11 @@ export default function AccountSettings() {
 
     setLicenseLoading(true);
     try {
-      // Use Supabase storage directly (bypasses base44 upload)
+      // Use Supabase storage directly (bypasses base44 upload).
+      // Path is UUID-namespaced so storage RLS policies in
+      // migrations/004_storage_hardening.sql can enforce ownership.
       const ext = file.name.split(".").pop();
-      const path = `public/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: upErr } = await supabase.storage.from("uploads").upload(path, file, { upsert: true });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);

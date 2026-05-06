@@ -454,9 +454,15 @@ const integrations = {
       // Verify session before upload — use direct localStorage (avoids supabase-js hang)
       const session = readLocalSession();
       if (!session) throw new Error('يجب تسجيل الدخول أولاً لرفع الملفات');
+      const userId = session?.user?.id;
+      if (!userId) throw new Error('تعذر التحقق من هويتك. يرجى تسجيل الدخول مرة أخرى');
 
       const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
-      const filePath = `public/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      // Path is namespaced under the user's UUID so storage RLS policies can
+      // enforce that user A cannot write/delete in user B's folder.
+      // See migrations/004_storage_hardening.sql for the policy that depends
+      // on this naming convention.
+      const filePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       // Direct REST upload — bypasses supabase-js client which hangs after token refresh.
       // Storage REST API: POST /storage/v1/object/{bucket}/{path}
