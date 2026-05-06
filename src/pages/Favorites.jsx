@@ -76,16 +76,21 @@ export default function Favorites() {
       ) : (
         <div className="space-y-4">
           {favTrips.map(trip => (
-            <div key={trip.id} className="relative">
-              {/* Remove button */}
-              <button
-                onClick={() => removeFav(trip.id)}
-                className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-destructive flex items-center justify-center shadow-md hover:bg-destructive/80 transition-colors"
-                title="إزالة من المفضلة"
-              >
-                <Heart className="w-4 h-4 text-white fill-white" />
-              </button>
+            <div key={trip.id} className="space-y-1.5">
               <TripCard trip={trip} />
+              {/* Remove-from-favorites action — rendered below the card
+                  rather than overlaid on top of it. The previous overlay
+                  at top-4 left-4 collided with the price chip in RTL. */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => removeFav(trip.id)}
+                  className="inline-flex items-center gap-1.5 text-xs text-destructive hover:bg-destructive/10 rounded-full px-3 py-1.5 transition-colors"
+                  title="إزالة من المفضلة"
+                >
+                  <Heart className="w-3.5 h-3.5 fill-destructive" />
+                  إزالة من المفضلة
+                </button>
+              </div>
             </div>
           ))}
         </div>
