@@ -295,7 +295,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     : []
                   ),
                   ...(user?.account_type === "driver" || user?.account_type === "both"
-                    ? [{ icon: CreditCard, label: "مدفوعات السائق", path: "/driver?tab=payment" }]
+                    ? [{ icon: CreditCard, label: "مدفوعات السائق", path: "/driver?tab=payments" }]
                     : []
                   ),
                   // Safety / moderation entries — without these, mobile users

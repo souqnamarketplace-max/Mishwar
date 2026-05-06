@@ -138,7 +138,7 @@ export default function AccountHub() {
         <AccountHubItem icon={CreditCard} label="سجل المدفوعات" sublabel="حجوزاتك السابقة والمدفوعة" onClick={() => setSection("payments")} />
 
         {isDriver && (
-          <Link to="/driver-dashboard?tab=payment">
+          <Link to="/driver?tab=payments">
             <AccountHubItem icon={CreditCard} label="مدفوعات السائق" sublabel="حسابك المصرفي، Jawwal Pay، Reflect" onClick={() => {}} />
           </Link>
         )}
