@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { resolveDocumentUrls } from "@/lib/licenseUrls";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,30 @@ export default function DashboardLicenses() {
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+
+  // Resolved (signed-or-public) URLs for the currently-open license.
+  // Stored values may be either:
+  //   - full https public URLs (legacy uploads, pre-migration-004)
+  //   - paths in `uploads-private` (post-migration-004 uploads)
+  // resolveDocumentUrls handles both transparently and caches signed
+  // URLs for ~50s so re-renders don't re-sign.
+  const [resolvedUrls, setResolvedUrls] = useState({});
+
+  useEffect(() => {
+    if (!selectedLicense) {
+      setResolvedUrls({});
+      return;
+    }
+    let cancelled = false;
+    resolveDocumentUrls({
+      license_image_url:    selectedLicense.license_image_url,
+      car_registration_url: selectedLicense.car_registration_url,
+      insurance_url:        selectedLicense.insurance_url,
+      selfie_1_url:         selectedLicense.selfie_1_url,
+      selfie_2_url:         selectedLicense.selfie_2_url,
+    }).then(urls => { if (!cancelled) setResolvedUrls(urls); });
+    return () => { cancelled = true; };
+  }, [selectedLicense?.id]);
   const { data: licensesData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["licenses", page],
     queryFn: () => base44.entities.DriverLicense.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
@@ -272,21 +297,26 @@ export default function DashboardLicenses() {
                       )}
                     </div>
                     {selectedLicense[doc.key] ? (
-                      <a
-                        href={selectedLicense[doc.key]}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        rel="noopener noreferrer"
-                        className="block hover:opacity-90 transition-opacity"
-                        title="انقر للعرض بالحجم الكامل"
-                      >
-                        <img
-                          loading="lazy"
-                          src={selectedLicense[doc.key]}
-                          alt={doc.label}
-                          className="w-full max-h-56 object-contain bg-white"
-                        />
-                      </a>
+                      resolvedUrls[doc.key] ? (
+                        <a
+                          href={resolvedUrls[doc.key]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block hover:opacity-90 transition-opacity"
+                          title="انقر للعرض بالحجم الكامل"
+                        >
+                          <img
+                            loading="lazy"
+                            src={resolvedUrls[doc.key]}
+                            alt={doc.label}
+                            className="w-full max-h-56 object-contain bg-white"
+                          />
+                        </a>
+                      ) : (
+                        <div className="p-6 text-center text-xs text-muted-foreground bg-muted/20 animate-pulse">
+                          جاري تحميل الصورة...
+                        </div>
+                      )
                     ) : (
                       <div className="p-6 text-center text-xs text-muted-foreground bg-muted/20">
                         لم يتم رفع هذا المستند
