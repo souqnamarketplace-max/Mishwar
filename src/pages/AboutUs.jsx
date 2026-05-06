@@ -2,6 +2,8 @@ import { useSEO } from "@/hooks/useSEO";
 import React from "react";
 import { Link } from "react-router-dom";
 import { Users, Target, Heart, Shield, ArrowLeft } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
 
 const values = [
   { icon: Heart, title: "المجتمع أولاً", desc: "نؤمن بقوة المجتمع وأهمية التعاون بين أبناء فلسطين" },
@@ -10,15 +12,20 @@ const values = [
   { icon: Users, title: "الشمول", desc: "خدماتنا متاحة لجميع المدن والمناطق الفلسطينية" },
 ];
 
-const team = [
-  { name: "أحمد سالم", role: "المؤسس والرئيس التنفيذي", emoji: "👨‍💼" },
-  { name: "سارة خالد", role: "مديرة المنتج", emoji: "👩‍💻" },
-  { name: "محمد عمر", role: "مدير التقنية", emoji: "👨‍💻" },
-  { name: "لينا حسن", role: "مديرة التسويق", emoji: "👩‍🎨" },
-];
+// Team is fetched from public.team_members. The previous hardcoded
+// array listed four fictional team members with executive titles —
+// dishonest to users and a likely App Store rejection (review process
+// asks "are these real people?"). When the table is empty the team
+// section hides entirely.
 
 export default function AboutUs() {
   useSEO({ title: "من نحن", description: "تعرف على مِشوار — منصة فلسطينية لمشاركة الرحلات" });
+
+  const { data: team = [] } = useQuery({
+    queryKey: ["team-members-published"],
+    queryFn: () => base44.entities.TeamMember.filter({ is_published: true }, "sort_order", 50),
+    staleTime: 5 * 60 * 1000,
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
@@ -64,17 +71,23 @@ export default function AboutUs() {
         ))}
       </div>
 
-      {/* Team */}
-      <h2 className="text-xl font-bold text-foreground mb-4">فريقنا</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {team.map((member) => (
-          <div key={member.name} className="bg-card rounded-2xl border border-border p-4 text-center">
-            <div className="text-4xl mb-2">{member.emoji}</div>
-            <h3 className="font-bold text-sm text-foreground">{member.name}</h3>
-            <p className="text-xs text-muted-foreground mt-1">{member.role}</p>
+      {/* Team — hidden until admin populates the table. */}
+      {team.length > 0 && (
+        <>
+          <h2 className="text-xl font-bold text-foreground mb-4">فريقنا</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {team.map((member) => (
+              <div key={member.id} className="bg-card rounded-2xl border border-border p-4 text-center">
+                {member.avatar_url
+                  ? <img loading="lazy" decoding="async" src={member.avatar_url} alt="" className="w-16 h-16 rounded-full mx-auto mb-2 object-cover" />
+                  : <div className="text-4xl mb-2">{member.emoji || "👤"}</div>}
+                <h3 className="font-bold text-sm text-foreground">{member.full_name}</h3>
+                {member.role_title && <p className="text-xs text-muted-foreground mt-1">{member.role_title}</p>}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Users, RotateCcw, Headphones, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { base44 } from "@/api/base44Client";
 
 const badges = [
   { emoji: "🛡️", title: "سائقون موثوقون", desc: "نتحقق من الهوية والرخصة والتأمين قبل انضمام أي سائق", color: "bg-primary/8 border-primary/20" },
@@ -9,56 +11,43 @@ const badges = [
   { emoji: "⚡", title: "حجز فوري", desc: "من البحث للتأكيد خلال أقل من دقيقتين", color: "bg-yellow-500/8 border-yellow-500/20" },
 ];
 
-const testimonials = [
-  {
-    name: "سارة ع.",
-    city: "رام الله",
-    role: "راكبة",
-    avatar: "س",
-    text: "بمِشوار وفرت أكثر من ₪200 الشهر الماضي! الخدمة رائعة والسائقون محترمون جداً. بصراحة أحسن من السرفيس بكثير.",
-    rating: 5,
-    route: "رام الله ← نابلس"
-  },
-  {
-    name: "محمود ك.",
-    city: "نابلس",
-    role: "سائق",
-    avatar: "م",
-    text: "كنت رايح رام الله كل يوم للشغل، هلق أغطي تكاليف السيارة وأربح فوقها. والركاب دائماً ناس محترمة.",
-    rating: 5,
-    route: "نابلس ← رام الله"
-  },
-  {
-    name: "رنا م.",
-    city: "الخليل",
-    role: "راكبة",
-    avatar: "ر",
-    text: "بمِشوار اخترت سائقة امرأة للرحلة — هاد الشي مهم كتير بالنسبة لإلي. التطبيق سهل وشعرت بالأمان.",
-    rating: 5,
-    route: "الخليل ← بيت لحم"
-  },
-  {
-    name: "خالد ز.",
-    city: "جنين",
-    role: "سائق",
-    avatar: "خ",
-    text: "بدأت بمِشوار قبل شهرين وهلق عندي ركاب ثابتين كل أسبوع. الأرباح بتغطي قسط السيارة ما بتصدق!",
-    rating: 5,
-    route: "جنين ← نابلس"
-  },
-];
+// Testimonials are now fetched from public.testimonials. The previous
+// hardcoded array contained fabricated quotes with specific savings
+// claims ("I saved ₪200 last month") — that was a misleading-marketing
+// risk for App Store / Play Store review and dishonest to users.
+// When the table is empty (initial state) the testimonials block hides
+// entirely and only the trust badges render.
 
 export default function TrustBadges() {
   const [activeTestimonial, setActiveTestimonial] = useState(0);
 
+  const { data: rawTestimonials = [] } = useQuery({
+    queryKey: ["testimonials-published"],
+    queryFn: () => base44.entities.Testimonial.filter({ is_published: true }, "sort_order", 20),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  // Normalize DB rows to the shape the renderer expects.
+  const testimonials = rawTestimonials.map(r => ({
+    name:   r.display_name || "",
+    city:   r.city || "",
+    role:   r.role === "driver" ? "سائق" : r.role === "passenger" ? "راكب/ة" : "",
+    avatar: r.avatar_letter || (r.display_name?.[0] || ""),
+    text:   r.text || "",
+    rating: Math.max(1, Math.min(5, Number(r.rating) || 5)),
+    route:  r.route || "",
+  }));
+
+  // Auto-rotate only if there are 2+ testimonials
   useEffect(() => {
+    if (testimonials.length < 2) return;
     const timer = setInterval(() => {
       setActiveTestimonial(i => (i + 1) % testimonials.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [testimonials.length]);
 
-  const t = testimonials[activeTestimonial];
+  const t = testimonials[activeTestimonial] || null;
 
   return (
     <section className="py-14 sm:py-20 bg-muted/20 border-t border-border overflow-hidden">
@@ -88,21 +77,24 @@ export default function TrustBadges() {
           ))}
         </motion.div>
 
-        {/* Testimonials section */}
-        <div className="text-center mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-2xl sm:text-3xl font-black text-foreground mb-2">
-              ماذا يقول مسافرونا؟ 🗣️
-            </h2>
-            <p className="text-muted-foreground text-sm">آلاف الفلسطينيين يثقون بمِشوار كل يوم</p>
-          </motion.div>
-        </div>
+        {/* Testimonials section — only renders when admin has populated
+            the testimonials table. Empty state = section hidden so we
+            never show fake quotes. */}
+        {t && (
+          <>
+            <div className="text-center mb-8">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-2xl sm:text-3xl font-black text-foreground mb-2">
+                  ماذا يقول مسافرونا؟ 🗣️
+                </h2>
+              </motion.div>
+            </div>
 
-        {/* Testimonial carousel */}
+            {/* Testimonial carousel */}
         <div className="max-w-2xl mx-auto">
           <div className="relative">
             <AnimatePresence mode="wait">
@@ -171,6 +163,8 @@ export default function TrustBadges() {
             </div>
           </div>
         </div>
+          </>
+        )}
       </div>
     </section>
   );

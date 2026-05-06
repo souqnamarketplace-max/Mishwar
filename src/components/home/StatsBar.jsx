@@ -38,71 +38,76 @@ function AnimatedNumber({ value, suffix = "", duration = 1.5 }) {
 
 export default function StatsBar() {
   const qc = useQueryClient();
+
+  // app_settings gates the entire bar. Until an admin sets
+  // public_stats_enabled=true, the section renders nothing — which is
+  // the correct launch-day behaviour (no fake "10,000+ users" claim).
+  const { data: settingsArr = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const settings = settingsArr[0] || {};
+  const statsEnabled = settings.public_stats_enabled === true;
+  const minUsers = Number(settings.public_stats_min_users ?? 100);
+
   const { data: trips = [] } = useQuery({
     queryKey: ["stats-trips"],
     queryFn: () => base44.entities.Trip.list("-created_date", 1000),
+    enabled: statsEnabled,
   });
   const { data: users = [] } = useQuery({
     queryKey: ["stats-users"],
     queryFn: () => base44.entities.User.list(),
+    enabled: statsEnabled,
   });
   const { data: reviews = [] } = useQuery({
     queryKey: ["stats-reviews"],
     queryFn: () => base44.entities.Review.filter({ review_type: "passenger_rates_driver" }),
+    enabled: statsEnabled,
   });
 
   useEffect(() => {
+    if (!statsEnabled) return;
     const u1 = base44.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-trips"] }));
     const u2 = base44.entities.Review.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-reviews"] }));
     return () => { u1(); u2(); };
-  }, [qc]);
+  }, [qc, statsEnabled]);
+
+  // Don't render anything when stats are disabled OR when the real
+  // user count is below the threshold the admin set. Showing inflated
+  // round numbers as "social proof" is not honest and risks app-store
+  // rejection for misleading marketing.
+  if (!statsEnabled) return null;
+  if (users.length < minUsers) return null;
 
   const completedTrips = trips.filter(t => t.status === "completed").length;
-  const cities = new Set([...trips.map(t => t.from_city), ...trips.map(t => t.to_city)]).size;
+  const cities = new Set([...trips.map(t => t.from_city), ...trips.map(t => t.to_city)].filter(Boolean)).size;
   const avgRating = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
-    : 4.8;
+    : null;
 
-  // Use real data if available, otherwise show aspirational fallback
-  const stats = [
-    {
-      icon: Users,
-      label: "مسافر فلسطيني",
-      value: users.length > 100 ? users.length : 10000,
-      suffix: "+",
-      color: "text-primary",
-      bg: "bg-primary/10",
-      emoji: "👥",
-    },
-    {
-      icon: Car,
-      label: "رحلة مكتملة",
-      value: completedTrips > 100 ? completedTrips : 5000,
-      suffix: "+",
-      color: "text-accent",
-      bg: "bg-accent/10",
-      emoji: "🚗",
-    },
-    {
-      icon: MapPin,
-      label: "مدينة وقرية مغطاة",
-      value: 363,   // actual CITY_COORDS count in our map
-      suffix: "+",
-      color: "text-blue-600",
-      bg: "bg-blue-500/10",
-      emoji: "📍",
-    },
-    {
-      icon: Star,
-      label: "متوسط التقييم",
-      value: 48,
-      suffix: "/5",
-      display: avgRating,
-      color: "text-yellow-500",
-      bg: "bg-yellow-400/10",
-      emoji: "⭐",
-    },
-  ];
+  // Each tile only appears if its underlying data is real and meaningful.
+  // Empty list of stats → bar renders nothing.
+  const stats = [];
+  if (users.length > 0) stats.push({
+    icon: Users, label: "مسافر فلسطيني", value: users.length,
+    color: "text-primary", bg: "bg-primary/10", emoji: "👥",
+  });
+  if (completedTrips > 0) stats.push({
+    icon: Car, label: "رحلة مكتملة", value: completedTrips,
+    color: "text-accent", bg: "bg-accent/10", emoji: "🚗",
+  });
+  if (cities > 0) stats.push({
+    icon: MapPin, label: "مدينة وقرية", value: cities,
+    color: "text-blue-600", bg: "bg-blue-500/10", emoji: "📍",
+  });
+  if (avgRating !== null) stats.push({
+    icon: Star, label: "متوسط التقييم", value: 0, suffix: "/5",
+    display: avgRating, color: "text-yellow-500", bg: "bg-yellow-400/10", emoji: "⭐",
+  });
+
+  if (stats.length === 0) return null;
 
   return (
     <section className="bg-card border-b border-t border-border">

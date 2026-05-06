@@ -54,21 +54,31 @@ export default function HeroSection() {
   // one because the read landed on a stale row. Order by updated_at DESC so we
   // deterministically pick the most recently saved settings — matching the
   // admin page's read pattern.
-  const { data: heroSlides } = useQuery({
-    queryKey: ["hero-city-slides-public"],
+  const { data: heroSettings } = useQuery({
+    queryKey: ["hero-settings-public"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_settings")
-        .select("hero_city_slides")
+        .select("hero_city_slides, hero_badge_text")
         .order("updated_at", { ascending: false })
         .limit(1);
-      if (error || !data?.[0]?.hero_city_slides) return null;
-      const raw = data[0].hero_city_slides;
-      const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-      return Array.isArray(parsed) ? parsed.filter(s => s.active !== false) : null;
+      if (error || !data?.[0]) return null;
+      const row = data[0];
+      let slides = null;
+      if (row.hero_city_slides) {
+        const raw = row.hero_city_slides;
+        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        slides = Array.isArray(parsed) ? parsed.filter(s => s.active !== false) : null;
+      }
+      return { slides, badgeText: row.hero_badge_text || null };
     },
     staleTime: 30000,
   });
+
+  const heroSlides = heroSettings?.slides;
+  // Badge text is admin-editable. If unset, the badge does not render at
+  // all (we used to hardcode "+10,000 مستخدم" — that was a false claim).
+  const badgeText = heroSettings?.badgeText;
 
   const slides = heroSlides?.length ? heroSlides : CITY_SLIDES;
 
@@ -169,10 +179,12 @@ export default function HeroSection() {
           })}
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/40 to-black/20" />
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full px-3 py-1 mb-2">
-              <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-              <span className="text-white text-xs">+10,000 مستخدم يثقون بنا 🇵🇸</span>
-            </div>
+            {badgeText && (
+              <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full px-3 py-1 mb-2">
+                <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+                <span className="text-white text-xs">{badgeText}</span>
+              </div>
+            )}
             <h1 className="text-2xl font-black text-white leading-tight">
               وصّل للمكان الصح <span className="text-accent">بنص السعر</span>
             </h1>
@@ -253,10 +265,12 @@ export default function HeroSection() {
         <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-10 flex items-center" style={{ minHeight: "560px" }}>
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.55 }}
             className="mr-auto ml-0 w-full max-w-xl text-right py-12">
-            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full px-4 py-1.5 mb-5">
-              <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
-              <span className="text-white text-xs font-medium">+10,000 مستخدم يثقون بنا يومياً 🇵🇸</span>
-            </div>
+            {badgeText && (
+              <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm border border-white/25 rounded-full px-4 py-1.5 mb-5">
+                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400" />
+                <span className="text-white text-xs font-medium">{badgeText}</span>
+              </div>
+            )}
             <h1 className="text-4xl sm:text-5xl font-black text-white leading-tight mb-3">
               وصّل للمكان الصح<br />
               <span className="text-accent">بنص السعر</span>
