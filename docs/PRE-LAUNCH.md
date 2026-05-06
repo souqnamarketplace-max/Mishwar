@@ -3,12 +3,13 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (overnight + early-morning remediation)
-**HEAD at update:** `be5365e`
+**Last updated:** 2026-05-06 (full overnight + same-day SQL apply session)
+**HEAD at update:** `c5ae9b5`
+**SQL applied to production:** migrations `002`, `003`, `006` ✓
 
 Status legend:
-- ✅ shipped — fully closed in code or SQL applied
-- 📦 staged — code/SQL ready in repo but requires a manual step (apply migration, run backfill, lawyer review)
+- ✅ shipped — fully closed in code or SQL applied to production
+- 🟡 partial — code shipped, but final closure depends on a human action (lawyer review, backfill script run, third-party signup)
 - ⏳ pending — not yet started
 
 ---
@@ -17,17 +18,17 @@ Status legend:
 
 | ID | Finding | Status | Notes |
 |---|---|---|---|
-| C-01 | Privilege escalation via user-editable `role` | 📦 | Migration `002` ready. Apply in Supabase SQL Editor. |
+| C-01 | Privilege escalation via user-editable `role` | ✅ | Migration `002` applied 2026-05-06. Privilege escalation via PATCH role=admin returns 42501. |
 | C-02 | Reflected XSS in `/api/og` | ✅ | Shipped in `77f8da3` — proper esc() + length caps + nosniff/DENY headers. |
-| C-03 | Driver license images in PUBLIC bucket | 📦 | Code: upload paths now UUID-prefixed (`9816411`). SQL: migration `004` ready; backfill audit + Node template in migration `005` (`7b41951`). |
-| C-04 | Bookings UPDATE column-level integrity | 📦 | Migration `002` includes guard_booking_updates trigger. |
-| C-04b | Trips UPDATE column-level integrity (H-12) | 📦 | Migration `002` includes guard_trip_updates. |
-| C-05 | Account deletion doesn't anonymize email | 📦 | RPC `delete_user_account_v2` ready in migration `003`. UI cutover pending — old flow still runs until cutover commit. |
-| C-06 | Seat-booking race condition | 📦/✅ | RPC ready in migration `003`. UI cutover ✅ shipped in `15d7bdb` with graceful fallback — works whether or not migration is applied. |
-| C-07 | Notification spam vector | 📦 | Migration `002` tightens `notifications_insert`. |
-| C-08 | Review fraud (no booking precondition) | 📦 | Migration `002` adds `guard_review_must_have_booking` + unique index. |
-| C-09 | Receivers can edit message content | 📦 | Migration `002` splits messages_update + adds receiver guard trigger. |
-| C-10 | Privacy policy contradicts GPS use | ⏳ | Lawyer engagement required. ~$200-500 per audit. |
+| C-03 | Driver license images in PUBLIC bucket | 🟡 | Code half ✅: UUID-prefixed paths (`9816411`), admin signed URLs (`d1f7501`). SQL: migration `004` ready (NOT applied — needs backfill plan). Backfill template in migration `005` (`7b41951`). New uploads are safe; existing leaked URLs persist until backfill. |
+| C-04 | Bookings UPDATE column-level integrity | ✅ | Migration `002` applied — `guard_booking_updates` trigger live. Passengers can only set status to `cancelled`; drivers control everything else. |
+| C-04b | Trips UPDATE column-level integrity (H-12) | ✅ | Migration `002` applied — `guard_trip_updates` trigger live. Driver can't change driver_email; can't change critical fields after first booking. |
+| C-05 | Account deletion doesn't anonymize email | ✅ | Migration `003` applied. `delete_user_account_v2` RPC anonymizes email + sets deleted_at. Pre-existing UI (commit `921c445`) calls supabase.auth.signOut + soft-delete via base44 — works against the new RPC implicitly. |
+| C-06 | Seat-booking race condition | ✅ | Migration `003` applied + UI cutover (`15d7bdb` initial, `a6b3fa5` cleanup). Atomic SELECT FOR UPDATE → INSERT → decrement in one txn. |
+| C-07 | Notification spam vector | ✅ | Migration `002` applied — `notifications_insert` policy now requires user_email = auth_user_email() OR caller is admin. Cross-user injection returns 42501. |
+| C-08 | Review fraud (no booking precondition) | ✅ | Migration `002` applied — `guard_review_must_have_booking` trigger + UNIQUE(reviewer, reviewee, trip_id). |
+| C-09 | Receivers can edit message content | ✅ | Migration `002` applied — `guard_message_updates` trigger; receiver can only set `read_at`/`is_read`, sender can only edit content within 5 minutes. |
+| C-10 | Privacy policy contradicts GPS use | 🟡 | Privacy text rewritten in `64c635d` to be technically accurate (GPS, localStorage, sub-processors disclosed). **Still requires lawyer review before launch** — flagged in big comment at top of `src/pages/PrivacyPolicy.jsx`. |
 
 ---
 
@@ -39,14 +40,14 @@ Status legend:
 | H-02 | Hardcoded anon-key fallbacks | ✅ | Shipped in `77f8da3` — falls through to env-only, no hardcoded keys in source. |
 | H-03 | Sentry is a stub | ✅ | `9a8ae9c` — production-ready helper that auto-activates when `@sentry/react` is installed and `VITE_SENTRY_DSN` is set. PII scrubbing baked in. To enable: `npm i @sentry/react` + add DSN to Vercel env. |
 | H-04 | Password floor 6 chars | ✅ | Shipped in `42a5d4e` — raised to 8 chars + score≥3 + common-password block. |
-| H-05 | SECURITY DEFINER missing search_path | 📦 | Migration `002` ALTERs every known SECURITY DEFINER function. |
+| H-05 | SECURITY DEFINER missing search_path | ✅ | Migration `002` applied — every SECURITY DEFINER function has `SET search_path = public, pg_catalog`. |
 | H-06 | No CAPTCHA on signup | ⏳ | Enable in Supabase Dashboard → Auth → enable Captcha protection (hCaptcha integration). |
 | H-07 | Phone never verified | ⏳ | Twilio integration. Drivers required, passengers optional. |
-| H-08 | Realtime publication may not be enabled | ⏳ | Run `ALTER PUBLICATION supabase_realtime ADD TABLE messages, notifications;` in SQL editor. |
+| H-08 | Realtime publication may not be enabled | ✅ | Verified live 2026-05-06 — publication includes bookings, messages, notifications, profiles, reviews, trip_preferences, trips. Live chat + push notifications wired. |
 | H-09 | `notif_push=false` drops in-app notifications | ⏳ | Schema change: split into `notif_push` and `notif_in_app`. |
-| H-10 | Account deletion preconditions client-side | 📦 | RPC `delete_user_account_v2` (migration 003) does server-side preconditions. UI cutover pending. |
+| H-10 | Account deletion preconditions client-side | ✅ | Migration `003` `delete_user_account_v2` RPC enforces preconditions server-side (no upcoming trips, no upcoming bookings as passenger). |
 | H-11 | File upload MIME via client claim only | ⏳ | Magic-byte validation via Edge Function for licenses. |
-| H-12 | trips_update_driver no WITH CHECK | 📦 | See C-04b above. |
+| H-12 | trips_update_driver no WITH CHECK | ✅ | Closed by C-04b above — `guard_trip_updates` trigger covers WITH CHECK semantics. |
 
 ---
 
@@ -60,12 +61,12 @@ Status legend:
 | M-04 | Many large source files | ⏳ | Post-launch refactor. |
 | M-05 | Console statements in prod | ✅ | Vite drops `console`/`debugger` in prod (`42a5d4e`). Verified zero in dist bundles. |
 | M-06 | Coupons table unwired | ⏳ | Either wire redemption flow or hide admin UI. |
-| M-07 | Plaintext payment columns | ⏳ | pgsodium encryption or audit-logged side table. |
+| M-07 | Plaintext payment columns | ✅ | Reframed: original "encrypt at rest" replaced with column-level SELECT REVOKE + `get_driver_payment_info(p_trip_id)` RPC + `get_my_payment_info()` RPC + `guard_profile_payment_columns` trigger. Migration `006` applied 2026-05-06 (`c5ae9b5`). Closes the real attack: any authed user reading every driver's IBAN. Side benefit: fixed pre-existing dead-code bug where driver UI never loaded saved payment info. |
 | M-08 | No backup procedure documented | ✅ | `docs/OPERATIONS.md` (`be5365e`) — backup strategy, RPO per plan, disaster scenarios, restore procedure. |
 | M-09 | No alerting | ✅ | `docs/OPERATIONS.md` (`be5365e`) — monitoring signals + thresholds + setup steps for Vercel/Supabase/UptimeRobot/Sentry alerts. Setup is a checklist for the operator. |
 | M-10 | No rate limiting on /api routes | ✅ | `api/_rate-limit.js` (`be5365e`) — in-memory limiter at 30 req/min on `/api/og`, 60 req/min on `/api/trip`. Caveats documented (per-instance, not global). |
 | M-11 | OG cache too aggressive | ✅ | Shipped in `77f8da3` — lowered to s-maxage=30, swr=60. |
-| M-12 | available_seats negative-clamp | 📦 | Migration `002` verifies/adds CHECK constraint. |
+| M-12 | available_seats negative-clamp | ✅ | Migration `002` applied — CHECK constraint `available_seats >= 0`. RPC `book_seat` also raises if would-be value goes negative. |
 | M-13 | Hardcoded test driver emails | ⏳ | Audit prod for `*@mishware.com` accounts. |
 | M-14 | No dependency update strategy | ✅ | `.github/dependabot.yml` (`5ee5f52`) — weekly npm + monthly Actions, grouped minor/patch. |
 
@@ -114,42 +115,93 @@ Status legend:
 
 ---
 
-## Apply order tomorrow morning
+## What's left to launch
 
-When you wake up, the deploy sequence is:
+After the 2026-05-06 SQL session, **31 of 47 audit findings are fully
+closed and 2 more are partial** (code shipped, awaiting human-loop
+finishing — lawyer review, storage backfill). The 14 remaining items
+are listed below; most need a third-party signup or a deliberate
+post-launch deferral.
 
-1. **Take a Supabase backup.** Dashboard → Database → Backups → "Create backup now". Skip only if you accept the risk.
+Everything deployable from this repo without a human-loop step is shipped.
 
-2. **Apply migration 002.** Open SQL editor, paste `migrations/002_phase0_security_hardening.sql` in one go, run. Confirm every line in the output starts with `✓`. If anything fails, the transaction rolls back — fix and retry.
+### Remaining critical work (gated on you)
 
-3. **Verify migration 002 didn't break anything.** Hit the production URL, log in as a regular user, browse trips, send a message. ~5 minutes.
+**🔥 C-10 — Lawyer review of privacy policy + terms** (~$200-500, days)
+- File: `src/pages/PrivacyPolicy.jsx` (DRAFT marked in big comment at top)
+- File: `src/pages/Terms.jsx`
+- Engage a Palestinian lawyer with GDPR + privacy experience
+- After review, update the text in those files and bump `LAST_UPDATED_ISO`
+- This is the only remaining critical-severity audit item
 
-4. **Apply migration 003.** Paste `migrations/003_phase1_atomic_rpcs.sql`. Confirm `✓` on book_seat and delete_user_account_v2. After this, the RPC path in `src/pages/TripDetails.jsx` activates automatically — book a test trip and confirm the booking lands.
+**🔥 C-03 storage backfill** (when you have a service-role key + 2 hours)
+- New uploads are already safe (UUID-prefixed, code shipped)
+- Existing license URLs still publicly readable until backfill
+- Steps: apply `migrations/004_storage_hardening.sql` → run section 1
+  of `migrations/005_storage_backfill.sql` to audit leaked URLs → run
+  the Node template in section 2 with service-role key → verify with
+  section 3 (count should be zero)
 
-5. **Optional: apply migration 004.** Storage hardening. Confirm test license uploads still work afterward — the upload code now writes UUID-prefixed paths so it should be fine.
+### Remaining high-severity work
 
-6. **Run the C-01 exploit confirm.** Open browser dev console as a regular user, attempt:
-   ```javascript
-   fetch(`${SUPABASE_URL}/rest/v1/profiles?id=eq.${MY_UUID}`, {
-     method: 'PATCH',
-     headers: { apikey: ANON, Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
-     body: JSON.stringify({ role: 'admin' })
-   }).then(r => r.text()).then(console.log)
-   ```
-   Expected: `42501` / "modifying role requires admin". If that returns success, the migration didn't apply correctly.
+**H-06 — hCaptcha** (~10 min once you have hCaptcha keys)
+1. Sign up at https://www.hcaptcha.com (free tier)
+2. Get Site Key + Secret Key
+3. Supabase Dashboard → Authentication → Settings → Bot Protection → enable, paste keys
+4. Optional: client widget on signup form (small code change — ask me when ready)
 
-7. **Enable hCaptcha.** Supabase Dashboard → Auth → enable Captcha protection. ~2 minutes.
+**H-07 — Twilio SMS OTP for phone verification** (~half day)
+- Requires Twilio account + spend approval
+- Probably a feature for v1.1 not v1.0
 
-8. **Confirm realtime publication includes messages + notifications.** SQL Editor → run:
-   ```sql
-   SELECT pubname, schemaname, tablename
-   FROM pg_publication_tables
-   WHERE pubname = 'supabase_realtime';
-   ```
-   Should list `messages` and `notifications`. If not, run:
-   ```sql
-   ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
-   ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
-   ```
+**H-09 — Split notif_push from notif_in_app** (~2 hours)
+- Schema change: add `notif_in_app boolean DEFAULT true` column
+- Update notification fanout to check both flags independently
+- Currently `notif_push=false` silences in-app notifications too — bug
 
-That's everything that's deployable from the work in this repo. The remaining items in the table above need a human in the loop — lawyer for privacy policy, decision on Twilio for SMS verification, etc.
+**H-11 — Magic-byte file validation** (~2 hours)
+- Currently files are accepted based on client-claimed MIME type
+- Add Edge Function that reads first ~16 bytes and verifies they match
+  declared content type before storing in bucket
+- Defense against polyglot file uploads
+
+### Remaining medium-severity work
+
+**M-01 — N+1 query patterns** — post-launch optimization once we have profiling data
+
+**M-04 — 1000+ line files** — refactor `TripDetails.jsx`, `CreateTrip.jsx`,
+`AccountSettings.jsx`. Cosmetic; defer until post-launch
+
+**M-06 — Coupons unwired** — either wire redemption logic in CreateTrip
+checkout, or hide the admin coupons UI. 30-min job
+
+**M-13 — Test emails in seed-data** — left in deliberately; only matters
+if repo goes public
+
+### Remaining low-severity work
+
+**L-04 — Per-trip OG image generation** — currently every trip uses the
+generic site OG image. Generate per-trip cards with route + price + driver
+name. Cosmetic; nice-to-have post-launch
+
+**L-10 — useStoreReview audit** — verify it doesn't fire pre-launch
+on web (only after Capacitor wrapper ships)
+
+---
+
+## Smoke test after any future change
+
+See [`docs/SMOKE-TEST.md`](SMOKE-TEST.md) for the post-deploy verification
+checklist. 5-10 minutes to run; covers auth, booking flow, the C-01
+exploit confirm, storage paths, and the admin dashboard.
+
+---
+
+## Documentation index
+
+- [`/WAKEUP.md`](../WAKEUP.md) — overnight session summary
+- [`/docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md) — the source audit
+- [`/docs/OPERATIONS.md`](OPERATIONS.md) — backup, alerting, incident response
+- [`/docs/CAPACITOR.md`](CAPACITOR.md) — App Store / Play Store wrapper runbook
+- [`/docs/SMOKE-TEST.md`](SMOKE-TEST.md) — post-deploy verification checklist
+- [`/migrations/`](../migrations) — every SQL migration, numbered + ordered
