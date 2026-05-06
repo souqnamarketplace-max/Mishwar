@@ -1,4 +1,5 @@
 import { useSEO } from "@/hooks/useSEO";
+import { friendlyError } from "@/lib/errors";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
@@ -105,7 +106,7 @@ export default function AccountSettings() {
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث المدينة ✅");
     } catch (err) {
-      toast.error(err?.message || "فشل التحديث");
+      toast.error(friendlyError(err, "فشل التحديث"));
     } finally {
       setProfileLoading(false);
     }
@@ -276,7 +277,7 @@ export default function AccountSettings() {
       toast.success(`✅ تم رفع ${fileType} بنجاح`);
     } catch (err) {
       console.error("Upload error:", err);
-      toast.error(`خطأ في رفع ${fileType}: ${err.message || "حاول مجدداً"}`);
+      toast.error(`خطأ في رفع ${fileType}: ${friendlyError(err, "حاول مجدداً")}`);
     }
     setLicenseLoading(false);
   };

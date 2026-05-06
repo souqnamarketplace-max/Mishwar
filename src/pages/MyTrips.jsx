@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { logAudit } from "@/lib/adminAudit";
 import { useSEO } from "@/hooks/useSEO";
+import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
@@ -99,7 +100,7 @@ export default function MyTrips() {
         }
       } catch (e) { console.warn("[Notif] booking_cancelled:", e?.message); }
     },
-    onError: (err) => toast.error(err.message || "فشل إلغاء الحجز"),
+    onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الحجز")),
   });
 
   const { user } = useAuth();

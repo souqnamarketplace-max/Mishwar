@@ -2,6 +2,7 @@ import { CITIES } from "@/lib/cities";
 import { captureException } from "@/lib/sentry";
 import MapCityPicker from "@/components/shared/MapCityPicker";
 import { useSEO } from "@/hooks/useSEO";
+import { friendlyError } from "@/lib/errors";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
@@ -142,7 +143,7 @@ export default function Onboarding() {
       }
     },
     onError: (err) => {
-      toast.error(err.message || "حدث خطأ في الإعداد");
+      toast.error(friendlyError(err, "حدث خطأ في الإعداد"));
     },
   });
 

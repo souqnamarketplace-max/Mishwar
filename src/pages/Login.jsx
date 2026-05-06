@@ -1,4 +1,5 @@
 import { useSEO } from "@/hooks/useSEO";
+import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail } from "@/lib/validation";
@@ -80,9 +81,8 @@ export default function Login() {
       // resulting in a redirect loop where the user saw a stuck spinner until refresh.
     } catch (err) {
       setLoading(false);  // only reset loading on error; success path navigates away
-      toast.error(err.message === 'Invalid login credentials'
-        ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة'
-        : err.message || 'فشل تسجيل الدخول');
+      // friendlyError already maps "invalid login credentials" to Arabic
+      toast.error(friendlyError(err, "فشل تسجيل الدخول"));
     }
   };
 
@@ -115,7 +115,7 @@ export default function Login() {
       setMode('login');
       setForm(p => ({ ...p, password: '', confirmPassword: '' }));
     } catch (err) {
-      toast.error(err.message || 'فشل إنشاء الحساب');
+      toast.error(friendlyError(err, "فشل إنشاء الحساب"));
     } finally { setLoading(false); }
   };
 

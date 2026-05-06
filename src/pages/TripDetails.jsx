@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
 import { useSEO } from "@/hooks/useSEO";
+import { friendlyError } from "@/lib/errors";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -167,7 +168,7 @@ export default function TripDetails() {
     },
     onError: (err) => {
       setShowConfirm(false);
-      toast.error(err?.message || "فشل الحجز، حاول مجدداً");
+      toast.error(friendlyError(err, "فشل الحجز، حاول مجدداً"));
     },
   });
 
