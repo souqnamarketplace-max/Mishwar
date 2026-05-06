@@ -29,11 +29,19 @@ function fmt(dateStr) {
 }
 
 // ── Share ─────────────────────────────────────────────────────────────────────
-function share(e, id, from, to) {
+// We pass ONLY { title, url } to navigator.share — no `text` field.
+// Reason: when shares are forwarded multiple times (chat → chat → browser),
+// some platforms concatenate text+url into a single blob and the user
+// ends up pasting "https://.../trip/<uuid> رحلة من ..." into the address
+// bar, which makes the trip ID unparseable. With url-only, WhatsApp /
+// Telegram / Twitter generate the rich preview card from OG meta tags
+// (served by /api/trip), which is actually a better-looking preview
+// than a hand-written text line anyway.
+function share(e, id) {
   e.preventDefault(); e.stopPropagation();
   const url = `${window.location.origin}/trip/${id}`;
   if (navigator.share) {
-    navigator.share({ title: "مِشوار", text: `رحلة من ${from} إلى ${to} على مِشوار 🚗`, url }).catch(() => {});
+    navigator.share({ title: "مِشوار", url }).catch(() => {});
   } else {
     navigator.clipboard.writeText(url)
       .then(() => import("sonner").then(m => m.toast.success("تم نسخ رابط الرحلة! 📋")))
@@ -222,7 +230,7 @@ function Card({ t, noSeats, urgentSeats }) {
 
           {/* Share */}
           <button
-            onClick={(e) => share(e, t.id, t.from_city, t.to_city)}
+            onClick={(e) => share(e, t.id)}
             className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/8 active:bg-primary/15 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />

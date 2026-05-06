@@ -36,7 +36,14 @@ const whyChoose = [
 ];
 
 export default function TripDetails() {
-  const { id } = useParams();
+  // Some share platforms concatenate the share text into the URL when
+  // forwarded, producing URLs like /trip/<uuid>%20<arabic-text>. The
+  // raw param then has the trip text appended to the UUID, and
+  // Trip.get(<garbled>) returns null. Extract just the canonical UUID
+  // prefix so dirty share-link forwards still resolve.
+  const { id: rawId } = useParams();
+  const uuidMatch = rawId?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  const id = uuidMatch?.[0] || null;
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -677,9 +684,10 @@ export default function TripDetails() {
                 onClick={async () => {
                   if (navigator.share) {
                     try {
+                      // url-only share to avoid text+url fusion when
+                      // forwarded — preview comes from /api/trip OG meta
                       await navigator.share({
                         title: `رحلة من ${trip.from_city} إلى ${trip.to_city}`,
-                        text: `انضم معي في رحلة بسعر ₪${trip.price}`,
                         url: window.location.href,
                       });
                     } catch (err) {
