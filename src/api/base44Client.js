@@ -302,6 +302,28 @@ const auth = {
       console.warn('[auth.me] profile fetch error, using session-only data:', e.message);
     }
 
+    // Fetch payment info via the SECURITY DEFINER RPC. After migration 006
+    // these columns are no longer SELECTable directly from `profiles` —
+    // even by the row owner — so we go through the RPC. If the RPC isn't
+    // deployed yet (migration 006 not applied), the call fails silently
+    // and payment fields remain undefined, matching the pre-migration
+    // behaviour.
+    let payment = null;
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_my_payment_info`, {
+        method: 'POST',
+        headers: { ...getRestHeaders(), Prefer: 'return=representation' },
+        body: '{}',
+      });
+      if (r.ok) {
+        const rows = await r.json();
+        payment = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      }
+    } catch (e) {
+      // RPC not yet deployed or transient error — leave payment as null
+    }
+
     return {
       id: user.id,
       email: user.email,
@@ -316,6 +338,7 @@ const auth = {
       car_year: profile?.car_year ?? null,
       car_color: profile?.car_color ?? null,
       car_plate: profile?.car_plate ?? null,
+      car_image: profile?.car_image ?? null,
       driver_note: profile?.driver_note ?? null,
       onboarding_completed: profile?.onboarding_completed ?? false,
       verification_pending: profile?.verification_pending ?? false,
@@ -323,6 +346,22 @@ const auth = {
       total_reviews: profile?.total_reviews ?? 0,
       is_active: profile?.is_active ?? true,
       created_at: profile?.created_at ?? user.created_at,
+      // ── Trip preferences (denormalized to user-shape for convenience) ──
+      pref_smoking:    profile?.pref_smoking    ?? null,
+      pref_chattiness: profile?.pref_chattiness ?? null,
+      pref_pets:       profile?.pref_pets       ?? null,
+      vehicle_luggage: profile?.vehicle_luggage ?? null,
+      vehicle_back_row: profile?.vehicle_back_row ?? null,
+      // ── Payment fields (via get_my_payment_info RPC) ──
+      bank_name:           payment?.bank_name           ?? null,
+      bank_account_name:   payment?.bank_account_name   ?? null,
+      bank_account_number: payment?.bank_account_number ?? null,
+      bank_iban:           payment?.bank_iban           ?? null,
+      jawwal_pay_number:   payment?.jawwal_pay_number   ?? null,
+      reflect_number:      payment?.reflect_number      ?? null,
+      card_holder_name:    payment?.card_holder_name    ?? null,
+      card_last_four:      payment?.card_last_four      ?? null,
+      preferred_payment:   payment?.preferred_payment   ?? null,
     };
   },
 

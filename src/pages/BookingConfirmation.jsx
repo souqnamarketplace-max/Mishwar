@@ -3,6 +3,7 @@ import React from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { CheckCircle, MapPin, Calendar, Clock, Users, MessageCircle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -37,12 +38,28 @@ export default function BookingConfirmation() {
   const booking = bookings[0];
   const trip    = trips.find(t => t.id === tripId) || trips[0];
 
-  const { data: driverProfiles = [] } = useQuery({
-    queryKey: ["driver-payment-info", trip?.driver_email],
-    queryFn: () => base44.entities.Profile.filter({ email: trip.driver_email }, "-created_at", 1),
-    enabled: !!trip?.driver_email,
+  // Fetch the driver's payment info via the get_driver_payment_info RPC
+  // (migration 006). The RPC enforces authorization server-side: only
+  // returns rows if the caller is the driver themselves, the passenger
+  // has a confirmed booking on this trip, or the caller is admin.
+  // Otherwise returns empty — the UI falls through to the "contact
+  // driver for details" fallback message that was already there.
+  const { data: dpRows = [] } = useQuery({
+    queryKey: ["driver-payment-info", trip?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_driver_payment_info", {
+        p_trip_id: trip.id,
+      });
+      if (error) {
+        // RPC not deployed yet (migration 006 not applied) → empty rows,
+        // existing fallback "تواصل مع السائق" UI handles this.
+        return [];
+      }
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!trip?.id,
   });
-  const dp = driverProfiles[0]; // driver profile with payment info
+  const dp = dpRows[0]; // driver payment info — null if not authorized
 
   const refNum      = (booking?.id || "").slice(-8).toUpperCase() || "--------";
   const method      = booking?.payment_method || "cash";
