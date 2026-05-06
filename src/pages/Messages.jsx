@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
 import { useBlockedEmails } from "@/lib/blockUtils";
+import { isDeletedUserEmail } from "@/lib/userStatus";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
 
 /**
@@ -303,6 +304,12 @@ export default function Messages() {
   // the void after I blocked them" surprise.
   const activeIsBlocked = !!(activeConv?.otherEmail && blockedSet.has(activeConv.otherEmail));
 
+  // True if the other party has deleted their account (anonymized email
+  // ending in @deleted.local). The DB enforces this with a RESTRICTIVE
+  // RLS policy that returns 403; this constant just lets us show a
+  // friendly notice instead of a raw error.
+  const activeIsDeleted = isDeletedUserEmail(activeConv?.otherEmail);
+
   // ─── Auto-open from URL params (fires ONCE per to+trip URL combo) ───
   const autoOpenedRef = useRef(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -420,6 +427,13 @@ export default function Messages() {
     mutationFn: async (overrideText) => {
       const text = (overrideText !== undefined ? overrideText : draft).trim();
       if (!text || !activeConv || !user?.email) return;
+      // Refuse to send to a deleted (anonymized) account. The DB enforces
+      // this with a RESTRICTIVE RLS policy; this client check just gives
+      // the user a friendly toast instead of waiting for the 403.
+      if (activeConv.otherEmail && isDeletedUserEmail(activeConv.otherEmail)) {
+        toast.error("لا يمكن إرسال رسائل إلى مستخدم محذوف");
+        return;
+      }
       // Last line of defense — even if the composer somehow got rendered
       // (race on the block being added in another tab, optimistic UI, etc.),
       // refuse to insert the row. The user sees the error but the message
@@ -626,7 +640,13 @@ export default function Messages() {
                 </div>
 
                 {/* Locked notice OR quick replies + input */}
-                {activeIsBlocked ? (
+                {activeIsDeleted ? (
+                  <div className="px-4 py-3 border-t border-border bg-muted/40">
+                    <p className="text-sm text-muted-foreground font-medium text-center">
+                      ⚪️ هذا المستخدم حذف حسابه — لا يمكن إرسال رسائل
+                    </p>
+                  </div>
+                ) : activeIsBlocked ? (
                   <div className="px-4 py-3 border-t border-border bg-destructive/5">
                     <p className="text-sm text-destructive font-medium text-center">
                       🚫 لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر

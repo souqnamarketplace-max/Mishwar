@@ -4,6 +4,7 @@ import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
 import { logAdminAction } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
@@ -941,7 +942,7 @@ export default function AccountSettings() {
         </div>
 
         {/* Delete Confirmation Modal */}
-        {showDeleteConfirm && (
+        {showDeleteConfirm && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-card rounded-2xl border border-border p-6 max-w-sm mx-4 space-y-4">
               <div className="flex items-center justify-between">
@@ -1047,7 +1048,8 @@ export default function AccountSettings() {
                 </div>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     </div>

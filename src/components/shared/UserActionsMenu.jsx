@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { invalidateBlockCache, REPORT_CATEGORIES } from "@/lib/blockUtils";
+import { isDeletedUserEmail } from "@/lib/userStatus";
 import { logAdminAction } from "@/lib/adminAudit";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
@@ -32,6 +33,9 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
 
   // Don't show menu if targeting self or no user
   if (!user || !targetEmail || user.email === targetEmail) return null;
+  // Don't show menu for deleted (anonymized) accounts — there's no one to
+  // block or report, and the actions would just create noise in the audit log.
+  if (isDeletedUserEmail(targetEmail)) return null;
 
   // Helper: invalidate every cache that depends on the block list. Pulled
   // out so block-from-report and explicit-block both go through the same

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
@@ -433,7 +434,7 @@ export default function Dashboard() {
           </div>
 
           {/* Broadcast Modal */}
-          {showBroadcast && (
+          {showBroadcast && createPortal(
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
               <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md" dir="rtl">
                 <h3 className="font-bold text-lg mb-1">📢 بث إشعار لجميع المستخدمين</h3>
@@ -451,12 +452,13 @@ export default function Dashboard() {
                   <button onClick={() => setShowBroadcast(false)} className="px-4 py-2.5 rounded-xl bg-muted text-muted-foreground text-sm">إلغاء</button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* Second-stage broadcast confirmation — final guard before
               fan-out RPC fires a notification at every user in the DB. */}
-          {broadcastConfirm && (
+          {broadcastConfirm && createPortal(
             <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
               <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md" dir="rtl">
                 <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center mb-3">
@@ -478,7 +480,8 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </div>
 
