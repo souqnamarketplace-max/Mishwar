@@ -188,13 +188,8 @@ export default function HeroSection() {
             <h1 className="text-2xl font-black text-white leading-tight">
               وصّل للمكان الصح <span className="text-accent">بنص السعر</span>
             </h1>
-            {/* City label */}
-            <div className="mt-2 flex items-center gap-1.5 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1">
-              <span className="text-white/90 text-xs font-bold">{slide.city}</span>
-              <span className="text-white/50 text-[10px]">— {slide.subtitle}</span>
-            </div>
             {/* Dot indicators — count must match the rendered slideshow above */}
-            <div className="flex gap-1.5 mt-2">
+            <div className="flex gap-1.5 mt-3">
               {slides.map((_, i) => (
                 <button key={i} onClick={() => setSlideIdx(i)}
                   className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-4 bg-accent" : "w-1.5 bg-white/40"}`} />
@@ -248,18 +243,12 @@ export default function HeroSection() {
           })}
           <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/55 to-black/15" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-          {/* City label bottom-left */}
-          <div className="absolute bottom-6 left-6 flex flex-col gap-1">
-            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-1.5">
-              <span className="text-white font-black text-sm">{slide.city}</span>
-              <span className="text-white/60 text-xs">{slide.subtitle}</span>
-            </div>
-            <div className="flex gap-1.5 mr-2">
-              {slides.map((_, i) => (
-                <button key={i} onClick={() => setSlideIdx(i)}
-                  className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-accent" : "w-1.5 bg-white/40"}`} />
-              ))}
-            </div>
+          {/* Slide dot indicators */}
+          <div className="absolute bottom-6 left-6 flex gap-1.5">
+            {slides.map((_, i) => (
+              <button key={i} onClick={() => setSlideIdx(i)}
+                className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-accent" : "w-1.5 bg-white/40"}`} />
+            ))}
           </div>
         </div>
         <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-10 flex items-center" style={{ minHeight: "560px" }}>
