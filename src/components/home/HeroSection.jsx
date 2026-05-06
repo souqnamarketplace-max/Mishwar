@@ -153,10 +153,17 @@ export default function HeroSection() {
             const isCurrent = i === slideIdx;
             const isNext = i === (slideIdx + 1) % slides.length;
             if (!isCurrent && !isNext) return null;
+            // The current slide is the page's LCP element. Hint the
+            // browser to prioritize it (fetchpriority=high) and disable
+            // lazy loading. The next-up slide is opportunistic — let
+            // the browser load it after critical work is done.
             return (
               <img key={(s.img || s.city) + i}
                 src={s.img.replace('w=1400&h=800', 'w=800&h=500')}
                 alt={s.city}
+                fetchpriority={isCurrent ? "high" : "low"}
+                loading={isCurrent ? "eager" : "lazy"}
+                decoding="async"
                 className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ${isCurrent ? "opacity-100" : "opacity-0"}`} />
             );
           })}
@@ -216,10 +223,14 @@ export default function HeroSection() {
             const isCurrent = i === slideIdx;
             const isNext = i === (slideIdx + 1) % slides.length;
             if (!isCurrent && !isNext) return null;
+            // Same LCP treatment as the mobile hero above
             return (
               <img key={(s.img || s.city) + i}
                 src={s.img.replace('w=1400&h=800', 'w=1200&h=700')}
                 alt={s.city}
+                fetchpriority={isCurrent ? "high" : "low"}
+                loading={isCurrent ? "eager" : "lazy"}
+                decoding="async"
                 className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 ${isCurrent ? "opacity-100" : "opacity-0"}`} />
             );
           })}
