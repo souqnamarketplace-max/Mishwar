@@ -451,7 +451,7 @@ export default function CreateTrip() {
       </div>
 
       {/* Steps */}
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex items-center justify-between mb-2">
         {steps.map((s, i) => (
           <React.Fragment key={s.id}>
             <div className="flex flex-col items-center">
@@ -462,6 +462,7 @@ export default function CreateTrip() {
               }`}>
                 {step > s.id ? <CheckCircle className="w-5 h-5" /> : s.id}
               </div>
+              {/* Desktop: show every step's label inline */}
               <span className="text-xs text-muted-foreground mt-1 hidden sm:block">{s.label}</span>
             </div>
             {i < steps.length - 1 && (
@@ -470,6 +471,13 @@ export default function CreateTrip() {
           </React.Fragment>
         ))}
       </div>
+      {/* Mobile: a single line under the bar showing the CURRENT step label
+          + position. Stacking every label under each circle on a 375px screen
+          either truncates them to ellipses or wraps the row to two lines. */}
+      <p className="sm:hidden text-center text-sm font-medium text-foreground mb-8">
+        خطوة {step} من {steps.length}: {steps.find((s) => s.id === step)?.label}
+      </p>
+      <div className="hidden sm:block mb-10" />
 
       {/* Step Content */}
       <div className="bg-card rounded-2xl border border-border p-6 mb-6">

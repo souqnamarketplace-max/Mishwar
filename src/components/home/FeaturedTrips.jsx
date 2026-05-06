@@ -150,8 +150,13 @@ function FeaturedCard({ trip, index }) {
                   </div>
                 </div>
 
-                {/* Time on mobile */}
-                <span className="sm:hidden text-[10px] text-muted-foreground">{trip.time}</span>
+                {/* Mobile compact: time + seats inline so the user gets both
+                    pieces of info without the desktop two-line stack taking
+                    too much horizontal room on a narrow screen. */}
+                <div className="sm:hidden flex flex-col items-end gap-0.5">
+                  <span className="text-[10px] text-muted-foreground">{trip.time}</span>
+                  <span className="text-[10px] text-muted-foreground">{trip.available_seats} مقاعد</span>
+                </div>
 
                 <div className={`text-center px-2.5 py-1.5 rounded-xl ${isFemale ? "bg-rose-100 text-rose-700" : "bg-primary/8 text-primary"}`}>
                   <p className="text-base font-black leading-none">₪{trip.price}</p>

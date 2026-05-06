@@ -190,7 +190,7 @@ export default function Onboarding() {
         </div>
 
         {/* Progress */}
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex items-center gap-2 mb-2">
           {steps.map((label, i) => (
             <React.Fragment key={i}>
               <div className="flex flex-col items-center gap-1">
@@ -209,6 +209,12 @@ export default function Onboarding() {
             </React.Fragment>
           ))}
         </div>
+        {/* Mobile: show only the active step's label so the user knows
+            where they are without crowding the bar with all labels. */}
+        <p className="sm:hidden text-center text-xs text-muted-foreground mb-6">
+          خطوة {step + 1} من {steps.length}: {steps[step]}
+        </p>
+        <div className="hidden sm:block mb-6" />
 
         <AnimatePresence mode="wait">
           {/* Step 0: Choose role */}

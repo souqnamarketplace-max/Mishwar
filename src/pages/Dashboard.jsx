@@ -410,11 +410,16 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowBroadcast(true)}
-              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+              className="flex items-center gap-2 px-2 sm:px-3 py-2 rounded-xl bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
               title="إرسال إشعار لجميع المستخدمين"
+              aria-label="بث إشعار"
             >
               <Bell className="w-4 h-4" />
-              بث إشعار
+              {/* Label hidden on mobile to save horizontal space — the bell
+                  icon plus aria-label keeps it discoverable. Was previously
+                  the entire button that was hidden on mobile, which left
+                  admins on phones with no way to broadcast at all. */}
+              <span className="hidden sm:inline">بث إشعار</span>
             </button>
             <div className="flex items-center gap-2 bg-card rounded-xl px-3 py-2 border border-border">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">

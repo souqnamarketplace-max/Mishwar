@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -183,6 +183,20 @@ export default function MobileLayout({ children, user, showHeader = true, header
           </div>
         )}
         {children}
+        {/* Emergency / SOS strip — desktop has this in <Footer />, mobile
+            wasn't rendering it anywhere, leaving people on phones with no
+            quick way to reach the abuse hotline. Pinned at the bottom of
+            the scroll content (above the tab bar) so users see it after
+            scrolling any page to the end. tel: links open the dialer
+            on every modern mobile OS. */}
+        <a
+          href="tel:+970599000000"
+          className="block bg-red-800/90 text-white text-center text-sm py-2.5 px-4 -mx-0 active:bg-red-900"
+          dir="rtl"
+        >
+          <span className="opacity-90">🆘 طوارئ أو إساءة؟ </span>
+          <span className="font-bold underline">اتصل: 0599-000-000</span>
+        </a>
       </div>
 
       {/* Bottom Tab Bar — with integrated driver post-trip button */}
@@ -337,6 +351,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">معلومات</p>
                 {[
                   { icon: BookOpen,        label: "كيف يعمل مِشوار",    path: "/how-it-works" },
+                { icon: Users,             label: "مجتمع مِشوارو",      path: "/community" },
                 { icon: Bell,           label: "إشعاراتي ومساراتي",  path: "/notifications" },
                 { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
                 { icon: HelpCircle,     label: "المساعدة",            path: "/help" },
