@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
 import { useBlockedEmails } from "@/lib/blockUtils";
+import UserActionsMenu from "@/components/shared/UserActionsMenu";
 
 /**
  * Messages page — Poparide-style chat.
@@ -573,6 +574,17 @@ export default function Messages() {
                     </Link>
                     <p className="text-xs text-muted-foreground truncate">{activeConv.otherEmail}</p>
                   </div>
+                  {/* Block / Report — same component used on TripDetails &
+                      UserProfile. The trip context (when present) is passed
+                      so admins reviewing the report can jump back to the
+                      trip the conversation related to. Hides itself when
+                      target equals current user. */}
+                  <UserActionsMenu
+                    targetEmail={activeConv.otherEmail}
+                    targetName={activeConv.otherName}
+                    contextType={activeTrip ? "trip" : "message"}
+                    contextId={activeTrip?.id || activeConv.id}
+                  />
                 </div>
 
                 {/* Trip Status Bar (dark navy / red / amber) */}

@@ -14,6 +14,7 @@ import RatingSummary from "../components/reviews/RatingSummary";
 import ReviewsList from "../components/reviews/ReviewsList";
 import PassengerPaymentSetup from "../components/user/PassengerPaymentSetup";
 import EmptyState from "@/components/shared/EmptyState";
+import UserActionsMenu from "@/components/shared/UserActionsMenu";
 
 // Friendly display name extracted from email
 function prettyNameFromEmail(email) {
@@ -224,6 +225,18 @@ export default function UserProfile() {
                       </Button>
                     </a>
                   )}
+                  {/* Block / Report menu — same component used on TripDetails.
+                      Without this, mobile users had no way to report or
+                      block someone they reached via a profile link (no 3-dot
+                      menu existed on the profile screen at all). The menu
+                      hides itself when targetEmail equals current user, so
+                      no extra guard needed. */}
+                  <UserActionsMenu
+                    targetEmail={targetEmail}
+                    targetName={profile?.full_name || prettyNameFromEmail(targetEmail)}
+                    contextType="profile"
+                    contextId={targetEmail}
+                  />
                 </>
               )}
             </div>

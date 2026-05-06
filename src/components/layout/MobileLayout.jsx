@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -298,6 +298,14 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     ? [{ icon: CreditCard, label: "مدفوعات السائق", path: "/driver?tab=payment" }]
                     : []
                   ),
+                  // Safety / moderation entries — without these, mobile users
+                  // could file reports or block people from a 3-dot menu but
+                  // had no obvious way to follow up on submitted reports or
+                  // un-block someone they regretted blocking. The entries
+                  // existed in /settings but only via deep-scroll. Surface
+                  // them in the drawer next to the rest of the account menu.
+                  { icon: Flag,    label: "بلاغاتي",                path: "/settings?section=reports" },
+                  { icon: Shield,  label: "المستخدمون المحظورون",   path: "/settings?section=blocked" },
                   { icon: Settings,      label: "إعدادات متقدمة",          path: "/account-settings/profile#license" },
                 ].map(({ icon: Icon, label, path }) => (
                   <Link
