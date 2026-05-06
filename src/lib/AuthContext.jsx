@@ -1,24 +1,16 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { toast } from "sonner";
-import { captureException } from "@/lib/sentry";
+import { captureException, setSentryUser, clearSentryUser } from "@/lib/sentry";
 import { supabase } from '@/lib/supabase';
 import { queryClientInstance } from '@/lib/query-client';
 import { invalidateBlockCache } from "@/lib/blockUtils";
 import { base44 } from '@/api/base44Client';
+import { readLocalSession, readSessionToken } from "@/lib/session";
 
-// Read session instantly from localStorage — no network call
-function readSessionFromStorage() {
-  try {
-    const PROJECT_REF = import.meta.env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0] || 'dimtdwahtwaslmnuakij';
-    const key = `sb-${PROJECT_REF}-auth-token`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    // Check expiry
-    if (parsed?.expires_at && parsed.expires_at * 1000 < Date.now()) return null;
-    return parsed;
-  } catch { return null; }
-}
+// Historical alias — the context referenced the function under this name.
+// Both old and new names resolve to the same helper so any in-flight
+// changes don't conflict.
+const readSessionFromStorage = readLocalSession;
 
 const AuthContext = createContext();
 
@@ -44,14 +36,19 @@ export const AuthProvider = ({ children }) => {
     // Subscribe to auth state changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
+        // Tag Sentry events with user.id (NOT email — PII protection).
+        // Helps cluster errors by user without leaking PII.
+        setSentryUser(session.user.id);
         await loadUserProfile(session.user);
       } else if (event === 'SIGNED_OUT') {
+        clearSentryUser();
         setUser(null);
         invalidateBlockCache();
         setIsAuthenticated(false);
         setAuthError(null);
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         // Silently refresh user data
+        setSentryUser(session.user.id);
         await loadUserProfile(session.user);
       }
     });
@@ -64,15 +61,9 @@ export const AuthProvider = ({ children }) => {
       // Direct REST fetch — supabase-js client hangs silently after token refresh
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
-      let userToken = ANON_KEY;
-      try {
-        const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.access_token) userToken = parsed.access_token;
-        }
-      } catch {}
+      // readSessionToken returns null if the token is expired / missing /
+      // unparseable — we fall back to ANON_KEY so RLS handles authz.
+      const userToken = readSessionToken() || ANON_KEY;
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8000);
       let profile = null;

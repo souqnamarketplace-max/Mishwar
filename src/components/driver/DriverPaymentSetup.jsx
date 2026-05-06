@@ -10,6 +10,7 @@ import { Building2, CreditCard, CheckCircle, AlertCircle, Wallet, Smartphone } f
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const TABS = [
   { id: "bank",       label: "تحويل بنكي",  icon: Building2,  color: "text-blue-600"   },
@@ -50,7 +51,7 @@ export default function DriverPaymentSetup({ user }) {
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم حفظ بيانات الدفع ✅");
     },
-    onError: (err) => toast.error(err?.message || "فشل الحفظ"),
+    onError: (err) => toast.error(friendlyError(err, "فشل الحفظ")),
   });
 
   const handleSave = () => {

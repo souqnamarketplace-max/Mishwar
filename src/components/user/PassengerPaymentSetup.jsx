@@ -7,6 +7,7 @@ import { CheckCircle, Wallet, Building2, Smartphone, CreditCard, AlertCircle } f
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const METHODS = [
   { id: "cash",          label: "نقداً",        icon: Wallet,     color: "bg-green-500/10 text-green-600",   desc: "ادفع للسائق نقداً عند نهاية الرحلة" },
@@ -26,7 +27,7 @@ export default function PassengerPaymentSetup({ user }) {
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم حفظ طريقة الدفع المفضلة ✅");
     },
-    onError: (err) => toast.error(err?.message || "فشل الحفظ"),
+    onError: (err) => toast.error(friendlyError(err, "فشل الحفظ")),
   });
 
   return (

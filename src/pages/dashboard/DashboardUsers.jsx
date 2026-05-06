@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import Pagination from "@/components/dashboard/Pagination";
 import { usePaginatedData } from "@/hooks/usePaginatedData";
 
@@ -83,7 +84,7 @@ export default function DashboardUsers() {
       setShowModal(false);
     },
     onError: (error) => {
-      toast.error(error.message || "حدث خطأ في التحديث");
+      toast.error(friendlyError(error, "حدث خطأ في التحديث"));
     }
   });
 
@@ -98,7 +99,7 @@ export default function DashboardUsers() {
       toast.success("تم تحديث حالة المستخدم");
     },
     onError: (error) => {
-      toast.error(error.message || "فشل التحديث");
+      toast.error(friendlyError(error, "فشل التحديث"));
     }
   });
 

@@ -3,6 +3,7 @@ import { captureException } from "@/lib/sentry";
 import MapCityPicker from "@/components/shared/MapCityPicker";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
+import { readSessionUserId } from "@/lib/session";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
@@ -22,18 +23,9 @@ const STEPS_DRIVER = ["اختيار الدور", "معلوماتك", "بيانا
 
 
 async function uploadToSupabase(file) {
-  // Resolve the user UUID from localStorage so the path matches the
-  // ownership policy in migrations/004_storage_hardening.sql.
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-  const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
-  let userId = null;
-  try {
-    const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      userId = parsed?.user?.id;
-    }
-  } catch {}
+  // Resolve the user UUID via the centralized session helper so the path
+  // matches the ownership policy in migrations/004_storage_hardening.sql.
+  const userId = readSessionUserId();
   if (!userId) throw new Error("يجب تسجيل الدخول لرفع الملفات");
 
   const ext = file.name.split('.').pop() || 'jpg';

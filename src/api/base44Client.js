@@ -7,6 +7,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { captureException } from "@/lib/sentry";
+import { readLocalSession as readSession } from "@/lib/session";
 
 // ─── Helpers ─────────────────────────────────────────────────
 
@@ -44,22 +45,15 @@ function withTimeout(promise, ms = 7000, label = 'query') {
 // every 15 seconds. Falling back to ANON_KEY when expired lets RLS handle authz
 // properly (anonymous reads succeed for public tables, denied for protected ones).
 function getRestHeaders() {
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
   const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
   let userToken = ANON_KEY;
-  try {
-    const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // Only use the access_token if it's still valid (not expired).
-      // expires_at is a UNIX timestamp in seconds.
-      const notExpired = parsed?.expires_at && parsed.expires_at * 1000 > Date.now();
-      if (parsed?.access_token && notExpired) {
-        userToken = parsed.access_token;
-      }
-    }
-  } catch {}
+  // readSession returns null if expired/missing/unparseable. When it
+  // returns null we fall back to ANON_KEY so RLS handles authz —
+  // sending an expired Bearer would 401 every request.
+  const session = readSession();
+  if (session?.access_token) {
+    userToken = session.access_token;
+  }
   return {
     apikey: ANON_KEY,
     Authorization: `Bearer ${userToken}`,
@@ -116,20 +110,10 @@ function buildQs({ select = '*', orderBy, ascending = false, limit, filters = {}
 
 
 
-// Read session directly from localStorage — bypasses supabase.auth.getSession() which can hang
-function readLocalSession() {
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-  const PROJECT_REF = SUPABASE_URL?.split('//')[1]?.split('.')[0] || '';
-  try {
-    const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.expires_at && parsed.expires_at * 1000 < Date.now()) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
+// Re-export the centralized session helper under the historical name so
+// existing call sites in this module keep working without churn. New code
+// should import from "@/lib/session" directly.
+const readLocalSession = readSession;
 
 function createEntityClient(tableName) {
   return {

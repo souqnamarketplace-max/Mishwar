@@ -22,23 +22,18 @@
  */
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const PROJECT_REF       = SUPABASE_URL?.split("//")[1]?.split(".")[0] || "";
 
+import { readLocalSession } from "@/lib/session";
+
+// Thin wrapper that returns just the (token, email) shape this module
+// uses. The expiry check is already done inside readLocalSession.
 function readSessionFromStorage() {
-  try {
-    const raw = localStorage.getItem(`sb-${PROJECT_REF}-auth-token`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    const expValid =
-      parsed?.expires_at && parsed.expires_at * 1000 > Date.now();
-    if (!parsed?.access_token || !expValid) return null;
-    return {
-      token: parsed.access_token,
-      email: parsed?.user?.email || null,
-    };
-  } catch {
-    return null;
-  }
+  const session = readLocalSession();
+  if (!session?.access_token) return null;
+  return {
+    token: session.access_token,
+    email: session?.user?.email || null,
+  };
 }
 
 export async function logAdminAction(action, targetType, targetId, details = {}) {
