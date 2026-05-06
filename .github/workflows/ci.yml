@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-flight runs for the same ref when a new push lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build + lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+        # Lint is non-fatal for now — the codebase has known unused-var
+        # warnings that aren't worth blocking on. Switch to `npm run lint`
+        # without continue-on-error once those are cleaned up.
+        continue-on-error: true
+
+      - name: Build
+        # Build IS fatal — anything that breaks the bundle should never reach main.
+        run: npm run build
+        env:
+          # Build needs these to construct env-conditional code paths;
+          # actual values come from Vercel at deploy time.
+          VITE_SUPABASE_URL: https://placeholder-for-ci.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder
+
+      - name: Verify console statements stripped from production
+        # Audit M-05: vite.config.js drops console/debugger when
+        # NODE_ENV=production. If a future change accidentally ships
+        # them, fail the build.
+        run: |
+          if grep -rn 'console\.' dist/assets/*.js > /tmp/leaked.txt; then
+            echo "::error::console.* statements found in production bundle:"
+            cat /tmp/leaked.txt
+            exit 1
+          fi
+
+      - name: Verify no hardcoded credentials
+        # Audit H-02: anon key fallbacks were a foot-gun. Block them at CI.
+        run: |
+          if grep -rn 'sb_publishable_\|sb_secret_\|service_role' \
+               --include='*.js' --include='*.jsx' --include='*.ts' --include='*.tsx' \
+               --include='*.md' --include='*.json' \
+               api/ src/ 2>/dev/null; then
+            echo "::error::hardcoded Supabase credentials found"
+            exit 1
+          fi

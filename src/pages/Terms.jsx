@@ -1,13 +1,26 @@
 import { useSEO } from "@/hooks/useSEO";
 import React from "react";
 
+// Bump this date whenever the terms text is materially updated.
+const LAST_UPDATED_ISO = "2026-05-01";
+
+function formatArabicMonthYear(iso) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat("ar-EG", { month: "long", year: "numeric" }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
 export default function Terms() {
   useSEO({ title: "شروط الاستخدام", description: "شروط استخدام منصة مِشوار" });
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12" dir="rtl">
       <h1 className="text-3xl font-black mb-2">شروط الاستخدام</h1>
-      <p className="text-muted-foreground text-sm mb-8">آخر تحديث: أبريل 2026</p>
+      <p className="text-muted-foreground text-sm mb-8">آخر تحديث: {formatArabicMonthYear(LAST_UPDATED_ISO)}</p>
 
       {[
         { title: "1. القبول بالشروط", body: "باستخدامك لمنصة مِشوار، فإنك توافق على الالتزام بهذه الشروط. إذا لم توافق على أي بند، يرجى عدم استخدام الخدمة." },

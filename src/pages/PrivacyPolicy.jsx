@@ -1,13 +1,27 @@
 import { useSEO } from "@/hooks/useSEO";
 import React from "react";
 
+// Bump this date whenever the policy text is materially updated.
+// It is rendered in Arabic via Intl.DateTimeFormat below.
+const LAST_UPDATED_ISO = "2026-05-01";
+
+function formatArabicMonthYear(iso) {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat("ar-EG", { month: "long", year: "numeric" }).format(d);
+  } catch {
+    return iso;
+  }
+}
+
 export default function PrivacyPolicy() {
   useSEO({ title: "سياسة الخصوصية", description: "سياسة خصوصية وحماية البيانات في مِشوار" });
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12" dir="rtl">
       <h1 className="text-3xl font-black mb-2">سياسة الخصوصية</h1>
-      <p className="text-muted-foreground text-sm mb-8">آخر تحديث: أبريل 2026</p>
+      <p className="text-muted-foreground text-sm mb-8">آخر تحديث: {formatArabicMonthYear(LAST_UPDATED_ISO)}</p>
 
       {[
         {
