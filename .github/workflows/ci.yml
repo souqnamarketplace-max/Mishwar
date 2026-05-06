@@ -46,14 +46,26 @@ jobs:
 
       - name: Verify console statements stripped from production
         # Audit M-05: vite.config.js drops console/debugger when
-        # NODE_ENV=production. If a future change accidentally ships
-        # them, fail the build.
+        # NODE_ENV=production. Vendor bundles legitimately contain the
+        # word "console" inside library source (Supabase debug logger
+        # references, etc.) so we only scan our own first-party chunks.
         run: |
-          if grep -rn 'console\.' dist/assets/*.js > /tmp/leaked.txt; then
-            echo "::error::console.* statements found in production bundle:"
+          set -e
+          # Find dist files that are NOT vendor-* and NOT third-party-named
+          our_files=$(find dist/assets -name '*.js' \
+            ! -name 'vendor-*' \
+            ! -name 'recharts*' \
+            ! -name 'leaflet*')
+          if [ -z "$our_files" ]; then
+            echo "::warning::no first-party bundles found to scan"
+            exit 0
+          fi
+          if grep -nH 'console\.' $our_files > /tmp/leaked.txt; then
+            echo "::error::console.* statements found in first-party production bundle:"
             cat /tmp/leaked.txt
             exit 1
           fi
+          echo "OK — no console.* in first-party bundles"
 
       - name: Verify no hardcoded credentials
         # Audit H-02: anon key fallbacks were a foot-gun. Block them at CI.
