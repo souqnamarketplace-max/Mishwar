@@ -14,7 +14,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="مِشوار" />
     <meta name="application-name" content="مِشوار" />
-    <meta name="theme-color" content="#2d6a4f" />
+    <!-- Browser chrome / OS UI tinting. Matches brand forest-green and
+         the theme_color in public/manifest.json so the chrome stays
+         consistent across web, PWA, and add-to-home-screen surfaces. -->
+    <meta name="theme-color" content="#1a3d2a" />
+    <!-- Safari pinned-tab icon: scales the SVG to greyscale + the supplied
+         color. Falls back to apple-touch-icon when not present. We use
+         the same logo source; cosmetic-only, but flagged in audit L-02. -->
+    <link rel="mask-icon" href="/icon-512.png" color="#1a3d2a" />
     <meta name="color-scheme" content="light dark" />
     <link rel="manifest" href="/manifest.json" />
 

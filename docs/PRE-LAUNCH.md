@@ -3,8 +3,8 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (overnight remediation session, complete)
-**HEAD at update:** `7b41951`
+**Last updated:** 2026-05-06 (overnight + early-morning remediation)
+**HEAD at update:** `be5365e`
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied
@@ -37,7 +37,7 @@ Status legend:
 |---|---|---|---|
 | H-01 | CSP allows `unsafe-eval` | ✅ | Shipped in `77f8da3` — `unsafe-eval` removed; added object-src/base-uri/form-action/manifest-src. `unsafe-inline` retained pending nonce-based CSP work. |
 | H-02 | Hardcoded anon-key fallbacks | ✅ | Shipped in `77f8da3` — falls through to env-only, no hardcoded keys in source. |
-| H-03 | Sentry is a stub | ⏳ | Plan: `npm i @sentry/react` + uncomment init in `src/lib/sentry.js`. |
+| H-03 | Sentry is a stub | ✅ | `9a8ae9c` — production-ready helper that auto-activates when `@sentry/react` is installed and `VITE_SENTRY_DSN` is set. PII scrubbing baked in. To enable: `npm i @sentry/react` + add DSN to Vercel env. |
 | H-04 | Password floor 6 chars | ✅ | Shipped in `42a5d4e` — raised to 8 chars + score≥3 + common-password block. |
 | H-05 | SECURITY DEFINER missing search_path | 📦 | Migration `002` ALTERs every known SECURITY DEFINER function. |
 | H-06 | No CAPTCHA on signup | ⏳ | Enable in Supabase Dashboard → Auth → enable Captcha protection (hCaptcha integration). |
@@ -61,9 +61,9 @@ Status legend:
 | M-05 | Console statements in prod | ✅ | Vite drops `console`/`debugger` in prod (`42a5d4e`). Verified zero in dist bundles. |
 | M-06 | Coupons table unwired | ⏳ | Either wire redemption flow or hide admin UI. |
 | M-07 | Plaintext payment columns | ⏳ | pgsodium encryption or audit-logged side table. |
-| M-08 | No backup procedure documented | ⏳ | Confirm Supabase plan; document in DEPLOY.md. |
-| M-09 | No alerting | ⏳ | Vercel email + Supabase quota + UptimeRobot. |
-| M-10 | No rate limiting on /api routes | ⏳ | Upstash Redis or in-memory. |
+| M-08 | No backup procedure documented | ✅ | `docs/OPERATIONS.md` (`be5365e`) — backup strategy, RPO per plan, disaster scenarios, restore procedure. |
+| M-09 | No alerting | ✅ | `docs/OPERATIONS.md` (`be5365e`) — monitoring signals + thresholds + setup steps for Vercel/Supabase/UptimeRobot/Sentry alerts. Setup is a checklist for the operator. |
+| M-10 | No rate limiting on /api routes | ✅ | `api/_rate-limit.js` (`be5365e`) — in-memory limiter at 30 req/min on `/api/og`, 60 req/min on `/api/trip`. Caveats documented (per-instance, not global). |
 | M-11 | OG cache too aggressive | ✅ | Shipped in `77f8da3` — lowered to s-maxage=30, swr=60. |
 | M-12 | available_seats negative-clamp | 📦 | Migration `002` verifies/adds CHECK constraint. |
 | M-13 | Hardcoded test driver emails | ⏳ | Audit prod for `*@mishware.com` accounts. |
