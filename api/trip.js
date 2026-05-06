@@ -11,6 +11,7 @@
 
 import { readFileSync } from "fs";
 import { join } from "path";
+import { rateLimit } from "./_rate-limit.js";
 
 // Configuration. SUPA_URL and SUPA_KEY are required at runtime; the
 // previous version of this file shipped a hardcoded anon-key fallback
@@ -62,6 +63,13 @@ function setMeta(html, attr, attrVal, contentVal) {
 }
 
 export default async function handler(req, res) {
+  // Rate limit per-IP. 60 requests/minute is generous for a real
+  // user clicking around, but blocks scraper / retry-storm patterns.
+  // See api/_rate-limit.js for caveats (per-instance, in-memory).
+  if (!rateLimit(req, res, { max: 60, windowMs: 60_000, keyPrefix: "trip:" })) {
+    return;
+  }
+
   const { id } = req.query;
 
   if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {

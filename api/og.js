@@ -16,6 +16,7 @@
 
 import { readFileSync } from "fs";
 import { join } from "path";
+import { rateLimit } from "./_rate-limit.js";
 
 const TITLE_MAX = 200;
 const DESC_MAX  = 400;
@@ -62,6 +63,13 @@ function setMeta(html, attr, attrVal, contentVal) {
 }
 
 export default function handler(req, res) {
+  // Rate limit per-IP. /api/og is a low-cost endpoint but reflects
+  // user-controlled query into the response — keeping the cap tight
+  // limits the value of any future XSS-class issue from being scaled.
+  if (!rateLimit(req, res, { max: 30, windowMs: 60_000, keyPrefix: "og:" })) {
+    return;
+  }
+
   const title       = clean(req.query.title, TITLE_MAX);
   const description = clean(req.query.description, DESC_MAX);
   const url         = clean(req.query.url, URL_MAX);
