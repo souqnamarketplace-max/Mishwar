@@ -26,7 +26,12 @@ export default defineConfig({
           'vendor-query':   ['@tanstack/react-query'],
           'vendor-supabase':['@supabase/supabase-js'],
           'vendor-leaflet': ['leaflet', 'react-leaflet'],
-          'vendor-charts':  ['recharts'],
+          // recharts intentionally NOT split into its own vendor chunk —
+          // it's only used by src/components/dashboard/DashboardCharts.jsx
+          // which is already lazy-imported. Letting Vite co-locate it
+          // with that lazy chunk means non-admin routes never load
+          // recharts at all, and admin routes load it asynchronously
+          // after the dashboard shell paints.
         },
       },
     },

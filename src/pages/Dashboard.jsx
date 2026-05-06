@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
@@ -29,7 +29,10 @@ import {
   Star, AlertCircle, Bell, Clock, CreditCard
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+// Recharts is heavy (~420KB / 113KB gzipped). Pull it into a lazy chunk
+// so even admins don't pay for it on initial dashboard nav — the charts
+// stream in after the rest of the dashboard renders.
+const DashboardCharts = lazy(() => import("@/components/dashboard/DashboardCharts"));
 
 import { useSEO } from "@/hooks/useSEO";
 const statusColors = {
@@ -162,77 +165,21 @@ function Overview() {
         ))}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="bg-card rounded-xl border border-border p-4">
-          <h3 className="font-bold text-sm mb-4">توزيع المستخدمين</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
-                  {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-4 mt-2">
-            {pieData.map((d) => (
-              <div key={d.name} className="flex items-center gap-2 text-xs">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
-                <span>{d.name} ({d.value.toLocaleString()})</span>
-              </div>
-            ))}
-          </div>
+      {/* Charts Row — lazy-loaded so recharts doesn't block initial dashboard paint */}
+      <Suspense fallback={
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          {[0,1,2].map(i => (
+            <div key={i} className="bg-card rounded-xl border border-border p-4 h-64 animate-pulse" />
+          ))}
         </div>
-
-        <div className="bg-card rounded-xl border border-border p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm">الرحلات خلال آخر 7 أيام</h3>
-            <Badge variant="outline" className="text-xs">إجمالي</Badge>
-          </div>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(40, 10%, 90%)" />
-                <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="value" stroke="hsl(135, 20%, 30%)" fill="hsl(135, 20%, 30%)" fillOpacity={0.1} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border p-4">
-          <h3 className="font-bold text-sm mb-2">الإيرادات</h3>
-          <div className="flex items-baseline gap-2 mb-1">
-            {/* Mirrors the totalRevenue stat at the top of the page —
-                filtered to confirmed/completed bookings so the number
-                here agrees with the Payments tab and the top stat row. */}
-            <span className="text-2xl font-bold text-primary">₪{totalRevenue.toLocaleString()}</span>
-          </div>
-          <div className="flex items-center gap-1 mb-4">
-            <TrendingUp className="w-3 h-3 text-muted-foreground" />
-            {/* Real period-over-period delta lands when we have at least
-                one previous full period to compare against. Until then
-                a static label keeps the UI honest instead of a fabricated
-                "+18.2%" growth claim. */}
-            <span className="text-xs text-muted-foreground">— مقارنة بالشهر الماضي</span>
-          </div>
-          <div className="h-36">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(40, 10%, 90%)" />
-                <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                <YAxis tick={{ fontSize: 9 }} />
-                <Tooltip />
-                <Area type="monotone" dataKey="value" stroke="hsl(90, 35%, 42%)" fill="hsl(90, 35%, 42%)" fillOpacity={0.1} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      }>
+        <DashboardCharts
+          pieData={pieData}
+          chartData={chartData}
+          revenueData={revenueData}
+          totalRevenue={totalRevenue}
+        />
+      </Suspense>
 
       {/* Recent Trips + Notifications */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
