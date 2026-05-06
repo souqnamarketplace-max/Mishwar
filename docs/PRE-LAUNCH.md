@@ -3,9 +3,9 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (full overnight + same-day SQL apply session)
-**HEAD at update:** `c5ae9b5`
-**SQL applied to production:** migrations `002`, `003`, `006` ✓
+**Last updated:** 2026-05-06 (content audit + admin UI session)
+**HEAD at update:** `9ca3ee5`
+**SQL applied to production:** migrations `002`, `003`, `006` ✓ — `007` pending
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied to production
@@ -197,6 +197,37 @@ exploit confirm, storage paths, and the admin dashboard.
 
 ---
 
+## Hardcoded content audit (separate from main audit)
+
+Beyond the security findings, a separate content sweep
+(2026-05-06, [`docs/HARDCODED-CONTENT-AUDIT.md`](HARDCODED-CONTENT-AUDIT.md))
+identified 8 surfaces where the app was shipping false claims about
+the business — fake stats, fake testimonials, fake team, fake blog
+posts, placeholder support contact, fake driver fallback, fake hero
+"+10,000 users" badge, and an unverified Twitter handle. These were
+material App Store / Play Store rejection risks and ethical issues.
+
+Status:
+| # | Item | Status |
+|---|---|---|
+| 1 | Fake stats bar (10,000 users / 5,000 trips) | ✅ Code (`8fb70af`) gates entire bar on `app_settings.public_stats_enabled`; admin UI shipped in `9ca3ee5` |
+| 2 | Fake testimonials with quoted savings | ✅ Code (`8fb70af`) fetches from `public.testimonials`; admin UI shipped in `9ca3ee5` |
+| 3 | Fake AboutUs team (4 fictional people) | ✅ Code (`8fb70af`) fetches from `public.team_members`; admin UI shipped in `9ca3ee5` |
+| 4 | Fake blog posts dated 2024 | ✅ Code (`8fb70af`) fetches from `public.blog_posts`; admin UI shipped in `9ca3ee5` |
+| 5 | Footer support contact placeholders | ✅ `2c6f087` — wired to `app_settings.support_email/phone`, hidden when empty |
+| 6 | Hardcoded driver name fallback "محمد درويش" | ✅ `2c6f087` — replaced with generic "السائق" |
+| 7 | Fake hero "+10,000 users" badge | ✅ Code (`8fb70af`) gates on `app_settings.hero_badge_text`; admin UI shipped in `9ca3ee5` |
+| 8 | Unverified Twitter handle `@mishwarps` | ✅ `2c6f087` — removed from index.html (twitter:site + sameAs); comment left explaining how to re-enable |
+
+**Required to take effect:**
+1. Apply [`migrations/007_admin_editable_content.sql`](../migrations/007_admin_editable_content.sql) in Supabase SQL Editor (creates `testimonials`, `team_members`, `blog_posts` tables + `app_settings` columns)
+2. Open `/dashboard?tab=content` to populate testimonials, team, blog
+3. Open `/dashboard?tab=settings` to set `hero_badge_text` and toggle stats bar
+4. All four sections render NOTHING until populated — that's the correct
+   launch-day state. No fake content will ship.
+
+---
+
 ## Documentation index
 
 - [`/WAKEUP.md`](../WAKEUP.md) — overnight session summary
@@ -204,4 +235,5 @@ exploit confirm, storage paths, and the admin dashboard.
 - [`/docs/OPERATIONS.md`](OPERATIONS.md) — backup, alerting, incident response
 - [`/docs/CAPACITOR.md`](CAPACITOR.md) — App Store / Play Store wrapper runbook
 - [`/docs/SMOKE-TEST.md`](SMOKE-TEST.md) — post-deploy verification checklist
+- [`/docs/HARDCODED-CONTENT-AUDIT.md`](HARDCODED-CONTENT-AUDIT.md) — fake-content sweep + remediation
 - [`/migrations/`](../migrations) — every SQL migration, numbered + ordered
