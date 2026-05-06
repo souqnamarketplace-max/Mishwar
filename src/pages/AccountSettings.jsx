@@ -669,61 +669,25 @@ export default function AccountSettings() {
         </div>
 
         {/* Driver License Section */}
-        {/* PASSENGER ONLY: Become a driver upgrade card */}
+        {/* PASSENGER ONLY: Slim entry point pointing to the dedicated
+            5-step wizard at /become-driver. The previous in-page form
+            (instant promotion + scroll wall of 10 fields) was confusing
+            and failed to convert. The wizard is the primary path now. */}
         {user?.account_type === "passenger" && (
-          <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-accent/10 rounded-2xl border-2 border-primary/30 p-6 space-y-3 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-12 translate-x-12" />
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-accent/5 rounded-full translate-y-8 -translate-x-8" />
-            <div className="relative">
-              <div className="flex items-start gap-3 mb-3">
+          <Link to="/become-driver" className="block">
+            <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-accent/10 rounded-2xl border-2 border-primary/30 p-5 hover:border-primary/50 transition-colors">
+              <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 text-2xl">
                   🚗
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-foreground text-base">تفعيل حساب السائق</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">انشر رحلاتك واربح من المقاعد الفارغة</p>
+                  <h3 className="font-bold text-foreground text-base">كن سائقاً في مِشوار</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">5 خطوات سهلة • 3-5 دقائق</p>
                 </div>
+                <Shield className="w-5 h-5 text-primary shrink-0" />
               </div>
-              <div className="space-y-1.5 mb-4 text-xs text-foreground/80">
-                <div className="flex items-center gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>انشر رحلاتك بين المدن الفلسطينية</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>اربح دخلاً إضافياً من المقاعد الفارغة</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-primary">✓</span>
-                  <span>قابل أشخاصاً جدداً وشارك الطريق</span>
-                </div>
-              </div>
-              <Button
-                onClick={async () => {
-                  // Confirmed via UI button — no native confirm() needed
-                  try {
-                    await base44.auth.updateMe({ account_type: "both" });
-                    toast.success("تم تفعيل حساب السائق! أكمل رفع الوثائق أدناه ↓");
-                    qc.invalidateQueries({ queryKey: ["me"] });
-                    // Refresh AuthContext too — needed for navbar to show driver features
-                    if (typeof window !== "undefined") {
-                      // Trigger AuthContext refresh by reloading user data
-                      setTimeout(() => window.location.reload(), 800);
-                    }
-                  } catch (err) {
-                    toast.error("فشل التحديث. حاول مجدداً");
-                  }
-                }}
-                className="w-full bg-primary text-primary-foreground rounded-xl gap-2 h-11"
-              >
-                <Shield className="w-4 h-4" />
-                تفعيل حساب السائق الآن
-              </Button>
-              <p className="text-[10px] text-center text-muted-foreground mt-2">
-                ستحتاج لتقديم 5 وثائق: الرخصة، تسجيل المركبة، التأمين، وسيلفي للهوية
-              </p>
             </div>
-          </div>
+          </Link>
         )}
 
         {user?.account_type && (user.account_type === "driver" || user.account_type === "both") && (

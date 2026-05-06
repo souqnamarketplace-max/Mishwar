@@ -115,6 +115,24 @@ export default function AccountHub() {
         </div>
       </Link>
 
+      {/* Become a driver — passengers only. Lifted to the top of the
+          list because a 5-step wizard is the primary upgrade path and
+          burying it under settings is a known friction point. */}
+      {!isDriver && (
+        <Link to="/become-driver" className="block mb-4">
+          <div className="bg-gradient-to-br from-primary via-primary to-primary/85 rounded-2xl p-4 flex items-center gap-3 shadow-md hover:shadow-lg transition-shadow">
+            <div className="w-12 h-12 rounded-xl bg-white/15 backdrop-blur-sm flex items-center justify-center text-2xl shrink-0">
+              🚗
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-primary-foreground">كن سائقاً في مِشوار</p>
+              <p className="text-xs text-primary-foreground/80 mt-0.5">اربح من مقاعدك الفارغة — التسجيل 5 دقائق</p>
+            </div>
+            <ChevronLeft className="w-4 h-4 text-primary-foreground/70 shrink-0" />
+          </div>
+        </Link>
+      )}
+
       <div className="bg-card border border-border rounded-2xl overflow-hidden">
         <Link to="/account-settings/profile" className="block">
           <AccountHubItem icon={User} label="إعدادات الملف الشخصي" sublabel="الاسم، الهاتف، الجنس، الصورة" onClick={() => {}} />

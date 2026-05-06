@@ -44,6 +44,7 @@ const DriverDashboard  = lazy(() => import('./pages/DriverDashboard'));
 const Notifications    = lazy(() => import('./pages/Notifications'));
 const UserProfile      = lazy(() => import('./pages/UserProfile'));
 const Onboarding       = lazy(() => import('./pages/Onboarding'));
+const BecomeDriver     = lazy(() => import('./pages/BecomeDriver'));
 const AboutUs          = lazy(() => import('./pages/AboutUs'));
 const Blog             = lazy(() => import('./pages/Blog'));
 const Safety           = lazy(() => import('./pages/Safety'));
@@ -149,6 +150,7 @@ const AuthenticatedApp = () => {
         <Route path="/account-settings/profile" element={<AccountSettings />} />
         <Route path="/feedback" element={<Feedback />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/become-driver" element={<BecomeDriver />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>

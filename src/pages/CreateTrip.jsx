@@ -100,7 +100,7 @@ export default function CreateTrip() {
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
           لنشر الرحلات تحتاج لتفعيل حساب السائق وإكمال التحقق من الوثائق.
         </p>
-        <Link to="/settings" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
+        <Link to="/become-driver" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
           تفعيل حساب السائق
         </Link>
       </div>
