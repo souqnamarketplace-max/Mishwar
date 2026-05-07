@@ -298,6 +298,14 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     ? [{ icon: CreditCard, label: "مدفوعات السائق", path: "/driver?tab=payments" }]
                     : []
                   ),
+                  // Become-a-driver entry — passenger-only. Mirrors the
+                  // top-of-list gradient card in AccountHub. Without this
+                  // a mobile passenger has no obvious in-app path into
+                  // the upgrade wizard from the side drawer.
+                  ...(user && user.account_type === "passenger"
+                    ? [{ icon: Car, label: "كن سائقاً في مِشوار", path: "/become-driver" }]
+                    : []
+                  ),
                   // Safety / moderation entries — without these, mobile users
                   // could file reports or block people from a 3-dot menu but
                   // had no obvious way to follow up on submitted reports or
@@ -306,7 +314,13 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   // them in the drawer next to the rest of the account menu.
                   { icon: Flag,    label: "بلاغاتي",                path: "/settings?section=reports" },
                   { icon: Shield,  label: "المستخدمون المحظورون",   path: "/settings?section=blocked" },
-                  { icon: Settings,      label: "إعدادات متقدمة",          path: "/account-settings/profile#license" },
+                  // إعدادات متقدمة links to the license management section,
+                  // which is driver-only. For passengers this would link
+                  // to a section that isn't rendered for them — confusing.
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                    ? [{ icon: Settings, label: "إعدادات متقدمة", path: "/account-settings/profile#license" }]
+                    : []
+                  ),
                 ].map(({ icon: Icon, label, path }) => (
                   <Link
                     key={path}

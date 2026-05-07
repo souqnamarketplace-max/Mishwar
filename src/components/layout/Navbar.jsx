@@ -67,11 +67,24 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            <Link to="/create-trip">
-              <Button size="sm" className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
-                أنشر رحلة
-              </Button>
-            </Link>
+            {/* Primary CTA — context-aware. Drivers see "post a trip"
+                (the action they actually want); passengers see the
+                upgrade pitch. Previously every user saw "أنشر رحلة"
+                and passengers got bounced through a gate to /become-driver
+                — wasted click + felt broken. */}
+            {(user?.account_type === "driver" || user?.account_type === "both") ? (
+              <Link to="/create-trip">
+                <Button size="sm" className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
+                  أنشر رحلة
+                </Button>
+              </Link>
+            ) : user ? (
+              <Link to="/become-driver">
+                <Button size="sm" variant="outline" className="hidden sm:flex border-primary/30 text-primary hover:bg-primary/5 rounded-xl">
+                  كن سائقاً
+                </Button>
+              </Link>
+            ) : null}
             <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
@@ -154,11 +167,19 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <Link to="/create-trip" onClick={() => setMobileOpen(false)}>
-                <Button className="w-full mt-2 bg-primary text-primary-foreground rounded-xl">
-                  أنشر رحلة
-                </Button>
-              </Link>
+              {(user?.account_type === "driver" || user?.account_type === "both") ? (
+                <Link to="/create-trip" onClick={() => setMobileOpen(false)}>
+                  <Button className="w-full mt-2 bg-primary text-primary-foreground rounded-xl">
+                    أنشر رحلة
+                  </Button>
+                </Link>
+              ) : user ? (
+                <Link to="/become-driver" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" className="w-full mt-2 border-primary/30 text-primary rounded-xl">
+                    كن سائقاً
+                  </Button>
+                </Link>
+              ) : null}
               <Link
                 to={`/profile?email=${user?.email}`}
                 onClick={() => setMobileOpen(false)}

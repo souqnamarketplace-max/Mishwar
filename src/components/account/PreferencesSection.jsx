@@ -55,9 +55,17 @@ export default function PreferencesSection({ user, onSaved }) {
     </button>
   );
 
+  // Role-aware copy: drivers' preferences appear ON their trips so
+  // passengers know what to expect; passengers' preferences appear on
+  // their profile so drivers can see them when they request a seat.
+  const isDriver = user?.account_type === "driver" || user?.account_type === "both";
+  const subtitle = isDriver
+    ? "ستظهر هذه التفضيلات على ملفك الشخصي وعلى رحلاتك"
+    : "ستظهر هذه التفضيلات على ملفك الشخصي ليراها السائقون";
+
   return (
     <div className="space-y-6">
-      <p className="text-sm text-muted-foreground">ستظهر هذه التفضيلات على ملفك الشخصي وعلى رحلاتك</p>
+      <p className="text-sm text-muted-foreground">{subtitle}</p>
 
       <div>
         <h4 className="font-bold text-sm text-foreground mb-3">التدخين</h4>
