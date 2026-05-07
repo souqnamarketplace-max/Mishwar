@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import RouteMap from "@/components/shared/RouteMap";
-import { sanitizeText } from "@/lib/validation";
+import { sanitizeText, todayISO, isFutureOrToday } from "@/lib/validation";
 
 import { checkDriverEligibility, daysUntil } from "@/lib/driverEligibility";
 const steps = [
@@ -250,13 +250,27 @@ export default function CreateTrip() {
       if (!form.to_city) { toast.error("يرجى اختيار مدينة الوصول ⚠️"); return false; }
       if (form.from_city === form.to_city) { toast.error("مدينة الانطلاق والوصول لا يمكن أن تكونا نفس المدينة ⚠️"); return false; }
       if (!form.date) { toast.error("يرجى تحديد تاريخ المغادرة ⚠️"); return false; }
+      // Catch typed-in past dates that bypassed the picker's `min` attribute
+      if (!isFutureOrToday(form.date)) { toast.error("لا يمكن نشر رحلة في تاريخ سابق ⚠️"); return false; }
       if (!form.time) { toast.error("يرجى تحديد وقت المغادرة ⚠️"); return false; }
-      // Validate every stop has city + time
+      // Validate every stop has city + non-negative price
       for (let i = 0; i < form.stops.length; i++) {
         const s = form.stops[i];
         if (!s.city) { toast.error(`المحطة ${i + 1}: يرجى اختيار المدينة ⚠️`); return false; }
         if (s.city === form.from_city || s.city === form.to_city) { toast.error(`المحطة ${i + 1}: لا يمكن أن تكون نفس مدينة الانطلاق أو الوصول ⚠️`); return false; }
+        const stopPrice = parseFloat(s.price_from_origin);
+        if (isNaN(stopPrice) || stopPrice < 0) { toast.error(`المحطة ${i + 1}: السعر يجب أن يكون رقماً صحيحاً ⚠️`); return false; }
       }
+    }
+    if (currentStep === 2) {
+      // Step 2 (seats + price) had NO validation before. Users could
+      // submit zero/negative prices, zero seats, or empty values.
+      const seats = parseInt(form.available_seats, 10);
+      if (isNaN(seats) || seats < 1) { toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️"); return false; }
+      if (seats > 8) { toast.error("الحد الأقصى للمقاعد هو 8 ⚠️"); return false; }
+      const price = parseFloat(form.price);
+      if (isNaN(price) || price <= 0) { toast.error("السعر يجب أن يكون أكبر من صفر ⚠️"); return false; }
+      if (price > 1000) { toast.error("السعر مرتفع جداً — تحقق من المبلغ ⚠️"); return false; }
     }
     if (currentStep === 3) {
       if (!form.car_model) { toast.error("يرجى إدخال نوع السيارة ⚠️"); return false; }
@@ -656,6 +670,8 @@ export default function CreateTrip() {
                 type="number"
                 value={form.price}
                 onChange={(e) => updateField("price", parseInt(e.target.value))}
+                min="1"
+                max="1000"
                 className="h-11 rounded-xl mt-1 max-w-xs"
               />
             </div>

@@ -1,5 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
+import { todayISO, isFutureOrToday } from "@/lib/validation";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
@@ -204,6 +205,11 @@ export default function AccountSettings() {
       toast.error("يرجى ملء جميع البيانات والمستندات المطلوبة");
       return;
     }
+    // Past-date guard — input min={today} blocks the picker but not
+    // hand-typed dates. Don't accept already-expired documents.
+    if (!isFutureOrToday(licenseExpiry))   { toast.error("تاريخ انتهاء الرخصة لا يمكن أن يكون في الماضي ⚠️"); return; }
+    if (!isFutureOrToday(carRegistrationExpiry)) { toast.error("تاريخ انتهاء تسجيل المركبة لا يمكن أن يكون في الماضي ⚠️"); return; }
+    if (!isFutureOrToday(insuranceExpiry))      { toast.error("تاريخ انتهاء التأمين لا يمكن أن يكون في الماضي ⚠️"); return; }
     setLicenseLoading(true);
     try {
       if (driverLicense) {
@@ -767,6 +773,7 @@ export default function AccountSettings() {
                 <Label>تاريخ انتهاء الرخصة</Label>
                 <Input
                   type="date"
+                  min={todayISO()}
                   value={licenseExpiry}
                   onChange={(e) => setLicenseExpiry(e.target.value)}
                   className="rounded-xl h-10 mt-1"
@@ -776,6 +783,7 @@ export default function AccountSettings() {
                 <Label>تاريخ انتهاء تسجيل المركبة</Label>
                 <Input
                   type="date"
+                  min={todayISO()}
                   value={carRegistrationExpiry}
                   onChange={(e) => setCarRegistrationExpiry(e.target.value)}
                   className="rounded-xl h-10 mt-1"
@@ -785,6 +793,7 @@ export default function AccountSettings() {
                 <Label>تاريخ انتهاء التأمين</Label>
                 <Input
                   type="date"
+                  min={todayISO()}
                   value={insuranceExpiry}
                   onChange={(e) => setInsuranceExpiry(e.target.value)}
                   className="rounded-xl h-10 mt-1"

@@ -8,6 +8,7 @@ import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { todayISO, isFutureOrToday } from "@/lib/validation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -413,7 +414,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             <div className="p-4 space-y-4">
               <div>
                 <label className="text-sm text-muted-foreground">السعر (₪)</label>
-                <Input type="number" value={editForm.price ?? ""} onChange={e => setEditForm(f => ({...f, price: parseFloat(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
+                <Input type="number" min="1" max="1000" value={editForm.price ?? ""} onChange={e => setEditForm(f => ({...f, price: parseFloat(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">وقت الانطلاق</label>
@@ -421,7 +422,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">المقاعد المتاحة</label>
-                <Input type="number" min="0" max="8" value={editForm.available_seats ?? ""} onChange={e => setEditForm(f => ({...f, available_seats: parseInt(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
+                <Input type="number" min="1" max="8" value={editForm.available_seats ?? ""} onChange={e => setEditForm(f => ({...f, available_seats: parseInt(e.target.value)}))} className="mt-1 h-10 rounded-xl" />
               </div>
               <div>
                 <label className="text-sm text-muted-foreground">ملاحظة للركاب</label>
@@ -445,7 +446,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">التاريخ</label>
-                      <Input type="date" value={editForm.date ?? ""} onChange={e => setEditForm(f => ({...f, date: e.target.value}))} className="mt-1 h-10 rounded-xl" />
+                      <Input type="date" min={todayISO()} value={editForm.date ?? ""} onChange={e => setEditForm(f => ({...f, date: e.target.value}))} className="mt-1 h-10 rounded-xl" />
                     </div>
                   </div>
 
@@ -464,7 +465,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                           <button type="button" onClick={() => setEditForm(f => ({...f, stops: f.stops.filter((_, i) => i !== idx)}))} className="text-xs text-destructive hover:underline">حذف</button>
                         </div>
                         <Input value={stop.city ?? ""} onChange={e => setEditForm(f => ({...f, stops: f.stops.map((s, i) => i === idx ? {...s, city: e.target.value} : s)}))} placeholder="مدينة المحطة" className="h-9 rounded-lg" />
-                        <Input type="number" value={stop.price_from_origin ?? 0} onChange={e => setEditForm(f => ({...f, stops: f.stops.map((s, i) => i === idx ? {...s, price_from_origin: parseFloat(e.target.value) || 0} : s)}))} placeholder="السعر (₪)" className="h-9 rounded-lg" />
+                        <Input type="number" min="0" max="1000" value={stop.price_from_origin ?? 0} onChange={e => setEditForm(f => ({...f, stops: f.stops.map((s, i) => i === idx ? {...s, price_from_origin: parseFloat(e.target.value) || 0} : s)}))} placeholder="السعر (₪)" className="h-9 rounded-lg" />
                       </div>
                     ))}
                   </div>
@@ -495,10 +496,27 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
 
             <div className="p-4 border-t border-border flex gap-2 sticky bottom-0 bg-card">
               <Button className="flex-1 rounded-xl" onClick={() => {
+                // Save-time validation — input attributes don't catch
+                // typed-in values that bypass the picker. Block past
+                // dates and zero/negative price/seats from going to DB.
+                const price = parseFloat(editForm.price);
+                if (isNaN(price) || price <= 0) {
+                  toast.error("السعر يجب أن يكون أكبر من صفر ⚠️");
+                  return;
+                }
+                const seats = parseInt(editForm.available_seats, 10);
+                if (isNaN(seats) || seats < 1) {
+                  toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️");
+                  return;
+                }
+                if (editForm.date && !isFutureOrToday(editForm.date)) {
+                  toast.error("لا يمكن نقل الرحلة إلى تاريخ سابق ⚠️");
+                  return;
+                }
                 const cleanStops = (editForm.stops || []).filter(s => s && s.city && s.city.trim()).map(s => ({
                   city: s.city.trim(),
                   location: (s.location || "").trim(),
-                  price_from_origin: Number(s.price_from_origin) || 0,
+                  price_from_origin: Math.max(0, Number(s.price_from_origin) || 0),
                 }));
                 const payload = { ...editForm };
                 delete payload._bookingsCount;

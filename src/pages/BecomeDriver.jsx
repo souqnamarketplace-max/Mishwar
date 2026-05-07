@@ -134,12 +134,17 @@ export default function BecomeDriver() {
   };
 
   // ── Per-step validation ────────────────────────────────────────────────────
+  // Past-date guard helper — input min={today} blocks the picker but
+  // not typed values. We re-check at step-validation time so a typed-in
+  // expired date can't pass the wizard.
+  const dateOK = (d) => !!d && d >= TODAY_ISO();
+
   const stepValid = (s) => {
     switch (s) {
       case 0: return true; // intro is always valid
-      case 1: return !!(form.license_number && form.expiry_date && form.license_image_url);
-      case 2: return !!(form.car_registration_expiry_date && form.car_registration_url
-                     && form.insurance_expiry_date && form.insurance_url);
+      case 1: return !!(form.license_number && dateOK(form.expiry_date) && form.license_image_url);
+      case 2: return !!(dateOK(form.car_registration_expiry_date) && form.car_registration_url
+                     && dateOK(form.insurance_expiry_date) && form.insurance_url);
       case 3: return !!(form.selfie_1_url && form.selfie_2_url);
       case 4: return [1,2,3].every(stepValid);
       default: return false;

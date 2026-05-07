@@ -1,5 +1,6 @@
 import { CITIES } from "@/lib/cities";
 import { captureException } from "@/lib/sentry";
+import { todayISO } from "@/lib/validation";
 import MapCityPicker from "@/components/shared/MapCityPicker";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
@@ -399,7 +400,7 @@ export default function Onboarding() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">تاريخ الانتهاء *</label>
-                      <Input type="date" value={form.license_expiry} onChange={(e) => setForm({ ...form, license_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                      <Input type="date" min={todayISO()} value={form.license_expiry} onChange={(e) => setForm({ ...form, license_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
                     </div>
                   </div>
                   <div>
@@ -430,7 +431,7 @@ export default function Onboarding() {
                   <p className="text-sm font-bold flex items-center gap-2">🚗 استمارة السيارة</p>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">تاريخ انتهاء الاستمارة</label>
-                    <Input type="date" value={form.car_reg_expiry} onChange={(e) => setForm({ ...form, car_reg_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                    <Input type="date" min={todayISO()} value={form.car_reg_expiry} onChange={(e) => setForm({ ...form, car_reg_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
                   </div>
                   <div>
                     <Button
@@ -459,7 +460,7 @@ export default function Onboarding() {
                   <p className="text-sm font-bold flex items-center gap-2">🛡️ وثيقة التأمين</p>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">تاريخ انتهاء التأمين</label>
-                    <Input type="date" value={form.insurance_expiry} onChange={(e) => setForm({ ...form, insurance_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                    <Input type="date" min={todayISO()} value={form.insurance_expiry} onChange={(e) => setForm({ ...form, insurance_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
                   </div>
                   <div>
                     <Button

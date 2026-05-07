@@ -69,22 +69,22 @@ export default function DashboardSettings() {
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">نسبة العمولة (%)</label>
-            <input type="number" value={form.commission_rate} onChange={(e) => update("commission_rate", parseInt(e.target.value))}
+            <input type="number" min="0" max="100" value={form.commission_rate} onChange={(e) => update("commission_rate", parseInt(e.target.value))}
               className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none" />
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">الحد الأدنى للسعر (₪)</label>
-            <input type="number" value={form.min_price} onChange={(e) => update("min_price", parseInt(e.target.value))}
+            <input type="number" min="0" value={form.min_price} onChange={(e) => update("min_price", parseInt(e.target.value))}
               className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none" />
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">الحد الأقصى للسعر (₪)</label>
-            <input type="number" value={form.max_price} onChange={(e) => update("max_price", parseInt(e.target.value))}
+            <input type="number" min="1" value={form.max_price} onChange={(e) => update("max_price", parseInt(e.target.value))}
               className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none" />
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">الحد الأقصى للمقاعد</label>
-            <input type="number" value={form.max_seats} onChange={(e) => update("max_seats", parseInt(e.target.value))}
+            <input type="number" min="1" max="8" value={form.max_seats} onChange={(e) => update("max_seats", parseInt(e.target.value))}
               className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none" />
           </div>
         </div>

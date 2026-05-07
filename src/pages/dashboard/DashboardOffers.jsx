@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tag, Plus, Trash2, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { todayISO } from "@/lib/validation";
 
 export default function DashboardOffers() {
   const qc = useQueryClient();
@@ -89,7 +90,7 @@ export default function DashboardOffers() {
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">الحد الأقصى للاستخدام</label>
               <input
-                type="number"
+                type="number" min="1"
                 value={form.max_uses}
                 onChange={(e) => setForm((f) => ({ ...f, max_uses: parseInt(e.target.value) }))}
                 className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
@@ -99,6 +100,7 @@ export default function DashboardOffers() {
               <label className="text-xs text-muted-foreground mb-1 block">تاريخ الانتهاء</label>
               <input
                 type="date"
+                min={todayISO()}
                 value={form.expires_at}
                 onChange={(e) => setForm((f) => ({ ...f, expires_at: e.target.value }))}
                 className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"

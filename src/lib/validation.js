@@ -251,3 +251,36 @@ export function getContactViolation(text) {
 export function phoneWarning() {
   return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. يمكنك التواصل عبر التطبيق فقط بعد تأكيد الحجز.";
 }
+
+// ─── DATE / NUMBER GUARDS ──────────────────────────────────────────────────
+// Defensive helpers for form inputs.
+//
+// <input type="date" min={today}> prevents pickers from offering past
+// dates, but does NOT prevent the user from typing/pasting a past
+// date directly (especially on iOS Safari and some Android browsers).
+//
+// <input type="number" min="0"> prevents the up-arrow from going
+// below 0, but the user can still TYPE -50 or 0 directly.
+//
+// These checks must therefore happen at submit-time as well, not
+// just on the input attribute. Use these helpers in your validate()
+// functions to catch the typed-around case.
+
+/** ISO date string (yyyy-MM-dd) for today, in local time. */
+export function todayISO() {
+  return new Date().toISOString().split("T")[0];
+}
+
+/** True if the given yyyy-MM-dd string is today or later. */
+export function isFutureOrToday(dateStr) {
+  if (!dateStr) return false;
+  // Compare strings — yyyy-MM-dd sorts lexicographically by date when
+  // both sides are zero-padded. Avoids time-zone gotchas.
+  return dateStr >= todayISO();
+}
+
+/** True if dateStr is strictly after today (i.e. tomorrow or later). */
+export function isStrictlyFuture(dateStr) {
+  if (!dateStr) return false;
+  return dateStr > todayISO();
+}
