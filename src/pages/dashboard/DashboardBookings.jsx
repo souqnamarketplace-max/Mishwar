@@ -105,7 +105,7 @@ export default function DashboardBookings() {
                         </select>
                       </td>
                       <td className="p-3 text-muted-foreground text-xs">
-                        {booking.created_at ? ((booking.created_at) ? new Date(booking.created_at).toLocaleDateString("ar") : "—") : "—"}
+                        {booking.created_at ? ((booking.created_at) ? new Date(booking.created_at).toLocaleDateString("ar-EG") : "—") : "—"}
                       </td>
                     </tr>
                   );

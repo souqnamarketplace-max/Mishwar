@@ -1,21 +1,20 @@
 import React, { useRef } from "react";
 import { Calendar } from "lucide-react";
+import { formatArabicDate } from "@/lib/validation";
 
 /**
  * DateInput — replaces native <input type="date"> across the app.
  * Shows an Arabic placeholder when no date is selected, while keeping
  * the native date-picker fully functional.
+ *
+ * Date format: Gregorian + Arabic month names ("٦ مايو ٢٠٢٦"), per
+ * Palestinian convention. We do NOT use ar-SA because that defaults
+ * to the Hijri/Islamic calendar which is unfamiliar in Palestine.
  */
 export default function DateInput({ value, onChange, className = "", min, max, placeholder = "اختر التاريخ" }) {
   const inputRef = useRef(null);
 
-  const formatted = value
-    ? new Date(value + "T00:00:00").toLocaleDateString("ar-SA", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : null;
+  const formatted = value ? formatArabicDate(value + "T00:00:00") : null;
 
   return (
     <div

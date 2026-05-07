@@ -243,7 +243,7 @@ export default function DashboardUsers() {
                       </Badge>
                     </td>
                     <td className="p-3 text-xs text-muted-foreground">
-                      {((user.created_at) ? new Date(user.created_at).toLocaleDateString("ar") : "—")}
+                      {((user.created_at) ? new Date(user.created_at).toLocaleDateString("ar-EG") : "—")}
                     </td>
                     <td className="p-3">
                       <div className="flex items-center gap-1">
@@ -387,7 +387,7 @@ export default function DashboardUsers() {
               <div className="col-span-2">
                 <Label className="text-sm">معلومات إضافية</Label>
                 <div className="mt-1 space-y-1.5 text-xs text-muted-foreground">
-                  <p>📅 تاريخ التسجيل: {(selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString("ar") : "—")}</p>
+                  <p>📅 تاريخ التسجيل: {(selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString("ar-EG") : "—")}</p>
                   {selectedUser.phone && <p>📱 الهاتف المسجل: {selectedUser.phone}</p>}
                   {selectedUser.city && <p>📍 المدينة: {selectedUser.city}</p>}
                 </div>

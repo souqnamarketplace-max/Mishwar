@@ -31,7 +31,7 @@ function formatJoinedDate(dateStr) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   if (isNaN(d)) return null;
-  return d.toLocaleDateString("ar", { year: "numeric", month: "long" });
+  return d.toLocaleDateString("ar-EG", { year: "numeric", month: "long" });
 }
 
 export default function UserProfile() {

@@ -112,7 +112,7 @@ function Overview() {
 
   // Chart data from recent trips
   const chartData = trips.slice(0, 7).map((trip, i) => ({
-    name: safeDate(trip.created_at).toLocaleDateString("ar"),
+    name: safeDate(trip.created_at).toLocaleDateString("ar-EG"),
     value: trip?.price || 0,
   }));
 
@@ -139,7 +139,7 @@ function Overview() {
     from: trip.from_city,
     to: trip.to_city,
     driver: trip.driver_name,
-    date: safeDate(trip.created_at).toLocaleDateString("ar"),
+    date: safeDate(trip.created_at).toLocaleDateString("ar-EG"),
     time: trip.time,
     status: trip.status,
   }));
@@ -224,7 +224,7 @@ function Overview() {
                <div>
                  <p className="text-xs">{n.message}</p>
                  <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
-                   <Clock className="w-3 h-3" />{safeDate(n.created_at).toLocaleDateString("ar")}
+                   <Clock className="w-3 h-3" />{safeDate(n.created_at).toLocaleDateString("ar-EG")}
                  </p>
                </div>
              </div>

@@ -78,7 +78,7 @@ export default function BlockedUsersSection({ user }) {
             )}
             {b.created_at && (
               <p className="text-[10px] text-muted-foreground mt-0.5">
-                {new Date(b.created_at).toLocaleDateString("ar")}
+                {new Date(b.created_at).toLocaleDateString("ar-EG")}
               </p>
             )}
           </div>

@@ -162,7 +162,7 @@ function AnnouncementsTab() {
                   ) : (
                     <>
                       <p className="text-sm">{a.text}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{a.created_at ? new Date(a.created_at).toLocaleDateString("ar") : "—"}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{a.created_at ? new Date(a.created_at).toLocaleDateString("ar-EG") : "—"}</p>
                     </>
                   )}
                 </div>
@@ -554,7 +554,7 @@ function BlogTab() {
                   {p.excerpt && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.excerpt}</p>}
                   <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1.5">
                     {p.author_name && <span>✍️ {p.author_name}</span>}
-                    {p.published_at && <span>📅 {new Date(p.published_at).toLocaleDateString("ar")}</span>}
+                    {p.published_at && <span>📅 {new Date(p.published_at).toLocaleDateString("ar-EG")}</span>}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">

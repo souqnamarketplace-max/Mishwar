@@ -108,7 +108,7 @@ export default function DashboardSupport() {
                   </div>
                   <p className="text-xs text-muted-foreground mb-1">{ticket.description || "—"}</p>
                   <p className="text-xs text-muted-foreground">
-                    {ticket.user_name || ticket.user_email || "—"} • {((ticket.created_at) ? new Date(ticket.created_at).toLocaleDateString("ar") : "—")}
+                    {ticket.user_name || ticket.user_email || "—"} • {((ticket.created_at) ? new Date(ticket.created_at).toLocaleDateString("ar-EG") : "—")}
                   </p>
                 </div>
                 <div className="flex gap-2 items-center shrink-0">

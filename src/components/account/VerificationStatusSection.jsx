@@ -85,17 +85,32 @@ export default function VerificationStatusSection() {
         </div>
       )}
 
-      {/* State 4: Expired or no docs */}
+      {/* State 4: Cannot publish trips. Three sub-cases:
+            - first_time_pending: brand-new driver awaiting initial approval
+            - expired_no_pending: previously approved, docs expired, no resubmit yet
+            - no_docs: never submitted */}
       {!eligibility.allowed && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+        <div className={`rounded-xl p-4 border ${
+          eligibility.reason === "first_time_pending"
+            ? "bg-yellow-500/10 border-yellow-500/30"
+            : "bg-red-500/10 border-red-500/30"
+        }`}>
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${
+              eligibility.reason === "first_time_pending" ? "text-yellow-600" : "text-red-600"
+            }`} />
             <div className="flex-1">
               <h3 className="font-bold text-foreground mb-1">
-                {eligibility.reason === "no_docs" ? "لم ترفع وثائق بعد" : "انتهت صلاحية الوثائق"}
+                {eligibility.reason === "no_docs"
+                  ? "لم ترفع وثائق بعد"
+                  : eligibility.reason === "first_time_pending"
+                  ? "وثائقك قيد المراجعة"
+                  : "انتهت صلاحية الوثائق"}
               </h3>
               <p className="text-sm text-muted-foreground">
-                لا يمكنك نشر رحلات حالياً. يرجى رفع وثائق محدثة.
+                {eligibility.reason === "first_time_pending"
+                  ? "ستتمكن من نشر الرحلات فور قبول وثائقك. مدة المراجعة عادة 1-3 أيام عمل."
+                  : "لا يمكنك نشر رحلات حالياً. يرجى رفع وثائق محدثة."}
               </p>
             </div>
           </div>

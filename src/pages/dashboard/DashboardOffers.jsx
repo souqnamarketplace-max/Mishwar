@@ -141,7 +141,7 @@ export default function DashboardOffers() {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     خصم {coupon.discount_percent}% • استُخدم {coupon.uses_count || 0}/{coupon.max_uses} مرة
-                    {coupon.expires_at && ` • ينتهي ${new Date(coupon.expires_at).toLocaleDateString("ar")}`}
+                    {coupon.expires_at && ` • ينتهي ${new Date(coupon.expires_at).toLocaleDateString("ar-EG")}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

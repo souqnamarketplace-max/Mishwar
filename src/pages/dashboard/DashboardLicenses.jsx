@@ -207,7 +207,7 @@ export default function DashboardLicenses() {
                       <td className="p-3 font-medium">{license.driver_name}</td>
                       <td className="p-3 text-xs text-muted-foreground">{license.driver_email}</td>
                       <td className="p-3 font-mono text-xs">{license.license_number}</td>
-                      <td className="p-3">{new Date(license.expiry_date).toLocaleDateString("ar")}</td>
+                      <td className="p-3">{new Date(license.expiry_date).toLocaleDateString("ar-EG")}</td>
                       <td className="p-3">
                         <Badge className={`${config.bg} ${config.text} text-xs gap-1`}>
                           <Icon className="w-3 h-3" />
@@ -215,7 +215,7 @@ export default function DashboardLicenses() {
                         </Badge>
                       </td>
                       <td className="p-3 text-xs text-muted-foreground">
-                        {new Date(license.submitted_at).toLocaleDateString("ar")}
+                        {new Date(license.submitted_at).toLocaleDateString("ar-EG")}
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
@@ -256,11 +256,11 @@ export default function DashboardLicenses() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">تاريخ الانتهاء</p>
-                  <p className="text-sm font-medium">{new Date(selectedLicense.expiry_date).toLocaleDateString("ar")}</p>
+                  <p className="text-sm font-medium">{new Date(selectedLicense.expiry_date).toLocaleDateString("ar-EG")}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">تاريخ التقديم</p>
-                  <p className="text-sm font-medium">{new Date(selectedLicense.submitted_at).toLocaleDateString("ar")}</p>
+                  <p className="text-sm font-medium">{new Date(selectedLicense.submitted_at).toLocaleDateString("ar-EG")}</p>
                 </div>
               </div>
 
@@ -289,7 +289,7 @@ export default function DashboardLicenses() {
                       <p className="text-xs font-medium text-foreground">{doc.label}</p>
                       {doc.expiry && selectedLicense[doc.expiry] && (
                         <p className="text-[10px] text-muted-foreground">
-                          ينتهي: {new Date(selectedLicense[doc.expiry]).toLocaleDateString("ar")}
+                          ينتهي: {new Date(selectedLicense[doc.expiry]).toLocaleDateString("ar-EG")}
                           {new Date(selectedLicense[doc.expiry]) < new Date() && (
                             <span className="text-destructive font-bold mr-1">(منتهي ⚠️)</span>
                           )}

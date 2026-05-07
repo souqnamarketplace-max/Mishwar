@@ -124,7 +124,7 @@ export default function DashboardFeedback() {
                         <span className="text-[10px] text-muted-foreground">{ticket.category}</span>
                       </div>
                       <p className="text-xs text-muted-foreground mb-1">
-                        {ticket.user_name} ({ticket.user_role}) • {new Date(ticket.created_at).toLocaleDateString("ar-SA")}
+                        {ticket.user_name} ({ticket.user_role}) • {new Date(ticket.created_at).toLocaleDateString("ar-EG")}
                       </p>
                       <p className="text-sm text-foreground line-clamp-2">{ticket.description}</p>
                       {ticket.admin_note && (

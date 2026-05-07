@@ -983,7 +983,7 @@ function formatDateLabel(iso) {
   // Within last 7 days: show weekday name (e.g. الأحد)
   const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
   if (diffDays >= 0 && diffDays < 7) {
-    return d.toLocaleDateString("ar", { weekday: "long" });
+    return d.toLocaleDateString("ar-EG", { weekday: "long" });
   }
   // Older: Palestinian DD/MM/YYYY format
   const dd = String(d.getDate()).padStart(2, "0");

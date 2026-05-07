@@ -227,7 +227,7 @@ export default function DashboardPayments() {
                     </Badge>
                   </td>
                   <td className="p-3 text-muted-foreground text-xs">
-                    {((b.created_at) ? new Date(b.created_at).toLocaleDateString("ar") : "—")}
+                    {((b.created_at) ? new Date(b.created_at).toLocaleDateString("ar-EG") : "—")}
                   </td>
                   <td className="p-3">
                     {b.payment_status === "paid" ? (

@@ -89,7 +89,7 @@ export default function PassengerPaymentsSection({ user }) {
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {trip?.date || new Date(b.created_date || b.created_at).toLocaleDateString("ar")}
+                    {trip?.date || new Date(b.created_date || b.created_at).toLocaleDateString("ar-EG")}
                     {b.payment_method && ` · ${b.payment_method === "cash" ? "نقداً" : b.payment_method}`}
                   </span>
                   <span className="font-bold text-primary text-sm">

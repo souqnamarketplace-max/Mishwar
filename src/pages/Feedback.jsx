@@ -144,7 +144,7 @@ export default function Feedback() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-foreground truncate">{ticket.subject || typeInfo.label}</p>
-                      <p className="text-xs text-muted-foreground">{ticket.category} • {new Date(ticket.created_at).toLocaleDateString("ar-SA")}</p>
+                      <p className="text-xs text-muted-foreground">{ticket.category} • {new Date(ticket.created_at).toLocaleDateString("ar-EG")}</p>
                     </div>
                     <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${statusInfo.color}`}>{statusInfo.label}</span>
                     {isOpen ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />}

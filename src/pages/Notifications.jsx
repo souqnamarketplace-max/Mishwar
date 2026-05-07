@@ -379,7 +379,7 @@ export default function Notifications() {
                             </span>
                           )}
                           <span className="text-xs text-muted-foreground">
-                            {((notif.created_at) ? new Date(notif.created_at).toLocaleDateString("ar") : "—")}
+                            {((notif.created_at) ? new Date(notif.created_at).toLocaleDateString("ar-EG") : "—")}
                           </span>
                         </div>
                       </div>

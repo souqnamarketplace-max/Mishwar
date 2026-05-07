@@ -423,6 +423,15 @@ export default function CreateTrip() {
         icon: "📄",
         title: "لم تقدم وثائق بعد",
         message: "لرفع وثائق قيادتك ومركبتك، يرجى إكمال الإعداد من صفحة الحساب.",
+        ctaLabel: "تفعيل حساب السائق",
+        ctaPath: "/become-driver",
+      },
+      first_time_pending: {
+        icon: "⏳",
+        title: "وثائقك قيد المراجعة",
+        message: "شكراً على إرسال وثائقك. يقوم فريقنا بمراجعتها خلال 1-3 أيام عمل. ستصلك إشعار فور القبول، وعندها يمكنك نشر رحلاتك.",
+        ctaLabel: "تتبّع حالة الوثائق",
+        ctaPath: "/account-settings/profile#license",
       },
       expired_no_pending: {
         icon: "⚠️",
@@ -430,6 +439,8 @@ export default function CreateTrip() {
         message: eligibility.lastRejected
           ? `وثائقك السابقة انتهت ولم تتم الموافقة على آخر تحديث: ${eligibility.lastRejected.rejection_reason || "بدون سبب"}. يرجى رفع وثائق محدثة.`
           : "صلاحية وثائقك انتهت ولم ترفع وثائق جديدة. يرجى تحديثها لتتمكن من نشر الرحلات.",
+        ctaLabel: "رفع وثائق جديدة",
+        ctaPath: "/account-settings/profile#license",
       },
     };
     const info = reasonMap[eligibility.reason] || reasonMap.expired_no_pending;
@@ -442,9 +453,9 @@ export default function CreateTrip() {
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">{info.title}</h2>
           <p className="text-muted-foreground mb-4">{info.message}</p>
-          <Link to="/account-settings/profile#license">
+          <Link to={info.ctaPath}>
             <Button className="bg-primary text-primary-foreground rounded-xl mt-4">
-              رفع وثائق جديدة
+              {info.ctaLabel}
             </Button>
           </Link>
         </div>

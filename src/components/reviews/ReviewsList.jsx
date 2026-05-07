@@ -48,7 +48,7 @@ export default function ReviewsList({ driverEmail }) {
             <p className="text-sm text-muted-foreground pr-10">{review.comment}</p>
           )}
           <p className="text-xs text-muted-foreground/60 mt-2 pr-10">
-            {((review.created_at) ? new Date(review.created_at).toLocaleDateString("ar") : "—")}
+            {((review.created_at) ? new Date(review.created_at).toLocaleDateString("ar-EG") : "—")}
           </p>
         </div>
       ))}

@@ -284,3 +284,35 @@ export function isStrictlyFuture(dateStr) {
   if (!dateStr) return false;
   return dateStr > todayISO();
 }
+
+// ─── ARABIC DATE FORMATTING ────────────────────────────────────────────────
+// Use these instead of `toLocaleDateString("ar-SA", ...)` or bare
+// `toLocaleDateString("ar", ...)`. The "ar-SA" locale defaults to the
+// Hijri (Islamic) calendar, which is unfamiliar in Palestine where the
+// Gregorian calendar with Arabic month names is the standard format used
+// in newspapers, government documents, and everyday life.
+//
+// "ar-EG" gives Gregorian dates with Arabic month names ("٦ مايو ٢٠٢٦"),
+// which is the modern Levantine convention. This matches Palestinian
+// users' expectations and matches how dates appear elsewhere in the app
+// (Blog.jsx already used ar-EG).
+
+export function formatArabicDate(input, options = { day: "numeric", month: "long", year: "numeric" }) {
+  if (!input) return "";
+  const d = input instanceof Date ? input : new Date(input);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("ar-EG", options);
+}
+
+export function formatArabicDateShort(input) {
+  return formatArabicDate(input, { day: "numeric", month: "short", year: "numeric" });
+}
+
+export function formatArabicDateNumeric(input) {
+  // For tables / dense UI — "06/05/2026" with Arabic numerals
+  return formatArabicDate(input, { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+export function formatArabicWeekday(input) {
+  return formatArabicDate(input, { weekday: "long" });
+}

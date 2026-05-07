@@ -42,11 +42,30 @@ export function checkDriverEligibility(licenses, today = new Date()) {
     };
   }
 
-  if (pending) {
+  // Pending grace ONLY applies to drivers who were previously approved
+  // and whose docs expired — they can keep posting while their renewal
+  // is reviewed. A driver awaiting their FIRST approval must not be
+  // allowed to post; this was the bug where a brand-new driver could
+  // submit the wizard and immediately publish trips before any human
+  // ever reviewed their license.
+  if (pending && approved.length > 0) {
     return {
       allowed: true,
       reason: "pending_grace",
-      latest: approved[0] || null,
+      latest: approved[0],
+      pending,
+      lastRejected,
+    };
+  }
+
+  // First-time pending — explicit block with a distinct reason so the
+  // UI can show "your documents are under review" rather than a
+  // generic expired-docs message.
+  if (pending) {
+    return {
+      allowed: false,
+      reason: "first_time_pending",
+      latest: null,
       pending,
       lastRejected,
     };
