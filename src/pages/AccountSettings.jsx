@@ -1,6 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import { todayISO, isFutureOrToday } from "@/lib/validation";
+import { compressImage } from "@/lib/compressImage";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
@@ -65,6 +66,10 @@ export default function AccountSettings() {
   const [selfie1Url, setSelfie1Url] = useState("");
   const [selfie2Url, setSelfie2Url] = useState("");
   const [licenseLoading, setLicenseLoading] = useState(false);
+  // Per-field upload state — same pattern as BecomeDriver.jsx. Lets the
+  // 5 license/registration/insurance/selfie inputs run concurrently
+  // instead of blocking each other through a shared boolean.
+  const [uploadingFields, setUploadingFields] = useState({});
 
   // Delete account
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -256,12 +261,12 @@ export default function AccountSettings() {
     setLicenseLoading(false);
   };
 
-  const uploadFile = async (e, setUrl, fileType = "صورة") => {
+  const uploadFile = async (e, setUrl, fileType = "صورة", fieldKey = fileType) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    if (file.size > 8 * 1024 * 1024) {
-      toast.error("حجم الملف يجب أن يكون أقل من 8 MB");
+
+    if (file.size > 12 * 1024 * 1024) {
+      toast.error("حجم الملف يجب أن يكون أقل من 12 MB");
       return;
     }
     if (!file.type.startsWith("image/") && !file.type.includes("pdf")) {
@@ -269,14 +274,19 @@ export default function AccountSettings() {
       return;
     }
 
-    setLicenseLoading(true);
+    // Per-field uploading state lets multiple fields upload concurrently
+    setUploadingFields(prev => ({ ...prev, [fieldKey]: true }));
     try {
+      // Compress images client-side before upload — typical phone-camera
+      // shot drops from 6-8 MB to ~500 KB. PDFs pass through.
+      const compressed = await compressImage(file).catch(() => file);
+
       // Use Supabase storage directly (bypasses base44 upload).
       // Path is UUID-namespaced so storage RLS policies in
       // migrations/004_storage_hardening.sql can enforce ownership.
-      const ext = file.name.split(".").pop();
+      const ext = (compressed.name || file.name).split(".").pop();
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("uploads").upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("uploads").upload(path, compressed, { upsert: true });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);
       setUrl(publicUrl);
@@ -284,8 +294,13 @@ export default function AccountSettings() {
     } catch (err) {
       console.error("Upload error:", err);
       toast.error(`خطأ في رفع ${fileType}: ${friendlyError(err, "حاول مجدداً")}`);
+    } finally {
+      setUploadingFields(prev => {
+        const next = { ...prev };
+        delete next[fieldKey];
+        return next;
+      });
     }
-    setLicenseLoading(false);
   };
 
   const deleteAccount = async () => {
@@ -810,19 +825,19 @@ export default function AccountSettings() {
                   <input
                     id="license-file"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     className="hidden"
-                    onChange={(e) => uploadFile(e, setLicenseImageUrl, "رخصة القيادة")}
-                    disabled={licenseLoading}
+                    onChange={(e) => uploadFile(e, setLicenseImageUrl, "رخصة القيادة", "license")}
+                    disabled={uploadingFields.license}
                   />
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl gap-2 w-full mt-1" 
-                    disabled={licenseLoading}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl gap-2 w-full mt-1"
+                    disabled={uploadingFields.license}
                     onClick={() => document.getElementById("license-file").click()}
                   >
                     <Image className="w-4 h-4" />
-                    {licenseImageUrl ? "✓ تم الرفع" : "اختر صورة"}
+                    {uploadingFields.license ? "جاري الرفع..." : licenseImageUrl ? "✓ تم الرفع — تغيير" : "اختر صورة"}
                   </Button>
                 </div>
 
@@ -832,19 +847,19 @@ export default function AccountSettings() {
                   <input
                     id="registration-file"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     className="hidden"
-                    onChange={(e) => uploadFile(e, setCarRegistrationUrl, "تسجيل المركبة")}
-                    disabled={licenseLoading}
+                    onChange={(e) => uploadFile(e, setCarRegistrationUrl, "تسجيل المركبة", "registration")}
+                    disabled={uploadingFields.registration}
                   />
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl gap-2 w-full mt-1" 
-                    disabled={licenseLoading}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl gap-2 w-full mt-1"
+                    disabled={uploadingFields.registration}
                     onClick={() => document.getElementById("registration-file").click()}
                   >
                     <Image className="w-4 h-4" />
-                    {carRegistrationUrl ? "✓ تم الرفع" : "اختر صورة"}
+                    {uploadingFields.registration ? "جاري الرفع..." : carRegistrationUrl ? "✓ تم الرفع — تغيير" : "اختر صورة"}
                   </Button>
                 </div>
 
@@ -854,19 +869,19 @@ export default function AccountSettings() {
                   <input
                     id="insurance-file"
                     type="file"
-                    accept="image/*"
+                    accept="image/*,application/pdf"
                     className="hidden"
-                    onChange={(e) => uploadFile(e, setInsuranceUrl, "التأمين")}
-                    disabled={licenseLoading}
+                    onChange={(e) => uploadFile(e, setInsuranceUrl, "التأمين", "insurance")}
+                    disabled={uploadingFields.insurance}
                   />
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl gap-2 w-full mt-1" 
-                    disabled={licenseLoading}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl gap-2 w-full mt-1"
+                    disabled={uploadingFields.insurance}
                     onClick={() => document.getElementById("insurance-file").click()}
                   >
                     <Image className="w-4 h-4" />
-                    {insuranceUrl ? "✓ تم الرفع" : "اختر صورة"}
+                    {uploadingFields.insurance ? "جاري الرفع..." : insuranceUrl ? "✓ تم الرفع — تغيير" : "اختر صورة"}
                   </Button>
                 </div>
 
@@ -878,17 +893,17 @@ export default function AccountSettings() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => uploadFile(e, setSelfie1Url, "السيلفي الأول")}
-                    disabled={licenseLoading}
+                    onChange={(e) => uploadFile(e, setSelfie1Url, "السيلفي الأول", "selfie1")}
+                    disabled={uploadingFields.selfie1}
                   />
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl gap-2 w-full mt-1" 
-                    disabled={licenseLoading}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl gap-2 w-full mt-1"
+                    disabled={uploadingFields.selfie1}
                     onClick={() => document.getElementById("selfie1-file").click()}
                   >
                     <Image className="w-4 h-4" />
-                    {selfie1Url ? "✓ تم الرفع" : "اختر صورة"}
+                    {uploadingFields.selfie1 ? "جاري الرفع..." : selfie1Url ? "✓ تم الرفع — تغيير" : "اختر صورة"}
                   </Button>
                 </div>
 
@@ -900,24 +915,24 @@ export default function AccountSettings() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => uploadFile(e, setSelfie2Url, "السيلفي الثاني")}
-                    disabled={licenseLoading}
+                    onChange={(e) => uploadFile(e, setSelfie2Url, "السيلفي الثاني", "selfie2")}
+                    disabled={uploadingFields.selfie2}
                   />
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl gap-2 w-full mt-1" 
-                    disabled={licenseLoading}
+                  <Button
+                    variant="outline"
+                    className="rounded-xl gap-2 w-full mt-1"
+                    disabled={uploadingFields.selfie2}
                     onClick={() => document.getElementById("selfie2-file").click()}
                   >
                     <Image className="w-4 h-4" />
-                    {selfie2Url ? "✓ تم الرفع" : "اختر صورة"}
+                    {uploadingFields.selfie2 ? "جاري الرفع..." : selfie2Url ? "✓ تم الرفع — تغيير" : "اختر صورة"}
                   </Button>
                 </div>
               </div>
 
               <Button
                 onClick={updateLicense}
-                disabled={licenseLoading}
+                disabled={licenseLoading || Object.keys(uploadingFields).length > 0}
                 className="w-full bg-primary text-primary-foreground rounded-xl"
               >
                 {licenseLoading ? "جاري التحديث..." : "إرسال المستندات للمراجعة"}

@@ -36,6 +36,7 @@ import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { useAuth } from "@/lib/AuthContext";
+import { compressImage } from "@/lib/compressImage";
 
 const STEPS = [
   { id: 0, title: "البداية",         icon: Sparkles },
@@ -76,7 +77,13 @@ export default function BecomeDriver() {
   // Form state — initialized from existing license if any
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  // Per-field uploading state — keys are field names. Multiple uploads
+  // can run concurrently without one blocking the others. The previous
+  // single boolean made every UploadField look 'uploading' as soon as
+  // any one of them started, and disabled their tap targets — users
+  // had to upload docs strictly sequentially even though Supabase
+  // can handle parallel uploads to UUID-prefixed paths just fine.
+  const [uploadingMap, setUploadingMap] = useState({});
   const [form, setForm] = useState({
     license_number: "",
     expiry_date: "",
@@ -110,18 +117,36 @@ export default function BecomeDriver() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // ── File upload helper (matches AccountSettings.uploadFile) ────────────────
+  // ── File upload helper ────────────────────────────────────────────────────
+  // Per-field uploading state lets multiple uploads run concurrently.
+  // We compress images client-side before upload (canvas API, no extra
+  // dep) so an 8 MB phone-camera photo becomes ~500 KB before it goes
+  // over the wire — typical 10× speedup on mobile networks. PDFs pass
+  // through uncompressed.
+  const setFieldUploading = (key, isUploading) => {
+    setUploadingMap((prev) => {
+      const next = { ...prev };
+      if (isUploading) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+  };
+
   const uploadFile = async (file, fieldKey, label) => {
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 8 MB"); return; }
+    if (file.size > 12 * 1024 * 1024) { toast.error("حجم الملف يجب أن يكون أقل من 12 MB"); return; }
     if (!file.type.startsWith("image/") && !file.type.includes("pdf")) {
       toast.error("يرجى رفع صورة أو ملف PDF فقط"); return;
     }
-    setUploading(true);
+    setFieldUploading(fieldKey, true);
     try {
-      const ext = file.name.split(".").pop();
+      // Compress images before upload — drops a typical phone-camera
+      // shot from ~6-8 MB down to ~500 KB. PDFs pass through.
+      const compressed = await compressImage(file).catch(() => file);
+
+      const ext = (compressed.name || file.name).split(".").pop();
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("uploads").upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("uploads").upload(path, compressed, { upsert: true });
       if (upErr) throw upErr;
       const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);
       set(fieldKey, publicUrl);
@@ -129,9 +154,14 @@ export default function BecomeDriver() {
     } catch (err) {
       toast.error(`خطأ في رفع ${label}: ${friendlyError(err, "حاول مجدداً")}`);
     } finally {
-      setUploading(false);
+      setFieldUploading(fieldKey, false);
     }
   };
+
+  // True if ANY field is currently uploading — used only for the
+  // wizard-level "next/submit" buttons so the user can't advance
+  // mid-upload (and lose progress to a step-change unmount).
+  const anyUploading = Object.keys(uploadingMap).length > 0;
 
   // ── Per-step validation ────────────────────────────────────────────────────
   // Past-date guard helper — input min={today} blocks the picker but
@@ -286,9 +316,9 @@ export default function BecomeDriver() {
           className="bg-card rounded-2xl border border-border p-5 sm:p-6"
         >
           {step === 0 && <StepIntro existingLicense={existingLicense} />}
-          {step === 1 && <StepLicense form={form} set={set} uploadFile={uploadFile} uploading={uploading} />}
-          {step === 2 && <StepVehicle form={form} set={set} uploadFile={uploadFile} uploading={uploading} />}
-          {step === 3 && <StepIdentity form={form} set={set} uploadFile={uploadFile} uploading={uploading} />}
+          {step === 1 && <StepLicense form={form} set={set} uploadFile={uploadFile} uploadingMap={uploadingMap} />}
+          {step === 2 && <StepVehicle form={form} set={set} uploadFile={uploadFile} uploadingMap={uploadingMap} />}
+          {step === 3 && <StepIdentity form={form} set={set} uploadFile={uploadFile} uploadingMap={uploadingMap} />}
           {step === 4 && <StepReview form={form} />}
         </motion.div>
       </AnimatePresence>
@@ -308,7 +338,7 @@ export default function BecomeDriver() {
         {step < STEPS.length - 1 ? (
           <Button
             onClick={() => canAdvance && setStep(step + 1)}
-            disabled={!canAdvance || uploading}
+            disabled={!canAdvance || anyUploading}
             className="rounded-xl gap-1 flex-1 sm:flex-initial"
           >
             {step === 0 ? "ابدأ" : "التالي"}
@@ -317,7 +347,7 @@ export default function BecomeDriver() {
         ) : (
           <Button
             onClick={submit}
-            disabled={!canAdvance || submitting || uploading}
+            disabled={!canAdvance || submitting || anyUploading}
             className="rounded-xl gap-2 flex-1 sm:flex-initial bg-primary"
           >
             {submitting ? "جاري الإرسال..." : <><Check className="w-4 h-4" />إرسال للمراجعة</>}
@@ -387,7 +417,7 @@ function Benefit({ text }) {
 }
 
 // ── STEP 1: License (3 fields) ────────────────────────────────────────────────
-function StepLicense({ form, set, uploadFile, uploading }) {
+function StepLicense({ form, set, uploadFile, uploadingMap }) {
   return (
     <div>
       <h2 className="text-xl font-bold text-foreground mb-1">رخصة القيادة</h2>
@@ -418,7 +448,7 @@ function StepLicense({ form, set, uploadFile, uploading }) {
           label="صورة الرخصة (الجهة الأمامية)"
           value={form.license_image_url}
           onUpload={(file) => uploadFile(file, "license_image_url", "صورة الرخصة")}
-          uploading={uploading}
+          uploading={!!uploadingMap.license_image_url}
           fieldId="license-img"
         />
       </div>
@@ -427,7 +457,7 @@ function StepLicense({ form, set, uploadFile, uploading }) {
 }
 
 // ── STEP 2: Vehicle (4 fields) ───────────────────────────────────────────────
-function StepVehicle({ form, set, uploadFile, uploading }) {
+function StepVehicle({ form, set, uploadFile, uploadingMap }) {
   return (
     <div>
       <h2 className="text-xl font-bold text-foreground mb-1">وثائق المركبة</h2>
@@ -452,7 +482,7 @@ function StepVehicle({ form, set, uploadFile, uploading }) {
             label="صورة تسجيل المركبة"
             value={form.car_registration_url}
             onUpload={(file) => uploadFile(file, "car_registration_url", "تسجيل المركبة")}
-            uploading={uploading}
+            uploading={!!uploadingMap.car_registration_url}
             fieldId="reg-img"
           />
         </div>
@@ -475,7 +505,7 @@ function StepVehicle({ form, set, uploadFile, uploading }) {
             label="صورة التأمين"
             value={form.insurance_url}
             onUpload={(file) => uploadFile(file, "insurance_url", "التأمين")}
-            uploading={uploading}
+            uploading={!!uploadingMap.insurance_url}
             fieldId="ins-img"
           />
         </div>
@@ -485,7 +515,7 @@ function StepVehicle({ form, set, uploadFile, uploading }) {
 }
 
 // ── STEP 3: Identity (2 selfies) ─────────────────────────────────────────────
-function StepIdentity({ form, set, uploadFile, uploading }) {
+function StepIdentity({ form, set, uploadFile, uploadingMap }) {
   return (
     <div>
       <h2 className="text-xl font-bold text-foreground mb-1">صور الهوية</h2>
@@ -496,7 +526,7 @@ function StepIdentity({ form, set, uploadFile, uploading }) {
           label="سيلفي مع الهوية (وجهك ظاهر مع بطاقة الهوية بجانبه)"
           value={form.selfie_1_url}
           onUpload={(file) => uploadFile(file, "selfie_1_url", "سيلفي الهوية")}
-          uploading={uploading}
+          uploading={!!uploadingMap.selfie_1_url}
           fieldId="selfie1"
           hint="تأكد أن الوجه والبطاقة كلاهما واضحان في نفس الصورة"
         />
@@ -504,7 +534,7 @@ function StepIdentity({ form, set, uploadFile, uploading }) {
           label="سيلفي إضافي (الوجه واضحاً، بدون نظارة شمسية أو قبعة)"
           value={form.selfie_2_url}
           onUpload={(file) => uploadFile(file, "selfie_2_url", "السيلفي الإضافي")}
-          uploading={uploading}
+          uploading={!!uploadingMap.selfie_2_url}
           fieldId="selfie2"
         />
       </div>
@@ -577,7 +607,7 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
       <input
         id={fieldId}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         className="hidden"
         onChange={(e) => onUpload(e.target.files?.[0])}
         disabled={uploading}
@@ -594,7 +624,7 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
               disabled={uploading}
               className="text-[11px] text-muted-foreground hover:text-foreground underline"
             >
-              تغيير الصورة
+              {uploading ? "جاري الرفع..." : "تغيير الصورة"}
             </button>
           </div>
         </div>
@@ -603,11 +633,25 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
           type="button"
           onClick={() => document.getElementById(fieldId).click()}
           disabled={uploading}
-          className="w-full mt-1.5 border-2 border-dashed border-border hover:border-primary/50 rounded-xl py-6 text-center transition-colors disabled:opacity-50"
+          className={`w-full mt-1.5 border-2 border-dashed rounded-xl py-6 text-center transition-colors disabled:opacity-60 ${
+            uploading
+              ? "border-primary/40 bg-primary/5"
+              : "border-border hover:border-primary/50"
+          }`}
         >
-          <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
-          <p className="text-sm text-muted-foreground">{uploading ? "جاري الرفع..." : "اضغط لرفع صورة"}</p>
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5">الحد الأقصى 8 ميجابايت</p>
+          {uploading ? (
+            <>
+              <div className="w-5 h-5 mx-auto mb-1 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-primary font-medium">جاري الرفع...</p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">قد يستغرق بضع ثوانٍ</p>
+            </>
+          ) : (
+            <>
+              <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+              <p className="text-sm text-muted-foreground">اضغط لرفع صورة</p>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">صورة أو PDF — حتى 12 ميجابايت</p>
+            </>
+          )}
         </button>
       )}
     </div>
