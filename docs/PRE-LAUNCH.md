@@ -3,8 +3,8 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (storage hardening session — migrations 004 + 005 applied, C-03 closed)
-**HEAD at update:** `18e1186`
+**Last updated:** 2026-05-06 (validation hardening session — past-date + negative-number guards everywhere)
+**HEAD at update:** `a593788`
 **SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006` ✓ — `007` still pending
 
 Status legend:
@@ -236,6 +236,8 @@ shipped, none pending.
 | P-07 | App OG preview image — refreshed with custom mid-century-modern flat illustration (Palestinian terraced hills, olive groves, white sedan). 1200×630, 346 KB. | ✅ | `89b22ad` |
 | P-08 | Trip-share OG preview image — refreshed with companion illustration (two villages connected by winding road, golden hour). Same brand palette. | ✅ | `bcf800d` |
 | P-09 | `car_image` not shown in MyTrips, UserProfile vehicle card, or BookingConfirmation — even though the data was already captured at trip-create time and shown elsewhere (TripCard, FeaturedTrips, TripDetails). Added thumbnails to all three. | ✅ | `b22f9ab` |
+| P-10 | Driver-only features (post-trip CTA, vehicle settings link, "Advanced settings" deep-link) leaking into passenger UIs across desktop Navbar, mobile drawer, and Preferences page. Audited all 7 role-gated surfaces; 4 had leaks. Now: passengers see "كن سائقاً" CTA where drivers see "أنشر رحلة"; mobile drawer hides `#license` deep-link from passengers + adds explicit "كن سائقاً" entry; Preferences subtitle is role-aware. | ✅ | `069b127` |
+| P-11 | Past-date / zero-or-negative number bypass — every `<input type="date">` and `<input type="number">` in the app audited. HTML `min` blocks pickers but not typed values. Added `todayISO()` / `isFutureOrToday()` helpers + submit-time guards in CreateTrip (step 1 date, step 2 price/seats — step 2 had ZERO validation before), DriverTripsList edit modal, AccountSettings/Onboarding/BecomeDriver expiry dates, DashboardOffers, DashboardSettings. UI input attrs tightened to match. | ✅ | `a593788` |
 
 ---
 
