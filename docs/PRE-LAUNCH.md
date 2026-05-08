@@ -3,9 +3,9 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-07 (migration 008 applied — payment columns live, reconciliation flow unblocked)
-**HEAD at update:** `7a9aab8`
-**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006`, `008` ✓ — `007` still pending
+**Last updated:** 2026-05-08 (driver subscription system fully built — sessions 1-3 shipped, kill-switch dormant)
+**HEAD at update:** `776b4df`
+**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006`, `008`, `009` ✓ — `007` and `010` still pending
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied to production
@@ -238,6 +238,44 @@ shipped, none pending.
 | P-09 | `car_image` not shown in MyTrips, UserProfile vehicle card, or BookingConfirmation — even though the data was already captured at trip-create time and shown elsewhere (TripCard, FeaturedTrips, TripDetails). Added thumbnails to all three. | ✅ | `b22f9ab` |
 | P-10 | Driver-only features (post-trip CTA, vehicle settings link, "Advanced settings" deep-link) leaking into passenger UIs across desktop Navbar, mobile drawer, and Preferences page. Audited all 7 role-gated surfaces; 4 had leaks. Now: passengers see "كن سائقاً" CTA where drivers see "أنشر رحلة"; mobile drawer hides `#license` deep-link from passengers + adds explicit "كن سائقاً" entry; Preferences subtitle is role-aware. | ✅ | `069b127` |
 | P-11 | Past-date / zero-or-negative number bypass — every `<input type="date">` and `<input type="number">` in the app audited. HTML `min` blocks pickers but not typed values. Added `todayISO()` / `isFutureOrToday()` helpers + submit-time guards in CreateTrip (step 1 date, step 2 price/seats — step 2 had ZERO validation before), DriverTripsList edit modal, AccountSettings/Onboarding/BecomeDriver expiry dates, DashboardOffers, DashboardSettings. UI input attrs tightened to match. | ✅ | `a593788` |
+
+---
+
+## Driver subscription system (revenue model)
+
+Built across 4 sessions in response to the question "how the driver will pay
+the admin?". Money flows direct passenger→driver (off-platform); drivers
+settle with the platform via a flat ₪30/month subscription. Ships behind a
+kill switch (`app_settings.subscription_required = false` by default) so
+the entire system is dormant until you flip it on. Commission system
+(0% currently) remains as an independent revenue knob — both can be on,
+both can be off, or either alone.
+
+| Session | What | Status | Commit |
+|---|---|---|---|
+| 1 | Migration 009: schema (driver_subscriptions table, 8 app_settings cols, RLS, RPC, triggers) + driver-facing UI (DriverSubscriptionSection.jsx with 5 render states + UploadField for proof image) + AccountHub & mobile-drawer entries + passenger guard | ✅ | `d98e70c`, `ce28a29`, `0a6f3e3` |
+| 2 | Admin approval queue at `/dashboard?tab=subscriptions` (3 views: pending/active/history, 4 stat cards, approve+reject mutations with reason modal) + DashboardSettings new card with kill switch + 4 platform rail fields + MonetizationModeCard at top of settings translating (commission, subscription) into plain Arabic prose ("وضع مجاني" / "وضع العمولة فقط" / "وضع الاشتراك فقط" / "وضع مزدوج") | ✅ | `4fec6ed` |
+| 3 | Trip-creation gate — `checkDriverEligibility()` extended with subscription-aware logic, CreateTrip.jsx renders 3 distinct block messages (`subscription_never_subscribed`, `subscription_expired`, `subscription_pending_review`) with CTAs to /driver?tab=subscription. `subscription_approved` + `subscription_rejected` notifications fired by admin mutation. | ✅ | `776b4df` |
+| 4 | Migration 010: pg_cron-driven `check_subscription_expiry()` function — sends `subscription_expiring_soon` notifications 7 days before period_end (deduplicated via subscription_expiry_warnings table), and flips status='active' rows past their grace window to status='expired'. **Not yet applied — see action items below.** | 📝 | drafted |
+
+**To activate the system after launch (when you have driver volume):**
+
+1. Set commission to whatever you want (0 stays 0; or e.g. 5% from admin panel)
+2. Apply migration 010 (`migrations/010_subscription_expiry_check.sql`)
+3. Schedule the cron job — one-time SQL:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS pg_cron;
+   SELECT cron.schedule(
+     'check-subscription-expiry',
+     '0 9 * * *',
+     $cron$ SELECT public.check_subscription_expiry() $cron$
+   );
+   ```
+4. Configure your platform receiving rails in `/dashboard?tab=settings`:
+   Reflect number, Jawwal Pay number, IBAN, account holder name
+5. Flip the kill switch ON: `subscription_required = true`
+6. Existing drivers fall into `never_subscribed`, see the subscribe form,
+   send you ₪30, you approve from `/dashboard?tab=subscriptions`
 
 ---
 
