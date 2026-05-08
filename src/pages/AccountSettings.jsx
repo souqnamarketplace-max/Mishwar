@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
-import { todayISO, isFutureOrToday } from "@/lib/validation";
+import { todayISO, isFutureOrToday, validatePhone } from "@/lib/validation";
 import { compressImage } from "@/lib/compressImage";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
@@ -161,10 +161,11 @@ export default function AccountSettings() {
   };
 
   const updatePhone = async () => {
-    if (!phone) {
-      toast.error("أدخل رقم الهاتف");
-      return;
-    }
+    // Run the same granular validator the signup form uses, so the user
+    // sees a specific reason ("الرقم قصير جداً", "رموز غير مسموحة", etc.)
+    // instead of just "أدخل رقم الهاتف" when something's malformed.
+    const phoneCheck = validatePhone(phone);
+    if (phoneCheck.reason) { toast.error(phoneCheck.reason); return; }
     setPhoneLoading(true);
     try {
       await base44.auth.updateMe({ phone });
@@ -612,6 +613,25 @@ export default function AccountSettings() {
                 {phoneLoading ? "جاري..." : "حفظ"}
               </Button>
             </div>
+            {/* Live phone validation hint — same UX pattern as the
+                signup and onboarding forms. */}
+            {phone ? (() => {
+              const c = validatePhone(phone);
+              if (c.reason) {
+                return (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                    <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-[9px] font-bold">!</span>
+                    {c.reason}
+                  </p>
+                );
+              }
+              return (
+                <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                  <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-100 dark:bg-green-900/40 text-[9px] font-bold">✓</span>
+                  {c.looksPalestinian ? "رقم فلسطيني صالح" : "رقم دولي صالح"}
+                </p>
+              );
+            })() : null}
           </div>
         </div>
 

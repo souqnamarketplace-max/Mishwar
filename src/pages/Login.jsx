@@ -2,7 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail, validatePasswordCompliance, passwordComplianceMessage } from "@/lib/validation";
+import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail, validatePasswordCompliance, passwordComplianceMessage, validatePhone, validateFullName } from "@/lib/validation";
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -134,7 +134,18 @@ export default function Login() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!form.email || !form.password || !form.fullName) { toast.error('يرجى ملء جميع الحقول'); return; }
+    // Run validators in order and stop at the first failure with that
+    // validator's specific reason (no more "يرجى ملء جميع الحقول" — the
+    // user gets told exactly what's wrong).
+    const nameCheck = validateFullName(form.fullName);
+    if (nameCheck.reason) { toast.error(nameCheck.reason); return; }
+    if (form.phone) {
+      const phoneCheck = validatePhone(form.phone);
+      if (phoneCheck.reason) { toast.error(phoneCheck.reason); return; }
+    }
+    if (!form.email) { toast.error("يرجى إدخال البريد الإلكتروني"); return; }
+    if (!isValidEmail(form.email)) { toast.error("صيغة البريد الإلكتروني غير صحيحة"); return; }
+    if (!form.password) { toast.error("يرجى إدخال كلمة المرور"); return; }
     if (form.password !== form.confirmPassword) { toast.error('كلمتا المرور غير متطابقتين'); return; }
     // Mandatory check: password must satisfy Supabase's server-side policy
     // (lowercase + uppercase + digit + min length). Without this, users get
@@ -153,11 +164,6 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      if (form.phone && !isValidPalestinianPhone(form.phone)) {
-        toast.error("رقم الهاتف غير صحيح. مثال: 05XXXXXXXX");
-        setLoading(false);
-        return;
-      }
       // Note: passwordStrength score check removed. The compliance check
       // above is mandatory and matches Supabase's server policy exactly.
       // The strength score was advisory — adding 1 point for special chars
@@ -325,14 +331,77 @@ export default function Login() {
                   <Input name="fullName" type="text" placeholder="محمد أحمد"
                     value={form.fullName} onChange={handleChange} className="pr-10" autoComplete="name" />
                 </div>
+                {/* Live name validation — only shows when there's an
+                    issue with the typed value. Doesn't clutter the form
+                    when the name is fine. Tells user EXACTLY what's wrong
+                    rather than the generic "fill all fields" toast. */}
+                {form.fullName && (() => {
+                  const c = validateFullName(form.fullName);
+                  if (!c.reason) {
+                    return (
+                      <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-100 dark:bg-green-900/40 text-[9px] font-bold">✓</span>
+                        اسم صالح
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-[9px] font-bold">!</span>
+                      {c.reason}
+                    </p>
+                  );
+                })()}
+                {!form.fullName && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                    استخدم اسمك الحقيقي بالعربية أو الإنجليزية (حرفان على الأقل)
+                  </p>
+                )}
               </div>
               <div>
-                <Label className="mb-1.5 block">رقم الهاتف</Label>
+                <Label className="mb-1.5 block flex items-center justify-between">
+                  <span>رقم الهاتف <span className="text-[10px] font-normal text-slate-500">(اختياري)</span></span>
+                </Label>
                 <div className="relative">
                   <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input name="phone" type="tel" placeholder="059XXXXXXX أو +970591234567"
                     value={form.phone} onChange={handleChange} className="pr-10 text-left" dir="ltr" autoComplete="tel" />
                 </div>
+                {/* Live phone validation — same pattern as name. Shows a
+                    green check + "Palestinian format" badge when the
+                    user enters a recognizable PS number, neutral OK for
+                    other valid international numbers, and a specific
+                    Arabic reason when the input is malformed. */}
+                {form.phone && (() => {
+                  const c = validatePhone(form.phone);
+                  if (c.reason) {
+                    return (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-[9px] font-bold">!</span>
+                        {c.reason}
+                      </p>
+                    );
+                  }
+                  if (c.looksPalestinian) {
+                    return (
+                      <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-100 dark:bg-green-900/40 text-[9px] font-bold">✓</span>
+                        رقم فلسطيني صالح
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-100 dark:bg-green-900/40 text-[9px] font-bold">✓</span>
+                      رقم دولي صالح
+                    </p>
+                  );
+                })()}
+                {!form.phone && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                    مثل: 0591234567 أو ‎+970 لرقم فلسطيني، أو رقم دولي بصيغة E.164
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="mb-1.5 block">البريد الإلكتروني</Label>

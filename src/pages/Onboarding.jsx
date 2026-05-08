@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { isValidPalestinianPhone } from "@/lib/validation";
+import { isValidPalestinianPhone, validatePhone } from "@/lib/validation";
 import { Car, Users, CheckCircle, ArrowLeft, ArrowRight, Phone, MapPin, User, Upload } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -164,8 +164,8 @@ export default function Onboarding() {
   const validateStep = () => {
     if (step === 0 && !accountType) { toast.error("يرجى اختيار نوع الحساب ⚠️"); return false; }
     if (step === 1) {
-      if (!form.phone) { toast.error("يرجى إدخال رقم الهاتف ⚠️"); return false; }
-      if (!isValidPalestinianPhone(form.phone)) { toast.error("رقم الهاتف غير صحيح. مثال: 05XXXXXXXX ⚠️"); return false; }
+      const phoneCheck = validatePhone(form.phone);
+      if (phoneCheck.reason) { toast.error(phoneCheck.reason); return false; }
       if (!form.city) { toast.error("يرجى اختيار مدينتك ⚠️"); return false; }
     }
     if (step === 2 && isDriver) {
@@ -303,6 +303,30 @@ export default function Onboarding() {
                         dir="ltr"
                       />
                     </div>
+                    {/* Live phone validation hint — same UX pattern as
+                        the signup form. Tells driver exactly what's
+                        wrong before they hit "next" instead of after. */}
+                    {form.phone ? (() => {
+                      const c = validatePhone(form.phone);
+                      if (c.reason) {
+                        return (
+                          <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-[9px] font-bold">!</span>
+                            {c.reason}
+                          </p>
+                        );
+                      }
+                      return (
+                        <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                          <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-100 dark:bg-green-900/40 text-[9px] font-bold">✓</span>
+                          {c.looksPalestinian ? "رقم فلسطيني صالح" : "رقم دولي صالح"}
+                        </p>
+                      );
+                    })() : (
+                      <p className="text-[11px] text-muted-foreground mt-1.5">
+                        مثل: 0591234567 أو ‎+970 لرقم فلسطيني
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-2 block">مدينتك <span className="text-destructive">*</span></label>

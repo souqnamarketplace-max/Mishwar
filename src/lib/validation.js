@@ -21,6 +21,115 @@ export function isValidPalestinianPhone(phone) {
 // Backward-compat alias
 export const isValidPhone = isValidPalestinianPhone;
 
+// ─── DETAILED PHONE COMPLIANCE
+// Returns granular pass/fail flags so the UI can show a live indicator
+// next to the phone input (same pattern as password requirements).
+// `reason` (when present) is a specific Arabic message explaining what
+// the user needs to fix — never a generic "invalid phone".
+//
+// Recognized "good" formats (any of these passes):
+//   - Palestinian local:   05XXXXXXXX (10 digits, starts with 05)
+//   - Palestinian intl:    +970 5XXXXXXXX
+//   - Israeli intl:        +972 5XXXXXXXX
+//   - Other international: +CCNNNNNNN... (7–15 digits total)
+//
+// We don't reject non-Palestinian numbers (family-abroad use case is
+// real) but we DO highlight the common Palestinian patterns since that's
+// the primary user base.
+export function validatePhone(phone) {
+  const result = {
+    nonEmpty:        false,
+    digitsOnly:      true,    // after stripping +/spaces/dashes
+    inLengthRange:   false,   // 7–15 total digits
+    looksPalestinian: false,  // matches preferred PS format
+    reason:          null,
+  };
+  if (!phone || phone.trim().length === 0) {
+    result.reason = "يرجى إدخال رقم الهاتف";
+    return result;
+  }
+  result.nonEmpty = true;
+  // Allowed chars: digits, leading +, separators (space/dash/dot/parens)
+  if (/[^\d+\s\-().]/.test(phone)) {
+    result.digitsOnly = false;
+    result.reason = "الرقم يحتوي على رموز غير مسموحة — استخدم أرقاماً فقط";
+    return result;
+  }
+  const cleaned = phone.replace(/[\s\-().+]/g, "");
+  if (cleaned.length === 0) {
+    result.reason = "يرجى إدخال أرقام الهاتف";
+    return result;
+  }
+  if (cleaned.length < 7) {
+    result.reason = "الرقم قصير جداً — يجب أن يحتوي على 7 أرقام على الأقل";
+    return result;
+  }
+  if (cleaned.length > 15) {
+    result.reason = "الرقم طويل جداً — الحد الأقصى 15 رقماً";
+    return result;
+  }
+  result.inLengthRange = true;
+  // Palestinian format detection
+  result.looksPalestinian =
+    /^(?:\+?970|\+?972|0)5[02-9]\d{7}$/.test(cleaned) ||
+    /^05[02-9]\d{7}$/.test(cleaned);
+  return result;
+}
+
+// ─── FULL NAME COMPLIANCE
+// Returns granular pass/fail flags for live indicator. Rules tuned for
+// real-world Arabic + English names without being too permissive:
+//   - At least 2 characters (after trimming)
+//   - At most 100 characters
+//   - At least one letter (Arabic or Latin) — rejects all-numbers/symbols
+//   - No emojis or symbols beyond letters/spaces/hyphens/apostrophes/dots
+//
+// Allows: محمد أحمد / Mohammed Ahmed / O'Brien / Saint-Denis / Dr. Smith
+// Rejects: 12345 / "" / "@@@" / "Mohamed 🚀"
+export function validateFullName(name) {
+  const result = {
+    nonEmpty:    false,
+    longEnough:  false,   // >= 2 trimmed chars
+    notTooLong:  false,   // <= 100 chars
+    hasLetter:   false,   // contains an Arabic or Latin letter
+    cleanChars:  false,   // only allowed character classes
+    reason:      null,
+  };
+  if (!name || name.trim().length === 0) {
+    result.reason = "يرجى إدخال الاسم الكامل";
+    return result;
+  }
+  result.nonEmpty = true;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) {
+    result.reason = "الاسم قصير جداً — استخدم حرفين على الأقل";
+    return result;
+  }
+  result.longEnough = true;
+  if (trimmed.length > 100) {
+    result.reason = "الاسم طويل جداً — الحد الأقصى 100 حرف";
+    return result;
+  }
+  result.notTooLong = true;
+  // Latin letters OR Arabic letters
+  result.hasLetter = /[A-Za-z\u0600-\u06FF]/.test(trimmed);
+  if (!result.hasLetter) {
+    result.reason = "الاسم يجب أن يحتوي على أحرف";
+    return result;
+  }
+  // Allowed: Arabic letters + diacritics, Latin letters, spaces, hyphens,
+  // apostrophes (O'Brien), dots (Dr.), and digits between (rare but valid
+  // in some legal names like "John 3rd")
+  const allowedPattern = /^[A-Za-z\u0600-\u06FF0-9\s\-'.\u064B-\u065F\u0670]+$/;
+  if (!allowedPattern.test(trimmed)) {
+    result.cleanChars = false;
+    result.reason = "الاسم يحتوي على رموز غير مسموحة — استخدم أحرفاً فقط";
+    return result;
+  }
+  result.cleanChars = true;
+  return result;
+}
+
 export function normalizePhone(phone) {
   if (!phone) return "";
   let p = phone.replace(/[\s\-().]/g, "");
