@@ -17,6 +17,7 @@ import { invalidateBlockCache } from "@/lib/blockUtils";
 import { Button } from "@/components/ui/button";
 import { Shield, X } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 export default function BlockedUsersSection({ user }) {
   const qc = useQueryClient();
@@ -42,7 +43,7 @@ export default function BlockedUsersSection({ user }) {
       qc.invalidateQueries({ queryKey: ["conversations"] });
       toast.success("تم إلغاء الحظر");
     },
-    onError: () => toast.error("فشل إلغاء الحظر"),
+    onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الحظر")),
   });
 
   if (isLoading) {

@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { User, MapPin, Users, CheckCircle, XCircle, ChevronRight, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 export default function BookingRequestPopup({ user }) {
   const qc = useQueryClient();
@@ -110,7 +111,7 @@ export default function BookingRequestPopup({ user }) {
         } catch {}
       }
     },
-    onError: () => toast.error("فشل التحديث، حاول مجدداً"),
+    onError: (err) => toast.error(friendlyError(err, "فشل تحديث الحجز — حاول مجدداً")),
   });
 
   if (!isDriver || pendingBookings.length === 0) return null;

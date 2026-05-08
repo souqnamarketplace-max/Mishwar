@@ -691,7 +691,7 @@ export default function TripDetails() {
                         url: window.location.href,
                       });
                     } catch (err) {
-                      if (err.name !== "AbortError") toast.error("فشلت المشاركة");
+                      if (err.name !== "AbortError") toast.error(friendlyError(err, "تعذر المشاركة"));
                     }
                   } else {
                     // Same fallback as the dedicated copy-link button

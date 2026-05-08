@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Briefcase, Users } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 /**
  * VehicleDetailsSection — luggage size + back row seating.
@@ -32,8 +33,8 @@ export default function VehicleDetailsSection({ user, onSaved }) {
       toast.success("تم حفظ تفاصيل السيارة ✅");
       qc.invalidateQueries({ queryKey: ["me"] });
       onSaved?.();
-    } catch {
-      toast.error("تعذر الحفظ");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر حفظ تفاصيل السيارة"));
     } finally {
       setSaving(false);
     }

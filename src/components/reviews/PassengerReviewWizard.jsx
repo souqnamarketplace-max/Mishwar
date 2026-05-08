@@ -6,6 +6,7 @@ import { notifyAdmin } from "@/lib/notifyAdmin";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 function StarPicker({ value, onChange }) {
   return (
@@ -80,8 +81,8 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
         });
       }
       setStep(5);
-    } catch {
-      toast.error("حدث خطأ أثناء الإرسال");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر إرسال التقييم"));
     } finally {
       setSubmitting(false);
     }

@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { invalidateBlockCache, REPORT_CATEGORIES } from "@/lib/blockUtils";
 import { isDeletedUserEmail } from "@/lib/userStatus";
 import { logAdminAction } from "@/lib/adminAudit";
+import { friendlyError } from "@/lib/errors";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
@@ -88,7 +89,7 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
       setShowBlock(false);
       setOpen(false);
     },
-    onError: () => toast.error("فشل حظر المستخدم"),
+    onError: (err) => toast.error(friendlyError(err, "فشل حظر المستخدم")),
   });
 
   const reportMutation = useMutation({
@@ -161,7 +162,7 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
       // إرسال البلاغ", then have no idea where their reports lived.
       setShowReportSuccess(true);
     },
-    onError: () => toast.error("فشل إرسال البلاغ"),
+    onError: (err) => toast.error(friendlyError(err, "فشل إرسال البلاغ")),
   });
 
   const handleReportSubmit = (e) => {

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { Trash2, Plus, Eye, EyeOff, Upload, ImageIcon, CheckCircle } from "lucide-react";
 
 const DEFAULT_SLIDES = [
@@ -30,7 +31,7 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       onUpdate("img", file_url);
       toast.success("✅ تم رفع الصورة بنجاح");
-    } catch { toast.error("فشل رفع الصورة، حاول مجدداً"); }
+    } catch (err) { toast.error(friendlyError(err, "تعذر رفع الصورة")); }
     finally { setUploading(false); }
   };
 

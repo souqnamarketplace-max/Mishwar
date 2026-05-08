@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Navigation, MapPin, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import DriverReviewWizard from "@/components/reviews/DriverReviewWizard";
 
 /**
@@ -39,8 +40,8 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
       qc.invalidateQueries({ queryKey: ["trips"] });
       toast.success("✅ اكتملت الرحلة! يمكنك الآن تقييم الركاب");
       setShowReviewWizard(true);
-    } catch {
-      toast.error("تعذر إنهاء الرحلة");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر إنهاء الرحلة"));
     } finally {
       setCompleting(false);
     }

@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { DollarSign } from "lucide-react";
 
 const statusConfig = {
@@ -47,7 +48,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
     },
     onError: (err, vars, ctx) => {
       qc.setQueryData(["bookings"], ctx);
-      toast.error("فشل التحديث");
+      toast.error(friendlyError(err, "فشل تحديث الحجز"));
     },
     onSuccess: async (_, { id, status }) => {
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
@@ -110,7 +111,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
       qc.invalidateQueries({ queryKey: ["payments-summary"] });
       toast.success(paid ? "تم تسجيل الدفع ✓" : "تم التراجع عن تسجيل الدفع");
     },
-    onError: () => toast.error("فشل التحديث، حاول مجدداً"),
+    onError: (err) => toast.error(friendlyError(err, "فشل تحديث الحجز — حاول مجدداً")),
   });
 
   // Realtime: booking list updates when any booking changes

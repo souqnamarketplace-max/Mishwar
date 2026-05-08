@@ -149,7 +149,7 @@ export default function Onboarding() {
       toast.success("تم رفع الصورة بنجاح ✅");
     } catch (err) {
       captureException(err, { msg: "Avatar upload error:" });
-      toast.error("فشل رفع الصورة. تأكد من الاتصال وحاول مجدداً");
+      toast.error(friendlyError(err, "تعذر رفع الصورة — تحقق من الاتصال"));
     } finally {
       setUploading(false);
     }
@@ -447,7 +447,7 @@ export default function Onboarding() {
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
                       try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, car_reg_url: url })); toast.success("✅ تم رفع الاستمارة"); }
-                      catch (err) { toast.error("فشل رفع الملف"); }
+                      catch (err) { toast.error(friendlyError(err, "تعذر رفع الملف")); }
                       finally { setUploading(false); }
                     }} />
                   </div>
@@ -476,7 +476,7 @@ export default function Onboarding() {
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
                       try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, insurance_url: url })); toast.success("✅ تم رفع وثيقة التأمين"); }
-                      catch (err) { toast.error("فشل رفع الملف"); }
+                      catch (err) { toast.error(friendlyError(err, "تعذر رفع الملف")); }
                       finally { setUploading(false); }
                     }} />
                   </div>

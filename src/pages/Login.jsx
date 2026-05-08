@@ -185,8 +185,8 @@ export default function Login() {
         redirectTo: window.location.origin + '/login',
       });
       setForgotSent(true);
-    } catch {
-      toast.error('حدث خطأ. تأكد من البريد الإلكتروني');
+    } catch (err) {
+      toast.error(friendlyError(err, 'تعذر إرسال رابط الاستعادة — تأكد من البريد الإلكتروني'));
     }
   };
 
@@ -343,7 +343,10 @@ export default function Login() {
                 </div>
               </div>
               <div>
-                <Label className="mb-1.5 block">كلمة المرور</Label>
+                <Label className="mb-1.5 block flex items-center justify-between">
+                  <span>كلمة المرور</span>
+                  <span className="text-[10px] font-normal text-slate-500">(انظر المتطلبات أدناه)</span>
+                </Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="مثال: Mishwar123"
@@ -353,25 +356,38 @@ export default function Login() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                {/* Live password requirements — turns each item green
-                    as the user types. Tells them EXACTLY what Supabase
-                    expects so they don't hit the server rejection. */}
-                {form.password && (() => {
+                {/* Password requirements panel — ALWAYS visible (not gated
+                    on form.password being non-empty). Users need to know
+                    the rules BEFORE they start typing, not discover them
+                    after a failure. The 4 items turn green as each is met,
+                    so the panel doubles as a live progress indicator.
+                    The static heading makes it clear this is the spec.
+
+                    Specifically prevents the previous failure mode where
+                    users typed e.g. "khaled@1994", saw no requirements
+                    upfront, hit submit, and got a rejection. */}
+                {(() => {
                   const c = validatePasswordCompliance(form.password);
+                  const allMet = form.password && c.missing.length === 0;
                   const Item = ({ ok, text }) => (
-                    <span className={`text-[11px] flex items-center gap-1 ${ok ? 'text-green-600' : 'text-slate-500'}`}>
-                      <span className={`inline-block w-3 h-3 rounded-full text-center leading-3 text-[9px] font-bold ${ok ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                    <span className={`text-[11px] flex items-center gap-1.5 ${ok ? 'text-green-700 dark:text-green-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                      <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0 ${ok ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500'}`}>
                         {ok ? '✓' : '○'}
                       </span>
                       {text}
                     </span>
                   );
                   return (
-                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
-                      <Item ok={c.longEnough} text={`${PASSWORD_MIN_LENGTH} أحرف على الأقل`} />
-                      <Item ok={c.hasUpper}   text="حرف كبير (A-Z)" />
-                      <Item ok={c.hasLower}   text="حرف صغير (a-z)" />
-                      <Item ok={c.hasDigit}   text="رقم (0-9)" />
+                    <div className={`mt-2 rounded-xl border p-3 transition-colors ${allMet ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
+                      <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">
+                        متطلبات كلمة المرور:
+                      </p>
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                        <Item ok={c.longEnough} text={`${PASSWORD_MIN_LENGTH} أحرف على الأقل`} />
+                        <Item ok={c.hasUpper}   text="حرف كبير (A-Z)" />
+                        <Item ok={c.hasLower}   text="حرف صغير (a-z)" />
+                        <Item ok={c.hasDigit}   text="رقم (0-9)" />
+                      </div>
                     </div>
                   );
                 })()}

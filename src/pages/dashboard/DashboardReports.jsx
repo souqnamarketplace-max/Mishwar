@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Flag, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { REPORT_CATEGORIES } from "@/lib/blockUtils";
 import { logAdminAction } from "@/lib/adminAudit";
 import Pagination from "@/components/dashboard/Pagination";
@@ -88,7 +89,7 @@ export default function DashboardReports() {
       qc.invalidateQueries({ queryKey: ["my-reports"] });
       toast.success("تم تحديث البلاغ");
     },
-    onError: () => toast.error("فشل التحديث"),
+    onError: (err) => toast.error(friendlyError(err, "تعذر التحديث")),
   });
 
   const handleAction = async (report, status) => {

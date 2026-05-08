@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Bell, Mail, MessageSquare, Megaphone } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 /**
  * NotificationPrefsSection — push, email, SMS, marketing toggles.
@@ -36,8 +37,8 @@ export default function NotificationPrefsSection({ user, onSaved }) {
       toast.success("تم حفظ الإعدادات ✅");
       qc.invalidateQueries({ queryKey: ["me"] });
       onSaved?.();
-    } catch {
-      toast.error("تعذر الحفظ");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر حفظ إعدادات الإشعارات"));
     } finally {
       setSaving(false);
     }

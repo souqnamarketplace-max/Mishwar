@@ -7,6 +7,7 @@ import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import EmptyState from "@/components/shared/EmptyState";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -104,7 +105,7 @@ export default function Notifications() {
       qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
-    onError: () => toast.error("تعذر تحديث الإشعارات"),
+    onError: (err) => toast.error(friendlyError(err, "تعذر تحديث الإشعارات")),
   });
 
   const deleteNotif = useMutation({
@@ -116,7 +117,7 @@ export default function Notifications() {
       qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
-    onError: () => toast.error("تعذر حذف الإشعار"),
+    onError: (err) => toast.error(friendlyError(err, "تعذر حذف الإشعار")),
   });
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;

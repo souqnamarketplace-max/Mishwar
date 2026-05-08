@@ -18,6 +18,7 @@ import {
   ArrowLeft, ArrowRight, Wifi, Music, Snowflake, Cigarette, Briefcase, AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import RouteMap from "@/components/shared/RouteMap";
 import { sanitizeText, todayISO, isFutureOrToday } from "@/lib/validation";
 
@@ -443,7 +444,7 @@ export default function CreateTrip() {
           toast.error(msg.split("\\n")[0]);
           return;
         }
-        toast.error("فشل نشر الرحلة. حاول مجدداً");
+        toast.error(friendlyError(err, "تعذر نشر الرحلة"));
         return;
       }
     }

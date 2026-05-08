@@ -5,6 +5,7 @@ import { Car, Save, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const COLORS = ["أبيض", "أسود", "فضي", "رمادي", "أحمر", "أزرق", "بيج"];
 
@@ -52,8 +53,8 @@ export default function DriverVehicleEditor() {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       set("car_image", file_url);
       toast.success("تم رفع الصورة بنجاح ✅");
-    } catch {
-      toast.error("فشل رفع الصورة، حاول مجدداً");
+    } catch (err) {
+      toast.error(friendlyError(err, "فشل رفع الصورة — حاول مجدداً"));
     } finally {
       setUploading(false);
     }

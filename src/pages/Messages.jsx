@@ -13,6 +13,7 @@ import {
   MapPin, ChevronLeft
 } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
 import { useBlockedEmails } from "@/lib/blockUtils";
@@ -478,7 +479,7 @@ export default function Messages() {
       }
       qc.invalidateQueries({ queryKey: ["messages", user?.email] });
     },
-    onError: () => toast.error("تعذر إرسال الرسالة. حاول مجدداً"),
+    onError: (err) => toast.error(friendlyError(err, "تعذر إرسال الرسالة")),
   });
   const sendQuick = (text) => send.mutate(text);
 

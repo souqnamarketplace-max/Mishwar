@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const statusConfig = {
   confirmed: { label: "مؤكدة", className: "bg-primary/10 text-primary" },
@@ -61,7 +62,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
     },
-    onError: () => toast.error("فشل إلغاء الرحلة"),
+    onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الرحلة")),
   });
 
   const updateMutation = useMutation({
@@ -76,7 +77,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
     },
     onError: (err, vars, ctx) => {
       qc.setQueryData(["trips"], ctx);
-      toast.error("فشل التحديث");
+      toast.error(friendlyError(err, "فشل تحديث الرحلة"));
     },
     onSuccess: async (_, { id, data, trip, bookings: tripBookings }) => {
       qc.invalidateQueries({ queryKey: ["trips"] });
@@ -127,7 +128,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       setEditingTrip(null);
       toast.success("تم تحديث الرحلة ✅");
     },
-    onError: () => toast.error("فشل التحديث"),
+    onError: (err) => toast.error(friendlyError(err, "فشل تحديث الرحلة")),
   });
 
   const deleteMutation = useMutation({
@@ -140,7 +141,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
     },
     onError: (err, vars, ctx) => {
       qc.setQueryData(["trips"], ctx);
-      toast.error("فشل الحذف");
+      toast.error(friendlyError(err, "فشل حذف الرحلة"));
     },
     onSuccess: (_, tripId) => {
       qc.invalidateQueries({ queryKey: ["trips"] });

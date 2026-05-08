@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Cigarette, MessageCircle, MessageSquare, Moon, Dog } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 /**
  * PreferencesSection — smoking, chattiness, pets toggles.
@@ -35,7 +36,7 @@ export default function PreferencesSection({ user, onSaved }) {
       qc.invalidateQueries({ queryKey: ["me"] });
       onSaved?.();
     } catch (e) {
-      toast.error("تعذر الحفظ");
+      toast.error(friendlyError(e, "تعذر حفظ التفضيلات"));
     } finally {
       setSaving(false);
     }

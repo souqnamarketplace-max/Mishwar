@@ -128,8 +128,8 @@ export default function AccountSettings() {
       await base44.auth.updateMe({ email });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث البريد الإلكتروني بنجاح!");
-    } catch {
-      toast.error("حدث خطأ في تحديث البريد");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر تحديث البريد الإلكتروني"));
     }
     setEmailLoading(false);
   };
@@ -154,8 +154,8 @@ export default function AccountSettings() {
       setPasswordForm({ current: "", new: "", confirm: "" });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تغيير كلمة المرور بنجاح!");
-    } catch {
-      toast.error("خطأ في تغيير كلمة المرور");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر تغيير كلمة المرور"));
     }
     setPasswordLoading(false);
   };
@@ -170,8 +170,8 @@ export default function AccountSettings() {
       await base44.auth.updateMe({ phone });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث رقم الهاتف!");
-    } catch {
-      toast.error("خطأ في تحديث الهاتف");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر تحديث رقم الهاتف"));
     }
     setPhoneLoading(false);
   };
@@ -199,8 +199,8 @@ export default function AccountSettings() {
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
       qc.invalidateQueries({ queryKey: ["featured-trips"] });
       toast.success("تم تحديث الصورة!");
-    } catch {
-      toast.error("خطأ في رفع الصورة");
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر رفع الصورة"));
     }
     setAvatarLoading(false);
   };
@@ -256,7 +256,7 @@ export default function AccountSettings() {
       qc.invalidateQueries({ queryKey: ["driver-license", user?.email] });
     } catch (err) {
       captureException(err, { msg: "License update error:" });
-      toast.error("خطأ في تحديث المستندات");
+      toast.error(friendlyError(err, "تعذر تحديث المستندات"));
     }
     setLicenseLoading(false);
   };
@@ -479,7 +479,7 @@ export default function AccountSettings() {
       if (err?.message === "session_expired_no_rows_updated") {
         toast.error("انتهت الجلسة — يرجى تسجيل الدخول مجدداً ثم إعادة المحاولة");
       } else {
-        toast.error("فشل حذف الحساب. يرجى الاتصال بالدعم");
+        toast.error(friendlyError(err, "فشل حذف الحساب. يرجى الاتصال بالدعم"));
       }
       setDeletionLoading(false);
     }

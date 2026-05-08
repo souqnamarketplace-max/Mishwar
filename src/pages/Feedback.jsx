@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { MessageSquarePlus, Lightbulb, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Send } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const TYPES = [
   { id: "suggestion", label: "اقتراح", icon: Lightbulb, color: "text-yellow-600 bg-yellow-50 border-yellow-200" },
@@ -71,7 +72,7 @@ export default function Feedback() {
       setSubject(""); setMessage(""); setType("suggestion"); setCategory("أخرى");
       qc.invalidateQueries({ queryKey: ["my-tickets", user?.email] });
     },
-    onError: () => toast.error("فشل الإرسال، حاول مجدداً"),
+    onError: (err) => toast.error(friendlyError(err, "تعذر إرسال الملاحظة — حاول مجدداً")),
   });
 
   return (

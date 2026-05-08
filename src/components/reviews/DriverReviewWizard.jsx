@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 // ── Star picker ───────────────────────────────────────────────────────────────
 function StarPicker({ value, onChange }) {
@@ -92,7 +93,7 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
       }));
       setStep(5);
     } catch (e) {
-      toast.error("حدث خطأ أثناء الإرسال");
+      toast.error(friendlyError(e, "تعذر إرسال التقييم"));
     } finally {
       setSubmitting(false);
     }
