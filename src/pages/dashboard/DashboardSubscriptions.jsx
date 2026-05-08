@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { logAdminAction } from "@/lib/adminAudit";
+import { base44 } from "@/api/base44Client";
 import { formatArabicDate } from "@/lib/validation";
 import {
   Wallet, CheckCircle, XCircle, Clock, ImageIcon, FileText, ExternalLink,
@@ -126,6 +127,26 @@ export default function DashboardSubscriptions() {
         driver_email: row.driver_email,
         amount: row.amount,
       });
+      // Notify the driver — formatArabicDate gives Gregorian Arabic
+      // ("٧ يونيو ٢٠٢٦") rather than Hijri.
+      try {
+        const periodEnd = data?.period_end;
+        const endDateStr = periodEnd ? formatArabicDate(periodEnd) : "";
+        await base44.entities.Notification.create({
+          user_email: row.driver_email,
+          title: "تم تفعيل اشتراكك ✅",
+          message: endDateStr
+            ? `تم تفعيل اشتراكك في مِشوار. الاشتراك ساري حتى ${endDateStr}.`
+            : "تم تفعيل اشتراكك في مِشوار.",
+          type: "system",
+          is_read: false,
+        });
+      } catch (notifyErr) {
+        // Don't fail the approval if notification creation failed —
+        // admin already approved, driver will see active status next
+        // time they refresh. Log to console for triage.
+        console.warn("subscription_approved notification failed:", notifyErr);
+      }
       return data;
     },
     onSuccess: () => {
@@ -152,6 +173,17 @@ export default function DashboardSubscriptions() {
         driver_email: row.driver_email,
         reason,
       });
+      try {
+        await base44.entities.Notification.create({
+          user_email: row.driver_email,
+          title: "لم نتمكن من تفعيل اشتراكك ❌",
+          message: `لم نتمكن من التحقق من تحويل الدفع. السبب: ${reason}. يمكنك إعادة الإرسال من صفحة الاشتراك.`,
+          type: "system",
+          is_read: false,
+        });
+      } catch (notifyErr) {
+        console.warn("subscription_rejected notification failed:", notifyErr);
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });

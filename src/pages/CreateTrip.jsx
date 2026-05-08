@@ -117,8 +117,42 @@ export default function CreateTrip() {
     enabled: !!user?.email,
   });
 
-  // Determine eligibility based on full license history
-  const eligibility = React.useMemo(() => checkDriverEligibility(licenses), [licenses]);
+  // Subscription gate — when the kill switch is on, drivers must have an
+  // active subscription to publish trips. RPC returns { status: 'not_required' }
+  // when the kill switch is off, which makes the eligibility check a no-op.
+  // If the RPC doesn't exist (migration 009 not applied yet), we treat the
+  // missing function as 'not_required' so older deployments still work.
+  const { data: subscriptionStatus = null } = useQuery({
+    queryKey: ["subscription-status", user?.email],
+    queryFn: async () => {
+      if (!user?.email) return null;
+      const { supabase } = await import("@/lib/supabase");
+      const { data, error } = await supabase.rpc("driver_subscription_status", {
+        p_driver_email: user.email,
+      });
+      if (error) {
+        if (
+          error.code === "PGRST202" ||
+          /function .* does not exist/i.test(error.message || "") ||
+          /not found/i.test(error.message || "")
+        ) {
+          return { status: "not_required", allowed: true };
+        }
+        throw error;
+      }
+      return data;
+    },
+    enabled: !!user?.email,
+    retry: 0,
+    staleTime: 30_000,
+  });
+
+  // Determine eligibility based on full license history + subscription state.
+  // Subscription block takes precedence over license-allowed states.
+  const eligibility = React.useMemo(
+    () => checkDriverEligibility(licenses, subscriptionStatus),
+    [licenses, subscriptionStatus]
+  );
   const driverLicense = eligibility.latest || licenses?.[0]; // for prefilling form fields
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
@@ -442,6 +476,30 @@ export default function CreateTrip() {
         ctaLabel: "رفع وثائق جديدة",
         ctaPath: "/account-settings/profile#license",
       },
+      // Subscription gates — only fire when kill switch is on AND driver
+      // doesn't have an active subscription. License is still valid but
+      // they need to subscribe (or wait for admin approval).
+      subscription_never_subscribed: {
+        icon: "💳",
+        title: "اشترك في المنصة لتتمكن من نشر الرحلات",
+        message: "وثائقك مقبولة، لكنك لم تشترك بعد في خدمة مِشوار للسائقين. الاشتراك الشهري ₪30 ويسمح لك بنشر رحلات بلا قيود.",
+        ctaLabel: "اشترك الآن",
+        ctaPath: "/driver?tab=subscription",
+      },
+      subscription_expired: {
+        icon: "⏰",
+        title: "انتهى اشتراكك",
+        message: "انتهت صلاحية اشتراكك الشهري ولم تجدّده خلال فترة السماح. لا يمكنك نشر رحلات جديدة حتى تجدّد الاشتراك.",
+        ctaLabel: "جدّد الاشتراك",
+        ctaPath: "/driver?tab=subscription",
+      },
+      subscription_pending_review: {
+        icon: "⏳",
+        title: "طلب اشتراكك قيد المراجعة",
+        message: "أرسلت طلب اشتراك ونحن نتحقق من تحويل الدفع. عادةً تكتمل المراجعة خلال 24 ساعة. ستصلك رسالة فور التفعيل وعندها يمكنك نشر رحلاتك.",
+        ctaLabel: "تتبّع طلب الاشتراك",
+        ctaPath: "/driver?tab=subscription",
+      },
     };
     const info = reasonMap[eligibility.reason] || reasonMap.expired_no_pending;
 
@@ -466,6 +524,7 @@ export default function CreateTrip() {
   // Eligibility allowed but with caveats: show banner above the form
   const showPendingBanner = eligibility.reason === "pending_grace" || eligibility.reason === "valid_with_pending";
   const showExpiringSoonBanner = eligibility.expiringSoon && !showPendingBanner;
+  const showSubscriptionGraceBanner = eligibility.reason === "subscription_in_grace";
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -474,6 +533,46 @@ export default function CreateTrip() {
         <h1 className="text-3xl font-bold text-foreground mb-2">كيف تنشر رحلة ؟</h1>
         <p className="text-muted-foreground">شارك مقاعدك الفارغة وساعد الآخرين على الوصول بأمان وراحة</p>
       </div>
+
+      {/* Subscription grace banner — driver's subscription expired but
+          they're inside the configured grace window. They can still post
+          but must renew before grace runs out. */}
+      {showSubscriptionGraceBanner && eligibility.subscriptionStatus && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-foreground mb-0.5">انتهى اشتراكك — أنت في فترة سماح</p>
+              <p className="text-sm text-muted-foreground">
+                متبقي {eligibility.subscriptionStatus.grace_days_left} أيام لتجديد الاشتراك. بعدها لن تتمكن من نشر رحلات جديدة.
+              </p>
+            </div>
+            <Link to="/driver?tab=subscription" className="text-xs font-bold text-primary underline shrink-0 mt-1">
+              جدّد الآن
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription expiring soon banner — sub is active but ≤7 days left */}
+      {eligibility.subscriptionStatus?.status === "active"
+        && eligibility.subscriptionStatus.days_remaining <= 7
+        && (
+        <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-foreground mb-0.5">ينتهي اشتراكك قريباً</p>
+              <p className="text-sm text-muted-foreground">
+                متبقي {eligibility.subscriptionStatus.days_remaining} أيام على انتهاء اشتراكك. يفضّل التجديد مبكّراً لتفادي انقطاع النشر.
+              </p>
+            </div>
+            <Link to="/driver?tab=subscription" className="text-xs font-bold text-primary underline shrink-0 mt-1">
+              جدّد
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Steps */}
       <div className="flex items-center justify-between mb-2">
