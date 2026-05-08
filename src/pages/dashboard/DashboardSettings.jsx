@@ -77,9 +77,28 @@ export default function DashboardSettings() {
   }, [existingSettings, isLoading, form]);
 
   const saveMutation = useMutation({
-    mutationFn: () => existingSettings
-      ? base44.entities.AppSettings.update(existingSettings.id, form)
-      : base44.entities.AppSettings.create(form),
+    mutationFn: () => {
+      // Build the payload from the explicit allowlist (= keys of
+      // defaultSettings) so we don't accidentally send back columns
+      // that came in via the existingSettings spread:
+      //   - server-managed (id, created_at, updated_at, created_by)
+      //   - admin-managed elsewhere (hero_city_slides)
+      //   - any future column we don't know about yet
+      // Without this filter, PATCH was including phantom columns in
+      // the body and PostgREST rejected the entire request with 400
+      // 'column X does not exist'. Save silently failed (no error
+      // handler before this commit), the user thought the toggle
+      // 'deactivated itself' on refresh.
+      const allowedKeys = Object.keys(defaultSettings);
+      const payload = Object.fromEntries(
+        allowedKeys
+          .filter((k) => k in form)
+          .map((k) => [k, form[k]])
+      );
+      return existingSettings
+        ? base44.entities.AppSettings.update(existingSettings.id, payload)
+        : base44.entities.AppSettings.create(payload);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["app_settings"] });
       setSaved(true);
@@ -87,17 +106,7 @@ export default function DashboardSettings() {
       toast.success("تم حفظ الإعدادات");
     },
     onError: (err) => {
-      // Without this handler, save failures were invisible — react-query
-      // would log to console but the user saw no toast, the toggle would
-      // appear to flip in the UI (form state held), and only a refresh
-      // (which re-syncs from DB) revealed nothing was actually saved.
-      //
-      // Most common cause we've seen: a form field references a column
-      // that doesn't exist in the DB (migration not yet applied), so
-      // PostgREST returns 400 "column does not exist" on PATCH.
       const msg = String(err?.message || err || "");
-      // Specifically detect missing-column errors and surface a more
-      // helpful message instead of the generic friendlyError.
       const missingColumn = msg.match(/column [\"']?(\w+)[\"']?\s+does not exist/i)
                           || msg.match(/Could not find the [\"']?(\w+)[\"']? column/i);
       if (missingColumn) {
@@ -106,6 +115,8 @@ export default function DashboardSettings() {
           `قد تحتاج لتطبيق آخر ترحيلات (migrations).`
         );
       } else {
+        // Surface the raw message in dev so it's diagnosable
+        console.error("AppSettings save failed:", err);
         toast.error(friendlyError(err, "فشل حفظ الإعدادات"));
       }
     },
