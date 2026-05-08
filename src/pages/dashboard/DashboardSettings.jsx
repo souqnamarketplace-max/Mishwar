@@ -6,7 +6,12 @@ import { Settings, Save, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const defaultSettings = {
-  commission_rate: 10,
+  // Commission default is 0% — the launch posture is "drivers keep
+  // everything" until volume + reconciliation processes are mature
+  // enough to justify a cut. Admin can raise this later from the UI
+  // and the value flows through to /dashboard?tab=payments and the
+  // driver_payments_summary RPC.
+  commission_rate: 0,
   min_price: 10,
   max_price: 500,
   max_seats: 6,
@@ -69,8 +74,27 @@ export default function DashboardSettings() {
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">نسبة العمولة (%)</label>
-            <input type="number" min="0" max="100" value={form.commission_rate} onChange={(e) => update("commission_rate", parseInt(e.target.value))}
-              className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none" />
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.5"
+              value={form.commission_rate ?? 0}
+              onChange={(e) => {
+                // parseInt returns NaN for empty input. Use parseFloat
+                // and fall back to 0 so clearing the field doesn't
+                // create an invalid state. Clamp to [0, 100].
+                const raw = parseFloat(e.target.value);
+                const n = Number.isFinite(raw) ? Math.min(100, Math.max(0, raw)) : 0;
+                update("commission_rate", n);
+              }}
+              className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+            />
+            {form.commission_rate === 0 && (
+              <p className="text-[11px] text-green-600 dark:text-green-400 mt-1">
+                ✓ العمولة 0% — السائقون يحتفظون بكامل الأرباح. يمكنك زيادتها لاحقاً.
+              </p>
+            )}
           </div>
           <div>
             <label className="text-xs text-muted-foreground mb-1 block">الحد الأدنى للسعر (₪)</label>

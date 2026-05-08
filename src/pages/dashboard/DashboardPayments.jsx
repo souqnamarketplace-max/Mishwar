@@ -87,11 +87,30 @@ export default function DashboardPayments() {
     b.passenger_name?.includes(search) || b.passenger_email?.includes(search)
   );
 
+  // Read commission rate from app_settings — the RPC may or may not
+  // include it; reading directly from settings is the source of truth
+  // and works whether or not the RPC was updated. Falsy-coalesce had
+  // a bug where commission=0 fell through to the 10% default; we now
+  // explicitly handle 0 by checking for null/undefined (??) instead
+  // of falsy (||).
+  const { data: appSettingsArr = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+    staleTime: 60000,
+  });
+  const settingsRate = appSettingsArr[0]?.commission_rate;
+
   const totalRevenue = summary.totals?.total_revenue ?? 0;
   const confirmed = summary.totals?.total_bookings ?? 0;
   const cancelled = bookingsData.total - confirmed; // approximate, can be improved
-  const COMMISSION_RATE = summary.commission_rate ? summary.commission_rate / 100 : 0.10;
-  const COMMISSION_PCT  = summary.commission_rate || 10;
+
+  // Commission resolution order: app_settings → RPC fallback → 0% default.
+  // Critically uses ?? (nullish-coalesce), not || (falsy), so a real
+  // configured value of 0 is preserved instead of falling through.
+  // Default 0 matches DashboardSettings.defaultSettings — the launch
+  // posture is "no commission" until volume justifies a cut.
+  const COMMISSION_PCT  = settingsRate ?? summary.commission_rate ?? 0;
+  const COMMISSION_RATE = COMMISSION_PCT / 100;
   // Build the same shape as before for downstream rendering
   const driverRevenue = (summary.drivers || []).reduce((acc, d) => {
     acc[d.driver_email || "unknown"] = {
@@ -151,13 +170,16 @@ export default function DashboardPayments() {
         <div className="bg-card rounded-xl border border-border overflow-hidden mb-4">
           <div className="p-4 border-b border-border flex items-center justify-between">
             <h3 className="font-bold text-sm">إيرادات السائقين والعمولات</h3>
-            <span className="text-xs text-muted-foreground">عمولة المنصة: 10%</span>
+            <span className="text-xs text-muted-foreground">
+              عمولة المنصة: {COMMISSION_PCT}%
+              {COMMISSION_PCT === 0 && " — السائقون يحتفظون بكامل الأرباح"}
+            </span>
           </div>
           <table className="w-full text-sm">
             <thead><tr className="text-right text-xs text-muted-foreground border-b border-border bg-muted/30">
               <th className="p-3">السائق/الراكب</th>
               <th className="p-3">إجمالي المعاملات</th>
-              <th className="p-3">عمولة المنصة (10%)</th>
+              <th className="p-3">عمولة المنصة ({COMMISSION_PCT}%)</th>
               <th className="p-3">صافي المدفوع</th>
             </tr></thead>
             <tbody>
