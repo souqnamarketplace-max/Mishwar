@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<!--
+  Mishwar — Email Confirmation Template
+  ─────────────────────────────────────────────────────────────────────────
+  Paste this entire file into:
+    Supabase Dashboard → Authentication → Email Templates → "Confirm signup"
+
+  Template variables (Supabase fills these at send time):
+    {{ .ConfirmationURL }}   — the verification link the user clicks
+
+  Design notes:
+    • Brand colors: forest green #1a3d2a, gold #c9a227, cream #faf5e6
+    • Bulletproof: uses table layouts + inline styles (Gmail/Outlook safe)
+    • Mobile-first: card caps at 560px, scales down gracefully
+    • RTL Arabic content, dir="rtl" on body + lang="ar" on html
+    • Fallback plain URL below the button for accessibility
+    • Spam-folder hint to nudge users on first-time delivery
+    • No external CSS, fonts, or images required to render
+-->
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light">
+<title>تأكيد البريد الإلكتروني — مِشوار</title>
+</head>
+<body style="margin:0;padding:0;background-color:#faf5e6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,Arial,sans-serif;color:#222222;-webkit-font-smoothing:antialiased;">
+  <!-- Preheader (shows in inbox preview, hidden from body) -->
+  <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#faf5e6;">
+    اضغط على الرابط لتفعيل حسابك في مِشوار والبدء بمشاركة الرحلات.
+  </div>
+
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color:#faf5e6;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <!-- Card -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;border:1px solid #e8e2d0;overflow:hidden;box-shadow:0 2px 8px rgba(26,61,42,0.06);">
+
+          <!-- Brand header -->
+          <tr>
+            <td style="background-color:#1a3d2a;padding:28px 32px;" dir="rtl">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td align="right" style="text-align:right;">
+                    <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;line-height:1.2;">مِشوار</div>
+                    <div style="font-size:13px;color:#c9a227;margin-top:4px;line-height:1.4;">منصة مشاركة الرحلات في فلسطين 🇵🇸</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Hero icon -->
+          <tr>
+            <td align="center" style="padding:32px 32px 0 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center" width="72" height="72" style="background-color:#faf5e6;border-radius:50%;width:72px;height:72px;font-size:36px;line-height:72px;">
+                    📧
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Body -->
+          <tr>
+            <td style="padding:24px 32px 8px 32px;text-align:right;" dir="rtl">
+              <h1 style="margin:0 0 16px 0;font-size:24px;color:#1a3d2a;font-weight:bold;line-height:1.3;text-align:right;">أهلاً بك في مِشوار 🚗</h1>
+              <p style="margin:0 0 20px 0;font-size:15px;color:#444444;line-height:1.7;text-align:right;">
+                شكراً لانضمامك إلى مجتمعنا! خطوة أخيرة قبل البدء — اضغط على الزر أدناه لتأكيد بريدك الإلكتروني وتفعيل حسابك.
+              </p>
+            </td>
+          </tr>
+
+          <!-- CTA Button -->
+          <tr>
+            <td align="center" style="padding:8px 32px 24px 32px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td style="background-color:#1a3d2a;border-radius:12px;">
+                    <!--[if mso]>
+                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ .ConfirmationURL }}" style="height:48px;v-text-anchor:middle;width:240px;" arcsize="25%" stroke="f" fillcolor="#1a3d2a">
+                      <w:anchorlock/>
+                      <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">تأكيد البريد الإلكتروني</center>
+                    </v:roundrect>
+                    <![endif]-->
+                    <!--[if !mso]><!-- -->
+                    <a href="{{ .ConfirmationURL }}" target="_blank" style="display:inline-block;padding:14px 40px;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:12px;line-height:1.2;mso-padding-alt:0;">
+                      تأكيد البريد الإلكتروني
+                    </a>
+                    <!--<![endif]-->
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Plain URL fallback -->
+          <tr>
+            <td style="padding:0 32px;text-align:right;" dir="rtl">
+              <p style="margin:0 0 8px 0;font-size:13px;color:#666666;line-height:1.6;text-align:right;">أو انسخ الرابط التالي والصقه في المتصفح:</p>
+              <p style="margin:0 0 24px 0;font-size:11px;color:#1a3d2a;word-break:break-all;background-color:#faf5e6;padding:12px;border-radius:8px;direction:ltr;text-align:left;font-family:Consolas,Monaco,monospace;">{{ .ConfirmationURL }}</p>
+            </td>
+          </tr>
+
+          <!-- Spam hint -->
+          <tr>
+            <td style="padding:0 32px 24px 32px;" dir="rtl">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                  <td style="background-color:#fef9e7;border:1px solid #f9e79f;border-radius:10px;padding:14px 16px;text-align:right;" dir="rtl">
+                    <p style="margin:0;font-size:13px;color:#7d6608;line-height:1.7;text-align:right;">
+                      <strong>💡 نصيحة:</strong> إذا وصلتك هذه الرسالة في مجلد الرسائل غير المرغوب فيها (Spam)، اسحبها إلى صندوق الوارد لضمان وصول الإشعارات المستقبلية بشكل طبيعي.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#faf5e6;padding:20px 32px;text-align:right;border-top:1px solid #e8e2d0;" dir="rtl">
+              <p style="margin:0 0 10px 0;font-size:12px;color:#888888;line-height:1.6;text-align:right;">
+                إذا لم تطلب إنشاء هذا الحساب، يمكنك تجاهل هذه الرسالة بأمان — لن يتم تفعيل الحساب دون الضغط على الرابط.
+              </p>
+              <p style="margin:0;font-size:11px;color:#aaaaaa;text-align:right;">
+                مِشوار 🇵🇸 — رحلتك أسهل، أوفر، وأسرع
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Below-card legal/spacer -->
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width:560px;margin-top:16px;">
+          <tr>
+            <td align="center" style="font-size:11px;color:#999999;line-height:1.5;padding:0 16px;">
+              تم إرسال هذه الرسالة من نظام مِشوار التلقائي — يرجى عدم الرد عليها.
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
