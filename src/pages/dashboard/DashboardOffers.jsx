@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
+import DashboardFilterBar from "@/components/dashboard/DashboardFilterBar";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,14 +13,34 @@ export default function DashboardOffers() {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ code: "", discount_percent: 10, max_uses: 100, expires_at: "" });
+  const [search, setSearch] = useState("");
+  const [activeFilter, setActiveFilter] = useState("");
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+
+  const setSearchAndReset = (v) => { setSearch(v); setPage(1); };
+  const setActiveAndReset = (v) => { setActiveFilter(v); setPage(1); };
+
   const { data: couponsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["coupons", page],
-    queryFn: () => base44.entities.Coupon.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryKey: ["coupons", page, search, activeFilter],
+    queryFn: () => {
+      // is_active filter — translate "true"/"false" string to boolean
+      const conditions = {};
+      if (activeFilter === "true")  conditions.is_active = true;
+      if (activeFilter === "false") conditions.is_active = false;
+      return base44.entities.Coupon.paginate({
+        page,
+        pageSize: PAGE_SIZE,
+        sort: "-created_date",
+        conditions,
+        searchTerm: search,
+        searchColumns: ["code"],
+      });
+    },
   });
   const coupons = couponsData.rows;
+  const totalCoupons = couponsData.total;
   const totalPages = couponsData.totalPages;
 
   const createMutation = useMutation({
@@ -49,6 +70,25 @@ export default function DashboardOffers() {
 
   return (
     <div>
+      <DashboardFilterBar
+        searchValue={search}
+        onSearch={setSearchAndReset}
+        searchPlaceholder="ابحث برمز الكوبون..."
+        selects={[
+          {
+            key: "active",
+            value: activeFilter,
+            onChange: setActiveAndReset,
+            placeholder: "الكل",
+            options: [
+              { value: "true",  label: "نشطة فقط" },
+              { value: "false", label: "موقوفة فقط" },
+            ],
+          },
+        ]}
+        resultCount={totalCoupons}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">

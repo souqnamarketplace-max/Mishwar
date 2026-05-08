@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
+import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -18,6 +19,10 @@ const statusConfig = {
 
 export default function DashboardTrips() {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateRangePreset, setDateRangePreset] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const qc = useQueryClient();
 
   // Realtime — admin sees trip changes instantly
@@ -29,9 +34,30 @@ export default function DashboardTrips() {
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+
+  // Reset page when any filter changes — otherwise admin can land on
+  // an empty page-N of a smaller filtered set.
+  const setSearchAndReset       = (v) => { setSearch(v); setPage(1); };
+  const setStatusAndReset       = (v) => { setStatusFilter(v); setPage(1); };
+  const setDateRangeAndReset    = (v) => { setDateRangePreset(v); setPage(1); };
+  const setCustomFromAndReset   = (v) => { setCustomFrom(v); setPage(1); };
+  const setCustomToAndReset     = (v) => { setCustomTo(v); setPage(1); };
+
+  const { dateFrom, dateTo } = resolveDateRange(dateRangePreset, customFrom, customTo);
+
   const { data: tripsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["trips", page],
-    queryFn: () => base44.entities.Trip.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryKey: ["trips", page, search, statusFilter, dateRangePreset, customFrom, customTo],
+    queryFn: () => base44.entities.Trip.paginate({
+      page,
+      pageSize: PAGE_SIZE,
+      sort: "-created_date",
+      conditions: statusFilter ? { status: statusFilter } : undefined,
+      searchTerm: search,
+      searchColumns: ["from_city", "to_city", "driver_name", "driver_email"],
+      dateColumn: "created_at",
+      dateFrom,
+      dateTo,
+    }),
   });
   const trips = tripsData.rows;
   const totalTrips = tripsData.total;
@@ -56,27 +82,51 @@ export default function DashboardTrips() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["trips"] }); toast.success("تم تحديث الحالة"); },
   });
 
-  const filtered = trips.filter((t) =>
-    !search ||
-    t.from_city?.includes(search) ||
-    t.to_city?.includes(search) ||
-    t.driver_name?.includes(search)
-  );
+  // No more client-side filter — server does it all. Display rows directly.
+  const filtered = trips;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">إدارة الرحلات</h1>
-          <p className="text-sm text-muted-foreground">{trips.length} رحلة مسجلة</p>
+          <p className="text-sm text-muted-foreground">{totalTrips.toLocaleString("ar-EG")} رحلة مسجلة</p>
         </div>
       </div>
 
+      <DashboardFilterBar
+        searchValue={search}
+        onSearch={setSearchAndReset}
+        searchPlaceholder="ابحث بالمدينة أو السائق أو معرّف الرحلة..."
+        selects={[
+          {
+            key: "status",
+            value: statusFilter,
+            onChange: setStatusAndReset,
+            placeholder: "كل الحالات",
+            options: [
+              { value: "confirmed",   label: "مؤكدة" },
+              { value: "in_progress", label: "جارية" },
+              { value: "completed",   label: "مكتملة" },
+              { value: "cancelled",   label: "ملغاة" },
+            ],
+          },
+        ]}
+        dateRange={{
+          value: dateRangePreset,
+          onChange: setDateRangeAndReset,
+          dateFrom: customFrom,
+          dateTo: customTo,
+          onDateFromChange: setCustomFromAndReset,
+          onDateToChange: setCustomToAndReset,
+        }}
+        resultCount={totalTrips}
+      />
+
       <div className="bg-card rounded-xl border border-border">
         <div className="p-4 border-b border-border">
-          <div className="relative max-w-sm">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالمدينة أو السائق..." className="pr-10 rounded-xl" />
+          <div className="text-xs text-muted-foreground">
+            صفحة {page} من {totalPages}
           </div>
         </div>
 

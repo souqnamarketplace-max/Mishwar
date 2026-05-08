@@ -141,7 +141,24 @@ function createEntityClient(tableName) {
      * @param {object} opts { page, pageSize, sort, conditions }
      * @returns { rows, total, page, pageSize, totalPages }
      */
-    paginate: async ({ page = 1, pageSize = 25, sort, conditions } = {}) => {
+    paginate: async ({
+      page = 1, pageSize = 25, sort, conditions,
+      // Multi-column case-insensitive search. Pass:
+      //   searchTerm:    string the admin typed (empty/undefined = no search)
+      //   searchColumns: array of column names to ilike across
+      // Translates to a Supabase .or() with `col.ilike.%term%` for each
+      // column. Special-cases ID search when the term looks like a UUID
+      // — exact id eq match instead of substring.
+      searchTerm,
+      searchColumns,
+      // Date range filter. Pass:
+      //   dateColumn: column to filter on (e.g. 'created_at', 'date')
+      //   dateFrom:   ISO string lower bound (inclusive); null/undefined = no lower bound
+      //   dateTo:     ISO string upper bound (inclusive); null/undefined = no upper bound
+      dateColumn,
+      dateFrom,
+      dateTo,
+    } = {}) => {
       const { column, ascending } = parseSortField(sort);
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
@@ -156,6 +173,29 @@ function createEntityClient(tableName) {
         Object.entries(conditions).forEach(([key, val]) => {
           if (val !== undefined && val !== null) query = query.eq(key, val);
         });
+      }
+
+      // Multi-column ilike search. Skip if no term or no columns.
+      if (searchTerm && Array.isArray(searchColumns) && searchColumns.length > 0) {
+        const term = String(searchTerm).trim();
+        if (term.length > 0) {
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(term);
+          if (isUuid) {
+            // Looks like a UUID — exact match on id (admin pasted a row id)
+            query = query.eq('id', term);
+          } else {
+            // Escape any commas/parens in the term to keep the .or() syntax safe
+            const escaped = term.replace(/[%,()]/g, ' ');
+            const orClauses = searchColumns.map((c) => `${c}.ilike.%${escaped}%`).join(',');
+            query = query.or(orClauses);
+          }
+        }
+      }
+
+      // Date range — apply both bounds independently
+      if (dateColumn) {
+        if (dateFrom) query = query.gte(dateColumn, dateFrom);
+        if (dateTo)   query = query.lte(dateColumn, dateTo);
       }
 
       const { data, count, error } = await query;

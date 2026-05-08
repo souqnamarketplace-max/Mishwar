@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
+import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,14 +10,41 @@ import { toast } from "sonner";
 
 export default function DashboardReviews() {
   const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [ratingFilter, setRatingFilter] = useState("");
+  const [dateRangePreset, setDateRangePreset] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+
+  const setSearchAndReset     = (v) => { setSearch(v); setPage(1); };
+  const setRatingAndReset     = (v) => { setRatingFilter(v); setPage(1); };
+  const setDateRangeAndReset  = (v) => { setDateRangePreset(v); setPage(1); };
+  const setCustomFromAndReset = (v) => { setCustomFrom(v); setPage(1); };
+  const setCustomToAndReset   = (v) => { setCustomTo(v); setPage(1); };
+
+  const { dateFrom, dateTo } = resolveDateRange(dateRangePreset, customFrom, customTo);
+
   const { data: reviewsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["reviews", page],
-    queryFn: () => base44.entities.Review.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryKey: ["reviews", page, search, ratingFilter, dateRangePreset, customFrom, customTo],
+    queryFn: () => base44.entities.Review.paginate({
+      page,
+      pageSize: PAGE_SIZE,
+      sort: "-created_date",
+      conditions: ratingFilter ? { rating: parseInt(ratingFilter, 10) } : undefined,
+      searchTerm: search,
+      // Search across the human-readable fields. comment is plain text so
+      // an admin looking for a specific complaint phrase can find it.
+      searchColumns: ["reviewer_name", "reviewer_email", "comment"],
+      dateColumn: "created_at",
+      dateFrom,
+      dateTo,
+    }),
   });
   const reviews = reviewsData.rows;
+  const totalReviews = reviewsData.total;
   const totalPages = reviewsData.totalPages;
 
   const deleteMutation = useMutation({
@@ -24,16 +52,46 @@ export default function DashboardReviews() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["reviews"] }); toast.success("تم حذف التقييم"); },
   });
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">جاري التحميل...</div>;
-
   return (
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">التقييمات والمراجعات</h1>
-        <p className="text-sm text-muted-foreground">{reviews.length} تقييم</p>
+        <p className="text-sm text-muted-foreground">{totalReviews.toLocaleString("ar-EG")} تقييم</p>
       </div>
 
-      {reviews.length === 0 ? (
+      <DashboardFilterBar
+        searchValue={search}
+        onSearch={setSearchAndReset}
+        searchPlaceholder="ابحث في اسم المُقيِّم أو نص التعليق..."
+        selects={[
+          {
+            key: "rating",
+            value: ratingFilter,
+            onChange: setRatingAndReset,
+            placeholder: "كل التقييمات",
+            options: [
+              { value: "5", label: "⭐⭐⭐⭐⭐ (5)" },
+              { value: "4", label: "⭐⭐⭐⭐ (4)" },
+              { value: "3", label: "⭐⭐⭐ (3)" },
+              { value: "2", label: "⭐⭐ (2)" },
+              { value: "1", label: "⭐ (1)" },
+            ],
+          },
+        ]}
+        dateRange={{
+          value: dateRangePreset,
+          onChange: setDateRangeAndReset,
+          dateFrom: customFrom,
+          dateTo: customTo,
+          onDateFromChange: setCustomFromAndReset,
+          onDateToChange: setCustomToAndReset,
+        }}
+        resultCount={totalReviews}
+      />
+
+      {isLoading ? (
+        <div className="bg-card rounded-xl border border-border p-12 text-center text-muted-foreground">جاري التحميل...</div>
+      ) : reviews.length === 0 ? (
         <div className="bg-card rounded-xl border border-border p-12 text-center">
           <Star className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
           <p className="text-muted-foreground">لا توجد تقييمات بعد</p>

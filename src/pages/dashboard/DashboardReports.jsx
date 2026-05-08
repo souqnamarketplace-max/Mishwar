@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { REPORT_CATEGORIES } from "@/lib/blockUtils";
 import { logAdminAction } from "@/lib/adminAudit";
 import Pagination from "@/components/dashboard/Pagination";
+import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 
 const STATUS_LABELS = {
   pending: { label: "قيد المراجعة", color: "yellow" },
@@ -36,33 +37,49 @@ const REPORTER_NOTIF_BY_STATUS = {
 export default function DashboardReports() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState("pending");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [dateRangePreset, setDateRangePreset] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   // Per-row admin note typed into a textarea before clicking an action.
   // Stored in component state keyed by report id so each row has its own.
   const [adminNotes, setAdminNotes] = useState({});
 
-  // Server-side pagination — was Report.filter(..., 200) before, which
-  // hard-capped at the latest 200 reports system-wide. At 100k users a
-  // pending report from week 2 would fall off the visible list within
-  // days. Now: 25 per page, infinite scroll-back via pager.
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
+  const setFilterAndReset       = (v) => { setFilter(v); setPage(1); };
+  const setSearchAndReset       = (v) => { setSearch(v); setPage(1); };
+  const setCategoryAndReset     = (v) => { setCategoryFilter(v); setPage(1); };
+  const setDateRangeAndReset    = (v) => { setDateRangePreset(v); setPage(1); };
+  const setCustomFromAndReset   = (v) => { setCustomFrom(v); setPage(1); };
+  const setCustomToAndReset     = (v) => { setCustomTo(v); setPage(1); };
+
+  const { dateFrom, dateTo } = resolveDateRange(dateRangePreset, customFrom, customTo);
+
   const { data: reportsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["reports", filter, page],
-    queryFn: () => base44.entities.UserReport.paginate({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: "-created_at",
-      conditions: filter === "all" ? {} : { status: filter },
-    }),
+    queryKey: ["reports", filter, page, search, categoryFilter, dateRangePreset, customFrom, customTo],
+    queryFn: () => {
+      const conditions = {};
+      if (filter !== "all")  conditions.status = filter;
+      if (categoryFilter)    conditions.category = categoryFilter;
+      return base44.entities.UserReport.paginate({
+        page,
+        pageSize: PAGE_SIZE,
+        sort: "-created_at",
+        conditions,
+        searchTerm: search,
+        searchColumns: ["reporter_email", "reported_email", "description"],
+        dateColumn: "created_at",
+        dateFrom,
+        dateTo,
+      });
+    },
   });
   const reports = reportsData.rows;
+  const totalReports = reportsData.total;
   const totalPages = reportsData.totalPages;
-
-  // When filter changes (status tab tapped), reset to page 1 — otherwise
-  // admin clicking 'pending' from page 5 of 'all' would land on an empty
-  // page-5-of-pending if there aren't that many pending reports.
-  const setFilterAndReset = (next) => { setFilter(next); setPage(1); };
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.UserReport.update(id, data),
@@ -138,7 +155,7 @@ export default function DashboardReports() {
         <h1 className="text-2xl font-bold text-foreground">بلاغات المستخدمين</h1>
       </div>
 
-      <div className="flex gap-2 mb-6 overflow-x-auto">
+      <div className="flex gap-2 mb-3 overflow-x-auto">
         {["pending", "reviewed", "action_taken", "dismissed", "all"].map(f => (
           <button
             key={f}
@@ -153,6 +170,33 @@ export default function DashboardReports() {
           </button>
         ))}
       </div>
+
+      <DashboardFilterBar
+        searchValue={search}
+        onSearch={setSearchAndReset}
+        searchPlaceholder="ابحث في إيميل المُبلِّغ أو المُبلَّغ عنه أو نص البلاغ..."
+        selects={[
+          {
+            key: "category",
+            value: categoryFilter,
+            onChange: setCategoryAndReset,
+            placeholder: "كل التصنيفات",
+            options: Object.entries(REPORT_CATEGORIES).map(([k, v]) => ({
+              value: k,
+              label: v.label || k,
+            })),
+          },
+        ]}
+        dateRange={{
+          value: dateRangePreset,
+          onChange: setDateRangeAndReset,
+          dateFrom: customFrom,
+          dateTo: customTo,
+          onDateFromChange: setCustomFromAndReset,
+          onDateToChange: setCustomToAndReset,
+        }}
+        resultCount={totalReports}
+      />
 
       {isLoading && <p className="text-muted-foreground">جارٍ التحميل...</p>}
       {!isLoading && reports.length === 0 && (

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import Pagination from "@/components/dashboard/Pagination";
+import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -37,16 +38,39 @@ const paymentStatusConfig = {
 export default function DashboardPayments() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState("transactions"); // "transactions" | "drivers"
+  const [statusFilter, setStatusFilter] = useState("");
+  const [dateRangePreset, setDateRangePreset] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
+  const setSearchAndReset       = (v) => { setSearch(v); setPage(1); };
+  const setStatusAndReset       = (v) => { setStatusFilter(v); setPage(1); };
+  const setDateRangeAndReset    = (v) => { setDateRangePreset(v); setPage(1); };
+  const setCustomFromAndReset   = (v) => { setCustomFrom(v); setPage(1); };
+  const setCustomToAndReset     = (v) => { setCustomTo(v); setPage(1); };
+
+  const { dateFrom, dateTo } = resolveDateRange(dateRangePreset, customFrom, customTo);
+
   // Server-side paginated bookings list (for transactions view)
   const { data: bookingsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["payments-bookings", page],
-    queryFn: () => base44.entities.Booking.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryKey: ["payments-bookings", page, search, statusFilter, dateRangePreset, customFrom, customTo],
+    queryFn: () => base44.entities.Booking.paginate({
+      page,
+      pageSize: PAGE_SIZE,
+      sort: "-created_date",
+      conditions: statusFilter ? { payment_status: statusFilter } : undefined,
+      searchTerm: search,
+      searchColumns: ["passenger_name", "passenger_email", "passenger_phone"],
+      dateColumn: "created_at",
+      dateFrom,
+      dateTo,
+    }),
   });
   const bookings = bookingsData.rows;
+  const totalBookings = bookingsData.total;
   const totalPages = bookingsData.totalPages;
 
   // Server-side aggregated summary (for stats + per-driver breakdown)
@@ -83,9 +107,8 @@ export default function DashboardPayments() {
     onError: (e) => toast.error("فشل التحديث: " + (e?.message || "")),
   });
 
-  const filtered = bookings.filter((b) =>
-    b.passenger_name?.includes(search) || b.passenger_email?.includes(search)
-  );
+  // Server-side filtering — display rows directly
+  const filtered = bookings;
 
   // Read commission rate from app_settings — the RPC may or may not
   // include it; reading directly from settings is the source of truth
@@ -196,16 +219,36 @@ export default function DashboardPayments() {
         </div>
       )}
 
-      {/* Search */}
+      {/* Filters */}
       {view === "transactions" && (
-      <div className="bg-card rounded-xl border border-border mb-4 p-3">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="ابحث باسم الراكب أو البريد..."
-          className="w-full bg-muted/50 rounded-lg px-4 py-2 text-sm outline-none"
+        <DashboardFilterBar
+          searchValue={search}
+          onSearch={setSearchAndReset}
+          searchPlaceholder="ابحث باسم الراكب أو البريد أو الهاتف..."
+          selects={[
+            {
+              key: "payment_status",
+              value: statusFilter,
+              onChange: setStatusAndReset,
+              placeholder: "كل حالات الدفع",
+              options: [
+                { value: "pending",  label: "بانتظار الدفع" },
+                { value: "paid",     label: "مدفوعة" },
+                { value: "refunded", label: "مستردة" },
+                { value: "failed",   label: "فشل الدفع" },
+              ],
+            },
+          ]}
+          dateRange={{
+            value: dateRangePreset,
+            onChange: setDateRangeAndReset,
+            dateFrom: customFrom,
+            dateTo: customTo,
+            onDateFromChange: setCustomFromAndReset,
+            onDateToChange: setCustomToAndReset,
+          }}
+          resultCount={totalBookings}
         />
-      </div>
       )}
 
       {/* Transactions Table */}

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { logAdminAction } from "@/lib/adminAudit";
 import Pagination from "@/components/dashboard/Pagination";
+import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, Search } from "lucide-react";
@@ -17,6 +18,11 @@ const statusConfig = {
 
 export default function DashboardBookings() {
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [dateRangePreset, setDateRangePreset] = useState("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const qc = useQueryClient();
 
   React.useEffect(() => {
@@ -26,9 +32,34 @@ export default function DashboardBookings() {
 
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
+
+  const setSearchAndReset       = (v) => { setSearch(v); setPage(1); };
+  const setStatusAndReset       = (v) => { setStatusFilter(v); setPage(1); };
+  const setPaymentAndReset      = (v) => { setPaymentFilter(v); setPage(1); };
+  const setDateRangeAndReset    = (v) => { setDateRangePreset(v); setPage(1); };
+  const setCustomFromAndReset   = (v) => { setCustomFrom(v); setPage(1); };
+  const setCustomToAndReset     = (v) => { setCustomTo(v); setPage(1); };
+
+  const { dateFrom, dateTo } = resolveDateRange(dateRangePreset, customFrom, customTo);
+
   const { data: bookingsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["bookings", page],
-    queryFn: () => base44.entities.Booking.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryKey: ["bookings", page, search, statusFilter, paymentFilter, dateRangePreset, customFrom, customTo],
+    queryFn: () => {
+      const conditions = {};
+      if (statusFilter)  conditions.status = statusFilter;
+      if (paymentFilter) conditions.payment_status = paymentFilter;
+      return base44.entities.Booking.paginate({
+        page,
+        pageSize: PAGE_SIZE,
+        sort: "-created_date",
+        conditions,
+        searchTerm: search,
+        searchColumns: ["passenger_name", "passenger_email", "passenger_phone"],
+        dateColumn: "created_at",
+        dateFrom,
+        dateTo,
+      });
+    },
   });
   const bookings = bookingsData.rows;
   const totalBookings = bookingsData.total;
@@ -39,26 +70,63 @@ export default function DashboardBookings() {
     onSuccess: (_, { id, status }) => { qc.invalidateQueries({ queryKey: ["bookings"] }); toast.success("تم تحديث الحالة"); logAdminAction("admin_update_booking_status", "booking", id, { new_status: status }); },
   });
 
-  const filtered = bookings.filter((b) =>
-    !search ||
-    b.passenger_name?.includes(search) ||
-    b.passenger_email?.toLowerCase().includes(search.toLowerCase())
-  );
+  // Server-side filtering — display rows directly
+  const filtered = bookings;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">إدارة الحجوزات</h1>
-          <p className="text-sm text-muted-foreground">{bookings.length} حجز مسجل</p>
+          <p className="text-sm text-muted-foreground">{totalBookings.toLocaleString("ar-EG")} حجز مسجل</p>
         </div>
       </div>
 
+      <DashboardFilterBar
+        searchValue={search}
+        onSearch={setSearchAndReset}
+        searchPlaceholder="ابحث بالاسم أو الإيميل أو الهاتف..."
+        selects={[
+          {
+            key: "status",
+            value: statusFilter,
+            onChange: setStatusAndReset,
+            placeholder: "كل الحالات",
+            options: [
+              { value: "pending",   label: "معلقة" },
+              { value: "confirmed", label: "مؤكدة" },
+              { value: "cancelled", label: "ملغاة" },
+              { value: "completed", label: "مكتملة" },
+            ],
+          },
+          {
+            key: "payment",
+            value: paymentFilter,
+            onChange: setPaymentAndReset,
+            placeholder: "كل حالات الدفع",
+            options: [
+              { value: "pending",  label: "بانتظار الدفع" },
+              { value: "paid",     label: "مدفوعة" },
+              { value: "refunded", label: "مستردة" },
+              { value: "failed",   label: "فشل الدفع" },
+            ],
+          },
+        ]}
+        dateRange={{
+          value: dateRangePreset,
+          onChange: setDateRangeAndReset,
+          dateFrom: customFrom,
+          dateTo: customTo,
+          onDateFromChange: setCustomFromAndReset,
+          onDateToChange: setCustomToAndReset,
+        }}
+        resultCount={totalBookings}
+      />
+
       <div className="bg-card rounded-xl border border-border">
         <div className="p-4 border-b border-border">
-          <div className="relative max-w-sm">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث بالاسم أو الإيميل..." className="pr-10 rounded-xl" />
+          <div className="text-xs text-muted-foreground">
+            صفحة {page} من {totalPages}
           </div>
         </div>
 
