@@ -11,6 +11,7 @@ import DashboardTrips from "./dashboard/DashboardTrips";
 import DashboardBookings from "./dashboard/DashboardBookings";
 import DashboardReviews from "./dashboard/DashboardReviews";
 import DashboardPayments from "./dashboard/DashboardPayments";
+import DashboardSubscriptions from "./dashboard/DashboardSubscriptions";
 import DashboardReports from "./dashboard/DashboardReports";
 import DashboardNotifications from "./dashboard/DashboardNotifications";
 import DashboardSupport from "./dashboard/DashboardSupport";
@@ -258,6 +259,7 @@ const pageTitles = {
   bookings: { title: "إدارة الحجوزات", subtitle: "عرض وإدارة جميع الحجوزات" },
   reviews: { title: "التقييمات والمراجعات", subtitle: "إدارة تقييمات المستخدمين" },
   payments: { title: "المعاملات والمدفوعات", subtitle: "تتبع الإيرادات والمعاملات المالية" },
+  subscriptions: { title: "اشتراكات السائقين", subtitle: "مراجعة طلبات الاشتراك الشهري وتفعيلها" },
   reports: { title: "بلاغات المستخدمين", subtitle: "مراجعة البلاغات والإجراءات الإدارية" },
   notifications: { title: "الإشعارات", subtitle: "سجل أحداث المنصة" },
   support: { title: "الدعم والشكاوى", subtitle: "إدارة تذاكر الدعم الفني" },
@@ -443,6 +445,7 @@ export default function Dashboard() {
         {activePage === "bookings" && <DashboardBookings />}
         {activePage === "reviews" && <DashboardReviews />}
         {activePage === "payments" && <DashboardPayments />}
+        {activePage === "subscriptions" && <DashboardSubscriptions />}
         {activePage === "reports" && <DashboardReports />}
         {activePage === "notifications" && <DashboardNotifications />}
         {activePage === "support" && <DashboardSupport />}

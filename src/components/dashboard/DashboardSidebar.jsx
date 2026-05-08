@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Car, CalendarCheck, CreditCard,
+  LayoutDashboard, Users, Car, CalendarCheck, CreditCard, Wallet,
   Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown
 } from "lucide-react";
 
@@ -12,6 +12,7 @@ const menuItems = [
   { id: "bookings", icon: CalendarCheck, label: "إدارة الحجوزات" },
   { id: "reviews", icon: Star, label: "التقييمات والمراجعات" },
   { id: "payments", icon: CreditCard, label: "المعاملات والمدفوعات" },
+  { id: "subscriptions", icon: Wallet, label: "اشتراكات السائقين" },
   { id: "reports", icon: Flag, label: "بلاغات المستخدمين" },
   { id: "notifications", icon: Bell, label: "الإشعارات" },
   { id: "support", icon: Headphones, label: "الدعم والشكاوى" },

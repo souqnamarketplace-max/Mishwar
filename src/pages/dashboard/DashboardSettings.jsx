@@ -12,6 +12,17 @@ const defaultSettings = {
   // and the value flows through to /dashboard?tab=payments and the
   // driver_payments_summary RPC.
   commission_rate: 0,
+  // Subscription defaults — kill switch OFF so this system is dormant
+  // until admin explicitly enables it. Existing drivers are unaffected
+  // until subscription_required = true.
+  subscription_required: false,
+  subscription_price: 30,
+  subscription_period_days: 30,
+  subscription_grace_days: 3,
+  platform_bank_account_name: "",
+  platform_bank_iban: "",
+  platform_reflect_number: "",
+  platform_jawwal_number: "",
   min_price: 10,
   max_price: 500,
   max_seats: 6,
@@ -60,6 +71,142 @@ export default function DashboardSettings() {
 
   return (
     <div className="space-y-5 max-w-2xl">
+      {/* Monetization mode summary — at-a-glance status of how the platform
+          is currently making money. Commission and subscription are
+          orthogonal levers; this card translates the current settings
+          into plain-Arabic prose so admin doesn't have to puzzle out the
+          combination of two toggles. */}
+      <MonetizationModeCard
+        commissionRate={form.commission_rate}
+        subscriptionOn={form.subscription_required}
+        subscriptionPrice={form.subscription_price}
+      />
+
+      {/* Subscription system */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
+          <Settings className="w-4 h-4 text-primary" />
+          نظام الاشتراك (تحصيل من السائقين)
+        </h3>
+
+        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg mb-4">
+          <div className="flex-1 ml-3">
+            <p className="text-sm font-medium">تفعيل نظام الاشتراك</p>
+            <p className="text-xs text-muted-foreground">
+              عند التفعيل، سيتطلب من السائقين دفع الاشتراك الشهري لنشر الرحلات.
+              السائقون الحاليون يحصلون على فترة سماح قبل الحظر.
+            </p>
+          </div>
+          <button
+            onClick={() => update("subscription_required", !form.subscription_required)}
+            className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${form.subscription_required ? "bg-primary" : "bg-muted-foreground/30"}`}
+            aria-label="تفعيل نظام الاشتراك"
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${form.subscription_required ? "right-0.5" : "left-0.5"}`} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">السعر الشهري (₪)</label>
+            <input
+              type="number"
+              min="0"
+              max="500"
+              step="0.5"
+              value={form.subscription_price ?? 30}
+              onChange={(e) => {
+                const raw = parseFloat(e.target.value);
+                update("subscription_price", Number.isFinite(raw) ? Math.max(0, Math.min(500, raw)) : 0);
+              }}
+              className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">مدة الاشتراك (يوماً)</label>
+            <input
+              type="number"
+              min="1"
+              max="365"
+              value={form.subscription_period_days ?? 30}
+              onChange={(e) => {
+                const raw = parseInt(e.target.value);
+                update("subscription_period_days", Number.isFinite(raw) ? Math.max(1, Math.min(365, raw)) : 30);
+              }}
+              className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">فترة السماح بعد الانتهاء (يوماً)</label>
+            <input
+              type="number"
+              min="0"
+              max="30"
+              value={form.subscription_grace_days ?? 3}
+              onChange={(e) => {
+                const raw = parseInt(e.target.value);
+                update("subscription_grace_days", Number.isFinite(raw) ? Math.max(0, Math.min(30, raw)) : 0);
+              }}
+              className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <p className="text-xs font-medium text-muted-foreground mb-3">
+            حسابات استلام الاشتراك (تظهر للسائقين عند التسجيل)
+          </p>
+          <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+            ⚠️ هذه الحسابات تخصك أنت كإدارة. السائقون يرسلون إليها مبلغ الاشتراك. اتركها فارغة لإخفائها.
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">رقم Reflect</label>
+                <input
+                  value={form.platform_reflect_number || ""}
+                  onChange={(e) => update("platform_reflect_number", e.target.value)}
+                  placeholder="0599XXXXXXX"
+                  dir="ltr"
+                  className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">رقم Jawwal Pay</label>
+                <input
+                  value={form.platform_jawwal_number || ""}
+                  onChange={(e) => update("platform_jawwal_number", e.target.value)}
+                  placeholder="0599XXXXXXX"
+                  dir="ltr"
+                  className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none font-mono"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">اسم صاحب الحساب البنكي</label>
+                <input
+                  value={form.platform_bank_account_name || ""}
+                  onChange={(e) => update("platform_bank_account_name", e.target.value)}
+                  placeholder="مثال: علاّم سعيد"
+                  className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">IBAN البنكي</label>
+                <input
+                  value={form.platform_bank_iban || ""}
+                  onChange={(e) => update("platform_bank_iban", e.target.value)}
+                  placeholder="PS00XXXXXXXXXXXXXXXXXXXXX"
+                  dir="ltr"
+                  className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none font-mono uppercase"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* General */}
       <div className="bg-card rounded-xl border border-border p-5">
         <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
@@ -224,6 +371,43 @@ export default function DashboardSettings() {
       >
         {saved ? <><CheckCircle className="w-4 h-4" />تم الحفظ</> : <><Save className="w-4 h-4" />حفظ الإعدادات</>}
       </Button>
+    </div>
+  );
+}
+
+// ─── Monetization mode summary ─────────────────────────────────────────────
+// Translates the (commission, subscription) pair into plain Arabic prose.
+// Commission and subscription are independent levers — admin can run any
+// combo (free, commission-only, subscription-only, both). This card removes
+// the cognitive load of figuring out which combination is currently active.
+function MonetizationModeCard({ commissionRate, subscriptionOn, subscriptionPrice }) {
+  const hasCommission = (commissionRate ?? 0) > 0;
+  const hasSubscription = !!subscriptionOn;
+
+  let title, body, color;
+
+  if (!hasCommission && !hasSubscription) {
+    title = "وضع مجاني — لا تحصيل من السائقين";
+    body  = "حالياً لا تحصّل المنصة أي مبلغ من السائقين. هذا الوضع مناسب لمرحلة الإطلاق وبناء قاعدة المستخدمين.";
+    color = "bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-400";
+  } else if (hasCommission && !hasSubscription) {
+    title = `وضع العمولة فقط — ${commissionRate}% لكل رحلة`;
+    body  = `تأخذ المنصة ${commissionRate}% من كل رحلة مدفوعة. السائق يحتفظ بالباقي. لا اشتراك شهري.`;
+    color = "bg-yellow-500/10 border-yellow-500/30 text-yellow-700 dark:text-yellow-400";
+  } else if (!hasCommission && hasSubscription) {
+    title = `وضع الاشتراك فقط — ₪${subscriptionPrice}/شهر`;
+    body  = `السائقون يدفعون ₪${subscriptionPrice} شهرياً ويحتفظون بـ 100% من أرباح كل رحلة. لا عمولة لكل رحلة.`;
+    color = "bg-green-500/10 border-green-500/30 text-green-700 dark:text-green-400";
+  } else {
+    title = "وضع مزدوج — اشتراك + عمولة";
+    body  = `السائقون يدفعون ₪${subscriptionPrice} شهرياً، وأيضاً ${commissionRate}% من كل رحلة. هذا الوضع غير شائع — تأكد أنه مناسب لإستراتيجيتك.`;
+    color = "bg-orange-500/10 border-orange-500/30 text-orange-700 dark:text-orange-400";
+  }
+
+  return (
+    <div className={`rounded-xl border p-4 ${color}`}>
+      <p className="text-sm font-bold mb-1">{title}</p>
+      <p className="text-xs leading-relaxed">{body}</p>
     </div>
   );
 }
