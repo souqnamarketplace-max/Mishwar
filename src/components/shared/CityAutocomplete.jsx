@@ -133,14 +133,41 @@ export default function CityAutocomplete({
                         <HighlightMatch text={city} query={query.trim()} />
                       </button>))
                   : (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      لا توجد نتائج لـ "{query}"
-                      <p className="text-xs mt-1">جرب اسم مدينة، بلدة أو قرية أخرى</p>
-                      <button type="button" onClick={() => { setOpen(false); setMapOpen(true); }}
-                        className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20">
-                        <MapIcon className="w-3.5 h-3.5" />اختر من الخريطة
+                    <>
+                      <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        لا توجد نتائج لـ "{query}"
+                        <p className="text-xs mt-1">جرب اسم مدينة، بلدة أو قرية أخرى</p>
+                      </div>
+                      {/* Suggest missing city — primary CTA when no results found.
+                          Was previously rendered only in the !query.trim() branch
+                          which made it unreachable; moved here so users actually
+                          see it when they need it. */}
+                      <button type="button"
+                        onClick={() => {
+                          setSuggestModal({ initialName: query.trim() });
+                          setOpen(false);
+                        }}
+                        className="w-full px-4 py-3 flex items-center gap-2 text-right hover:bg-primary/5 border-y border-border/30 bg-primary/5 transition-colors">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Plus className="w-4 h-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-primary">اقترح إضافة "{query.trim()}"</p>
+                          <p className="text-xs text-muted-foreground">سيتم إرسال طلب للإدارة لإضافتها مع موقعها على الخريطة</p>
+                        </div>
                       </button>
-                    </div>)}
+                      <button type="button" onClick={() => { setOpen(false); setMapOpen(true); }}
+                        className="w-full px-4 py-3 flex items-center gap-2 text-right hover:bg-muted/50 transition-colors">
+                        <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                          <MapIcon className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">اختر من الخريطة</p>
+                          <p className="text-xs text-muted-foreground">حدد الموقع يدوياً على الخريطة</p>
+                        </div>
+                      </button>
+                    </>
+                  )}
               </>
             )}
             {!query.trim() && (
@@ -176,23 +203,6 @@ export default function CityAutocomplete({
                       </button>);
                   })}
                 </div>
-                {/* Request missing city — opens proper suggest modal */}
-                {query.trim() && filtered.length === 0 && (
-                  <button type="button"
-                    onClick={() => {
-                      setSuggestModal({ initialName: query.trim() });
-                      setOpen(false);
-                    }}
-                    className="w-full px-4 py-3 flex items-center gap-2 text-right hover:bg-primary/5 border-b border-border/30 transition-colors">
-                    <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                      <Plus className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-primary">اقترح إضافة "{query.trim()}"</p>
-                      <p className="text-xs text-muted-foreground">سيتم إرسال طلب للإدارة لإضافتها رسمياً</p>
-                    </div>
-                  </button>
-                )}
                 <div className="grid grid-cols-2 divide-x divide-border/40 rtl:divide-x-reverse bg-muted/20">
                   <div className="px-3 py-2.5 text-center text-[11px] text-muted-foreground">{CITIES.length}+ مدينة وقرية</div>
                   <button type="button" onClick={() => { setOpen(false); setMapOpen(true); }}
