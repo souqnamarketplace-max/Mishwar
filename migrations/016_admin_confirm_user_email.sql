@@ -77,11 +77,11 @@ BEGIN
   END IF;
 
   -- Confirm the email. Setting email_confirmed_at is what unblocks login.
-  -- We also set confirmed_at for completeness (older Supabase versions
-  -- check both columns).
+  -- We do NOT touch confirmed_at — in current Supabase versions it's a
+  -- GENERATED column (computed from email_confirmed_at and phone_confirmed_at)
+  -- and writing to it raises 428C9 "can only be updated to DEFAULT".
   UPDATE auth.users
-  SET email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-      confirmed_at       = COALESCE(confirmed_at,       NOW())
+  SET email_confirmed_at = COALESCE(email_confirmed_at, NOW())
   WHERE id = v_user_id;
 
   -- Audit trail — admin actions on user accounts must always be loggable
