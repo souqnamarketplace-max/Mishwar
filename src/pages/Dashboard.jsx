@@ -23,7 +23,7 @@ import DashboardHeroSlides from "./dashboard/DashboardHeroSlides";
 import DashboardLogs from "./dashboard/DashboardLogs";
 import DashboardCities from "./dashboard/DashboardCities";
 import DashboardLicenses from "./dashboard/DashboardLicenses";
-import NotificationBell from "@/components/notifications/NotificationBell";
+import AdminNotificationBell from "@/components/notifications/AdminNotificationBell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useState as useBroadcastState } from "react";
 import { Input } from "@/components/ui/input";
@@ -378,14 +378,21 @@ export default function Dashboard() {
             {/* Admin's own notification bell — shows all notifications
                 addressed to souqnamarketplace@gmail.com (license requests,
                 reports, subscription requests, low ratings, city
-                suggestions, support tickets, etc). Wrapped in its own
-                ErrorBoundary with fallback={null} so any internal failure
-                (auth state race, supabase realtime hiccup, etc.) just
-                silently hides the bell instead of crashing the dashboard.
-                The actual error is still logged to Sentry for debugging. */}
+                suggestions, support tickets, etc).
+
+                Uses AdminNotificationBell — a dedicated component that:
+                  - Has its own user-scoped realtime channel name to avoid
+                    colliding with the consumer NotificationBell that
+                    AppLayout's Navbar/MobileLayout already renders
+                  - Polls every 30s as a realtime fallback
+                  - Skips the entity-level subscribe (which has the
+                    non-scoped channel name that races with the consumer
+                    bell when both mount simultaneously)
+                Wrapping ErrorBoundary kept as defense-in-depth for any
+                other unexpected failure mode. */}
             <ErrorBoundary fallback={null}>
               <div className="bg-card rounded-xl border border-border h-10 flex items-center px-1">
-                <NotificationBell userEmail={user?.email} />
+                <AdminNotificationBell userEmail={user?.email} />
               </div>
             </ErrorBoundary>
             <div className="flex items-center gap-2 bg-card rounded-xl px-3 py-2 border border-border">
