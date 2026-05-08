@@ -54,12 +54,25 @@ function findScrollContainer(start) {
 
 export default function PullToRefresh({ children, onRefresh }) {
   const qc = useQueryClient();
+  // Visual state (drives the spinner + content offset) — updated from
+  // refs in a rAF loop. Don't read these inside the touch handlers.
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const wrapperRef = useRef(null);
-  const startYRef = useRef(0);
-  const isTrackingRef = useRef(false);
-  const scrollerRef = useRef(null); // captured at touchstart for the gesture
+  // ALL gesture state lives in refs — never read closure-captured state
+  // inside the touch handlers. Avoids the React-batching race where
+  // touchend could read a stale pullDistance and miss a refresh.
+  const startYRef        = useRef(0);
+  const isTrackingRef    = useRef(false);
+  const scrollerRef      = useRef(null);
+  const pullDistanceRef  = useRef(0);
+  const refreshingRef    = useRef(false);
+  // Stable refs for the user-supplied callbacks so listeners don't
+  // remount when the parent passes a new function each render.
+  const onRefreshRef = useRef(onRefresh);
+  useEffect(() => { onRefreshRef.current = onRefresh; }, [onRefresh]);
+  const qcRef = useRef(qc);
+  useEffect(() => { qcRef.current = qc; }, [qc]);
 
   const [isTouch, setIsTouch] = useState(false);
   useEffect(() => {
@@ -73,69 +86,79 @@ export default function PullToRefresh({ children, onRefresh }) {
 
     const handleTouchStart = (e) => {
       if (e.touches.length !== 1) return;
-      // Find the actual scroll container at the touch point. If it's not
-      // already at the top, the user is mid-scroll and we don't want to
-      // hijack their gesture into a refresh.
+      // If a refresh is already running, ignore new gestures.
+      if (refreshingRef.current) return;
+      // Find the actual scroll container at the touch point. If it's
+      // not at the top, the user is mid-scroll; don't hijack.
       const scroller = findScrollContainer(e.target);
       if (!scroller || scroller.scrollTop > 0) return;
       scrollerRef.current = scroller;
       startYRef.current = e.touches[0].clientY;
       isTrackingRef.current = true;
+      pullDistanceRef.current = 0;
     };
 
     const handleTouchMove = (e) => {
-      if (!isTrackingRef.current || refreshing) return;
-      // If the scroller has moved off the top during this gesture (e.g. a
-      // momentum scroll started), bail. Don't show a spinner over a scroll.
+      if (!isTrackingRef.current || refreshingRef.current) return;
+      // If the scroller has moved off the top during this gesture
+      // (e.g. a momentum scroll started), bail.
       const scroller = scrollerRef.current;
       if (scroller && scroller.scrollTop > 0) {
         isTrackingRef.current = false;
+        pullDistanceRef.current = 0;
         setPullDistance(0);
         return;
       }
       const currentY = e.touches[0].clientY;
       const delta = currentY - startYRef.current;
       if (delta <= 0) {
-        setPullDistance(0);
+        if (pullDistanceRef.current !== 0) {
+          pullDistanceRef.current = 0;
+          setPullDistance(0);
+        }
         return;
       }
       const resisted = Math.min(delta * RESISTANCE, MAX_PULL);
+      pullDistanceRef.current = resisted;
       setPullDistance(resisted);
-      // Stop the inner scroller from rubber-banding while we own the gesture.
-      // Listener is attached with passive:false (see addEventListener call
-      // below) so this preventDefault actually takes effect.
+      // Stop the inner scroller from rubber-banding while we own the
+      // gesture. Listener uses passive:false (below) so this works.
       if (delta > 5) e.preventDefault();
     };
 
     const handleTouchEnd = async () => {
       if (!isTrackingRef.current) return;
       isTrackingRef.current = false;
-      const distance = pullDistance;
+      // Read from REF, not closure-captured state. The previous
+      // implementation read `pullDistance` which could be stale due to
+      // React batching, causing touchend to miss a refresh that should
+      // have fired (or fire one that shouldn't have).
+      const distance = pullDistanceRef.current;
 
-      if (distance >= TRIGGER_DISTANCE && !refreshing) {
+      if (distance >= TRIGGER_DISTANCE && !refreshingRef.current) {
+        refreshingRef.current = true;
         setRefreshing(true);
         try {
-          if (onRefresh) {
-            await onRefresh();
+          if (onRefreshRef.current) {
+            await onRefreshRef.current();
           } else {
-            // Default behaviour: invalidate every React Query cache. That
-            // re-fetches whatever the current page subscribes to (trips,
-            // bookings, profile, hero slides etc) without a full page reload,
-            // so user state, scroll position, modals all stay intact.
-            await qc.invalidateQueries();
+            await qcRef.current.invalidateQueries();
             // Hold the spinner briefly so the action feels intentional.
             await new Promise((r) => setTimeout(r, 600));
           }
         } finally {
+          refreshingRef.current = false;
           setRefreshing(false);
         }
       }
+      pullDistanceRef.current = 0;
       setPullDistance(0);
     };
 
-    // Attach to the WRAPPER, not window — so the inner scroll container
-    // (MobileLayout's <main overflow-y-auto>) routes the gesture through
-    // us before its own scroll handler runs.
+    // Attach to the WRAPPER, not window. Listeners are STABLE across
+    // the gesture's lifetime — the dep array is just [isTouch] now,
+    // not the previous [isTouch, pullDistance, refreshing, qc, onRefresh]
+    // which caused listener churn at ~60fps during a pull and missed events.
     wrapper.addEventListener("touchstart", handleTouchStart, { passive: true });
     wrapper.addEventListener("touchmove", handleTouchMove, { passive: false });
     wrapper.addEventListener("touchend", handleTouchEnd, { passive: true });
@@ -147,7 +170,7 @@ export default function PullToRefresh({ children, onRefresh }) {
       wrapper.removeEventListener("touchend", handleTouchEnd);
       wrapper.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, [isTouch, pullDistance, refreshing, qc, onRefresh]);
+  }, [isTouch]);  // ← stable dep array; refs handle the rest
 
   const progress = Math.min(pullDistance / TRIGGER_DISTANCE, 1);
   const showIndicator = isTouch && (pullDistance > 0 || refreshing);
