@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.driver_subscriptions (
   period_start       TIMESTAMPTZ,
   period_end         TIMESTAMPTZ,
   -- Driver's claim about how they paid:
-  payment_method     TEXT CHECK (payment_method IN ('bank_transfer','reflect','jawwal_pay','cash','other')),
+  payment_method     TEXT CHECK (payment_method IN ('bank_transfer','reflect','jawwal_pay','cash','other','admin_grant')),  -- 'admin_grant' added retroactively by migration 013 — included here for fresh DBs that apply 009 directly
   payment_reference  TEXT CHECK (payment_reference IS NULL OR length(payment_reference) <= 200),
   proof_url          TEXT CHECK (proof_url IS NULL OR length(proof_url) <= 500),
   -- Driver-supplied note (optional). Admin reads this when verifying.
