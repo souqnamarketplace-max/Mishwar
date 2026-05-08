@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Search, Shield, UserCheck, Mail, Trash2, Edit2, Car, Lock, Unlock, Copy, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -41,31 +42,52 @@ export default function DashboardUsers() {
   const totalUsers = usersData.total;
   const totalPages = usersData.totalPages;
 
-  const { data: userTrips = {} } = useQuery({
-    queryKey: ["user-trips"],
+  // Trip + booking counts per user — at scale (500k+ trips), the prior
+  // implementation that fetched the latest 200 rows and counted in JS
+  // produced silently-wrong "0 trips" for almost every user. Now we call
+  // the user_activity_counts RPC (migration 014) with the 25 emails on
+  // the current page, getting accurate aggregate counts in one roundtrip
+  // regardless of how many trips/bookings exist in the system.
+  //
+  // RPC fallback handling: if the RPC doesn't exist yet (migration not
+  // applied), we surface zeros instead of throwing — admins still get a
+  // working page, just without counts.
+  const pageEmails = users.map((u) => u.email).filter(Boolean);
+  const { data: countsByEmail = {} } = useQuery({
+    queryKey: ["user-activity-counts", pageEmails.join(",")],
     queryFn: async () => {
-      const allTrips = await base44.entities.Trip.list("-created_date", 200);
-      const tripsByUser = {};
-      users.forEach(u => {
-        tripsByUser[u.email] = allTrips.filter(t => t.created_by === u.email).length;
+      if (pageEmails.length === 0) return {};
+      const { data, error } = await supabase.rpc("user_activity_counts", {
+        p_emails: pageEmails,
       });
-      return tripsByUser;
+      if (error) {
+        // If the RPC is missing, return empty (page renders, counts show 0)
+        if (
+          error.code === "PGRST202" ||
+          /function .* does not exist/i.test(error.message || "")
+        ) {
+          return {};
+        }
+        throw error;
+      }
+      // Reshape array → email-keyed map for O(1) lookup in render
+      const map = {};
+      for (const row of data || []) {
+        map[row.email] = {
+          trips: Number(row.trip_count || 0),
+          bookings: Number(row.booking_count || 0),
+        };
+      }
+      return map;
     },
-    enabled: users.length > 0,
+    enabled: pageEmails.length > 0,
+    staleTime: 30_000,
   });
 
-  const { data: userBookings = {} } = useQuery({
-    queryKey: ["user-bookings"],
-    queryFn: async () => {
-      const allBookings = await base44.entities.Booking.list("-created_date", 200);
-      const bookingsByUser = {};
-      users.forEach(u => {
-        bookingsByUser[u.email] = allBookings.filter(b => b.passenger_email === u.email).length;
-      });
-      return bookingsByUser;
-    },
-    enabled: users.length > 0,
-  });
+  // Backwards-compatible shape so existing render code (`userTrips[u.email]`,
+  // `userBookings[u.email]`) keeps working without touching the JSX.
+  const userTrips    = Object.fromEntries(Object.entries(countsByEmail).map(([k, v]) => [k, v.trips]));
+  const userBookings = Object.fromEntries(Object.entries(countsByEmail).map(([k, v]) => [k, v.bookings]));
 
   const updateUserMutation = useMutation({
     mutationFn: (data) => base44.functions.invoke('updateUserAdmin', {

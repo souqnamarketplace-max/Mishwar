@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Lightbulb, AlertTriangle, CheckCircle, MessageSquarePlus, ThumbsUp, Clock, Eye, Send, Filter } from "lucide-react";
 import { toast } from "sonner";
+import Pagination from "@/components/dashboard/Pagination";
 
 const TYPE_CONFIG = {
   suggestion: { label: "اقتراح",  icon: Lightbulb,        color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
@@ -26,21 +28,64 @@ export default function DashboardFeedback() {
   const [selected, setSelected] = useState(null);
   const [adminReply, setAdminReply] = useState("");
 
-  const { data: tickets = [], isLoading } = useQuery({
-    queryKey: ["feedback-tickets"],
-    queryFn: () => base44.entities.SupportTicket.list("-created_date", 200),
+  // Server-side pagination + filters. Was list("-created_date", 200)
+  // before, which silently dropped tickets after the 200th most recent.
+  // Now: 25 per page with type/status filters applied at query level.
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  const { data: ticketsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["feedback-tickets", typeFilter, statusFilter, page],
+    queryFn: () => {
+      // Build conditions only with non-empty filters
+      const conditions = {};
+      if (typeFilter)   conditions.type   = typeFilter;
+      if (statusFilter) conditions.status = statusFilter;
+      return base44.entities.SupportTicket.paginate({
+        page,
+        pageSize: PAGE_SIZE,
+        sort: "-created_date",
+        conditions,
+      });
+    },
   });
+  const filtered = ticketsData.rows;
+  const totalPages = ticketsData.totalPages;
+  const totalMatching = ticketsData.total;
 
-  // Stats
-  const suggestions = tickets.filter(t => t.type === "suggestion").length;
-  const complaints   = tickets.filter(t => t.type === "complaint").length;
-  const praise       = tickets.filter(t => t.type === "praise").length;
-  const open         = tickets.filter(t => t.status === "open").length;
+  // Reset to page 1 when filters change — otherwise admin tapping a
+  // different type from page 5 would land on an empty page-5-of-X.
+  const setTypeAndReset   = (next) => { setTypeFilter(next);   setPage(1); };
+  const setStatusAndReset = (next) => { setStatusFilter(next); setPage(1); };
 
-  const filtered = tickets.filter(t =>
-    (!typeFilter   || t.type   === typeFilter) &&
-    (!statusFilter || t.status === statusFilter)
-  );
+  // Stats: 4 cheap parallel COUNT queries instead of computing from
+  // current page. Computing from current page would lie at scale —
+  // "12 complaints" from a 25-row sample is nothing like "12,847 in
+  // total". head:true means rows aren't returned, just the count
+  // header — fast even with no indexes.
+  const { data: stats = { suggestions: 0, complaints: 0, praise: 0, open: 0 } } = useQuery({
+    queryKey: ["feedback-stats"],
+    queryFn: async () => {
+      const make = (col, val) =>
+        supabase.from("support_tickets")
+          .select("*", { count: "exact", head: true })
+          .eq(col, val);
+      const [s, c, p, o] = await Promise.all([
+        make("type",   "suggestion"),
+        make("type",   "complaint"),
+        make("type",   "praise"),
+        make("status", "open"),
+      ]);
+      return {
+        suggestions: s.count ?? 0,
+        complaints:  c.count ?? 0,
+        praise:      p.count ?? 0,
+        open:        o.count ?? 0,
+      };
+    },
+    staleTime: 30_000,
+  });
+  const { suggestions, complaints, praise, open } = stats;
 
   const replyMutation = useMutation({
     mutationFn: ({ id, status }) => base44.entities.SupportTicket.update(id, {
@@ -50,6 +95,7 @@ export default function DashboardFeedback() {
     onSuccess: () => {
       toast.success("تم الرد بنجاح");
       qc.invalidateQueries({ queryKey: ["feedback-tickets"] });
+      qc.invalidateQueries({ queryKey: ["feedback-stats"] });
       setSelected(null); setAdminReply("");
     },
   });
@@ -86,17 +132,19 @@ export default function DashboardFeedback() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-4">
-        <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}
+        <select value={typeFilter} onChange={e => setTypeAndReset(e.target.value)}
           className="h-9 px-3 rounded-lg bg-muted/50 border border-border text-sm">
           <option value="">كل الأنواع</option>
           {Object.entries(TYPE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+        <select value={statusFilter} onChange={e => setStatusAndReset(e.target.value)}
           className="h-9 px-3 rounded-lg bg-muted/50 border border-border text-sm">
           <option value="">كل الحالات</option>
           {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
-        <span className="text-sm text-muted-foreground self-center">{filtered.length} نتيجة</span>
+        <span className="text-sm text-muted-foreground self-center">
+          {totalMatching.toLocaleString("ar-EG")} نتيجة
+        </span>
       </div>
 
       {/* Table */}
@@ -142,6 +190,10 @@ export default function DashboardFeedback() {
           </div>
         )}
       </div>
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
 
       {/* Reply Dialog */}
       {selected && (

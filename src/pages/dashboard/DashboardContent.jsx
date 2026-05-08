@@ -205,10 +205,16 @@ const EMPTY_TESTIMONIAL = {
 function TestimonialsTab() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(null); // null = no editor; {} = new; {id, ...} = existing
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["testimonials-admin"],
-    queryFn: () => base44.entities.Testimonial.list("sort_order", 200),
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["testimonials-admin", page],
+    queryFn: () => base44.entities.Testimonial.paginate({
+      page, pageSize: PAGE_SIZE, sort: "sort_order",
+    }),
   });
+  const rows = rowsData.rows;
+  const totalPages = rowsData.totalPages;
 
   const save = useMutation({
     mutationFn: (form) => form.id
@@ -278,6 +284,10 @@ function TestimonialsTab() {
             ))}
           </div>
       }
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
     </div>
   );
 }
@@ -361,10 +371,16 @@ const EMPTY_MEMBER = { full_name: "", role_title: "", emoji: "👤", avatar_url:
 function TeamTab() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(null);
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["team-admin"],
-    queryFn: () => base44.entities.TeamMember.list("sort_order", 200),
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["team-admin", page],
+    queryFn: () => base44.entities.TeamMember.paginate({
+      page, pageSize: PAGE_SIZE, sort: "sort_order",
+    }),
   });
+  const rows = rowsData.rows;
+  const totalPages = rowsData.totalPages;
 
   const save = useMutation({
     mutationFn: (form) => form.id
@@ -427,6 +443,10 @@ function TeamTab() {
             ))}
           </div>
       }
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
     </div>
   );
 }
@@ -498,10 +518,16 @@ const EMPTY_POST = {
 function BlogTab() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(null);
-  const { data: rows = [], isLoading } = useQuery({
-    queryKey: ["blog-admin"],
-    queryFn: () => base44.entities.BlogPost.list("-created_date", 200),
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+  const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["blog-admin", page],
+    queryFn: () => base44.entities.BlogPost.paginate({
+      page, pageSize: PAGE_SIZE, sort: "-created_date",
+    }),
   });
+  const rows = rowsData.rows;
+  const totalPages = rowsData.totalPages;
 
   const save = useMutation({
     mutationFn: (form) => {
@@ -570,6 +596,10 @@ function BlogTab() {
             ))}
           </div>
       }
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
     </div>
   );
 }

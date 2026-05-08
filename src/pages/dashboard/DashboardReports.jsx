@@ -6,6 +6,7 @@ import { Flag, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { REPORT_CATEGORIES } from "@/lib/blockUtils";
 import { logAdminAction } from "@/lib/adminAudit";
+import Pagination from "@/components/dashboard/Pagination";
 
 const STATUS_LABELS = {
   pending: { label: "قيد المراجعة", color: "yellow" },
@@ -39,14 +40,29 @@ export default function DashboardReports() {
   // Stored in component state keyed by report id so each row has its own.
   const [adminNotes, setAdminNotes] = useState({});
 
-  const { data: reports = [], isLoading } = useQuery({
-    queryKey: ["reports", filter],
-    queryFn: () => base44.entities.UserReport.filter(
-      filter === "all" ? {} : { status: filter },
-      "-created_at",
-      200
-    ),
+  // Server-side pagination — was Report.filter(..., 200) before, which
+  // hard-capped at the latest 200 reports system-wide. At 100k users a
+  // pending report from week 2 would fall off the visible list within
+  // days. Now: 25 per page, infinite scroll-back via pager.
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  const { data: reportsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["reports", filter, page],
+    queryFn: () => base44.entities.UserReport.paginate({
+      page,
+      pageSize: PAGE_SIZE,
+      sort: "-created_at",
+      conditions: filter === "all" ? {} : { status: filter },
+    }),
   });
+  const reports = reportsData.rows;
+  const totalPages = reportsData.totalPages;
+
+  // When filter changes (status tab tapped), reset to page 1 — otherwise
+  // admin clicking 'pending' from page 5 of 'all' would land on an empty
+  // page-5-of-pending if there aren't that many pending reports.
+  const setFilterAndReset = (next) => { setFilter(next); setPage(1); };
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.UserReport.update(id, data),
@@ -126,7 +142,7 @@ export default function DashboardReports() {
         {["pending", "reviewed", "action_taken", "dismissed", "all"].map(f => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => setFilterAndReset(f)}
             className={`px-4 py-2 rounded-xl text-sm whitespace-nowrap transition-colors ${
               filter === f
                 ? "bg-primary text-primary-foreground"
@@ -225,6 +241,10 @@ export default function DashboardReports() {
           );
         })}
       </div>
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
     </div>
   );
 }

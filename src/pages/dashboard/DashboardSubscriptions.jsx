@@ -13,6 +13,7 @@
  * pending request. Old rejected row stays for audit.
  */
 import React, { useMemo, useState } from "react";
+import Pagination from "@/components/dashboard/Pagination";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -49,23 +50,81 @@ export default function DashboardSubscriptions() {
   const [view, setView] = useState("pending"); // pending | active | history
   const [rejectModal, setRejectModal] = useState(null); // { row } when reject button tapped
   const [grantModal, setGrantModal] = useState(null);   // null | "single" | "bulk"
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  // Reset to page 1 when switching tabs — otherwise tab change leaves
+  // page index stale and may land on an empty page.
+  const setViewAndReset = (next) => { setView(next); setPage(1); };
 
   // ── Data ────────────────────────────────────────────────────────────────
-  // Pull all subscription rows; categorize client-side. The table is small
-  // enough that fetching all of them and filtering in JS avoids the
-  // complexity of 3 separate paginated queries.
-  const { data: subs = [], isLoading } = useQuery({
-    queryKey: ["admin-subscriptions"],
+  // Three separate paginated queries, one per tab. Powered by the
+  // driver_subscriptions_v view (migration 014) which pre-computes
+  // view_category server-side. Only the ACTIVE tab's query runs unless
+  // that's what the admin is viewing — saves bandwidth at scale.
+  //
+  // Why a view instead of three .or() filters: 'history' is the negation
+  // of pending+active, which is awkward in PostgREST syntax. The view
+  // pushes that logic to SQL where it stays maintainable as the schema
+  // evolves.
+  const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["admin-subscriptions", view, page],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("driver_subscriptions")
-        .select("*")
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data, count, error } = await supabase
+        .from("driver_subscriptions_v")
+        .select("*", { count: "exact" })
+        .eq("view_category", view)
         .order("created_at", { ascending: false })
-        .limit(500); // adjust pagination later if you outgrow this
+        .range(from, to);
       if (error) throw error;
-      return data;
+      return {
+        rows: data ?? [],
+        total: count ?? 0,
+        totalPages: Math.max(1, Math.ceil((count ?? 0) / PAGE_SIZE)),
+      };
     },
     refetchOnWindowFocus: true,
+  });
+  const rows = rowsData.rows;
+  const totalPages = rowsData.totalPages;
+
+  // Counts for tab badges + stat cards. Three cheap parallel COUNT queries
+  // with head:true (no rows transferred). Plus a sum-style query for
+  // collected-this-month. Updates every 30s.
+  const { data: counts = { pending: 0, active: 0, history: 0, collectedThisMonth: 0 } } = useQuery({
+    queryKey: ["admin-subscriptions-counts"],
+    queryFn: async () => {
+      const monthAgoIso = new Date(Date.now() - 30 * 86400_000).toISOString();
+      const make = (cat) => supabase
+        .from("driver_subscriptions_v")
+        .select("*", { count: "exact", head: true })
+        .eq("view_category", cat);
+      const [p, a, h, collected] = await Promise.all([
+        make("pending"),
+        make("active"),
+        make("history"),
+        // Sum amount of all approved-this-month active subs.
+        // Limited fetch is OK because head:true returns just the count;
+        // for the actual sum we pull only those rows (typically <month's worth).
+        supabase
+          .from("driver_subscriptions")
+          .select("amount")
+          .eq("status", "active")
+          .gte("approved_at", monthAgoIso)
+          .limit(10000),
+      ]);
+      const collectedSum = (collected.data || [])
+        .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+      return {
+        pending:             p.count ?? 0,
+        active:              a.count ?? 0,
+        history:             h.count ?? 0,
+        collectedThisMonth:  collectedSum,
+      };
+    },
+    staleTime: 30_000,
   });
 
   // Read app_settings to compute MRR
@@ -82,35 +141,21 @@ export default function DashboardSubscriptions() {
   const currentPrice = settings.subscription_price ?? 30;
   const switchOn = !!settings.subscription_required;
 
-  // ── Categorize ──────────────────────────────────────────────────────────
-  const { pending, active, historyAll } = useMemo(() => {
-    const now = new Date();
-    const pending = [];
-    const active = [];
-    const historyAll = [];
-    for (const s of subs) {
-      if (s.status === "pending") pending.push(s);
-      else if (s.status === "active" && s.period_end && new Date(s.period_end) > now) active.push(s);
-      else historyAll.push(s); // rejected, expired, cancelled, or active+past-period
-    }
-    return { pending, active, historyAll };
-  }, [subs]);
+  // ── Derived for legacy code below ──────────────────────────────────────
+  // Existing render code references `pending`, `active`, `historyAll`
+  // arrays. After the restructure, only the CURRENT view's rows are
+  // available. Map them so existing JSX still works.
+  const pending    = view === "pending" ? rows : [];
+  const active     = view === "active"  ? rows : [];
+  const historyAll = view === "history" ? rows : [];
 
   // ── Stats ───────────────────────────────────────────────────────────────
-  const stats = useMemo(() => {
-    const monthAgo = new Date(Date.now() - 30 * 86400_000);
-    // MRR proxy: active subscribers × current price
-    const mrr = active.length * currentPrice;
-    const collectedThisMonth = subs
-      .filter(s => s.status === "active" && new Date(s.approved_at || s.created_at) > monthAgo)
-      .reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
-    return {
-      pendingCount: pending.length,
-      activeCount: active.length,
-      mrr,
-      collectedThisMonth,
-    };
-  }, [subs, pending, active, currentPrice]);
+  const stats = {
+    pendingCount:        counts.pending,
+    activeCount:         counts.active,
+    mrr:                 counts.active * currentPrice,
+    collectedThisMonth:  counts.collectedThisMonth,
+  };
 
   // ── Approve mutation ───────────────────────────────────────────────────
   const approveMutation = useMutation({
@@ -152,7 +197,7 @@ export default function DashboardSubscriptions() {
       return data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] }); qc.invalidateQueries({ queryKey: ["admin-subscriptions-counts"] });
       toast.success("تم تفعيل الاشتراك ✅");
     },
     onError: (err) => toast.error(friendlyError(err, "فشل التفعيل")),
@@ -188,7 +233,7 @@ export default function DashboardSubscriptions() {
       }
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] }); qc.invalidateQueries({ queryKey: ["admin-subscriptions-counts"] });
       setRejectModal(null);
       toast.success("تم رفض الطلب");
     },
@@ -230,7 +275,7 @@ export default function DashboardSubscriptions() {
       return data;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] }); qc.invalidateQueries({ queryKey: ["admin-subscriptions-counts"] });
       setGrantModal(null);
       toast.success("تم منح الاشتراك ✓");
     },
@@ -250,7 +295,7 @@ export default function DashboardSubscriptions() {
       return data;
     },
     onSuccess: (count) => {
-      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] }); qc.invalidateQueries({ queryKey: ["admin-subscriptions-counts"] });
       setGrantModal(null);
       toast.success(`تم منح ${count} اشتراكاً للسائقين الحاليين ✓`);
     },
@@ -306,11 +351,11 @@ export default function DashboardSubscriptions() {
 
       {/* View toggle + grant actions */}
       <div className="flex gap-2 flex-wrap items-center">
-        <ViewTab id="pending"  active={view} onChange={setView}
+        <ViewTab id="pending"  active={view} onChange={setViewAndReset}
           label={`قيد المراجعة${stats.pendingCount > 0 ? ` (${stats.pendingCount})` : ""}`}
           alert={stats.pendingCount > 0} />
-        <ViewTab id="active"   active={view} onChange={setView} label={`نشطون (${stats.activeCount})`} />
-        <ViewTab id="history"  active={view} onChange={setView} label={`السجل (${historyAll.length})`} />
+        <ViewTab id="active"   active={view} onChange={setViewAndReset} label={`نشطون (${stats.activeCount})`} />
+        <ViewTab id="history"  active={view} onChange={setViewAndReset} label={`السجل (${counts.history})`} />
 
         {/* Grant complimentary actions — pushed to the right */}
         <div className="flex gap-2 mr-auto">
@@ -353,6 +398,10 @@ export default function DashboardSubscriptions() {
         <SubscriptionList rows={active} emptyMessage="لا يوجد مشتركون نشطون" />
       ) : (
         <SubscriptionList rows={historyAll} emptyMessage="السجل فارغ" />
+      )}
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
 
       {/* Reject modal */}
