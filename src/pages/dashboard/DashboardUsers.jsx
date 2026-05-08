@@ -89,6 +89,52 @@ export default function DashboardUsers() {
   const userTrips    = Object.fromEntries(Object.entries(countsByEmail).map(([k, v]) => [k, v.trips]));
   const userBookings = Object.fromEntries(Object.entries(countsByEmail).map(([k, v]) => [k, v.bookings]));
 
+  // Email-confirmation status per user. profiles table doesn't carry the
+  // confirmation flag — it lives in auth.users.email_confirmed_at, which
+  // RLS hides from regular clients. The emails_confirmation_status RPC
+  // (migration 016) is admin-only and returns just (email, confirmed)
+  // rows for the page's emails. Result shape: { [lowercaseEmail]: bool }.
+  //
+  // Used by the modal to show/hide the "Confirm manually" panel and by
+  // the row to render a small ⚠️ next to unconfirmed users so the admin
+  // sees at-a-glance who's stuck.
+  const { data: confirmedByEmail = {} } = useQuery({
+    queryKey: ["users-confirmation-status", pageEmails.join(",")],
+    queryFn: async () => {
+      if (pageEmails.length === 0) return {};
+      const { data, error } = await supabase.rpc("emails_confirmation_status", {
+        p_emails: pageEmails,
+      });
+      if (error) {
+        // RPC not yet applied? Don't break the page — silently treat
+        // every user as confirmed. The yellow warning just won't show.
+        if (
+          error.code === "PGRST202" ||
+          /function .* does not exist/i.test(error.message || "")
+        ) {
+          return {};
+        }
+        throw error;
+      }
+      const map = {};
+      for (const row of data || []) {
+        map[(row.email || "").toLowerCase()] = !!row.confirmed;
+      }
+      return map;
+    },
+    enabled: pageEmails.length > 0,
+    staleTime: 30_000,
+  });
+
+  // Helper — returns true if user is confirmed, true if status unknown
+  // (RPC missing). The "show warning" branch only triggers on explicit
+  // false, so admins never see false-positive warnings.
+  const isUserConfirmed = (user) => {
+    if (!user?.email) return true;
+    const v = confirmedByEmail[user.email.toLowerCase()];
+    return v === undefined ? true : v;
+  };
+
   const updateUserMutation = useMutation({
     mutationFn: (data) => base44.functions.invoke('updateUserAdmin', {
       userId: data.id,
@@ -122,6 +168,34 @@ export default function DashboardUsers() {
     },
     onError: (error) => {
       toast.error(friendlyError(error, "فشل التحديث"));
+    }
+  });
+
+  // Manually mark a user's email as confirmed. The most common need
+  // for this: a Palestinian user signs up but the confirmation email
+  // never arrives (spam, ISP block, Supabase auth rate limit). Admin
+  // verifies their identity through another channel and confirms here.
+  // Migration 016's RPC writes directly to auth.users.email_confirmed_at.
+  const confirmEmailMutation = useMutation({
+    mutationFn: async (user) => {
+      const { data, error } = await supabase.rpc("admin_confirm_user_email", {
+        p_user_email: user.email,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data, user) => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      if (data?.already_confirmed) {
+        toast.info("بريد المستخدم مؤكد بالفعل");
+      } else if (data?.success) {
+        toast.success("تم تأكيد بريد المستخدم — يستطيع الآن تسجيل الدخول ✓");
+      } else {
+        toast.error(data?.reason === "user_not_found" ? "المستخدم غير موجود" : "فشل التأكيد");
+      }
+    },
+    onError: (error) => {
+      toast.error(friendlyError(error, "فشل التأكيد"));
     }
   });
 
@@ -228,7 +302,20 @@ export default function DashboardUsers() {
                           )}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-medium truncate">{user.full_name || "—"}</p>
+                          <p className="font-medium truncate flex items-center gap-1">
+                            {user.full_name || "—"}
+                            {/* Small ⚠️ next to unconfirmed users so the
+                                admin can spot them at a glance. Title
+                                attribute provides hover context. */}
+                            {!isUserConfirmed(user) && (
+                              <span
+                                className="text-xs text-amber-600"
+                                title="البريد غير مؤكد — لا يستطيع المستخدم تسجيل الدخول"
+                              >
+                                ⚠️
+                              </span>
+                            )}
+                          </p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                         </div>
                       </div>
@@ -414,6 +501,38 @@ export default function DashboardUsers() {
                   {selectedUser.city && <p>📍 المدينة: {selectedUser.city}</p>}
                 </div>
               </div>
+
+              {/* Email confirmation status — only shown if NOT confirmed.
+                  Admin sees this when a user reports they can't log in;
+                  one click marks them confirmed via the migration 016 RPC. */}
+              {!isUserConfirmed(selectedUser) && (
+                <div className="col-span-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3">
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg">⚠️</span>
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">
+                        البريد غير مؤكد
+                      </p>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-300 leading-relaxed mb-2">
+                        لم يضغط المستخدم على رابط التأكيد بعد. إذا تواصل معك وأكد هويته، يمكنك تأكيد بريده يدوياً.
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (confirm(`تأكيد بريد ${selectedUser.email} يدوياً؟ سيتمكن المستخدم من تسجيل الدخول مباشرة.`)) {
+                            confirmEmailMutation.mutate(selectedUser);
+                          }
+                        }}
+                        disabled={confirmEmailMutation.isPending}
+                        className="rounded-lg text-xs"
+                      >
+                        {confirmEmailMutation.isPending ? "جاري التأكيد..." : "تأكيد البريد يدوياً"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2">

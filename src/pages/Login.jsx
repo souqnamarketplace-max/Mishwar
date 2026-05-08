@@ -16,7 +16,7 @@ export default function Login() {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login, register, isAuthenticated } = useAuth();
+  const { login, register, resendConfirmation, isAuthenticated } = useAuth();
 
   const [mode, setMode] = useState(searchParams.get('signup') === '1' ? 'signup' : 'login');
   const [loading, setLoading] = useState(false);
@@ -24,6 +24,13 @@ export default function Login() {
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  // Resend confirmation flow — shown when login fails with "email not confirmed"
+  // OR when a fresh signup completes. Stores the email so the user doesn't
+  // have to retype it.
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState('');
+  const [resending, setResending] = useState(false);
+  const [resentAt, setResentAt] = useState(0); // timestamp of last successful resend
 
   // Brute force protection — max 5 attempts per 15 minutes
   const getRateLimit = () => {
@@ -81,8 +88,47 @@ export default function Login() {
       // resulting in a redirect loop where the user saw a stuck spinner until refresh.
     } catch (err) {
       setLoading(false);  // only reset loading on error; success path navigates away
-      // friendlyError already maps "invalid login credentials" to Arabic
+      const msg = err?.message || '';
+      // The most common failure mode for new users in Palestine:
+      // they signed up, the confirmation email never arrived (spam, ISP
+      // delays, throttling), and now they're trying to log in. Detect
+      // this specific error and offer a resend instead of just toasting.
+      if (/email not confirmed|email_not_confirmed/i.test(msg)) {
+        setConfirmEmail(form.email);
+        setNeedsConfirm(true);
+        return;
+      }
       toast.error(friendlyError(err, "فشل تسجيل الدخول"));
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    // Supabase rate-limits resend to 1/min by default. Disable button
+    // for 60s after a successful resend so the user doesn't bash it.
+    const COOLDOWN_MS = 60_000;
+    if (Date.now() - resentAt < COOLDOWN_MS) {
+      const remaining = Math.ceil((COOLDOWN_MS - (Date.now() - resentAt)) / 1000);
+      toast.error(`يرجى الانتظار ${remaining} ثانية قبل إعادة الإرسال`);
+      return;
+    }
+    if (!confirmEmail) { toast.error('يرجى إدخال البريد الإلكتروني'); return; }
+    setResending(true);
+    try {
+      await resendConfirmation(confirmEmail);
+      setResentAt(Date.now());
+      toast.success('تم إرسال رابط التأكيد مجدداً ✓ تحقق من بريدك (وصندوق الرسائل غير المرغوب فيها)', { duration: 8000 });
+    } catch (err) {
+      const msg = err?.message || '';
+      if (/already.*confirmed/i.test(msg)) {
+        toast.success('بريدك مؤكد بالفعل! حاول تسجيل الدخول');
+        setNeedsConfirm(false);
+      } else if (/rate.*limit|too many/i.test(msg)) {
+        toast.error('تم إرسال رسائل كثيرة. حاول بعد دقيقة');
+      } else {
+        toast.error(friendlyError(err, 'فشل إعادة الإرسال'));
+      }
+    } finally {
+      setResending(false);
     }
   };
 
@@ -111,8 +157,13 @@ export default function Login() {
         return;
       }
       await register(form.email, form.password, form.fullName);
-      toast.success("تم إنشاء حسابك بنجاح! تحقق من بريدك الإلكتروني لتأكيد الحساب 📧", { duration: 6000 });
-      setMode('login');
+      // Success — but they still need to confirm their email. Switch the
+      // UI to the resend panel with their email pre-filled, so if the
+      // confirmation never arrives they can immediately resend instead
+      // of getting stuck on a login that won't work.
+      setConfirmEmail(form.email);
+      setNeedsConfirm(true);
+      setResentAt(Date.now()); // start the cooldown — first email was just sent
       setForm(p => ({ ...p, password: '', confirmPassword: '' }));
     } catch (err) {
       toast.error(friendlyError(err, "فشل إنشاء الحساب"));
@@ -155,7 +206,65 @@ export default function Login() {
 
         {/* Card */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-100 dark:border-slate-800">
+          {/* Email confirmation panel — shown after a fresh signup OR
+              when login fails because the user hasn't confirmed yet.
+              Critical for the Palestinian-region case where confirmation
+              emails are often delayed or routed to spam, leaving users
+              stuck. The "Did not receive?" resend button + spam-folder
+              hint cover ~95% of the support burden. */}
+          {needsConfirm && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="w-14 h-14 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center mb-3">
+                  <Mail className="w-7 h-7 text-primary" />
+                </div>
+                <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1">
+                  تحقق من بريدك الإلكتروني
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  أرسلنا رابط تأكيد إلى <span className="font-bold text-foreground" dir="ltr">{confirmEmail}</span>.
+                  انقر على الرابط لتفعيل حسابك.
+                </p>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3">
+                <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                  <strong>لم تجد الرسالة؟</strong> تحقق من مجلد <strong>الرسائل غير المرغوب فيها (Spam)</strong> — وأحياناً تستغرق الرسالة بضع دقائق للوصول.
+                </p>
+              </div>
+              <div>
+                <Label className="mb-1.5 block">البريد الإلكتروني</Label>
+                <div className="relative">
+                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type="email"
+                    placeholder="example@email.com"
+                    value={confirmEmail}
+                    onChange={(e) => setConfirmEmail(e.target.value)}
+                    className="pr-10 text-left"
+                    dir="ltr"
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleResendConfirmation}
+                disabled={resending || !confirmEmail}
+                className="w-full"
+              >
+                {resending ? 'جاري الإرسال...' : 'إعادة إرسال رابط التأكيد'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => { setNeedsConfirm(false); setMode('login'); }}
+                className="text-sm text-primary hover:underline w-full text-center"
+              >
+                العودة لتسجيل الدخول
+              </button>
+            </div>
+          )}
+
           {/* Tabs */}
+          {!needsConfirm && (
           <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 mb-6">
             {['login', 'register'].map(m => (
               <button key={m} onClick={() => setMode(m)}
@@ -164,9 +273,10 @@ export default function Login() {
               </button>
             ))}
           </div>
+          )}
 
           {/* Login Form */}
-          {mode === 'login' && (
+          {!needsConfirm && mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <Label className="mb-1.5 block">البريد الإلكتروني</Label>
@@ -199,7 +309,7 @@ export default function Login() {
           )}
 
           {/* Register Form */}
-          {mode === 'register' && (
+          {!needsConfirm && mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
                 <Label className="mb-1.5 block">الاسم الكامل</Label>

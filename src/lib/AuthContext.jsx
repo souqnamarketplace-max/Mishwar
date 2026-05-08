@@ -295,15 +295,47 @@ export const AuthProvider = ({ children }) => {
   /**
    * Sign up a new user.
    * Called from the Login page.
+   *
+   * IMPORTANT: emailRedirectTo. The confirmation email Supabase sends
+   * contains a link that, when clicked, calls Supabase's verify endpoint
+   * and THEN redirects the user. Without an emailRedirectTo, the redirect
+   * falls back to whatever's configured in the Supabase dashboard's
+   * "Site URL" — which can be wrong, missing, or a stale preview URL.
+   *
+   * Setting it here pins the redirect to wherever the user actually
+   * signed up from. window.location.origin gives us the correct host
+   * for production, preview deploys, and localhost development without
+   * any environment-specific config.
    */
   const register = async (email, password, fullName) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/login`,
+      },
     });
     if (error) throw error;
     return data;
+  };
+
+  /**
+   * Resend the email confirmation link to a user who didn't receive it
+   * the first time. Most common cause of "I can't log in" reports —
+   * the original email went to spam, was throttled by Supabase, or the
+   * user mistyped their address. Supabase's resend has its own rate
+   * limit (1/min by default) so the UI should disable the button briefly.
+   */
+  const resendConfirmation = async (email) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/login`,
+      },
+    });
+    if (error) throw error;
   };
 
   const logout = async (shouldRedirect = true) => {
@@ -332,6 +364,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       login,
       register,
+      resendConfirmation,
       navigateToLogin,
       checkUserAuth,
       checkAppState: checkUserAuth, // alias for compat
