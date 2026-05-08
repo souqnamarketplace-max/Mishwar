@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Car, Users, DollarSign, Star, ChevronDown, Plus, X,
-  TrendingUp, CreditCard, CheckCircle
+  TrendingUp, CreditCard, CheckCircle, Wallet
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -18,15 +18,17 @@ import { useGPSTripCompletion } from "../lib/gpsTracking";
 import { createPortal } from "react-dom";
 import { MapPin, Navigation, Clock } from "lucide-react";
 import DriverPaymentSetup from "../components/driver/DriverPaymentSetup";
+import DriverSubscriptionSection from "../components/driver/DriverSubscriptionSection";
 
 // ─── Tab definitions ────────────────────────────────────────────────────────
 const TABS = [
-  { id: "trips",      label: "رحلاتي",      icon: Car,        color: "text-primary"   },
-  { id: "passengers", label: "الركاب",       icon: Users,      color: "text-blue-600"  },
-  { id: "earnings",   label: "الأرباح",      icon: DollarSign, color: "text-green-600" },
-  { id: "ratings",    label: "التقييمات",    icon: Star,       color: "text-yellow-600" },
-  { id: "vehicle",    label: "مركبتي",       icon: Car,        color: "text-accent"    },
-  { id: "payments",   label: "الدفع",        icon: CreditCard, color: "text-purple-600"},
+  { id: "trips",        label: "رحلاتي",       icon: Car,        color: "text-primary"   },
+  { id: "passengers",   label: "الركاب",        icon: Users,      color: "text-blue-600"  },
+  { id: "earnings",     label: "الأرباح",       icon: DollarSign, color: "text-green-600" },
+  { id: "ratings",      label: "التقييمات",     icon: Star,       color: "text-yellow-600" },
+  { id: "vehicle",      label: "مركبتي",        icon: Car,        color: "text-accent"    },
+  { id: "payments",     label: "الدفع",         icon: CreditCard, color: "text-purple-600"},
+  { id: "subscription", label: "اشتراك المنصة", icon: Wallet,     color: "text-orange-600"},
 ];
 
 // ─── Mobile dropdown tab selector ──────────────────────────────────────────
@@ -286,6 +288,10 @@ export default function DriverDashboard() {
             <p className="text-sm text-muted-foreground mb-4">أضف بياناتك لاستلام مدفوعات الرحلات من الركاب</p>
             <DriverPaymentSetup user={user} />
           </div>
+        )}
+
+        {activeTab === "subscription" && (
+          <DriverSubscriptionSection user={user} />
         )}
       </div>
     </div>
