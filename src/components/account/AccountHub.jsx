@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import {
   ArrowLeft, ChevronLeft, User, ShieldCheck, Bell, CreditCard,
-  Sparkles, Car, Settings as SettingsIcon, Shield, Flag
+  Sparkles, Car, Settings as SettingsIcon, Shield, Flag, Wallet
 } from "lucide-react";
 import AccountHubItem from "./AccountHubItem";
 import PreferencesSection from "./PreferencesSection";
@@ -158,6 +158,12 @@ export default function AccountHub() {
         {isDriver && (
           <Link to="/driver?tab=payments">
             <AccountHubItem icon={CreditCard} label="مدفوعات السائق" sublabel="حسابك المصرفي، Jawwal Pay، Reflect" onClick={() => {}} />
+          </Link>
+        )}
+
+        {isDriver && (
+          <Link to="/driver?tab=subscription">
+            <AccountHubItem icon={Wallet} label="اشتراك المنصة" sublabel="حالة الاشتراك الشهري وطلب التجديد" onClick={() => {}} />
           </Link>
         )}
 

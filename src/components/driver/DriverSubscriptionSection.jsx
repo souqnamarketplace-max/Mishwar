@@ -58,6 +58,9 @@ export default function DriverSubscriptionSection({ user }) {
   const periodDays = settings.subscription_period_days ?? 30;
 
   // ── 2) Read current subscription status from RPC ─────────────────────────
+  // RPC may not exist if migration 009 hasn't been applied yet. We catch
+  // the specific error and surface a clear "system not yet active" message
+  // instead of crashing the page or showing a generic error toast.
   const { data: status = { status: "loading", allowed: true }, isLoading } = useQuery({
     queryKey: ["subscription-status", user?.email],
     queryFn: async () => {
@@ -65,11 +68,25 @@ export default function DriverSubscriptionSection({ user }) {
       const { data, error } = await supabase.rpc("driver_subscription_status", {
         p_driver_email: user.email,
       });
-      if (error) throw error;
+      if (error) {
+        // PostgREST returns 404 + code "PGRST202" (or similar) when an
+        // RPC doesn't exist. Surface as a benign "not deployed yet" state
+        // rather than throwing — keeps the page usable for the driver
+        // even when the backend hasn't been migrated.
+        if (
+          error.code === "PGRST202" ||
+          /function .* does not exist/i.test(error.message || "") ||
+          /not found/i.test(error.message || "")
+        ) {
+          return { status: "not_deployed", allowed: true };
+        }
+        throw error;
+      }
       return data || { status: "loading", allowed: true };
     },
     enabled: !!user?.email,
     refetchOnWindowFocus: true,
+    retry: 0, // RPC presence shouldn't trigger retries; either it's there or it isn't
   });
 
   if (isLoading) {
@@ -80,8 +97,9 @@ export default function DriverSubscriptionSection({ user }) {
     );
   }
 
-  // Kill switch off → don't even show the form, just a friendly note
-  if (status.status === "not_required") {
+  // RPC not yet deployed (migration 009 not applied) — same UX as
+  // "kill switch off": tell the driver no action is needed
+  if (status.status === "not_deployed" || status.status === "not_required") {
     return (
       <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
         <div className="flex items-start gap-3">

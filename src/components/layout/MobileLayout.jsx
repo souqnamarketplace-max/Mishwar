@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -295,7 +295,10 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     : []
                   ),
                   ...(user?.account_type === "driver" || user?.account_type === "both"
-                    ? [{ icon: CreditCard, label: "مدفوعات السائق", path: "/driver?tab=payments" }]
+                    ? [
+                        { icon: CreditCard, label: "مدفوعات السائق",  path: "/driver?tab=payments"     },
+                        { icon: Wallet,     label: "اشتراك المنصة",   path: "/driver?tab=subscription" },
+                      ]
                     : []
                   ),
                   // Become-a-driver entry — passenger-only. Mirrors the
