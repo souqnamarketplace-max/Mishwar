@@ -24,15 +24,16 @@ import { base44 } from "@/api/base44Client";
 import { formatArabicDate } from "@/lib/validation";
 import {
   Wallet, CheckCircle, XCircle, Clock, ImageIcon, FileText, ExternalLink,
-  TrendingUp, Users, AlertCircle, Calendar, Building2, Smartphone,
+  TrendingUp, Users, AlertCircle, Calendar, Building2, Smartphone, Gift, UserPlus, X,
 } from "lucide-react";
 
 const METHOD_LABELS = {
-  bank_transfer: { label: "تحويل بنكي", icon: Building2  },
-  reflect:       { label: "Reflect",     icon: Wallet     },
-  jawwal_pay:    { label: "Jawwal Pay",  icon: Smartphone },
-  cash:          { label: "نقداً",        icon: Wallet     },
-  other:         { label: "أخرى",        icon: Wallet     },
+  bank_transfer: { label: "تحويل بنكي",         icon: Building2  },
+  reflect:       { label: "Reflect",             icon: Wallet     },
+  jawwal_pay:    { label: "Jawwal Pay",          icon: Smartphone },
+  cash:          { label: "نقداً",                icon: Wallet     },
+  admin_grant:   { label: "منحة من الإدارة",    icon: Gift        },
+  other:         { label: "أخرى",                icon: Wallet     },
 };
 
 const STATUS_CONFIG = {
@@ -47,6 +48,7 @@ export default function DashboardSubscriptions() {
   const qc = useQueryClient();
   const [view, setView] = useState("pending"); // pending | active | history
   const [rejectModal, setRejectModal] = useState(null); // { row } when reject button tapped
+  const [grantModal, setGrantModal] = useState(null);   // null | "single" | "bulk"
 
   // ── Data ────────────────────────────────────────────────────────────────
   // Pull all subscription rows; categorize client-side. The table is small
@@ -193,6 +195,68 @@ export default function DashboardSubscriptions() {
     onError: (err) => toast.error(friendlyError(err, "فشل الرفض")),
   });
 
+  // ── Grant complimentary subscription mutations ─────────────────────────
+  // These call the SECURITY DEFINER RPCs from migration 011.
+  //
+  // Single: admin enters one driver's email + days. Used for loyalty
+  // rewards, beta tester comps, make-goods after issues.
+  //
+  // Bulk: admin grants 30-day grace to ALL current drivers without
+  // active subs. Use case: before flipping the kill switch on, give
+  // existing drivers a runway so they're not abruptly cut off.
+
+  const grantSingle = useMutation({
+    mutationFn: async ({ email, days, note }) => {
+      const { data, error } = await supabase.rpc("grant_complimentary_subscription", {
+        p_driver_email: email,
+        p_days: days,
+        p_note: note || null,
+      });
+      if (error) throw error;
+      try {
+        await base44.entities.Notification.create({
+          user_email: email,
+          title: "تم منحك اشتراكاً مجانياً 🎁",
+          message: `قامت إدارة مِشوار بتفعيل اشتراك مجاني لك لمدة ${days} يوماً.${note ? " السبب: " + note : ""}`,
+          type: "system",
+          is_read: false,
+        });
+      } catch (notifyErr) {
+        console.warn("comp grant notification failed:", notifyErr);
+      }
+      await logAdminAction("subscription_granted", "driver_subscription", data, {
+        driver_email: email, days, note,
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      setGrantModal(null);
+      toast.success("تم منح الاشتراك ✓");
+    },
+    onError: (err) => toast.error(friendlyError(err, "فشل المنح")),
+  });
+
+  const grantBulk = useMutation({
+    mutationFn: async ({ days, note }) => {
+      const { data, error } = await supabase.rpc("bulk_grant_grace_to_unsubscribed_drivers", {
+        p_days: days,
+        p_note: note || "فترة سماح من إدارة مِشوار",
+      });
+      if (error) throw error;
+      await logAdminAction("subscription_bulk_granted", "driver_subscription", null, {
+        days, count: data,
+      });
+      return data;
+    },
+    onSuccess: (count) => {
+      qc.invalidateQueries({ queryKey: ["admin-subscriptions"] });
+      setGrantModal(null);
+      toast.success(`تم منح ${count} اشتراكاً للسائقين الحاليين ✓`);
+    },
+    onError: (err) => toast.error(friendlyError(err, "فشل المنح الجماعي")),
+  });
+
   return (
     <div className="space-y-5">
       {/* Kill switch banner */}
@@ -240,13 +304,35 @@ export default function DashboardSubscriptions() {
         />
       </div>
 
-      {/* View toggle */}
-      <div className="flex gap-2 flex-wrap">
+      {/* View toggle + grant actions */}
+      <div className="flex gap-2 flex-wrap items-center">
         <ViewTab id="pending"  active={view} onChange={setView}
           label={`قيد المراجعة${stats.pendingCount > 0 ? ` (${stats.pendingCount})` : ""}`}
           alert={stats.pendingCount > 0} />
         <ViewTab id="active"   active={view} onChange={setView} label={`نشطون (${stats.activeCount})`} />
         <ViewTab id="history"  active={view} onChange={setView} label={`السجل (${historyAll.length})`} />
+
+        {/* Grant complimentary actions — pushed to the right */}
+        <div className="flex gap-2 mr-auto">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGrantModal("single")}
+            className="rounded-lg gap-1.5"
+          >
+            <Gift className="w-4 h-4 text-primary" />
+            منح اشتراك مجاني
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setGrantModal("bulk")}
+            className="rounded-lg gap-1.5"
+          >
+            <UserPlus className="w-4 h-4 text-primary" />
+            منح فترة سماح للجميع
+          </Button>
+        </div>
       </div>
 
       {/* List */}
@@ -276,6 +362,24 @@ export default function DashboardSubscriptions() {
           onClose={() => setRejectModal(null)}
           onSubmit={(reason) => rejectMutation.mutate({ row: rejectModal.row, reason })}
           submitting={rejectMutation.isPending}
+        />
+      )}
+
+      {/* Grant comp subscription modal — single driver */}
+      {grantModal === "single" && (
+        <GrantSingleModal
+          onClose={() => setGrantModal(null)}
+          onSubmit={({ email, days, note }) => grantSingle.mutate({ email, days, note })}
+          submitting={grantSingle.isPending}
+        />
+      )}
+
+      {/* Grant grace to all — bulk */}
+      {grantModal === "bulk" && (
+        <GrantBulkModal
+          onClose={() => setGrantModal(null)}
+          onSubmit={({ days, note }) => grantBulk.mutate({ days, note })}
+          submitting={grantBulk.isPending}
         />
       )}
     </div>
@@ -485,6 +589,175 @@ function RejectModal({ row, onClose, onSubmit, submitting }) {
             className="flex-1 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl"
           >
             {submitting ? "جاري..." : "تأكيد الرفض"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Grant complimentary subscription — single driver ───────────────────────
+function GrantSingleModal({ onClose, onSubmit, submitting }) {
+  const [email, setEmail] = useState("");
+  const [days, setDays] = useState(30);
+  const [note, setNote] = useState("");
+
+  // Driver autocomplete — pull from profiles where account_type ∈ (driver, both).
+  // Limited to the first 100 matches by email substring; for solo founder
+  // scale this is fine, will need pagination later.
+  const { data: matches = [] } = useQuery({
+    queryKey: ["driver-search", email],
+    queryFn: async () => {
+      if (!email || email.length < 2) return [];
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("email, full_name, account_type")
+        .in("account_type", ["driver", "both"])
+        .ilike("email", `%${email}%`)
+        .limit(8);
+      if (error) return [];
+      return data || [];
+    },
+    enabled: email.length >= 2,
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            <Gift className="w-5 h-5 text-primary" />
+            منح اشتراك مجاني
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-lg" aria-label="إغلاق">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          سيتم تفعيل اشتراك مجاني للسائق فوراً، بدون مراجعة. مناسب للسائقين المميزين أو في حالات خاصة.
+        </p>
+
+        <label className="text-xs text-muted-foreground mb-1 block">بريد السائق *</label>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="driver@example.com"
+          className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-sm outline-none mb-1"
+          autoFocus
+        />
+        {matches.length > 0 && email && !matches.find(m => m.email === email) && (
+          <div className="bg-card border border-border rounded-xl mb-2 max-h-40 overflow-y-auto">
+            {matches.map(m => (
+              <button
+                key={m.email}
+                type="button"
+                onClick={() => setEmail(m.email)}
+                className="w-full text-right px-3 py-2 text-sm hover:bg-muted/30 border-b border-border last:border-b-0"
+              >
+                <div className="font-medium truncate">{m.full_name || m.email}</div>
+                <div className="text-xs text-muted-foreground truncate">{m.email}</div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <label className="text-xs text-muted-foreground mb-1 block mt-3">عدد الأيام *</label>
+        <input
+          type="number"
+          min="1"
+          max="365"
+          value={days}
+          onChange={e => {
+            const raw = parseInt(e.target.value);
+            setDays(Number.isFinite(raw) ? Math.max(1, Math.min(365, raw)) : 30);
+          }}
+          className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-sm outline-none mb-3"
+        />
+
+        <label className="text-xs text-muted-foreground mb-1 block">ملاحظة (اختياري)</label>
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder="مثال: مكافأة سائق متميز، تعويض عن مشكلة، مرحلة تجريبية"
+          className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-sm outline-none resize-none"
+        />
+
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl" disabled={submitting}>
+            إلغاء
+          </Button>
+          <Button
+            onClick={() => onSubmit({ email: email.trim(), days, note: note.trim() })}
+            disabled={!email.trim() || days < 1 || submitting}
+            className="flex-1 bg-primary text-primary-foreground rounded-xl"
+          >
+            {submitting ? "جاري..." : "منح الاشتراك"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Bulk grace grant — to all current drivers without active subs ───────
+function GrantBulkModal({ onClose, onSubmit, submitting }) {
+  const [days, setDays] = useState(30);
+  const [note, setNote] = useState("فترة سماح من إدارة مِشوار");
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-lg flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-primary" />
+            منح فترة سماح لجميع السائقين
+          </h3>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded-lg" aria-label="إغلاق">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 mb-4 text-xs text-muted-foreground leading-relaxed">
+          سيتم منح اشتراك مجاني لكل السائقين الذين لا يملكون اشتراكاً نشطاً حالياً.
+          يفيد قبل تفعيل نظام الاشتراك ليحصل السائقون على فترة سماح بدلاً من حظرهم فجأة.
+          <br /><br />
+          السائقون الذين لديهم اشتراك نشط لن يتأثروا (لا يُضاف وقت إضافي).
+        </div>
+
+        <label className="text-xs text-muted-foreground mb-1 block">عدد الأيام لكل سائق *</label>
+        <input
+          type="number"
+          min="1"
+          max="365"
+          value={days}
+          onChange={e => {
+            const raw = parseInt(e.target.value);
+            setDays(Number.isFinite(raw) ? Math.max(1, Math.min(365, raw)) : 30);
+          }}
+          className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-sm outline-none mb-3"
+        />
+
+        <label className="text-xs text-muted-foreground mb-1 block">ملاحظة (تظهر للسائقين)</label>
+        <textarea
+          value={note}
+          onChange={e => setNote(e.target.value)}
+          rows={2}
+          maxLength={500}
+          className="w-full bg-muted/30 border border-border rounded-xl px-3 py-2 text-sm outline-none resize-none"
+        />
+
+        <div className="flex gap-2 mt-4">
+          <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl" disabled={submitting}>
+            إلغاء
+          </Button>
+          <Button
+            onClick={() => onSubmit({ days, note: note.trim() })}
+            disabled={days < 1 || submitting}
+            className="flex-1 bg-primary text-primary-foreground rounded-xl"
+          >
+            {submitting ? "جاري المنح..." : `منح ${days} يوماً للجميع`}
           </Button>
         </div>
       </div>

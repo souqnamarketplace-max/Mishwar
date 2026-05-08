@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -47,13 +47,33 @@ export default function DashboardSettings() {
   const qc = useQueryClient();
   const [saved, setSaved] = useState(false);
 
-  const { data: settingsArr = [] } = useQuery({
+  const { data: settingsArr = [], isLoading } = useQuery({
     queryKey: ["app_settings"],
     queryFn: () => base44.entities.AppSettings.list(),
   });
 
   const existingSettings = settingsArr[0];
-  const [form, setForm] = useState(() => ({ ...defaultSettings, ...existingSettings }));
+  // CRITICAL: form starts as null and gets populated from the DB once the
+  // query resolves. Earlier this was useState(() => ({ ...defaultSettings,
+  // ...existingSettings })) — but the lazy initializer only runs ONCE on
+  // first render, when the query is still loading and existingSettings is
+  // undefined. So the form was permanently stuck at defaults, regardless
+  // of what was actually saved in the DB. On every page refresh the toggle
+  // appeared OFF even when DB had subscription_required=true, and saving
+  // would silently overwrite all other fields with their defaults.
+  //
+  // Now: form is null until existingSettings loads, then we sync once.
+  // After that user edits drive the form, and the form keeps its value
+  // across mutation invalidations (we only re-sync on first hydrate).
+  const [form, setForm] = useState(null);
+  useEffect(() => {
+    if (form === null && existingSettings) {
+      setForm({ ...defaultSettings, ...existingSettings });
+    } else if (form === null && !isLoading && !existingSettings) {
+      // No row exists in DB yet — first-time save will create it
+      setForm({ ...defaultSettings });
+    }
+  }, [existingSettings, isLoading, form]);
 
   const saveMutation = useMutation({
     mutationFn: () => existingSettings
@@ -68,6 +88,18 @@ export default function DashboardSettings() {
   });
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  // Loading state — without this guard, downstream {form.commission_rate}
+  // accesses would throw because form is initially null.
+  if (form === null) {
+    return (
+      <div className="space-y-5 max-w-2xl">
+        <div className="bg-card rounded-xl border border-border p-5">
+          <div className="animate-pulse h-32 bg-muted/40 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 max-w-2xl">
@@ -94,11 +126,27 @@ export default function DashboardSettings() {
             <p className="text-sm font-medium">تفعيل نظام الاشتراك</p>
             <p className="text-xs text-muted-foreground">
               عند التفعيل، سيتطلب من السائقين دفع الاشتراك الشهري لنشر الرحلات.
-              السائقون الحاليون يحصلون على فترة سماح قبل الحظر.
+              يفضّل منح السائقين الحاليين فترة سماح من صفحة "اشتراكات السائقين" قبل التفعيل.
             </p>
           </div>
           <button
-            onClick={() => update("subscription_required", !form.subscription_required)}
+            onClick={() => {
+              // When flipping FROM off TO on, warn about existing drivers
+              // and direct admin to grant them grace first. Without this
+              // confirm step, every existing driver immediately can't post
+              // trips the moment the toggle saves.
+              if (!form.subscription_required) {
+                const ok = window.confirm(
+                  "تحذير: عند تفعيل نظام الاشتراك، السائقون الذين لا يملكون اشتراكاً نشطاً " +
+                  "سيُمنعون فوراً من نشر رحلات جديدة.\n\n" +
+                  "نوصي بزيارة صفحة 'اشتراكات السائقين' أولاً ومنح فترة سماح للسائقين الحاليين " +
+                  "قبل تفعيل النظام.\n\n" +
+                  "هل تريد المتابعة؟"
+                );
+                if (!ok) return;
+              }
+              update("subscription_required", !form.subscription_required);
+            }}
             className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${form.subscription_required ? "bg-primary" : "bg-muted-foreground/30"}`}
             aria-label="تفعيل نظام الاشتراك"
           >
