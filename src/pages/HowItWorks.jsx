@@ -6,12 +6,17 @@ import { Shield, Clock, CreditCard, Headphones, Heart, Users } from "lucide-reac
 import { motion } from "framer-motion";
 
 const features = [
-  { icon: Shield, title: "رحلة آمنة", desc: "جميع السائقين موثقين ونتحقق من بياناتهم لضمان تجربة آمنة لك" },
-  { icon: CreditCard, title: "دفع آمن", desc: "جميع المعاملات عبر المنصة بطريقة آمنة ومحمية" },
-  { icon: Headphones, title: "دعم على مدار الساعة", desc: "فريق دعم جاهز لمساعدتك في أي وقت" },
-  { icon: Users, title: "مجتمع موثوق", desc: "آلاف المستخدمين يثقون بمِشوار كل يوم" },
-  { icon: Heart, title: "تقييمات ومراجعات", desc: "بناء مجتمع ثقة من خلال سجلات موثقة ومحدثة" },
-  { icon: Clock, title: "سياسة إلغاء مرنة", desc: "إلغاء مجاني للدفع الإلكتروني قبل 24 ساعة، والنقد قبل ساعتين" },
+  { icon: Shield, title: "رحلة آمنة", desc: "جميع السائقين موثقون من قبل فريق الإدارة قبل نشر رحلاتهم" },
+  // Previously claimed "all transactions through the platform" — that's
+  // false. Mishwar does NOT process payments; passengers pay drivers
+  // directly. Replaced with an accurate description of the model.
+  { icon: CreditCard, title: "دفع مباشر", desc: "تدفع للسائق مباشرة بالطريقة المتفق عليها — نقداً، جوال باي، ريفلكت، أو تحويل بنكي" },
+  { icon: Headphones, title: "دعم سريع", desc: "تواصل مع فريق الدعم في أي وقت من خلال صفحة المساعدة" },
+  { icon: Users, title: "مجتمع فلسطيني", desc: "نخدم مجتمع المسافرين والسائقين في فلسطين" },
+  { icon: Heart, title: "تقييمات شفافة", desc: "نظام تقييمات مزدوج بين السائقين والركاب لبناء الثقة" },
+  // Previously claimed 24h cancellation for "electronic payment" — that
+  // payment mode doesn't exist in the app. Simplified to the actual rule.
+  { icon: Clock, title: "إلغاء مرن", desc: "يمكنك إلغاء حجزك من 'رحلاتي' قبل بدء الرحلة" },
 ];
 
 const tips = [
@@ -72,7 +77,14 @@ export default function HowItWorks() {
         </div>
       </section>
 
-      {/* Cancellation Policy */}
+      {/* Cancellation Policy — simplified to reflect the actual model.
+          Previously this section described two cancellation windows
+          (24h for "electronic payment", 2h for cash). The app has no
+          electronic-payment processing — passengers pay drivers
+          directly off-platform — so that distinction was misleading.
+          The actual rule: cancel anytime before the trip starts via
+          'My Trips'. The 2-hour-courtesy advisory is kept as a tip,
+          not a system-enforced policy. */}
       <section className="py-16 bg-muted/30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
           <div className="bg-card rounded-2xl border border-border p-8">
@@ -80,20 +92,20 @@ export default function HowItWorks() {
             <div className="space-y-6">
               <div>
                 <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-primary" />
-                  الحجوزات برسم الدفع الإلكتروني (بطاقة / تحويل)
+                  <Clock className="w-5 h-5 text-primary" />
+                  إلغاء قبل بدء الرحلة
                 </h3>
                 <p className="text-muted-foreground">
-                  يمكن إلغاء الحجز مجاناً قبل 24 ساعة من موعد الرحلة. بعد هذا الوقت، قد تطبق رسوم إلغاء.
+                  يمكنك إلغاء الحجز في أي وقت قبل بدء الرحلة من صفحة "رحلاتي". احتراماً للسائق وللركاب الآخرين، ننصح بالإلغاء قبل ساعتين على الأقل من موعد المغادرة كلما أمكن.
                 </p>
               </div>
               <div>
                 <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-accent" />
-                  حجوزات الدفع النقدي
+                  <CreditCard className="w-5 h-5 text-accent" />
+                  استرداد المبالغ
                 </h3>
                 <p className="text-muted-foreground">
-                  يمكن إلغاء الحجز مجاناً قبل ساعتين من موعد الرحلة.
+                  الدفع يتم مباشرة بينك وبين السائق — لذا أي استرداد يكون باتفاق مباشر معه. مِشوار لا يحتفظ بأموال الرحلات ولا يدير المعاملات المالية.
                 </p>
               </div>
               <div className="p-4 bg-primary/5 rounded-xl border border-primary/20">

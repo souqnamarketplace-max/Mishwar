@@ -94,7 +94,7 @@ export default function MyReportsSection({ user }) {
               </div>
             )}
             <p className="text-[10px] text-muted-foreground">
-              {r.created_at && new Date(r.created_at).toLocaleString("ar")}
+              {r.created_at && new Date(r.created_at).toLocaleString("ar-EG")}
             </p>
           </div>
         );

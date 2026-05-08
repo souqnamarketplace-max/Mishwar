@@ -17,22 +17,29 @@ const features = [
   {
     icon: Lock,
     title: "حماية البيانات",
-    desc: "بياناتك الشخصية محمية بتشفير عالي المستوى ولا تُشارك مع أي طرف ثالث.",
+    desc: "بياناتك الشخصية محمية وفق معايير عالية ولا تُشارك مع أي طرف ثالث.",
   },
   {
     icon: Phone,
-    title: "دعم على مدار الساعة",
-    desc: "فريق الدعم متاح 24/7 للاستجابة لأي طارئ أو استفسار.",
+    // Previously claimed "24/7 support team" — that's an overclaim for
+    // an early-stage app. Adjusted to factual: a support page where
+    // users can submit reports and get follow-up.
+    title: "دعم سريع",
+    desc: "يمكنك التواصل مع فريق الدعم في أي وقت عبر صفحة المساعدة، وسنرد في أقرب فرصة.",
   },
   {
     icon: Shield,
     title: "سياسة الإلغاء",
-    desc: "يمكنك إلغاء حجزك مجاناً حتى ساعتين قبل موعد الرحلة دون أي رسوم.",
+    desc: "يمكنك إلغاء حجزك في أي وقت قبل بدء الرحلة من صفحة 'رحلاتي'. ننصح بالإلغاء قبل ساعتين على الأقل احتراماً للسائق وباقي الركاب.",
   },
   {
     icon: CheckCircle,
-    title: "ضمان الجودة",
-    desc: "نراقب جودة الرحلات باستمرار ونتخذ إجراءات فورية عند أي شكوى.",
+    // Previously: "we monitor trip quality continuously and take
+    // immediate action on complaints" — overclaims continuous
+    // monitoring + instant action. Honest version: review of reports
+    // by the team.
+    title: "متابعة الشكاوى",
+    desc: "نستقبل البلاغات والملاحظات من المستخدمين، يراجعها فريق الإدارة ويتخذ الإجراء المناسب.",
   },
 ];
 

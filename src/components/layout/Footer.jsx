@@ -39,13 +39,20 @@ export default function Footer() {
   return (
     <footer className="bg-primary text-primary-foreground" dir="rtl">
 
-      {/* Emergency Bar */}
-      <div className="bg-red-800/70 px-4 py-2.5 text-center text-sm">
-        <span>🆘 طوارئ أو إساءة؟ </span>
-        <a href="tel:+970599000000" className="font-bold underline hover:opacity-80 mr-1">
-          اتصل: 0599-000-000
-        </a>
-      </div>
+      {/* Emergency Bar — shown only when an admin has actually set a
+          support phone in app_settings. Previously this was hardcoded
+          to +970599000000 / "0599-000-000" — a placeholder number that
+          would either ring nobody or ring whoever happened to own that
+          line. Showing fake emergency contact info is worse than not
+          showing one. */}
+      {supportPhone && (
+        <div className="bg-red-800/70 px-4 py-2.5 text-center text-sm">
+          <span>🆘 طوارئ أو إساءة؟ </span>
+          <a href={`tel:${supportPhone.replace(/\s/g, "")}`} className="font-bold underline hover:opacity-80 mr-1">
+            اتصل: {supportPhone}
+          </a>
+        </div>
+      )}
 
       {/* Main Footer */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">

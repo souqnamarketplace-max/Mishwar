@@ -93,6 +93,18 @@ export default function MobileLayout({ children, user, showHeader = true, header
     staleTime: 15000,
   });
 
+  // ─── Support phone for the emergency CTA (pulled from settings so
+  // admin can edit without a deploy; same pattern as Help.jsx and
+  // Footer.jsx). The CTA is hidden when no admin has configured a
+  // number — showing a placeholder hotline that goes nowhere is worse
+  // than showing nothing for a safety feature. */}
+  const { data: settingsArrM = [] } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: () => base44.entities.AppSettings.list(),
+    staleTime: 5 * 60 * 1000,
+  });
+  const supportPhoneM = settingsArrM[0]?.support_phone || "";
+
   // Realtime: bump unread count when a new message arrives, drop it when read
   useEffect(() => {
     if (!user?.email) return;
@@ -180,14 +192,16 @@ export default function MobileLayout({ children, user, showHeader = true, header
             the scroll content (above the tab bar) so users see it after
             scrolling any page to the end. tel: links open the dialer
             on every modern mobile OS. */}
-        <a
-          href="tel:+970599000000"
-          className="block bg-red-800/90 text-white text-center text-sm py-2.5 px-4 -mx-0 active:bg-red-900"
-          dir="rtl"
-        >
-          <span className="opacity-90">🆘 طوارئ أو إساءة؟ </span>
-          <span className="font-bold underline">اتصل: 0599-000-000</span>
-        </a>
+        {supportPhoneM && (
+          <a
+            href={`tel:${supportPhoneM.replace(/\s/g, "")}`}
+            className="block bg-red-800/90 text-white text-center text-sm py-2.5 px-4 -mx-0 active:bg-red-900"
+            dir="rtl"
+          >
+            <span className="opacity-90">🆘 طوارئ أو إساءة؟ </span>
+            <span className="font-bold underline">اتصل: {supportPhoneM}</span>
+          </a>
+        )}
       </div>
 
       {/* Bottom Tab Bar — with integrated driver post-trip button */}
