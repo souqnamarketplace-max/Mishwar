@@ -39,6 +39,35 @@ export default function Login() {
   // sessionStorage instead of localStorage, so it's cleared by the
   // browser when the tab closes.
   const [rememberMe, setRememberMeState] = useState(() => getRememberMe());
+  // ─── Password recovery flow ─────────────────────────────────────────
+  // When a user clicks the link in a "Reset Password" email, Supabase
+  // verifies their token, creates a recovery session, and redirects
+  // here with a URL fragment like:
+  //   /login#access_token=...&type=recovery&refresh_token=...
+  //
+  // detectSessionInUrl auto-consumes that fragment and fires a
+  // SIGNED_IN auth event, so without special handling the app would
+  // just log them in and send them to the home page — they'd never
+  // see a "set a new password" form.
+  //
+  // We detect the recovery type on mount and switch to a dedicated UI
+  // that lets them set a new password. The auto-redirect (above) is
+  // suppressed while in this mode.
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  useEffect(() => {
+    // Supabase puts auth payload in the URL hash. Recovery sessions are
+    // identified by `type=recovery` in that fragment. Only set the flag
+    // if it's actually present — running this unconditionally would
+    // misfire on every page load.
+    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
+      setRecoveryMode(true);
+    }
+  }, []);
 
   // Brute force protection — max 5 attempts per 15 minutes
   const getRateLimit = () => {
@@ -69,13 +98,17 @@ export default function Login() {
   });
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // While we're in password-recovery mode, don't redirect home —
+    // the user has to set a new password first. The hash already put
+    // them in an authenticated state but the only allowed action is
+    // updateUser({ password }).
+    if (isAuthenticated && !recoveryMode) {
       // Validate returnTo — only allow internal paths (prevent open redirect)
       const raw = searchParams.get('returnTo') || '/';
       const safePath = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
       navigate(safePath, { replace: true });
     }
-  }, [isAuthenticated, navigate, searchParams]);
+  }, [isAuthenticated, recoveryMode, navigate, searchParams]);
 
   const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -208,6 +241,65 @@ export default function Login() {
     }
   };
 
+  /**
+   * Set the user's password during the recovery flow.
+   *
+   * Triggered after the user clicked the link in a "Reset Password"
+   * email — by this point Supabase has already validated the token,
+   * and they have a recovery session that allows updateUser({ password }).
+   *
+   * Same compliance check as signup, so the new password meets
+   * Supabase's server-side policy (lowercase + uppercase + digit + 8
+   * chars). Without this, the server would reject the update with a
+   * generic error and the user would be stuck on the recovery page.
+   *
+   * After success, we clear the URL hash (so a refresh doesn't re-enter
+   * recovery mode) and navigate to home where the user is now logged in.
+   */
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (newPassword !== newPasswordConfirm) {
+      toast.error('كلمتا المرور غير متطابقتين');
+      return;
+    }
+    const compliance = validatePasswordCompliance(newPassword);
+    if (compliance.missing.length > 0) {
+      toast.error(passwordComplianceMessage(compliance), { duration: 7000 });
+      return;
+    }
+    if (isCommonPassword(newPassword)) {
+      toast.error('هذه كلمة مرور شائعة جداً وغير آمنة. اختر كلمة مرور أصعب');
+      return;
+    }
+    setUpdatingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success('تم تغيير كلمة المرور بنجاح! 🎉', { duration: 5000 });
+      // Clear the recovery hash so a refresh doesn't re-trigger this UI
+      window.history.replaceState(null, '', window.location.pathname);
+      setRecoveryMode(false);
+      setNewPassword('');
+      setNewPasswordConfirm('');
+      // The auth state is already SIGNED_IN with the new password —
+      // navigate to home and let the normal authenticated flow take over.
+      navigate('/', { replace: true });
+    } catch (err) {
+      toast.error(friendlyError(err, 'تعذر تغيير كلمة المرور — حاول مجدداً'));
+    } finally {
+      setUpdatingPassword(false);
+    }
+  };
+
+  /** Cancel the recovery flow — sign out and return to a clean login. */
+  const cancelRecovery = async () => {
+    try { await supabase.auth.signOut(); } catch { /* ignore */ }
+    window.history.replaceState(null, '', window.location.pathname);
+    setRecoveryMode(false);
+    setNewPassword('');
+    setNewPasswordConfirm('');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4" dir="rtl">
       <div className="w-full max-w-md">
@@ -231,13 +323,113 @@ export default function Login() {
 
         {/* Card */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-8 border border-slate-100 dark:border-slate-800">
+          {/* Password recovery panel — shown when user lands here from
+              a "Reset Password" email link. Supabase has already
+              authenticated them via the token, but the only allowed
+              action right now is updating the password. We render a
+              dedicated form with the same live requirements indicator
+              the signup uses, so the UX is consistent and the user
+              can't pick a noncompliant password. */}
+          {recoveryMode && (
+            <div className="space-y-4">
+              <div className="text-center">
+                <div className="w-14 h-14 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center mb-3">
+                  <Lock className="w-7 h-7 text-primary" />
+                </div>
+                <h3 className="font-bold text-lg text-slate-900 dark:text-white mb-1">
+                  اختر كلمة مرور جديدة
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                  اكتب كلمة المرور الجديدة لحسابك في مِشوار. ستستخدمها لتسجيل الدخول من الآن.
+                </p>
+              </div>
+              <form onSubmit={handleUpdatePassword} className="space-y-4">
+                <div>
+                  <Label className="mb-1.5 block flex items-center justify-between">
+                    <span>كلمة المرور الجديدة</span>
+                    <span className="text-[10px] font-normal text-slate-500">(انظر المتطلبات أدناه)</span>
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      type={showNewPassword ? 'text' : 'password'}
+                      placeholder="مثال: Mishwar123"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="pr-10 pl-10"
+                      autoComplete="new-password"
+                      autoFocus
+                    />
+                    <button type="button" onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {/* Same live requirements indicator used by signup —
+                      keeps the password UX consistent across flows. */}
+                  {(() => {
+                    const c = validatePasswordCompliance(newPassword);
+                    const allMet = newPassword && c.missing.length === 0;
+                    const Item = ({ ok, text }) => (
+                      <span className={`text-[11px] flex items-center gap-1.5 ${ok ? 'text-green-700 dark:text-green-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                        <span className={`inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold shrink-0 ${ok ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500'}`}>
+                          {ok ? '✓' : '○'}
+                        </span>
+                        {text}
+                      </span>
+                    );
+                    return (
+                      <div className={`mt-2 rounded-xl border p-3 transition-colors ${allMet ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900' : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700'}`}>
+                        <p className="text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-2">
+                          متطلبات كلمة المرور:
+                        </p>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                          <Item ok={c.longEnough} text={`${PASSWORD_MIN_LENGTH} أحرف على الأقل`} />
+                          <Item ok={c.hasUpper}   text="حرف كبير (A-Z)" />
+                          <Item ok={c.hasLower}   text="حرف صغير (a-z)" />
+                          <Item ok={c.hasDigit}   text="رقم (0-9)" />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div>
+                  <Label className="mb-1.5 block">تأكيد كلمة المرور الجديدة</Label>
+                  <div className="relative">
+                    <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input
+                      type={showNewPassword ? 'text' : 'password'}
+                      placeholder="أعد كتابة كلمة المرور"
+                      value={newPasswordConfirm}
+                      onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                      className="pr-10"
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+                <Button type="submit" className="w-full h-11 text-base" disabled={updatingPassword}>
+                  {updatingPassword
+                    ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    : 'تحديث كلمة المرور'}
+                </Button>
+                <button
+                  type="button"
+                  onClick={cancelRecovery}
+                  className="text-sm text-primary hover:underline w-full text-center"
+                >
+                  إلغاء
+                </button>
+              </form>
+            </div>
+          )}
+
           {/* Email confirmation panel — shown after a fresh signup OR
               when login fails because the user hasn't confirmed yet.
               Critical for the Palestinian-region case where confirmation
               emails are often delayed or routed to spam, leaving users
               stuck. The "Did not receive?" resend button + spam-folder
               hint cover ~95% of the support burden. */}
-          {needsConfirm && (
+          {!recoveryMode && needsConfirm && (
             <div className="space-y-4">
               <div className="text-center">
                 <div className="w-14 h-14 mx-auto bg-primary/10 rounded-2xl flex items-center justify-center mb-3">
@@ -289,7 +481,7 @@ export default function Login() {
           )}
 
           {/* Tabs */}
-          {!needsConfirm && (
+          {!recoveryMode && !needsConfirm && (
           <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 mb-6">
             {['login', 'register'].map(m => (
               <button key={m} onClick={() => setMode(m)}
@@ -301,7 +493,7 @@ export default function Login() {
           )}
 
           {/* Login Form */}
-          {!needsConfirm && mode === 'login' && (
+          {!recoveryMode && !needsConfirm && mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <Label className="mb-1.5 block">البريد الإلكتروني</Label>
@@ -352,7 +544,7 @@ export default function Login() {
           )}
 
           {/* Register Form */}
-          {!needsConfirm && mode === 'register' && (
+          {!recoveryMode && !needsConfirm && mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div>
                 <Label className="mb-1.5 block">الاسم الكامل</Label>
