@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { MapPin, X, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { toast } from "sonner";
 
 /**
@@ -53,6 +54,12 @@ export default function SuggestCityModal({ initialName, onClose }) {
       if (data === null) {
         setStage("already_exists");
       } else {
+        // Fire admin notification — admin will see this in the dashboard
+        // bell so they can review pending suggestions promptly.
+        await notifyAdmin({
+          title: "🗺️ اقتراح مدينة جديدة",
+          message: `اقترح مستخدم إضافة "${cleanName}"${notes.trim() ? ` — ${notes.trim().slice(0, 120)}` : ""}`,
+        });
         setStage("success");
       }
     } catch (err) {

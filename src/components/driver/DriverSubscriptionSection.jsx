@@ -27,6 +27,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { base44 } from "@/api/base44Client";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -318,6 +319,20 @@ function SubscribeForm({ user, price, periodDays, settings, variant = "new", onS
         driver_note:       note || null,
       }).select().single();
       if (error) throw error;
+      // Notify admin so the new pending subscription appears in the bell
+      // immediately rather than only being visible after admin happens to
+      // open the subscriptions tab.
+      const methodLabels = {
+        bank_transfer: "تحويل بنكي",
+        reflect: "Reflect",
+        jawwal_pay: "Jawwal Pay",
+        cash: "نقداً",
+        other: "أخرى",
+      };
+      await notifyAdmin({
+        title: "💳 طلب اشتراك جديد",
+        message: `${user.full_name || user.email} أرسل طلب ${variant === "renewal" ? "تجديد" : "اشتراك"} عبر ${methodLabels[method] || method} (مرجع: ${reference}) — ₪${price}`,
+      });
       return data;
     },
     onSuccess: () => {

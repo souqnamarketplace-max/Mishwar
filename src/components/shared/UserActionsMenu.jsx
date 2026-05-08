@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MoreVertical, Shield, Flag, X, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { useAuth } from "@/lib/AuthContext";
 import { invalidateBlockCache, REPORT_CATEGORIES } from "@/lib/blockUtils";
 import { isDeletedUserEmail } from "@/lib/userStatus";
@@ -121,19 +122,12 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
       }
 
       // 3) Notify admins so reports don't sit unseen in the dashboard.
-      // The notif goes to the souqnamarketplace@gmail.com admin account
-      // (same channel already used for license-verification submissions
-      // in Onboarding.jsx). Wrapped in try/catch so a notification failure
-      // doesn't poison the report submission itself.
-      try {
-        await base44.entities.Notification.create({
-          user_email: "souqnamarketplace@gmail.com",
-          title: "بلاغ جديد من مستخدم 🚩",
-          message: `${user.full_name || user.email} قدّم بلاغاً ضد ${targetEmail}. السبب: ${data.category}`,
-          type: "system",
-          is_read: false,
-        });
-      } catch {}
+      // notifyAdmin handles its own try/catch internally so a notification
+      // failure never poisons the report submission itself.
+      await notifyAdmin({
+        title: "🚩 بلاغ جديد من مستخدم",
+        message: `${user.full_name || user.email} قدّم بلاغاً ضد ${targetEmail}. السبب: ${data.category}`,
+      });
 
       // 4) Audit-trail entry on the report submission itself. The admin
       // dashboard already logs `report_action_taken` etc. when the admin

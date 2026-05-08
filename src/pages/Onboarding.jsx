@@ -7,6 +7,7 @@ import { friendlyError } from "@/lib/errors";
 import { readSessionUserId } from "@/lib/session";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { supabase } from "@/lib/supabase";
 import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
 import { useAuth } from "@/lib/AuthContext";
@@ -112,12 +113,9 @@ export default function Onboarding() {
         });
 
         // Create notification for admin
-        await base44.entities.Notification.create({
-          user_email: "souqnamarketplace@gmail.com",
-          title: "طلب تحقق من رخصة قيادة جديد",
-          message: `${user?.full_name} قدّم طلب للتحقق من رخصة القيادة الخاصة به`,
-          type: "system",
-          is_read: false,
+        await notifyAdmin({
+          title: "🪪 طلب تحقق من رخصة قيادة",
+          message: `${user?.full_name || user?.email} قدّم طلب للتحقق من رخصة القيادة`,
         });
       }
     },

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
@@ -65,6 +66,17 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
           title: "رسالة خاصة من راكب 📩",
           message: privateMsg,
           type: "system", trip_id: trip.id, is_read: false,
+        });
+      }
+      // Low-rating signal to admin — gives admin a quality signal to
+      // investigate problem drivers without having to mine the reviews
+      // table manually. Threshold 1-2 stars only; 3+ stars is normal
+      // variance not worth interrupting.
+      if (rating <= 2) {
+        await notifyAdmin({
+          title: `⚠️ تقييم منخفض (${rating}/5) للسائق`,
+          message: `${passengerUser?.full_name || "راكب"} قيّم السائق بـ ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${publicReview ? ` — "${publicReview.slice(0, 100)}"` : ""}`,
+          trip_id: trip.id,
         });
       }
       setStep(5);

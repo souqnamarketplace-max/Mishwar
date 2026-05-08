@@ -23,6 +23,7 @@ import DashboardHeroSlides from "./dashboard/DashboardHeroSlides";
 import DashboardLogs from "./dashboard/DashboardLogs";
 import DashboardCities from "./dashboard/DashboardCities";
 import DashboardLicenses from "./dashboard/DashboardLicenses";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import { useState as useBroadcastState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -372,6 +373,17 @@ export default function Dashboard() {
                   admins on phones with no way to broadcast at all. */}
               <span className="hidden sm:inline">بث إشعار</span>
             </button>
+
+            {/* Admin's own notification bell — shows all notifications
+                addressed to souqnamarketplace@gmail.com (license requests,
+                reports, subscription requests, low ratings, city
+                suggestions, support tickets, etc). The same NotificationBell
+                component used in the user-facing layouts. user.email is
+                the currently logged-in admin's own email (which equals
+                ADMIN_EMAIL since that's the only admin role row). */}
+            <div className="bg-card rounded-xl border border-border h-10 flex items-center px-1">
+              <NotificationBell userEmail={user?.email} />
+            </div>
             <div className="flex items-center gap-2 bg-card rounded-xl px-3 py-2 border border-border">
               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
                 {user?.avatar_url ? <img loading="lazy" src={user.avatar_url} className="w-full h-full rounded-full object-cover" alt="" /> : "أ"}

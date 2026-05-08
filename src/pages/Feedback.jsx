@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useSEO } from "@/hooks/useSEO";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { MessageSquarePlus, Lightbulb, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Send } from "lucide-react";
@@ -43,17 +44,28 @@ export default function Feedback() {
   });
 
   const submit = useMutation({
-    mutationFn: () => base44.entities.SupportTicket.create({
-      user_email: user?.email || "anonymous",
-      user_name:  user?.full_name || "مستخدم",
-      user_role:  user?.account_type || "passenger",
-      subject:    subject || TYPES.find(t => t.id === type)?.label,
-      description: message,
-      type,
-      category,
-      status: "open",
-      priority: type === "complaint" ? "high" : "normal",
-    }),
+    mutationFn: async () => {
+      const ticket = await base44.entities.SupportTicket.create({
+        user_email: user?.email || "anonymous",
+        user_name:  user?.full_name || "مستخدم",
+        user_role:  user?.account_type || "passenger",
+        subject:    subject || TYPES.find(t => t.id === type)?.label,
+        description: message,
+        type,
+        category,
+        status: "open",
+        priority: type === "complaint" ? "high" : "normal",
+      });
+      // Notify admin so it shows up in the dashboard bell. Fire-and-forget;
+      // a failure here shouldn't block the user's success toast.
+      const typeLabel = TYPES.find(t => t.id === type)?.label || type;
+      const titleEmoji = type === "complaint" ? "⚠️" : type === "praise" ? "💚" : "💡";
+      await notifyAdmin({
+        title: `${titleEmoji} ${typeLabel} جديد${type === "complaint" ? "ة" : ""} من ${user?.full_name || "مستخدم"}`,
+        message: (subject || message).slice(0, 200),
+      });
+      return ticket;
+    },
     onSuccess: () => {
       toast.success("تم إرسال ملاحظتك بنجاح! سنرد عليك قريباً 🙏");
       setSubject(""); setMessage(""); setType("suggestion"); setCategory("أخرى");
