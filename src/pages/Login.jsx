@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X, ArrowRight } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { supabase, setRememberMe, getRememberMe } from '@/lib/supabase';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function Login() {
   useSEO({ title: "تسجيل الدخول", description: "سجل دخولك إلى حسابك في مِشوار" });
@@ -31,6 +32,13 @@ export default function Login() {
   const [confirmEmail, setConfirmEmail] = useState('');
   const [resending, setResending] = useState(false);
   const [resentAt, setResentAt] = useState(0); // timestamp of last successful resend
+  // Remember-me toggle. Default: read whatever the user picked last
+  // time (persisted in localStorage by setRememberMe). On a fresh
+  // browser this evaluates to true — most users expect to stay logged
+  // in. When unchecked, the actual session token is written to
+  // sessionStorage instead of localStorage, so it's cleared by the
+  // browser when the tab closes.
+  const [rememberMe, setRememberMeState] = useState(() => getRememberMe());
 
   // Brute force protection — max 5 attempts per 15 minutes
   const getRateLimit = () => {
@@ -81,6 +89,10 @@ export default function Login() {
     if (!form.email || !form.password) { toast.error('يرجى ملء جميع الحقول'); return; }
     setLoading(true);
     try {
+      // Persist the remember-me choice BEFORE the login request so the
+      // storage adapter (in src/lib/supabase.js) routes the new session
+      // token to the right backing store on its first write.
+      setRememberMe(rememberMe);
       await login(form.email, form.password);
       // No manual navigate here — the useEffect at top of this component watches
       // isAuthenticated and handles redirect once React has committed the new state.
@@ -310,6 +322,24 @@ export default function Login() {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+              {/* Remember me — when checked, session persists in
+                  localStorage across browser restarts (default).
+                  When unchecked, session is written to sessionStorage
+                  and is cleared when the browser closes. The choice
+                  is persisted across visits. */}
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(v) => setRememberMeState(v === true)}
+                />
+                <label
+                  htmlFor="remember-me"
+                  className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer select-none"
+                >
+                  تذكرني على هذا الجهاز
+                </label>
               </div>
               <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
                 {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'تسجيل الدخول'}
