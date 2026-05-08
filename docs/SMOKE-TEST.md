@@ -175,11 +175,16 @@ If admin sees the test notification: migration 002 §C-07 reverted.
 
 As admin (`souqnamarketplace`):
 
-- [ ] Open `/dashboard` → loads without crash
+- [ ] Open `/dashboard` → loads without crash, NO error boundary fallback
+- [ ] Top bar shows: title, broadcast button, **🔔 admin bell** (NEW),
+      avatar — all four side by side
 - [ ] Charts render (recharts lazy-loaded chunk works)
-- [ ] Click "Users" tab → list of users renders
+- [ ] Click "Users" tab → list of users renders, trip counts accurate
+- [ ] Click "Trips" tab → filters bar visible (search + status + date range)
+- [ ] Click "Bookings" tab → filters bar with status + payment status
 - [ ] Click "Logs" tab → audit log entries visible
-- [ ] Click "Reports" tab → report list renders (might be empty)
+- [ ] Click "Reports" tab → report list with category filter
+- [ ] Click "المدن المقترحة" (Cities) tab — NEW — should show 3 sub-tabs
 - [ ] Click "Licenses" tab → if any licenses pending, click one →
       modal shows the license image. After migration 004 + backfill,
       the image URL will be a signed URL like `...?token=...` not a
@@ -189,9 +194,120 @@ If `/dashboard` 404s for non-admin: client-side gate is working but
 that's belt+suspenders — the real gate is RLS on every admin-restricted
 table.
 
+If the page shows "حدث خطأ غير متوقع" error boundary: something in
+the dashboard render path is throwing. Open DevTools → Console → look
+for the stack trace. Most recent suspect: NotificationBell vs
+AdminNotificationBell channel race (fixed in 991e049).
+
 ---
 
-## 9. Build & CI (passive)
+## 9. Admin notification bell (1 min) — NEW
+
+The dashboard has a dedicated bell that surfaces admin notifications
+in real-time (with a 30s polling fallback).
+
+As admin on `/dashboard`:
+
+- [ ] Click the 🔔 in the top bar → dropdown opens
+- [ ] If unread: red badge with count (capped at "9+")
+- [ ] Each row shows: emoji + title + message snippet + Arabic date
+- [ ] Click a row → marks as read + navigates to relevant dashboard tab:
+      - 💳 اشتراك → /dashboard?tab=subscriptions
+      - 🚩 بلاغ → /dashboard?tab=reports
+      - 🪪 رخصة → /dashboard?tab=licenses
+      - 🗺️ مدينة → /dashboard?tab=cities
+      - 💡/⚠️/💚 شكوى/اقتراح/إشادة → /dashboard?tab=feedback
+      - ⚠️ تقييم منخفض → /dashboard?tab=reviews
+- [ ] Click "تحديد الكل كمقروء" → all unread badges disappear
+
+In another browser/incognito as a regular user:
+
+- [ ] Submit a city suggestion via home page autocomplete (type a fake
+      village name → tap "اقتراح إضافة")
+- [ ] Submit feedback at `/feedback`
+- [ ] Within 30 sec, admin's bell badge increments
+
+If badge doesn't increment within 60 sec: realtime channel issue.
+Polling fallback should still pick it up at the 30s mark — if even
+polling misses it, check Supabase → notifications table → confirm
+the row was created with `user_email = souqnamarketplace@gmail.com`.
+
+---
+
+## 10. City suggestion flow (1 min) — NEW
+
+As any signed-in user (not necessarily admin):
+
+- [ ] Home page → click "من أين تنطلق؟" → type a fake village name
+- [ ] Dropdown shows "لا توجد نتائج" + highlighted "اقترح إضافة" button
+- [ ] Tap suggest button → modal opens with name pre-filled
+- [ ] Add an optional landmark note → submit
+- [ ] Green "تم إرسال اقتراحك ✓" confirmation
+
+As admin:
+
+- [ ] `/dashboard?tab=cities` → "قيد المراجعة" tab → see the suggestion
+- [ ] Higher `duplicate_count` if multiple users suggested same name
+- [ ] Click "موافقة وإضافة الإحداثيات"
+- [ ] Paste a Google Maps URL → lat/lng auto-fill
+- [ ] Submit → green "تمت الموافقة وأُضيفت المدينة ✓"
+- [ ] Within 5 min, the new city appears in autocomplete for ALL users
+
+---
+
+## 11. Driver subscription (1 min)
+
+As driver:
+
+- [ ] `/driver` → if subscription required, see "اشترك الآن" card
+- [ ] Tap → submit a payment with method + reference
+- [ ] Success toast → admin gets a 💳 notification
+
+As admin:
+
+- [ ] `/dashboard?tab=subscriptions` → see the new pending row
+- [ ] Click "موافقة" → status flips to active, period_end set
+- [ ] Driver can now post trips (subscription gate passed)
+
+---
+
+## 12. Pull-to-refresh (mobile only)
+
+On a real phone or Chrome DevTools device emulation:
+
+- [ ] Open home page → swipe down from top → spinner appears with rotation
+- [ ] Past ~80px threshold → release → React Query invalidates, data refetches
+- [ ] Release before threshold → snaps back, no refetch
+- [ ] At any scrolled-down position → swipe down → no spinner (correct)
+
+If swipe feels sticky or unresponsive: the listener-churn fix in 0463ed2
+might have regressed.
+
+---
+
+## 13. Filter system (admin) (90 sec) — NEW
+
+Visit each of these tabs and exercise the filters:
+
+| Tab | Filters to test |
+|---|---|
+| Trips | Search "نابلس" → see only Nablus trips; status=completed → only completed; date=7 days |
+| Bookings | Payment status=paid → only paid bookings; combined with status filter |
+| Reviews | Rating=1 → only 1-star reviews; date=30 days |
+| Reports | Category dropdown shows REPORT_CATEGORIES; combined with status tabs |
+| Notifications | Type=license_approved → only those |
+| Offers | active=true → only active coupons; search by code |
+| Payments | Same as Bookings filters |
+
+UUID paste-to-jump test:
+
+- [ ] Copy any row's id from `/dashboard?tab=trips` (right-click → inspect)
+- [ ] Paste it into the search box on the Trips tab → exact row appears
+- [ ] (Same UUID logic should work on any filter-enabled page)
+
+---
+
+## 14. Build & CI (passive)
 
 - [ ] Open https://github.com/souqnamarketplace-max/Mishwar/actions
 - [ ] Most recent run on main: green checkmark
@@ -200,7 +316,7 @@ table.
 
 ---
 
-## 10. Sentry (when wired)
+## 15. Sentry (when wired)
 
 After H-03 activation (npm i @sentry/react + DSN set):
 

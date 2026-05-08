@@ -21,7 +21,15 @@ const menuItems = [
   { id: "cities", icon: MapPin, label: "المدن المقترحة" },
   { id: "content", icon: FileText, label: "إدارة المحتوى" },
   { id: "hero-slides", icon: ImageIcon, label: "شرائح الصفحة الرئيسية" },
-  { id: "offers", icon: Tag, label: "إدارة العروض والكوبونات" },
+  // OFFERS / COUPONS — HIDDEN FOR v1.0 LAUNCH (M-06 in pre-launch audit).
+  // The admin UI to CREATE coupons works, but the redemption side is
+  // completely unwired: there's no input field on the booking flow,
+  // no validation RPC, no uses_count increment, no per-user redemption
+  // tracking. Shipping the create-only side risks an admin generating
+  // a code, sharing it on social, and customers being unable to redeem
+  // it — which damages launch trust.
+  // Re-enable when the redemption pipeline ships (post-launch).
+  // { id: "offers", icon: Tag, label: "إدارة العروض والكوبونات" },
   { id: "settings", icon: Settings, label: "إعدادات النظام" },
   { id: "logs", icon: Activity, label: "سجل النشاطات" },
 ];

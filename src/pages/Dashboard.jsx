@@ -17,7 +17,8 @@ import DashboardNotifications from "./dashboard/DashboardNotifications";
 import DashboardSupport from "./dashboard/DashboardSupport";
 import DashboardFeedback from "./dashboard/DashboardFeedback";
 import DashboardContent from "./dashboard/DashboardContent";
-import DashboardOffers from "./dashboard/DashboardOffers";
+// DashboardOffers import removed — coupons hidden for v1.0 launch (M-06).
+// File kept on disk; re-import when redemption pipeline ships.
 import DashboardSettings from "./dashboard/DashboardSettings";
 import DashboardHeroSlides from "./dashboard/DashboardHeroSlides";
 import DashboardLogs from "./dashboard/DashboardLogs";
@@ -476,7 +477,27 @@ export default function Dashboard() {
         {activePage === "feedback" && <DashboardFeedback />}
         {activePage === "licenses" && <DashboardLicenses />}
         {activePage === "content" && <DashboardContent />}
-        {activePage === "offers" && <DashboardOffers />}
+        {/* Offers / coupons — hidden from sidebar but URL-accessible via
+            bookmarks. Render a "coming soon" notice instead of the half-
+            wired DashboardOffers UI so admin doesn't accidentally create
+            coupons that customers can't redeem. See sidebar comment for
+            full reasoning. */}
+        {activePage === "offers" && (
+          <div className="bg-card border border-border rounded-2xl p-12 text-center" dir="rtl">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">🎟️</span>
+            </div>
+            <h2 className="text-xl font-bold text-foreground mb-2">العروض والكوبونات</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+              نظام الكوبونات قيد التطوير وسيتوفر في تحديث قادم.
+              في الإصدار الحالي، لا يوجد حقل لإدخال رمز كوبون في صفحة الحجز،
+              لذا تم إخفاء الإنشاء مؤقتاً لتجنب تشويش المستخدمين.
+            </p>
+            <Link to="/dashboard" className="inline-block mt-6 px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
+              العودة للوحة التحكم
+            </Link>
+          </div>
+        )}
         {activePage === "hero-slides" && <DashboardHeroSlides />}
         {activePage === "settings" && <DashboardSettings />}
         {activePage === "logs" && <DashboardLogs />}
