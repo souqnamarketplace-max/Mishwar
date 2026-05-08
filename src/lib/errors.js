@@ -56,6 +56,17 @@ const KNOWN_PATTERNS = [
   [/email not confirmed/i,                                 "يرجى تأكيد بريدك الإلكتروني أولاً"],
   [/user already registered/i,                             "هذا البريد مسجل بالفعل"],
   [/email rate limit exceeded/i,                           "تم إرسال عدد كبير من الرسائل. حاول لاحقاً"],
+  // Supabase password policy — server returns HTTP 422 with this message
+  // when the password fails server-side checks (uppercase + lowercase +
+  // digit). Should be caught by validatePasswordCompliance() client-side
+  // but mapped here as defense in depth in case Supabase changes its
+  // policy and ours falls out of sync.
+  [/password should contain at least one character|weak[_ ]?password/i,
+                                                           "كلمة المرور ضعيفة. يجب أن تحتوي على حرف كبير وحرف صغير ورقم"],
+  // Supabase signup rate limit — same email retried too fast
+  [/for security purposes.*request this after/i,           "حاول مجدداً بعد دقيقة"],
+  // Database error in handle_new_user trigger or similar
+  [/database error saving new user/i,                      "تعذر إنشاء الحساب. يرجى التواصل مع الدعم"],
 ];
 
 const PG_CODE_MAP = {

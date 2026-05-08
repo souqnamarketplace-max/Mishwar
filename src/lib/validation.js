@@ -94,6 +94,47 @@ export function passwordStrength(password) {
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MIN_SCORE  = 3;
 
+// ─── PASSWORD COMPLIANCE
+// Mirrors Supabase Auth's server-side password policy, which requires
+// at least one of each: lowercase letter, uppercase letter, digit.
+// Without this client-side check, users hit Supabase's HTTP 422
+// `weak_password` error and see a generic "failure" toast — the most
+// common signup failure mode in production. By validating client-side
+// FIRST with specific Arabic feedback, we tell users exactly what's
+// missing before they hit submit.
+//
+// Returns an object describing what (if anything) is missing. An empty
+// `missing` array means the password is acceptable to Supabase.
+export function validatePasswordCompliance(password) {
+  const result = { missing: [], hasLower: false, hasUpper: false, hasDigit: false, longEnough: false };
+  if (!password || typeof password !== "string") {
+    result.missing.push("length", "lower", "upper", "digit");
+    return result;
+  }
+  result.longEnough = password.length >= PASSWORD_MIN_LENGTH;
+  result.hasLower   = /[a-z]/.test(password);
+  result.hasUpper   = /[A-Z]/.test(password);
+  result.hasDigit   = /\d/.test(password);
+  if (!result.longEnough) result.missing.push("length");
+  if (!result.hasLower)   result.missing.push("lower");
+  if (!result.hasUpper)   result.missing.push("upper");
+  if (!result.hasDigit)   result.missing.push("digit");
+  return result;
+}
+
+// Build a human-readable Arabic message listing missing requirements.
+// Used by the signup toast to tell the user EXACTLY what's wrong, not
+// the generic "weak password" we used to show.
+export function passwordComplianceMessage(check) {
+  const parts = [];
+  if (check.missing.includes("length")) parts.push(`${PASSWORD_MIN_LENGTH} أحرف على الأقل`);
+  if (check.missing.includes("upper"))  parts.push("حرف كبير (A-Z)");
+  if (check.missing.includes("lower"))  parts.push("حرف صغير (a-z)");
+  if (check.missing.includes("digit"))  parts.push("رقم (0-9)");
+  if (parts.length === 0) return "";
+  return `كلمة المرور يجب أن تحتوي على: ${parts.join("، ")}`;
+}
+
 // Common-password blocklist (top 50 most-leaked passwords ever; the long
 // tail is left to passwordStrength scoring + Supabase Auth's own breach
 // detection if enabled). Lowercased for comparison.

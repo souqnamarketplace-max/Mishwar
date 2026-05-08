@@ -2,7 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail } from "@/lib/validation";
+import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail, validatePasswordCompliance, passwordComplianceMessage } from "@/lib/validation";
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -136,8 +136,15 @@ export default function Login() {
     e.preventDefault();
     if (!form.email || !form.password || !form.fullName) { toast.error('يرجى ملء جميع الحقول'); return; }
     if (form.password !== form.confirmPassword) { toast.error('كلمتا المرور غير متطابقتين'); return; }
-    if (form.password.length < PASSWORD_MIN_LENGTH) {
-      toast.error(`كلمة المرور يجب أن تكون ${PASSWORD_MIN_LENGTH} أحرف على الأقل`);
+    // Mandatory check: password must satisfy Supabase's server-side policy
+    // (lowercase + uppercase + digit + min length). Without this, users get
+    // a generic "failed" toast after Supabase rejects the signup with HTTP
+    // 422 weak_password — the #1 mysterious-signup-failure cause in prod.
+    // Showing the EXACT missing requirements client-side prevents the
+    // round-trip and gives users actionable feedback.
+    const compliance = validatePasswordCompliance(form.password);
+    if (compliance.missing.length > 0) {
+      toast.error(passwordComplianceMessage(compliance), { duration: 7000 });
       return;
     }
     if (isCommonPassword(form.password)) {
@@ -151,11 +158,11 @@ export default function Login() {
         setLoading(false);
         return;
       }
-      if (passwordStrength(form.password).score < PASSWORD_MIN_SCORE) {
-        toast.error("كلمة المرور ضعيفة. استخدم خليطاً من حروف كبيرة وصغيرة وأرقام");
-        setLoading(false);
-        return;
-      }
+      // Note: passwordStrength score check removed. The compliance check
+      // above is mandatory and matches Supabase's server policy exactly.
+      // The strength score was advisory — adding 1 point for special chars
+      // — but it caused false-positive REJECTIONS when users had a 12-char
+      // password without uppercase that scored 4 here but failed Supabase.
       await register(form.email, form.password, form.fullName);
       // Success — but they still need to confirm their email. Switch the
       // UI to the resend panel with their email pre-filled, so if the
@@ -339,13 +346,35 @@ export default function Login() {
                 <Label className="mb-1.5 block">كلمة المرور</Label>
                 <div className="relative">
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="8 أحرف على الأقل مع أرقام"
+                  <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="مثال: Mishwar123"
                     value={form.password} onChange={handleChange} className="pr-10 pl-10" autoComplete="new-password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {/* Live password requirements — turns each item green
+                    as the user types. Tells them EXACTLY what Supabase
+                    expects so they don't hit the server rejection. */}
+                {form.password && (() => {
+                  const c = validatePasswordCompliance(form.password);
+                  const Item = ({ ok, text }) => (
+                    <span className={`text-[11px] flex items-center gap-1 ${ok ? 'text-green-600' : 'text-slate-500'}`}>
+                      <span className={`inline-block w-3 h-3 rounded-full text-center leading-3 text-[9px] font-bold ${ok ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                        {ok ? '✓' : '○'}
+                      </span>
+                      {text}
+                    </span>
+                  );
+                  return (
+                    <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <Item ok={c.longEnough} text={`${PASSWORD_MIN_LENGTH} أحرف على الأقل`} />
+                      <Item ok={c.hasUpper}   text="حرف كبير (A-Z)" />
+                      <Item ok={c.hasLower}   text="حرف صغير (a-z)" />
+                      <Item ok={c.hasDigit}   text="رقم (0-9)" />
+                    </div>
+                  );
+                })()}
               </div>
               <div>
                 <Label className="mb-1.5 block">تأكيد كلمة المرور</Label>
