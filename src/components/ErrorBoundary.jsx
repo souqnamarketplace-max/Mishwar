@@ -12,13 +12,28 @@ export class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // Log to error tracking service
+    // Log to error tracking service. The error message + component stack
+    // is what the dev needs to actually fix the bug; the user-facing
+    // fallback UI just needs to recover gracefully.
     console.error("[ErrorBoundary]", error, info);
     captureException(error, { componentStack: info.componentStack });
   }
 
   render() {
     if (this.state.hasError) {
+      // Caller can opt into a custom inline fallback (e.g. an empty
+      // span where a small widget used to be) instead of the default
+      // full-screen recovery UI. Use cases:
+      //   - inline widgets (notification bell, badges) where a full
+      //     screen takeover would be jarring
+      //   - non-critical sections (recent activity panel, charts)
+      //     where the rest of the page should still work
+      // If `fallback={null}` is passed, the failed subtree just
+      // renders nothing — error is still logged so we can fix it.
+      if (this.props.fallback !== undefined) {
+        return this.props.fallback;
+      }
+
       return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4" dir="rtl">
           <div className="text-center max-w-sm">
