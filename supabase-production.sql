@@ -120,7 +120,21 @@ CREATE TABLE IF NOT EXISTS public.bookings (
   seats_booked     INTEGER DEFAULT 1 CHECK (seats_booked >= 1 AND seats_booked <= 10),
   total_price      NUMERIC CHECK (total_price >= 0),
   status           TEXT DEFAULT 'pending' CHECK (status IN ('pending','confirmed','cancelled','completed')),
-  payment_method   TEXT
+  -- Payment columns — added in migration 008. payment_status tracks whether
+  -- the off-platform money movement actually happened; status tracks the
+  -- booking lifecycle. The two are intentionally orthogonal: a booking can
+  -- be status=confirmed (driver accepted) but payment_status=pending (cash
+  -- not yet collected). Reconciliation happens via /dashboard?tab=payments.
+  payment_method   TEXT,
+  payment_status   TEXT DEFAULT 'pending'
+                     CHECK (payment_status IN ('pending','paid','refunded','failed')),
+  paid_at          TIMESTAMPTZ,
+  -- Pickup/dropoff columns — passenger can board/disembark at any stop
+  -- along the trip. NULL means origin/destination respectively.
+  pickup_city      TEXT CHECK (pickup_city IS NULL OR length(pickup_city) <= 200),
+  pickup_stop_index  INTEGER CHECK (pickup_stop_index  IS NULL OR pickup_stop_index  >= 0),
+  -- notes is the passenger's free-text message to the driver at booking time.
+  notes            TEXT CHECK (notes IS NULL OR length(notes) <= 1000)
 );
 
 -- REVIEWS

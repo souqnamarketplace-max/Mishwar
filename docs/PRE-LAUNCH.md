@@ -3,9 +3,9 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-06 (validation hardening session — past-date + negative-number guards everywhere)
-**HEAD at update:** `a593788`
-**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006` ✓ — `007` still pending
+**Last updated:** 2026-05-07 (payment-flow audit — migration 008 written, awaiting apply)
+**HEAD at update:** `6d23782`
+**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006` ✓ — `007` and **`008` pending apply**
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied to production
