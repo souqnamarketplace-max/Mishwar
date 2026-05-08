@@ -3,9 +3,9 @@
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).
 
-**Last updated:** 2026-05-08 (driver subscription system fully built — sessions 1-3 shipped, kill-switch dormant)
-**HEAD at update:** `776b4df`
-**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006`, `008`, `009` ✓ — `007` and `010` still pending
+**Last updated:** 2026-05-08 (post-launch session: filters, city suggestions, PTR fixes, admin notifications + bell — 13 of 14 critical items closed; only C-10 lawyer review remains)
+**HEAD at update:** `991e049`
+**SQL applied to production:** migrations `002`, `003`, `004`, `005`, `006`, `007`, `008`, `009`, `010`, `011`, `012`, `013`, `014`, `015` ✓ — ALL applied
 
 Status legend:
 - ✅ shipped — fully closed in code or SQL applied to production
