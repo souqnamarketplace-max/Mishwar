@@ -1,9 +1,13 @@
-import React, { useState, useRef, useEffect } from "react";
-import { MapPin, X, Clock, TrendingUp, Map as MapIcon, Search } from "lucide-react";
+import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { MapPin, X, Clock, TrendingUp, Map as MapIcon, Search, Plus } from "lucide-react";
 import { CITIES, normalizeArabic } from "@/lib/cities";
 import { useAllCities } from "@/hooks/useAllCities";
 import { cn } from "@/lib/utils";
 import MapCityPicker from "@/components/shared/MapCityPicker";
+
+// Lazy-loaded — most users never click "suggest a city" so we don't pay
+// the bundle cost upfront.
+const SuggestCityModal = lazy(() => import("@/components/shared/SuggestCityModal"));
 
 const POPULAR = ["رام الله", "نابلس", "الخليل", "بيت لحم", "جنين", "طولكرم", "قلقيلية", "أريحا"];
 const RECENT_KEY = "mishwar:recent-cities";
@@ -30,6 +34,7 @@ export default function CityAutocomplete({
   const [open, setOpen]             = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [mapOpen, setMapOpen]       = useState(false);
+  const [suggestModal, setSuggestModal] = useState(null); // { initialName } when open
   const inputRef   = useRef(null);
   const dropdownRef = useRef(null);
   const wrapperRef  = useRef(null);
@@ -171,21 +176,11 @@ export default function CityAutocomplete({
                       </button>);
                   })}
                 </div>
-                {/* Request missing city */}
+                {/* Request missing city — opens proper suggest modal */}
                 {query.trim() && filtered.length === 0 && (
                   <button type="button"
-                    onClick={async () => {
-                      const cityName = query.trim();
-                      try {
-                        const { supabase } = await import("@/lib/supabase");
-                        await supabase.from("feedback").insert({
-                          message: `طلب إضافة مدينة: ${cityName}`,
-                          category: "city_suggestion",
-                          status: "new",
-                        });
-                      } catch(e) {}
-                      // Show inline confirmation
-                      onSelect(cityName);
+                    onClick={() => {
+                      setSuggestModal({ initialName: query.trim() });
                       setOpen(false);
                     }}
                     className="w-full px-4 py-3 flex items-center gap-2 text-right hover:bg-primary/5 border-b border-border/30 transition-colors">
@@ -193,9 +188,8 @@ export default function CityAutocomplete({
                       <Plus className="w-3.5 h-3.5 text-primary" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-primary">إضافة "{query.trim()}" كمدينة مؤقتة</p>
-                      <p className="text-xs text-muted-foreground">سيتم إرسال طلب للإضافة الرسمية</p>
-                      <p className="text-[10px] text-muted-foreground">سيتم إرسال اقتراح إضافتها رسمياً للإدارة</p>
+                      <p className="text-sm font-medium text-primary">اقترح إضافة "{query.trim()}"</p>
+                      <p className="text-xs text-muted-foreground">سيتم إرسال طلب للإدارة لإضافتها رسمياً</p>
                     </div>
                   </button>
                 )}
@@ -214,6 +208,15 @@ export default function CityAutocomplete({
 
       {mapOpen && (
         <MapCityPicker value={value} onChange={handleMapPick} onClose={() => setMapOpen(false)} forceOpen={true} />
+      )}
+
+      {suggestModal && (
+        <Suspense fallback={null}>
+          <SuggestCityModal
+            initialName={suggestModal.initialName}
+            onClose={() => setSuggestModal(null)}
+          />
+        </Suspense>
       )}
     </>
   );

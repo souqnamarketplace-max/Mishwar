@@ -21,6 +21,7 @@ import DashboardOffers from "./dashboard/DashboardOffers";
 import DashboardSettings from "./dashboard/DashboardSettings";
 import DashboardHeroSlides from "./dashboard/DashboardHeroSlides";
 import DashboardLogs from "./dashboard/DashboardLogs";
+import DashboardCities from "./dashboard/DashboardCities";
 import DashboardLicenses from "./dashboard/DashboardLicenses";
 import { useState as useBroadcastState } from "react";
 import { Input } from "@/components/ui/input";
@@ -456,6 +457,7 @@ export default function Dashboard() {
         {activePage === "hero-slides" && <DashboardHeroSlides />}
         {activePage === "settings" && <DashboardSettings />}
         {activePage === "logs" && <DashboardLogs />}
+        {activePage === "cities" && <DashboardCities />}
       </div>
     </div>
   );

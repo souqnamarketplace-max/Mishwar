@@ -49,13 +49,34 @@ export function useAllCities() {
     retry: 1,
   });
 
+  // Admin-approved cities — added via the city suggestion review flow.
+  // Read at runtime so a freshly-approved city appears in autocomplete
+  // for ALL users within 5 minutes (next staleTime refresh) without
+  // requiring a code deploy.
+  const { data: adminCities = [] } = useQuery({
+    queryKey: ["admin-approved-cities"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_cities")
+        .select("name")
+        .limit(2000);
+      if (error) return [];
+      return (data || []).map((r) => r.name).filter(Boolean);
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
   return useMemo(() => {
     const set = new Set(CITIES);
     for (const c of dbCities) {
       if (typeof c === "string" && c.trim()) set.add(c.trim());
     }
+    for (const c of adminCities) {
+      if (typeof c === "string" && c.trim()) set.add(c.trim());
+    }
     return [...set].sort((a, b) => a.localeCompare(b, "ar"));
-  }, [dbCities]);
+  }, [dbCities, adminCities]);
 }
 
 export default useAllCities;

@@ -157,6 +157,27 @@ export async function geocodeCity(cityName) {
     }
   }
 
+  // 4. Admin-approved cities table — runtime lookup so a city the admin
+  // approved 5 minutes ago resolves correctly without a code deploy.
+  // Wrapped in try/catch because supabase.from() can throw if the client
+  // isn't initialized yet (shouldn't happen in practice, but defensive).
+  try {
+    // Lazy-load supabase to avoid circular import issues at module load
+    const { supabase } = await import("@/lib/supabase");
+    const { data, error } = await supabase
+      .from("admin_cities")
+      .select("name, lat, lng")
+      .or(`name.eq.${cityName},name.ilike.%${cityName}%`)
+      .limit(5);
+    if (!error && Array.isArray(data) && data.length > 0) {
+      // Prefer exact match if multiple rows came back
+      const exact = data.find((r) => r.name === cityName) || data[0];
+      return [Number(exact.lat), Number(exact.lng)];
+    }
+  } catch (e) {
+    // Silent — fall through to Nominatim
+  }
+
   // Log the cache miss so we can see what slipped through
   console.warn("[geocodeCity] Cache miss, falling back to Nominatim:", JSON.stringify(cityName), "normalized:", JSON.stringify(normalized));
 
