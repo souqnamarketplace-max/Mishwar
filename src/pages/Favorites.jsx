@@ -6,6 +6,7 @@ import { Heart, Search, Bell, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import TripCard from "../components/shared/TripCard";
+import { isTripExpired } from "@/lib/tripScheduling";
 
 export default function Favorites() {
   useSEO({ title: "المفضلة", description: "الرحلات المفضلة لديك" });
@@ -36,7 +37,11 @@ export default function Favorites() {
   };
 
   const favIds = getFavIds();
-  const favTrips = trips.filter(t => favIds.has(t.id));
+  // Filter out expired trips — a passenger favorited a trip in March,
+  // it's now May, the trip has already happened. Showing it as a
+  // bookable favorite is misleading. Stale favorites are silently
+  // hidden but stay in localStorage in case they want a record.
+  const favTrips = trips.filter(t => favIds.has(t.id) && !isTripExpired(t));
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6" dir="rtl">

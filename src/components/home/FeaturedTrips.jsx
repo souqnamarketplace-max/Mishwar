@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo} from "react";
 import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
+import { isTripExpired } from "@/lib/tripScheduling";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2 } from "lucide-react";
@@ -184,14 +185,23 @@ function FeaturedCard({ trip, index }) {
 // ── Section ────────────────────────────────────────────────────────────────────
 export default function FeaturedTrips() {
   const qc = useQueryClient();
+  // Fetch 20 confirmed trips, then filter to upcoming ones client-side and
+  // slice to 4. Without the over-fetch, if the 4 most-recent confirmed
+  // trips have already expired (driver never marked them completed),
+  // the homepage would show an empty Featured section. The migration 012
+  // pg_cron job auto-flips expired trips to 'completed' nightly, but
+  // this client-side filter is the fast path that works immediately
+  // even before the cron has run.
   const { data: trips_unfiltered = [] } = useQuery({
     queryKey: ["featured-trips"],
-    queryFn: () => base44.entities.Trip.filter({ status: "confirmed" }, "-created_date", 4),
+    queryFn: () => base44.entities.Trip.filter({ status: "confirmed" }, "-created_date", 20),
   });
 
   const blockedSet = useBlockedEmails();
   const trips = useMemo(
-    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email"),
+    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email")
+            .filter((t) => !isTripExpired(t))
+            .slice(0, 4),
     [trips_unfiltered, blockedSet]
   );
 
