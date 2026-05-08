@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Settings, Save, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 const defaultSettings = {
   // Commission default is 0% — the launch posture is "drivers keep
@@ -84,6 +85,29 @@ export default function DashboardSettings() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       toast.success("تم حفظ الإعدادات");
+    },
+    onError: (err) => {
+      // Without this handler, save failures were invisible — react-query
+      // would log to console but the user saw no toast, the toggle would
+      // appear to flip in the UI (form state held), and only a refresh
+      // (which re-syncs from DB) revealed nothing was actually saved.
+      //
+      // Most common cause we've seen: a form field references a column
+      // that doesn't exist in the DB (migration not yet applied), so
+      // PostgREST returns 400 "column does not exist" on PATCH.
+      const msg = String(err?.message || err || "");
+      // Specifically detect missing-column errors and surface a more
+      // helpful message instead of the generic friendlyError.
+      const missingColumn = msg.match(/column [\"']?(\w+)[\"']?\s+does not exist/i)
+                          || msg.match(/Could not find the [\"']?(\w+)[\"']? column/i);
+      if (missingColumn) {
+        toast.error(
+          `لم يتم الحفظ — العمود ${missingColumn[1]} غير موجود في قاعدة البيانات. ` +
+          `قد تحتاج لتطبيق آخر ترحيلات (migrations).`
+        );
+      } else {
+        toast.error(friendlyError(err, "فشل حفظ الإعدادات"));
+      }
     },
   });
 
