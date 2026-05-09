@@ -32,6 +32,14 @@ const KNOWN_PATTERNS = [
   [/drivers cannot change/i,                               "هذه العملية مسموحة للراكب فقط"],
   [/cannot change.*after first booking/i,                  "لا يمكن تعديل تفاصيل رحلة بعد بدء الحجوزات"],
   [/cannot book your own trip/i,                           "لا يمكنك حجز رحلتك الخاصة"],
+  // Block-pair errors from migration 017 — both for booking RPC and the
+  // RESTRICTIVE messages_no_blocked_insert RLS policy. The RLS policy
+  // surfaces as "new row violates row-level security policy" in PostgREST,
+  // so we match that too and route it to the same friendly message
+  // (since the only RESTRICTIVE policy on messages INSERT is the block one).
+  [/cannot book.*block exists/i,                           "لا يمكنك حجز رحلة هذا السائق — أحدكما حظر الآخر"],
+  [/new row violates row-level security policy.*messages|messages.*new row violates row-level security/i,
+                                                           "لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر"],
   [/not enough seats/i,                                    "لم يتبقَ عدد كافٍ من المقاعد"],
   [/trip not bookable/i,                                   "الرحلة غير متاحة للحجز حالياً"],
   [/trip is in the past/i,                                 "هذه الرحلة قد انتهت"],

@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
+import { useBlockedEmails } from "@/lib/blockUtils";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -112,8 +113,28 @@ export default function TripDetails() {
     select: (data) => data?.[0] || null,
   });
 
+  // ─── Block check ─────────────────────────────────────────────────────
+  // True if the current user has blocked the trip's driver, OR the
+  // driver has blocked the current user. Used both:
+  //   1. To short-circuit the booking mutation with a clear Arabic toast
+  //      before the round-trip (saves the user from a confusing
+  //      40X-then-translate-server-error round-trip).
+  //   2. To swap the bottom CTA out for an "unblock to book" notice so
+  //      the button can't be clicked when blocked. Defense-in-depth:
+  //      migration 017 also adds a check inside book_seat() so direct
+  //      RPC calls fail with 42501 even if the UI is bypassed.
+  const blockedSet = useBlockedEmails();
+  const isDriverBlocked = !!(tripData?.driver_email && blockedSet.has(tripData.driver_email));
+
   const bookingMutation = useMutation({
     mutationFn: async (tripData) => {
+      // Fast-path block check — if the passenger blocked the driver
+      // (or vice versa) refuse here without contacting the server. The
+      // server-side check in book_seat() (migration 017) is the
+      // authoritative one; this is a UX nicety to avoid the round trip.
+      if (tripData?.driver_email && blockedSet.has(tripData.driver_email)) {
+        throw new Error("cannot book — block exists between passenger and driver");
+      }
       // Atomic seat booking via the `book_seat` RPC (migration 003).
       // SELECT FOR UPDATE → INSERT booking → UPDATE seats, all in one
       // transaction, so two concurrent passengers can't both succeed
@@ -297,13 +318,32 @@ export default function TripDetails() {
                       ⏰ آخر فرصة — {minutesUntilTrip(trip)} دقيقة للحجز!
                     </div>
                   )}
-                  <Button
-                    className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                    onClick={() => setShowConfirm(true)}
-                    disabled={bookingMutation.isPending}
-                  >
-                    احجز الآن
-                  </Button>
+                  {/* Block-aware CTA — when a block exists between the
+                      current user and this trip's driver, swap the
+                      "Book now" button for a notice. The user can still
+                      see trip details for context (matches WhatsApp's
+                      "you blocked this contact" pattern) but can't
+                      attempt to book. Migration 017 enforces the same
+                      check server-side. */}
+                  {isDriverBlocked ? (
+                    <div className="mt-2 rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-center">
+                      <p className="text-sm font-bold text-destructive">
+                        🚫 لا يمكنك حجز هذه الرحلة
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        أحدكما حظر الآخر. يمكنك إدارة قائمة الحظر من{" "}
+                        <Link to="/settings?section=blocked" className="text-primary underline">الإعدادات</Link>.
+                      </p>
+                    </div>
+                  ) : (
+                    <Button
+                      className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                      onClick={() => setShowConfirm(true)}
+                      disabled={bookingMutation.isPending}
+                    >
+                      احجز الآن
+                    </Button>
+                  )}
                 </>
               )}
 
@@ -791,13 +831,21 @@ export default function TripDetails() {
                     <p className="text-2xl font-black text-primary leading-none">₪{trip.price}</p>
                     <p className="text-[10px] text-muted-foreground">للمقعد</p>
                   </div>
-                  <Button
-                    className="flex-1 h-12 rounded-xl font-black text-base bg-primary text-primary-foreground shadow-lg shadow-primary/30 active:scale-95 transition-transform"
-                    onClick={() => setShowConfirm(true)}
-                    disabled={bookingMutation.isPending}
-                  >
-                    احجز الآن
-                  </Button>
+                  {isDriverBlocked ? (
+                    <div className="flex-1 h-12 rounded-xl border-2 border-destructive/30 bg-destructive/5 flex items-center justify-center px-3">
+                      <p className="text-xs font-bold text-destructive text-center leading-tight">
+                        🚫 لا يمكنك حجز هذه الرحلة — أحدكما حظر الآخر
+                      </p>
+                    </div>
+                  ) : (
+                    <Button
+                      className="flex-1 h-12 rounded-xl font-black text-base bg-primary text-primary-foreground shadow-lg shadow-primary/30 active:scale-95 transition-transform"
+                      onClick={() => setShowConfirm(true)}
+                      disabled={bookingMutation.isPending}
+                    >
+                      احجز الآن
+                    </Button>
+                  )}
                   {trip?.driver_email && user?.email !== trip.driver_email && (
                     <button
                       type="button"
