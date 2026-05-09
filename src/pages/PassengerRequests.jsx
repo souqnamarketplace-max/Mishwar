@@ -152,6 +152,14 @@ export default function PassengerRequests() {
 
   // ─── Subscription gate UI ─────────────────────────────────────
   if (!subLoading && subActive === false) {
+    // CTA varies by account type:
+    //   - Driver / both → "اشترك" → /driver?tab=subscription (existing flow)
+    //   - Passenger     → "كن سائقاً" → /become-driver (must upgrade first)
+    //                     because /driver dashboard doesn't exist for them
+    //                     and /driver?tab=subscription would 404 or redirect
+    const isPassengerOnly = user?.account_type === "passenger";
+    const ctaHref  = isPassengerOnly ? "/become-driver" : "/driver?tab=subscription";
+    const ctaLabel = isPassengerOnly ? "كن سائقاً للوصول للطلبات" : "اشترك الآن لتصفح الطلبات";
     return (
       <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
         <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
@@ -168,6 +176,12 @@ export default function PassengerRequests() {
             تصفح طلبات الرحلات من الركاب الذين يبحثون عن سائق لمسارك.
             ميزة حصرية للسائقين المشتركين في المنصة.
           </p>
+          {isPassengerOnly && (
+            <p className="text-xs leading-relaxed opacity-85 mt-2 bg-black/15 rounded-lg px-3 py-2">
+              💡 حسابك حالياً كراكب فقط. لتصفح طلبات الركاب يجب أن تصبح سائقاً
+              في مشوارو أولاً.
+            </p>
+          )}
         </div>
 
         {openCount > 0 && (
@@ -197,10 +211,10 @@ export default function PassengerRequests() {
               مجاني للراكب، اشتراك السائق فقط ₪30/شهر
             </li>
           </ul>
-          <Link to="/driver?tab=subscription">
+          <Link to={ctaHref}>
             <Button className="w-full h-12 rounded-xl text-base font-bold gap-2 mt-2">
               <Wallet className="w-5 h-5" />
-              اشترك الآن لتصفح الطلبات
+              {ctaLabel}
             </Button>
           </Link>
         </div>
