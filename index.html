@@ -42,33 +42,41 @@
 
 
     <!-- ── SEO ───────────────────────────────────── -->
+    <!-- The <title> below is a fallback for SPA shell rendering, robot
+         crawlers that can't execute JS, and the noscript fallback. Every
+         page replaces it via react-helmet-async (<SEO> component) or the
+         useSEO hook, so the runtime title is per-route correct. -->
     <title>مشوارو — شارك الطريق، وفر أكثر 🇵🇸</title>
     <meta name="description" content="مشوارو — منصة فلسطينية لمشاركة رحلات السيارة بين المدن. سافر بأمان، وفر المال، وتعرف على ناس جديدة. احجز رحلتك الآن من رام الله، نابلس، الخليل، بيت لحم والمزيد." />
     <meta name="keywords" content="مشاركة سيارات, رحلات فلسطين, مشوار, سفر رخيص, نقل ركاب, رام الله نابلس, كارpooling فلسطين" />
     <meta name="robots" content="index, follow" />
     <meta name="author" content="مشوارو" />
-    <link rel="canonical" href="https://mishwar-nu.vercel.app/" />
+    <!-- IMPORTANT: canonical, og:url, og:title, og:description,
+         twitter:title, twitter:description are NOT statically declared
+         here. They MUST be per-route. react-helmet-async (used by
+         <SEO />) appends rather than replaces, so a static tag here
+         would create a duplicate that Google may pick up first.
+         Per-route tags are injected by:
+            - <SEO path="/foo" /> for landing pages and most routes
+            - useSEO({ title, description }) for legacy pages
+         Both cover canonical, og:title, og:url, og:description,
+         twitter:title, twitter:description. -->
 
-    <!-- ── Open Graph ─────────────────────────────── -->
+    <!-- ── Open Graph (site-level defaults — overridden per route) ─── -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://mishwar-nu.vercel.app/" />
     <meta property="og:site_name" content="مشوارو" />
-    <meta property="og:title" content="مشوارو — شارك الطريق، وفر أكثر 🇵🇸" />
-    <meta property="og:description" content="منصة فلسطينية لمشاركة رحلات السيارة. سافر بأمان واحجز مقعدك في ثوانٍ." />
     <meta property="og:image" content="https://mishwar-nu.vercel.app/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="ar_PS" />
 
-    <!-- ── Twitter Card ──────────────────────────── -->
+    <!-- ── Twitter Card (site-level defaults — overridden per route) ─ -->
     <meta name="twitter:card" content="summary_large_image" />
     <!-- twitter:site is intentionally omitted until brand handle ownership
          is confirmed. Adding an unverified handle here points search-engine
          and social-card trust signals at an account that may not be ours.
          When you confirm/create the official @mishwar handle, uncomment:
          <meta name="twitter:site" content="@your_handle" />  -->
-    <meta name="twitter:title" content="مشوارو — شارك الطريق، وفر أكثر" />
-    <meta name="twitter:description" content="منصة فلسطينية لمشاركة رحلات السيارة. سافر بأمان واحجز مقعدك." />
     <meta name="twitter:image" content="https://mishwar-nu.vercel.app/og-image.png" />
 
     <!-- ── Schema.org Structured Data ───────────── -->
