@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -104,7 +105,7 @@ export default function DashboardPayments() {
       toast.success(paid ? "تم تسجيل الدفع" : "تم إعادة الحالة إلى بانتظار الدفع");
       logAdminAction("admin_mark_payment", "booking", id, { paid });
     },
-    onError: (e) => toast.error("فشل التحديث: " + (e?.message || "")),
+    onError: (e) => toast.error(friendlyError(e, "تعذر تحديث حالة الدفع")),
   });
 
   // Server-side filtering — display rows directly

@@ -2,6 +2,7 @@ import React, { useState, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { Navigate, useSearchParams, Link } from "react-router-dom";
@@ -323,7 +324,7 @@ export default function Dashboard() {
       setShowBroadcast(false);
       setBroadcastConfirm(false);
     } catch (e) {
-      toast.error("فشل الإرسال: " + e.message);
+      toast.error(friendlyError(e, "فشل إرسال الإشعار"));
     } finally {
       setBroadcasting(false);
     }
