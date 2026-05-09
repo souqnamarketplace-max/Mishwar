@@ -118,10 +118,13 @@ export default function PassengerVerification() {
       toast.success("تم استلام طلب التوثيق! سنراجعه خلال 24-48 ساعة 🛡️");
       qc.invalidateQueries({ queryKey: ["my-passenger-verification"] });
       qc.invalidateQueries({ queryKey: ["is-passenger-verified"] });
-      // Notify admin asynchronously — failure doesn't impact the user flow
+      // Notify admin asynchronously — failure doesn't impact the user flow.
+      // Link sends the admin straight to the verification queue tab when
+      // they tap the bell row.
       notifyAdmin({
         title:   "طلب توثيق راكب جديد 🛡️",
-        message: `${user?.full_name || user?.email} أرسل طلب توثيق هوية. راجع الطلب من تبويب 'توثيق الركاب' في لوحة الإدارة.`,
+        message: `${user?.full_name || user?.email} أرسل طلب توثيق هوية. اضغط لمراجعة الطلب.`,
+        link:    "/dashboard?tab=passenger-verifications",
       }).catch(() => { /* non-fatal */ });
     },
     onError: (err) => toast.error(friendlyError(err, "تعذر إرسال طلب التوثيق")),

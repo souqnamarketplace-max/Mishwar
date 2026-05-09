@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -180,6 +180,21 @@ export default function Navbar() {
                     <Settings className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">إعدادات الحساب</span>
                   </Link>
+                  {/* Admin panel entry — only visible to admins. Without this,
+                      admins landing on / had no in-app path to /dashboard
+                      and had to type the URL by hand. Placed just above
+                      logout so it's always reachable regardless of how
+                      many other entries appear above. */}
+                  {user?.role === "admin" && (
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border bg-amber-50/50"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-medium text-amber-900">لوحة الإدارة</span>
+                    </Link>
+                  )}
                   <button
                     onClick={() => { base44.auth.logout(); setProfileOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
@@ -252,6 +267,16 @@ export default function Navbar() {
                 <Settings className="w-4 h-4" />
                 ملفي الشخصي
               </Link>
+              {user?.role === "admin" && (
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-amber-900 bg-amber-50/50 hover:bg-amber-100/60 transition-colors"
+                >
+                  <LayoutDashboard className="w-4 h-4 text-amber-600" />
+                  لوحة الإدارة
+                </Link>
+              )}
               <button
                 onClick={() => { base44.auth.logout(); setMobileOpen(false); }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"

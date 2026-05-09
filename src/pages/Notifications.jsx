@@ -374,7 +374,7 @@ export default function Notifications() {
                         </p>
                         <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{notif.message}</p>
                         <div className="flex items-center gap-3 mt-2">
-                          {notif.trip_id && (
+                          {(notif.trip_id || notif.link) && (
                             <span className="text-xs text-primary">
                               اضغط للعرض ←
                             </span>

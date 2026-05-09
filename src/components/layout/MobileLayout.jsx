@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet, Inbox } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet, Inbox, LayoutDashboard } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -458,6 +458,24 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 ))}
               </div>
             </div>
+
+            {/* Admin Panel — only for admin role. Without this, admins on
+                mobile had no in-app path from the drawer to /dashboard
+                and had to type the URL by hand on every visit. Placed
+                in its own bordered section just above sign-out for
+                visual prominence. */}
+            {user?.role === "admin" && (
+              <div className="border-t border-border" dir="rtl">
+                <Link
+                  to="/dashboard"
+                  onClick={() => setShowMobileMenu(false)}
+                  className="flex items-center gap-3 w-full px-4 py-3 hover:bg-amber-100/60 transition-colors bg-amber-50/50 text-amber-900"
+                >
+                  <LayoutDashboard className="w-5 h-5 shrink-0 text-amber-600" />
+                  <span className="text-sm font-medium">لوحة الإدارة</span>
+                </Link>
+              </div>
+            )}
 
             {/* Sign Out + Version */}
             <div className="border-t border-border" dir="rtl">

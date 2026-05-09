@@ -9,7 +9,8 @@
  *   await notifyAdmin({
  *     title: "بلاغ جديد من مستخدم 🚩",
  *     message: "تفاصيل البلاغ...",
- *     trip_id: trip?.id,        // optional — links the bell entry to a row
+ *     trip_id: trip?.id,        // optional — links the bell entry to a trip
+ *     link: "/dashboard?tab=reports",  // optional — explicit deep-link in admin
  *   });
  *
  * Why a helper instead of inline create() everywhere:
@@ -29,6 +30,13 @@ export async function notifyAdmin({
   title,
   message,
   trip_id = null,
+  // Deep-link inside the app the admin should land on when they tap
+  // the notification. Notifications.jsx routes by notif.link first,
+  // falling back to type-based defaults. Without this, admin-targeted
+  // notifications about non-trip entities (verification queue, reports
+  // queue, etc.) had no way to express "open the relevant tab" — they
+  // just opened /notifications and stopped there.
+  link = null,
   // Reserved for future categorization. Currently all admin notifs are
   // type='system' so the bell + filtering work uniformly.
   type = "system",
@@ -44,6 +52,7 @@ export async function notifyAdmin({
       message,
       type,
       trip_id,
+      link,
       is_read: false,
     });
   } catch (err) {
