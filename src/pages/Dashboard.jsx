@@ -10,6 +10,7 @@ import DashboardSidebar, { DashboardMobileTabSelector } from "../components/dash
 import DashboardUsers from "./dashboard/DashboardUsers";
 import DashboardTrips from "./dashboard/DashboardTrips";
 import DashboardBookings from "./dashboard/DashboardBookings";
+import DashboardRequests from "./dashboard/DashboardRequests";
 import DashboardReviews from "./dashboard/DashboardReviews";
 import DashboardPayments from "./dashboard/DashboardPayments";
 import DashboardSubscriptions from "./dashboard/DashboardSubscriptions";
@@ -469,6 +470,7 @@ export default function Dashboard() {
         {activePage === "users" && <DashboardUsers />}
         {activePage === "trips" && <DashboardTrips />}
         {activePage === "bookings" && <DashboardBookings />}
+        {activePage === "trip-requests" && <DashboardRequests />}
         {activePage === "reviews" && <DashboardReviews />}
         {activePage === "payments" && <DashboardPayments />}
         {activePage === "subscriptions" && <DashboardSubscriptions />}

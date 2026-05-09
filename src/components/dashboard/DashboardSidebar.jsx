@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard, Wallet,
-  Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin
+  Star, BarChart3, Bell, Headphones, FileText, Tag, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox
 } from "lucide-react";
 
 const menuItems = [
@@ -10,6 +10,7 @@ const menuItems = [
   { id: "users", icon: Users, label: "إدارة المستخدمين" },
   { id: "trips", icon: Car, label: "إدارة الرحلات" },
   { id: "bookings", icon: CalendarCheck, label: "إدارة الحجوزات" },
+  { id: "trip-requests", icon: Inbox, label: "طلبات الركاب" },
   { id: "reviews", icon: Star, label: "التقييمات والمراجعات" },
   { id: "payments", icon: CreditCard, label: "المعاملات والمدفوعات" },
   { id: "subscriptions", icon: Wallet, label: "اشتراكات السائقين" },
