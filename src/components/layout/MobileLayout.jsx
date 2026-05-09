@@ -28,6 +28,9 @@ const PAGE_TITLES = {
   "/account-settings":     "الإعدادات",
   "/settings":             "الحساب",
   "/create-trip":          "نشر رحلة",
+  "/request-trip":         "اطلب رحلة",
+  "/my-requests":          "طلباتي",
+  "/passenger-requests":   "طلبات الركاب",
   "/driver":               "لوحة السائق",
   "/how-it-works":         "كيف يعمل مشوارو؟",
   "/about":                "عن مشوارو",
@@ -212,8 +215,15 @@ export default function MobileLayout({ children, user, showHeader = true, header
             const isActive = location.pathname.startsWith(tab.path.split("?")[0]);
             const href = tab.id === "profile" ? `${tab.path}${user?.email}` : tab.path;
             const isDriver = user?.account_type === "driver" || user?.account_type === "both";
-            // Insert driver post-trip button in the center (after index 1)
-            const centerInsert = isDriver && idx === 2;
+            const isPassenger = user?.account_type === "passenger";
+            // Center FAB inserted between the 2nd and 3rd tabs (visually
+            // sits in the middle of the 5-tab strip). Role-aware:
+            //   - Drivers / both accounts → "نشر رحلة" (post a trip)
+            //   - Passengers              → "اطلب رحلة" (request a trip)
+            //   - Anonymous users         → no FAB (must log in to use either)
+            const centerInsert = (isDriver || isPassenger) && idx === 2;
+            const fabHref  = isPassenger && !isDriver ? "/request-trip" : "/create-trip";
+            const fabLabel = isPassenger && !isDriver ? "اطلب رحلة"      : "نشر رحلة";
 
             const handleTabClick = (e) => {
               if (isActive && location.pathname !== tab.path.split("?")[0]) {
@@ -226,13 +236,13 @@ export default function MobileLayout({ children, user, showHeader = true, header
             return (
               <React.Fragment key={tab.id}>
                 {centerInsert && (
-                  <RouterLink to="/create-trip"
+                  <RouterLink to={fabHref}
                     className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5"
                     onClick={() => setShowMobileMenu(false)}>
                     <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5">
                       <Plus className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
                     </div>
-                    <span className="text-[10px] font-bold text-primary">نشر رحلة</span>
+                    <span className="text-[10px] font-bold text-primary">{fabLabel}</span>
                   </RouterLink>
                 )}
               <Link

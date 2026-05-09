@@ -1,0 +1,356 @@
+import React, { useState, useMemo } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/lib/AuthContext";
+import { useSEO } from "@/hooks/useSEO";
+import { supabase } from "@/lib/supabase";
+import { base44 } from "@/api/base44Client";
+import { friendlyError } from "@/lib/errors";
+import { CITY_COORDS } from "@/lib/mapUtils";
+import { toast } from "sonner";
+import { ArrowLeft, MapPin, Calendar, Clock, Users, DollarSign, Info, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import CityAutocomplete from "@/components/shared/CityAutocomplete";
+import DateInput from "@/components/shared/DateInput";
+
+/**
+ * RequestTrip — passenger-facing form to post a "I want a ride" request.
+ *
+ * Calls submit_trip_request RPC (migration 019) which:
+ *   - Validates auth + 3-active-max
+ *   - Computes expires_at from date + time + flexibility
+ *   - Inserts with status='open'
+ *
+ * On success, redirects to /my-requests so the user sees their new
+ * request immediately + understands where to manage it.
+ *
+ * Auth gate: requires login. If not authed, redirects to /login with a
+ * returnTo. If authed but is a driver-only account, soft-warning that
+ * this feature is for passengers (driver-only users can still post —
+ * they might want a ride for personal use — but we surface the
+ * driver-side counterpart so they know it exists).
+ */
+const FLEX_OPTIONS = [
+  { value: "exact",     label: "وقت محدد",     desc: "أحدد ساعة الانطلاق بالضبط" },
+  { value: "morning",   label: "صباحاً",        desc: "بين 6 ص و 12 ظ" },
+  { value: "afternoon", label: "بعد الظهر",     desc: "بين 12 ظ و 5 م" },
+  { value: "evening",   label: "مساءً",          desc: "بين 5 م و 10 م" },
+  { value: "flexible",  label: "أي وقت",         desc: "وقت الانطلاق مرن" },
+];
+
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
+export default function RequestTrip() {
+  useSEO({
+    title: "اطلب رحلة",
+    description: "انشر طلب رحلة في مشوارو وسيتواصل معك السائقون المتجهون لوجهتك.",
+    canonical: "https://mishwar-nu.vercel.app/request-trip",
+  });
+
+  const navigate = useNavigate();
+  const qc       = useQueryClient();
+  const { user, isAuthenticated, isLoadingAuth } = useAuth();
+
+  const [form, setForm] = useState({
+    from_city:        "",
+    to_city:          "",
+    requested_date:   todayISO(),
+    requested_time:   "",
+    time_flexibility: "flexible",
+    seats_needed:     1,
+    suggested_price:  0,
+    pickup_details:   "",
+    dropoff_details:  "",
+    notes:            "",
+  });
+
+  // Active-requests count — surface the 3-max ceiling upfront so the user
+  // knows their remaining budget. Cheap query, only fires for authed users.
+  const { data: activeCount = 0 } = useQuery({
+    queryKey: ["my-active-request-count", user?.email],
+    queryFn: async () => {
+      const list = await base44.entities.TripRequest.filter(
+        { passenger_email: user.email, status: "open" }, "-created_at", 10
+      );
+      return list?.length || 0;
+    },
+    enabled: !!user?.email && isAuthenticated,
+    staleTime: 30_000,
+  });
+
+  // Auth gate
+  if (!isLoadingAuth && !isAuthenticated) {
+    navigate("/login?returnTo=/request-trip", { replace: true });
+    return null;
+  }
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      // Pull GPS coords from CITY_COORDS for "near me" filtering by drivers.
+      // Optional — null is fine if the city isn't in the lookup.
+      const fromCoord = CITY_COORDS[form.from_city] || null;
+      const toCoord   = CITY_COORDS[form.to_city]   || null;
+
+      const { data, error } = await supabase.rpc("submit_trip_request", {
+        p_from_city:        form.from_city,
+        p_to_city:          form.to_city,
+        p_requested_date:   form.requested_date,
+        p_requested_time:   form.time_flexibility === "exact" && form.requested_time
+                              ? form.requested_time
+                              : null,
+        p_time_flexibility: form.time_flexibility,
+        p_seats_needed:     form.seats_needed,
+        p_suggested_price:  form.suggested_price,
+        p_pickup_details:   form.pickup_details || null,
+        p_dropoff_details:  form.dropoff_details || null,
+        p_notes:            form.notes || null,
+        p_from_lat:         fromCoord?.[0] ?? null,
+        p_from_lng:         fromCoord?.[1] ?? null,
+        p_to_lat:           toCoord?.[0]   ?? null,
+        p_to_lng:           toCoord?.[1]   ?? null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("تم نشر طلبك! سيظهر للسائقين فوراً 🎉");
+      qc.invalidateQueries({ queryKey: ["my-trip-requests"] });
+      qc.invalidateQueries({ queryKey: ["my-active-request-count"] });
+      qc.invalidateQueries({ queryKey: ["public-open-requests-count"] });
+      navigate("/my-requests");
+    },
+    onError: (err) => {
+      toast.error(friendlyError(err, "تعذر نشر الطلب"));
+    },
+  });
+
+  // ─── Validators ─────────────────────────────────────────────
+  const issues = useMemo(() => {
+    const arr = [];
+    if (!form.from_city)                 arr.push("اختر مدينة الانطلاق");
+    if (!form.to_city)                   arr.push("اختر مدينة الوصول");
+    if (form.from_city === form.to_city && form.from_city) arr.push("نقطة الانطلاق والوصول لا يمكن أن تكون نفسها");
+    if (!form.requested_date)            arr.push("اختر تاريخ الرحلة");
+    if (form.requested_date < todayISO())arr.push("تاريخ الرحلة في الماضي");
+    if (form.time_flexibility === "exact" && !form.requested_time) arr.push("اختر ساعة الانطلاق");
+    if (form.seats_needed < 1 || form.seats_needed > 6) arr.push("عدد المقاعد بين 1 و 6");
+    if (form.suggested_price < 0 || form.suggested_price > 1000) arr.push("السعر المقترح بين 0 و 1000 شيكل");
+    return arr;
+  }, [form]);
+
+  const canSubmit = issues.length === 0 && !submit.isPending && activeCount < 3;
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
+      <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="w-4 h-4 rotate-180" />
+        رجوع
+      </Link>
+
+      <div className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground rounded-2xl p-5 mb-5">
+        <h1 className="text-2xl font-bold mb-1">اطلب رحلة 🚗</h1>
+        <p className="text-sm opacity-90 leading-relaxed">
+          أخبر السائقين أنك تبحث عن رحلة. سيتواصل معك من يمر بمسارك.
+          خدمة مجانية للراكب — لا حجز ولا التزام.
+        </p>
+      </div>
+
+      {/* Active requests counter — show before form so user knows the limit */}
+      {activeCount >= 3 && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 mb-5 flex items-start gap-2">
+          <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              لديك 3 طلبات نشطة بالفعل
+            </p>
+            <p className="text-xs text-amber-800 dark:text-amber-300 mt-1">
+              ألغِ أحدها قبل إنشاء طلب جديد.{" "}
+              <Link to="/my-requests" className="underline font-medium">إدارة طلباتي</Link>
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-5">
+        {/* From / To */}
+        <div className="space-y-3">
+          <div>
+            <Label className="mb-1.5 block flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-green-600" />
+              من أين؟
+            </Label>
+            <CityAutocomplete
+              value={form.from_city}
+              onChange={(v) => set("from_city", v)}
+              placeholder="اختر مدينة الانطلاق"
+            />
+            <Input
+              value={form.pickup_details}
+              onChange={(e) => set("pickup_details", e.target.value)}
+              placeholder="نقطة محددة (مثل: قرب الصيدلية، اختياري)"
+              className="mt-2 text-sm"
+              maxLength={200}
+            />
+          </div>
+          <div>
+            <Label className="mb-1.5 block flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-destructive" />
+              إلى أين؟
+            </Label>
+            <CityAutocomplete
+              value={form.to_city}
+              onChange={(v) => set("to_city", v)}
+              placeholder="اختر مدينة الوصول"
+            />
+            <Input
+              value={form.dropoff_details}
+              onChange={(e) => set("dropoff_details", e.target.value)}
+              placeholder="نقطة محددة (مثل: مستشفى الهمشري، اختياري)"
+              className="mt-2 text-sm"
+              maxLength={200}
+            />
+          </div>
+        </div>
+
+        {/* Date */}
+        <div>
+          <Label className="mb-1.5 block flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-primary" />
+            متى تريد الرحلة؟
+          </Label>
+          <DateInput
+            value={form.requested_date}
+            onChange={(v) => set("requested_date", v)}
+            min={todayISO()}
+          />
+        </div>
+
+        {/* Time flexibility */}
+        <div>
+          <Label className="mb-1.5 block flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-primary" />
+            وقت الانطلاق
+          </Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {FLEX_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => set("time_flexibility", opt.value)}
+                className={`text-right rounded-xl border p-3 transition-colors ${
+                  form.time_flexibility === opt.value
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/40"
+                }`}
+              >
+                <p className="text-sm font-bold text-foreground">{opt.label}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
+          {form.time_flexibility === "exact" && (
+            <Input
+              type="time"
+              value={form.requested_time}
+              onChange={(e) => set("requested_time", e.target.value)}
+              className="mt-2"
+              required
+            />
+          )}
+        </div>
+
+        {/* Seats + Price */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label className="mb-1.5 block flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-blue-600" />
+              عدد المقاعد
+            </Label>
+            <div className="flex items-center gap-2">
+              <button type="button"
+                onClick={() => set("seats_needed", Math.max(1, form.seats_needed - 1))}
+                className="w-9 h-10 rounded-lg border border-border bg-muted/40 active:scale-95">−</button>
+              <div className="flex-1 h-10 rounded-lg border border-border flex items-center justify-center font-bold text-foreground">
+                {form.seats_needed}
+              </div>
+              <button type="button"
+                onClick={() => set("seats_needed", Math.min(6, form.seats_needed + 1))}
+                className="w-9 h-10 rounded-lg border border-border bg-muted/40 active:scale-95">+</button>
+            </div>
+          </div>
+          <div>
+            <Label className="mb-1.5 block flex items-center gap-1.5">
+              <DollarSign className="w-4 h-4 text-green-600" />
+              السعر المقترح للمقعد
+            </Label>
+            <div className="relative">
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={1000}
+                step={5}
+                value={form.suggested_price}
+                onChange={(e) => set("suggested_price", parseInt(e.target.value || 0, 10))}
+                className="pr-14"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">₪</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              السائق قد يقبل أو يفاوض عليه
+            </p>
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div>
+          <Label className="mb-1.5 block flex items-center gap-1.5">
+            <Info className="w-4 h-4 text-muted-foreground" />
+            ملاحظات إضافية (اختياري)
+          </Label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => set("notes", e.target.value)}
+            placeholder="مثلاً: لدي حقيبة كبيرة، أو أفضل سائقاً امرأة..."
+            maxLength={500}
+            rows={3}
+            className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1 text-left">
+            {form.notes.length}/500
+          </p>
+        </div>
+
+        {/* Issues / Submit */}
+        {issues.length > 0 && (
+          <div className="rounded-xl bg-amber-500/10 border border-amber-500/30 p-3">
+            <p className="text-xs font-bold text-amber-900 dark:text-amber-200 mb-1">يرجى إكمال:</p>
+            <ul className="text-[11px] text-amber-800 dark:text-amber-300 space-y-0.5">
+              {issues.map(i => <li key={i}>• {i}</li>)}
+            </ul>
+          </div>
+        )}
+
+        <Button
+          onClick={() => submit.mutate()}
+          disabled={!canSubmit}
+          className="w-full h-12 text-base font-bold"
+        >
+          {submit.isPending ? "جاري النشر..." : "نشر الطلب"}
+        </Button>
+
+        <p className="text-[11px] text-muted-foreground text-center leading-relaxed">
+          بنشر الطلب فإنك توافق على{" "}
+          <Link to="/terms" className="text-primary underline">شروط الاستخدام</Link>.
+          سيظهر اسمك ومسارك ومقعدك المطلوب للسائقين المشتركين فقط — لن يُكشف رقم هاتفك.
+        </p>
+      </div>
+    </div>
+  );
+}

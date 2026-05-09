@@ -661,6 +661,7 @@ export const base44 = {
     SupportTicket:  createEntityClient('support_tickets'),
     UserBlock:      createEntityClient('user_blocks'),
     UserReport:     createEntityClient('user_reports'),
+    TripRequest:    createEntityClient('trip_requests'),
     TripPreference: createEntityClient('trip_preferences'),
     User:           createEntityClient('profiles'),
   },

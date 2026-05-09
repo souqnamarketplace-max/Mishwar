@@ -36,6 +36,9 @@ const MyTrips          = lazy(() => import('./pages/MyTrips'));
 const Favorites        = lazy(() => import('./pages/Favorites'));
 const Messages         = lazy(() => import('./pages/Messages'));
 const CreateTrip       = lazy(() => import('./pages/CreateTrip'));
+const RequestTrip      = lazy(() => import('./pages/RequestTrip'));
+const MyRequests       = lazy(() => import('./pages/MyRequests'));
+const PassengerRequests= lazy(() => import('./pages/PassengerRequests'));
 const HowItWorks       = lazy(() => import('./pages/HowItWorks'));
 const Community        = lazy(() => import('./pages/Community'));
 const Help             = lazy(() => import('./pages/Help'));
@@ -141,6 +144,9 @@ const AuthenticatedApp = () => {
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/create-trip" element={<CreateTrip />} />
+        <Route path="/request-trip" element={<RequestTrip />} />
+        <Route path="/my-requests" element={<MyRequests />} />
+        <Route path="/passenger-requests" element={<PassengerRequests />} />
         <Route path="/driver" element={<DriverDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<UserProfile />} />
