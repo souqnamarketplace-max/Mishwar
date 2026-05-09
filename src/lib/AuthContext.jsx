@@ -23,6 +23,32 @@ export const AuthProvider = ({ children }) => {
   const [authChecked, setAuthChecked] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
 
+  // ─── Password recovery flag ─────────────────────────────────────────
+  // True when the user landed here via a "Reset Password" email link.
+  // Two ways this gets set:
+  //   1. Lazy initializer below — checks the URL hash for type=recovery
+  //      synchronously on first render, BEFORE any other useEffect
+  //      runs. This is the fast path for the implicit-flow recovery
+  //      URL format (#access_token=...&type=recovery&...).
+  //   2. PASSWORD_RECOVERY event in onAuthStateChange — Supabase fires
+  //      this after processing the URL. This is the canonical signal,
+  //      and it covers BOTH implicit AND PKCE flows (?code=...).
+  //
+  // The lazy initializer is the critical fix: previously this state
+  // was set inside a useEffect, which runs AFTER the auth-redirect
+  // useEffect on Login.jsx, so the redirect-home code fired BEFORE
+  // recoveryMode flipped to true → user landed on home, not on the
+  // password-set form.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    // Implicit flow: #access_token=...&type=recovery
+    if (window.location.hash.includes('type=recovery')) return true;
+    // PKCE flow: we can't tell from ?code= alone whether this is
+    // recovery vs normal sign-in — the PASSWORD_RECOVERY event below
+    // will catch it after Supabase exchanges the code.
+    return false;
+  });
+
   useEffect(() => {
     // Hard safeguard: never let auth loading hang for more than 8 seconds
     const failsafe = setTimeout(() => {
@@ -46,10 +72,34 @@ export const AuthProvider = ({ children }) => {
         invalidateBlockCache();
         setIsAuthenticated(false);
         setAuthError(null);
+        // Always clear recovery flag on signout — covers the cancel-
+        // recovery flow + general defense in case state got stuck.
+        setIsPasswordRecovery(false);
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
         // Silently refresh user data
         setSentryUser(session.user.id);
         await loadUserProfile(session.user);
+      } else if (event === 'PASSWORD_RECOVERY') {
+        // Canonical recovery signal from supabase-js. Fires once
+        // detectSessionInUrl has parsed the URL fragments AND determined
+        // the session is a recovery one. Works for both implicit flow
+        // (hash-based URLs) and PKCE flow (query-based URLs after code
+        // exchange). We deliberately do NOT call loadUserProfile here
+        // because we don't want isAuthenticated=true while in recovery —
+        // the user is in a constrained state where the only allowed
+        // action is updateUser({password}), and surfacing them as
+        // "logged in" would let them navigate around in a broken state.
+        setIsPasswordRecovery(true);
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        // Fired after supabase.auth.updateUser({password}) succeeds at
+        // the end of the recovery flow. Now that the password change
+        // landed, transition the user into a normal authenticated state
+        // and clear the recovery flag — they can navigate freely from
+        // here. Without this branch, isAuthenticated would lag (stuck
+        // false from the recovery state) until the next page reload.
+        setSentryUser(session.user.id);
+        await loadUserProfile(session.user);
+        setIsPasswordRecovery(false);
       }
     });
 
@@ -369,6 +419,11 @@ export const AuthProvider = ({ children }) => {
       checkUserAuth,
       checkAppState: checkUserAuth, // alias for compat
       refreshUser,
+      // Recovery-flow flag + clear helper. Login.jsx reads these to
+      // (1) suppress the auto-redirect-when-authenticated and (2) show
+      // the dedicated "set new password" UI instead of the login form.
+      isPasswordRecovery,
+      exitPasswordRecovery: () => setIsPasswordRecovery(false),
     }}>
       {children}
     </AuthContext.Provider>

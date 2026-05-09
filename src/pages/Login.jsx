@@ -17,7 +17,8 @@ export default function Login() {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { login, register, resendConfirmation, isAuthenticated } = useAuth();
+  const auth = useAuth();
+  const { login, register, resendConfirmation, isAuthenticated } = auth;
 
   const [mode, setMode] = useState(searchParams.get('signup') === '1' ? 'signup' : 'login');
   const [loading, setLoading] = useState(false);
@@ -40,34 +41,23 @@ export default function Login() {
   // browser when the tab closes.
   const [rememberMe, setRememberMeState] = useState(() => getRememberMe());
   // ─── Password recovery flow ─────────────────────────────────────────
-  // When a user clicks the link in a "Reset Password" email, Supabase
-  // verifies their token, creates a recovery session, and redirects
-  // here with a URL fragment like:
-  //   /login#access_token=...&type=recovery&refresh_token=...
-  //
-  // detectSessionInUrl auto-consumes that fragment and fires a
-  // SIGNED_IN auth event, so without special handling the app would
-  // just log them in and send them to the home page — they'd never
-  // see a "set a new password" form.
-  //
-  // We detect the recovery type on mount and switch to a dedicated UI
-  // that lets them set a new password. The auto-redirect (above) is
-  // suppressed while in this mode.
-  const [recoveryMode, setRecoveryMode] = useState(false);
+  // The flag now lives in AuthContext (single source of truth) so it's:
+  //   - Set synchronously on first render via lazy state initializer
+  //     that reads window.location.hash (covers implicit-flow recovery
+  //     URLs like #type=recovery before any useEffect can fire and
+  //     mistakenly trigger the auto-redirect).
+  //   - Set canonically via PASSWORD_RECOVERY auth event (covers PKCE
+  //     flow with ?code=... query params, which can't be detected from
+  //     the URL alone).
+  //   - Cleared via SIGNED_OUT or USER_UPDATED (the latter fires after
+  //     supabase.auth.updateUser succeeds).
+  // We read it via useAuth() and treat recoveryMode as derived state.
+  const recoveryMode = !!auth?.isPasswordRecovery;
+  const exitPasswordRecovery = auth?.exitPasswordRecovery;
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-
-  useEffect(() => {
-    // Supabase puts auth payload in the URL hash. Recovery sessions are
-    // identified by `type=recovery` in that fragment. Only set the flag
-    // if it's actually present — running this unconditionally would
-    // misfire on every page load.
-    if (typeof window !== 'undefined' && window.location.hash.includes('type=recovery')) {
-      setRecoveryMode(true);
-    }
-  }, []);
 
   // Brute force protection — max 5 attempts per 15 minutes
   const getRateLimit = () => {
@@ -278,11 +268,13 @@ export default function Login() {
       toast.success('تم تغيير كلمة المرور بنجاح! 🎉', { duration: 5000 });
       // Clear the recovery hash so a refresh doesn't re-trigger this UI
       window.history.replaceState(null, '', window.location.pathname);
-      setRecoveryMode(false);
+      // USER_UPDATED auth event will clear the recovery flag and
+      // transition isAuthenticated to true — but we also call the
+      // explicit exit here so navigation happens immediately without
+      // racing the event listener.
+      exitPasswordRecovery?.();
       setNewPassword('');
       setNewPasswordConfirm('');
-      // The auth state is already SIGNED_IN with the new password —
-      // navigate to home and let the normal authenticated flow take over.
       navigate('/', { replace: true });
     } catch (err) {
       toast.error(friendlyError(err, 'تعذر تغيير كلمة المرور — حاول مجدداً'));
@@ -295,7 +287,10 @@ export default function Login() {
   const cancelRecovery = async () => {
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     window.history.replaceState(null, '', window.location.pathname);
-    setRecoveryMode(false);
+    // SIGNED_OUT auth event will clear the recovery flag, but call
+    // the explicit exit too in case signOut errored or the listener
+    // hasn't propagated yet.
+    exitPasswordRecovery?.();
     setNewPassword('');
     setNewPasswordConfirm('');
   };
