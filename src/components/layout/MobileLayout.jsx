@@ -69,6 +69,10 @@ export default function MobileLayout({ children, user, showHeader = true, header
   const location = useLocation();
   const qc = useQueryClient();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  // For "both" account users (driver + passenger combined), the center FAB
+  // opens a chooser sheet instead of navigating directly — they can pick
+  // between posting a trip (driving) or requesting one (riding).
+  const [showFabChooser, setShowFabChooser] = useState(false);
   // contentRef is the inner scroll container — kept around so sub-components
   // can read the DOM if needed. PTR moved out to the dedicated
   // PullToRefresh wrapper in AppLayout (which finds this element by walking
@@ -216,14 +220,17 @@ export default function MobileLayout({ children, user, showHeader = true, header
             const href = tab.id === "profile" ? `${tab.path}${user?.email}` : tab.path;
             const isDriver = user?.account_type === "driver" || user?.account_type === "both";
             const isPassenger = user?.account_type === "passenger";
+            const isBoth = user?.account_type === "both";
             // Center FAB inserted between the 2nd and 3rd tabs (visually
             // sits in the middle of the 5-tab strip). Role-aware:
-            //   - Drivers / both accounts → "نشر رحلة" (post a trip)
-            //   - Passengers              → "اطلب رحلة" (request a trip)
-            //   - Anonymous users         → no FAB (must log in to use either)
+            //   - Pure driver    → "نشر رحلة" → /create-trip      (direct)
+            //   - Pure passenger → "اطلب رحلة" → /request-trip     (direct)
+            //   - Both accounts  → opens chooser sheet so the user picks
+            //                       what they want (post or request)
+            //   - Anonymous users → no FAB (must log in)
             const centerInsert = (isDriver || isPassenger) && idx === 2;
             const fabHref  = isPassenger && !isDriver ? "/request-trip" : "/create-trip";
-            const fabLabel = isPassenger && !isDriver ? "اطلب رحلة"      : "نشر رحلة";
+            const fabLabel = isBoth ? "إنشاء" : (isPassenger && !isDriver ? "اطلب رحلة" : "نشر رحلة");
 
             const handleTabClick = (e) => {
               if (isActive && location.pathname !== tab.path.split("?")[0]) {
@@ -236,14 +243,25 @@ export default function MobileLayout({ children, user, showHeader = true, header
             return (
               <React.Fragment key={tab.id}>
                 {centerInsert && (
-                  <RouterLink to={fabHref}
-                    className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5"
-                    onClick={() => setShowMobileMenu(false)}>
-                    <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5">
-                      <Plus className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
-                    </div>
-                    <span className="text-[10px] font-bold text-primary">{fabLabel}</span>
-                  </RouterLink>
+                  isBoth ? (
+                    <button type="button"
+                      onClick={() => { setShowFabChooser(true); setShowMobileMenu(false); }}
+                      className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5">
+                      <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5">
+                        <Plus className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
+                      </div>
+                      <span className="text-[10px] font-bold text-primary">{fabLabel}</span>
+                    </button>
+                  ) : (
+                    <RouterLink to={fabHref}
+                      className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5"
+                      onClick={() => setShowMobileMenu(false)}>
+                      <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5">
+                        <Plus className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
+                      </div>
+                      <span className="text-[10px] font-bold text-primary">{fabLabel}</span>
+                    </RouterLink>
+                  )
                 )}
               <Link
                 to={href}
@@ -423,6 +441,62 @@ export default function MobileLayout({ children, user, showHeader = true, header
               </button>
               <p className="text-center text-[11px] text-muted-foreground pb-2">مشوارو · النسخة 1.0</p>
             </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── Center-FAB chooser sheet (only for "both" account users) ─── */}
+      {showFabChooser && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-[60]"
+            onClick={() => setShowFabChooser(false)}
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-3xl shadow-2xl p-5 pb-8 safe-area-inset-bottom"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-foreground text-center mb-1">ماذا تريد أن تفعل؟</h3>
+            <p className="text-xs text-muted-foreground text-center mb-5">
+              حسابك يدعم النشر والطلب — اختر ما يناسبك الآن
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <RouterLink
+                to="/create-trip"
+                onClick={() => setShowFabChooser(false)}
+                className="flex flex-col items-center gap-2 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-2xl p-4 transition-colors active:scale-95"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Car className="w-6 h-6 text-primary" />
+                </div>
+                <p className="text-sm font-bold text-foreground">نشر رحلة</p>
+                <p className="text-[11px] text-muted-foreground text-center leading-snug">
+                  لديك سيارة وتريد ركاباً
+                </p>
+              </RouterLink>
+              <RouterLink
+                to="/request-trip"
+                onClick={() => setShowFabChooser(false)}
+                className="flex flex-col items-center gap-2 bg-accent/5 hover:bg-accent/10 border border-accent/20 rounded-2xl p-4 transition-colors active:scale-95"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+                  <MapPin className="w-6 h-6 text-accent" />
+                </div>
+                <p className="text-sm font-bold text-foreground">اطلب رحلة</p>
+                <p className="text-[11px] text-muted-foreground text-center leading-snug">
+                  تبحث عن سائق لرحلتك
+                </p>
+              </RouterLink>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFabChooser(false)}
+              className="w-full mt-4 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+            >
+              إلغاء
+            </button>
           </div>
         </>
       )}
