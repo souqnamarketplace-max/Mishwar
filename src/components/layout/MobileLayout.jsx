@@ -326,7 +326,18 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">حسابي</p>
                 {[
                   { icon: User,          label: "إعدادات الملف الشخصي", path: "/account-settings/profile" },
-                  { icon: ShieldCheck,   label: "التحقق من الهوية",       path: "/account-settings?section=verification" },
+                  // Verification entry routes by account_type:
+                  //   - passenger / no account → /verify-passenger (ID verification gate for trip-requests)
+                  //   - driver / both          → /account-settings?section=verification (driver license docs)
+                  // Without this split, passengers were sent to a section that
+                  // doesn't render meaningful content for them.
+                  {
+                    icon: ShieldCheck,
+                    label: "توثيق الهوية",
+                    path: (user?.account_type === "driver" || user?.account_type === "both")
+                      ? "/account-settings?section=verification"
+                      : "/verify-passenger",
+                  },
                   { icon: Bell,          label: "إعدادات الإشعارات",       path: "/account-settings?section=notifications" },
                   { icon: Sparkles,      label: "التفضيلات",                path: "/account-settings?section=preferences" },
                   ...(user?.account_type === "driver" || user?.account_type === "both"
@@ -357,6 +368,13 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   // their requests (passenger) or browse them (driver).
                   // The center FAB shows a chooser but doesn't surface
                   // ongoing/historical lists.
+                  // Direct "post a request" entry — passengers + both. This
+                  // duplicates the FAB for users who prefer the drawer flow
+                  // (or are still discovering the FAB exists).
+                  ...(user?.account_type === "passenger" || user?.account_type === "both" || !user?.account_type
+                    ? [{ icon: Plus, label: "اطلب رحلة جديدة", path: "/request-trip" }]
+                    : []
+                  ),
                   { icon: Inbox, label: "طلباتي",       path: "/my-requests" },
                   ...(user?.account_type === "driver" || user?.account_type === "both"
                     ? [{ icon: Inbox, label: "طلبات الركاب", path: "/passenger-requests" }]
