@@ -27,7 +27,14 @@ export default function Notifications() {
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
-  const [activeTab, setActiveTab] = useState("preferences");
+  // Default to "inbox" — when a user lands on /notifications (either
+  // by tapping the "عرض جميع الإشعارات" footer link, by URL, or by the
+  // type-based fallback for notifications without trip_id+link), they
+  // expect to see the inbox first, not the preferences settings UI.
+  // The previous default ("preferences") was confusing — admin tapping
+  // a verification notification would land here and not understand
+  // why a route-watcher form was the first thing they saw.
+  const [activeTab, setActiveTab] = useState("inbox");
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -152,11 +159,14 @@ export default function Notifications() {
         )}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs — inbox first (primary use case: read incoming notifications),
+          preferences second (configure route-watchers). Order swapped from
+          the original so a user landing on /notifications sees their inbox
+          immediately. */}
       <div className="flex gap-1 bg-muted/50 p-1 rounded-xl mb-6">
         {[
-          { id: "preferences", label: `تفضيلاتي (${preferences.length})` },
           { id: "inbox", label: `صندوق الإشعارات${unreadCount > 0 ? ` (${unreadCount})` : ""}` },
+          { id: "preferences", label: `تفضيلاتي (${preferences.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
