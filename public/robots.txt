@@ -1,4 +1,4 @@
-# robots.txt for مِشوار
+# robots.txt for مشوارو
 #
 # Production indexing policy:
 #   - Public marketing/info pages: allowed

@@ -68,7 +68,24 @@ const faqs = [
 ];
 
 export default function Help() {
-  useSEO({ title: "المساعدة والدعم", description: "إجابات للأسئلة الشائعة وطرق التواصل مع فريق دعم مشوارو" });
+  // FAQPage structured data — gives the FAQ entries a chance to appear
+  // as rich results in Google search ("People also ask" carousel).
+  // Each Q&A becomes a Question + Answer pair in the itemListElement.
+  const helpJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(f => ({
+      "@type": "Question",
+      "name": f.q,
+      "acceptedAnswer": { "@type": "Answer", "text": f.a },
+    })),
+  };
+  useSEO({
+    title: "المساعدة والدعم",
+    description: "إجابات للأسئلة الشائعة وطرق التواصل مع فريق دعم مشوارو",
+    canonical: "https://mishwar-nu.vercel.app/help",
+    jsonLd: helpJsonLd,
+  });
 
   const [openIndex, setOpenIndex] = useState(null);
 

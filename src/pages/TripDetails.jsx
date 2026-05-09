@@ -180,7 +180,49 @@ export default function TripDetails() {
     ? `احجز مقعدك في رحلة ${trip.from_city} ← ${trip.to_city} بسعر ${trip.price} شيكل. ${trip.available_seats || 0} مقاعد متاحة.`
     : "تفاصيل الرحلة في مشوارو";
   const seoCanonical = trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined;
-  useSEO({ title: seoTitle, description: seoDescription, canonical: seoCanonical });
+
+  // ── Per-trip JSON-LD structured data ─────────────────────────────
+  // Schema.org doesn't have a perfect "rideshare trip" type, so we use
+  // TouristTrip (general "trip" schema) plus an embedded Offer for the
+  // seat price. This lets Google surface the route + price as a rich
+  // result for queries like "رام الله إلى نابلس". The PostalAddress
+  // bits are city-level only (we don't have street precision and
+  // shouldn't pretend to). priceCurrency is ILS — Israeli Shekel,
+  // the actual currency drivers and passengers transact in inside
+  // the West Bank and Gaza.
+  const tripJsonLd = trip ? {
+    "@context": "https://schema.org",
+    "@type": "TouristTrip",
+    "name": `رحلة من ${trip.from_city} إلى ${trip.to_city}`,
+    "description": seoDescription,
+    "url": seoCanonical,
+    "itinerary": {
+      "@type": "ItemList",
+      "itemListElement": [
+        { "@type": "Place", "name": trip.from_city, "address": { "@type": "PostalAddress", "addressLocality": trip.from_city, "addressCountry": "PS" } },
+        { "@type": "Place", "name": trip.to_city,   "address": { "@type": "PostalAddress", "addressLocality": trip.to_city,   "addressCountry": "PS" } },
+      ],
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": String(trip.price ?? ""),
+      "priceCurrency": "ILS",
+      "availability": (trip.available_seats > 0 && trip.status === "confirmed")
+        ? "https://schema.org/InStock"
+        : "https://schema.org/SoldOut",
+      "url": seoCanonical,
+    },
+    // Trip start time. ar-EG-locale free-form fallback if date/time
+    // are split: Schema.org accepts ISO-8601 here.
+    ...(trip.date ? { "departureTime": `${trip.date}T${trip.time || "00:00"}:00` } : {}),
+    "provider": {
+      "@type": "Organization",
+      "name": "مشوارو",
+      "url": "https://mishwar-nu.vercel.app",
+    },
+  } : null;
+
+  useSEO({ title: seoTitle, description: seoDescription, canonical: seoCanonical, jsonLd: tripJsonLd });
 
   // ── Render states ──────────────────────────────────────────
   // The previous code had a single `if (!trip) return <loading>` —
