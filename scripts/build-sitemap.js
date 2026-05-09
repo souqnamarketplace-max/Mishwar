@@ -63,6 +63,50 @@ const MAX_PROFILES = 100;
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+// ─── Slug builder (mirrors src/lib/slug.js, inlined here) ──────────────
+// Vite aliases (@/...) don't resolve in plain Node ESM, so we inline a
+// minimal version. If src/lib/slug.js changes its slug format, mirror
+// the change here. The CITY-name → Latin map is intentionally TINY here
+// because the sitemap doesn't need pretty Latin city names — only
+// uniqueness. autoTranslit gives us URL-safe slugs for any city. The
+// frontend uses the full curated map for nicer URLs.
+const SITEMAP_ARABIC_TO_LATIN = {
+  "رام الله":"ramallah","نابلس":"nablus","الخليل":"hebron",
+  "بيت لحم":"bethlehem","القدس":"jerusalem","غزة":"gaza",
+  "أريحا":"jericho","جنين":"jenin","طولكرم":"tulkarm",
+  "قلقيلية":"qalqilya","سلفيت":"salfit","طوباس":"tubas",
+  "قصرة":"qasra","كفر الليمون":"kafr-al-laymun",
+};
+const SITEMAP_TRANSLIT = {
+  "ا":"a","أ":"a","إ":"a","آ":"a","ء":"a","ى":"a","ب":"b","ت":"t","ة":"a",
+  "ث":"th","ج":"j","ح":"h","خ":"kh","د":"d","ذ":"dh","ر":"r","ز":"z",
+  "س":"s","ش":"sh","ص":"s","ض":"d","ط":"t","ظ":"z","ع":"a","غ":"gh",
+  "ف":"f","ق":"q","ك":"k","ل":"l","م":"m","ن":"n","ه":"h","ؤ":"w",
+  "و":"w","ي":"y","ئ":"y"," ":"-",
+};
+function sitemapCityToLatin(s) {
+  if (!s) return "";
+  if (SITEMAP_ARABIC_TO_LATIN[s]) return SITEMAP_ARABIC_TO_LATIN[s];
+  let out = "";
+  for (const ch of s) out += (SITEMAP_TRANSLIT[ch] ?? "");
+  return out.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+const SITEMAP_MONTH_SHORT = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+function sitemapFormatDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return "";
+  return `${SITEMAP_MONTH_SHORT[d.getUTCMonth()]}${d.getUTCDate()}`;
+}
+function buildTripSlugSitemap(t) {
+  if (!t.short_code) return `/trip/${t.id}`;
+  const from = sitemapCityToLatin(t.from_city);
+  const to   = sitemapCityToLatin(t.to_city);
+  const date = sitemapFormatDate(t.date);
+  const parts = [from, to, date, t.short_code].filter(Boolean);
+  return `/trip/${parts.join("-")}`;
+}
+
 // ─── Static routes (must match robots.txt allow-list) ──────────────
 // priority and changefreq are advisory — Google barely uses them but
 // other crawlers do. Higher priority = "this page matters more on this
@@ -101,7 +145,7 @@ async function fetchRecentTrips() {
   // with a "completed" badge and the route + price are indexable.
   // is_public defaults true; we filter just-in-case it's false.
   const url = `${SUPABASE_URL}/rest/v1/trips?` +
-    `select=id,from_city,to_city,date,updated_at,status&` +
+    `select=id,short_code,from_city,to_city,date,updated_at,status&` +
     `order=created_at.desc&limit=${MAX_TRIPS}`;
   try {
     const res = await fetch(url, {
@@ -193,8 +237,13 @@ async function main() {
   console.log(`  · trips:    ${trips.length}`);
   for (const t of trips) {
     if (!t.id) continue;
+    // Prefer slug URL when short_code is present (post-migration 022).
+    // Falls back to UUID for trips without short_code (shouldn't happen
+    // post-deploy but defensive). Slug builder is inlined here because
+    // this script is plain Node ESM and can't resolve the Vite alias.
+    const slugPath = buildTripSlugSitemap(t);
     entries.push(urlEntry({
-      loc:        `${SITE_URL}/trip/${t.id}`,
+      loc:        `${SITE_URL}${slugPath}`,
       lastmod:    (t.updated_at || "").slice(0, 10) || TODAY,
       changefreq: "daily",
       priority:   "0.6",

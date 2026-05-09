@@ -47,7 +47,7 @@ function getIndexHtml() {
     return readFileSync(join(process.cwd(), "dist", "index.html"), "utf-8");
   } catch {
     // Fallback: minimal shell that loads the SPA
-    return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>مِشوار</title></head><body><div id="root"></div></body></html>`;
+    return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>مشوارو</title></head><body><div id="root"></div></body></html>`;
   }
 }
 
@@ -70,10 +70,30 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { id } = req.query;
+  const { id: rawId } = req.query;
 
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
-    // Invalid ID — just serve the SPA
+  // Detect whether `id` is a UUID or a slug ending in 6-char short_code.
+  // UUID pattern: 8-4-4-4-12 hex.
+  // Slug pattern: anything ending in `-{6 alphanumerics}` after at least
+  // one earlier hyphen-separated segment.
+  // Anything else is invalid → fall through to SPA shell.
+  let lookupCol = null;
+  let lookupVal = null;
+  if (rawId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId)) {
+    lookupCol = "id";
+    lookupVal = rawId.toLowerCase();
+  } else if (rawId) {
+    const segs = rawId.split("-");
+    const last = segs[segs.length - 1];
+    if (last && /^[0-9A-Za-z]{6}$/.test(last) && segs.length >= 2) {
+      lookupCol = "short_code";
+      lookupVal = last;
+    }
+  }
+
+  if (!lookupCol || !lookupVal) {
+    // Invalid ID — just serve the SPA shell. The frontend will show a
+    // "trip not found" UI to the user.
     const html = getIndexHtml();
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Content-Type-Options", "nosniff");
@@ -90,11 +110,12 @@ export default async function handler(req, res) {
     return res.status(200).send(html);
   }
 
-  // Fetch trip from Supabase REST API (no SDK, pure fetch)
+  // Fetch trip from Supabase REST API (no SDK, pure fetch). Looks up by
+  // either trips.id (UUID URLs) or trips.short_code (slug URLs).
   let trip = null;
   try {
     const r = await fetch(
-      `${SUPA_URL}/rest/v1/trips?id=eq.${encodeURIComponent(id)}&select=from_city,to_city,price,date,time,available_seats,driver_name,driver_gender,driver_rating,status,distance,car_model&limit=1`,
+      `${SUPA_URL}/rest/v1/trips?${lookupCol}=eq.${encodeURIComponent(lookupVal)}&select=from_city,to_city,price,date,time,available_seats,driver_name,driver_gender,driver_rating,status,distance,car_model&limit=1`,
       { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } }
     );
     const rows = await r.json();
@@ -117,7 +138,7 @@ export default async function handler(req, res) {
     const rating  = trip.driver_rating ? `⭐ ${Number(trip.driver_rating).toFixed(1)}` : "";
     const dist    = trip.distance ? ` · ${trip.distance}` : "";
 
-    const title   = `رحلة من ${from} إلى ${to} 🚗 | مِشوار`;
+    const title   = `رحلة من ${from} إلى ${to} 🚗 | مشوارو`;
     const desc    = [
       `₪${price} للمقعد`,
       date,

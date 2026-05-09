@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
 import { useSEO } from "@/hooks/useSEO";
 import { absoluteUrl, SITE_URL } from "@/lib/seo/config";
+import { buildTripSlug, parseTripIdFromSlug } from "@/lib/slug";
 import { friendlyError } from "@/lib/errors";
 import { useBlockedEmails } from "@/lib/blockUtils";
 
@@ -38,14 +39,34 @@ const whyChoose = [
 ];
 
 export default function TripDetails() {
-  // Some share platforms concatenate the share text into the URL when
-  // forwarded, producing URLs like /trip/<uuid>%20<arabic-text>. The
-  // raw param then has the trip text appended to the UUID, and
-  // Trip.get(<garbled>) returns null. Extract just the canonical UUID
-  // prefix so dirty share-link forwards still resolve.
+  // The :id param can be either:
+  //   1. A canonical UUID  /trip/e30e8388-4207-...
+  //   2. A slug ending in 6-char short_code  /trip/qasra-kafr-al-laymun-may13-aB3xK9
+  //   3. A garbled paste — share platforms sometimes concatenate share
+  //      text into the URL: /trip/<uuid>%20<arabic-text>. parseTripIdFromSlug
+  //      handles the clean cases; for garbled pastes we fall back to the
+  //      "extract first UUID-shaped substring" rescue further down.
   const { id: rawId } = useParams();
-  const uuidMatch = rawId?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
-  const id = uuidMatch?.[0] || null;
+  const parsed = parseTripIdFromSlug(rawId);
+  // Rescue: if parseTripIdFromSlug couldn't decide, look for a
+  // UUID-shaped substring anywhere in rawId (handles share-text
+  // concat pollution).
+  const uuidRescue = parsed.kind === "invalid"
+    ? rawId?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
+    : null;
+  const lookupKind = parsed.kind === "uuid" ? "uuid"
+                   : parsed.kind === "slug" ? "code"
+                   : uuidRescue              ? "uuid"
+                   :                           "invalid";
+  const lookupValue = parsed.kind === "uuid" ? parsed.uuid
+                    : parsed.kind === "slug" ? parsed.code
+                    : uuidRescue;
+  // Pre-fetch `id` is the UUID we have RIGHT NOW (URL says UUID), or null
+  // (URL says slug — id will be filled in after the trip fetch resolves
+  // to the row matching the short_code). The downstream code that uses
+  // `id` for booking queries handles `null` gracefully (queries are
+  // gated by `enabled: !!id`).
+  const preFetchId = lookupKind === "uuid" ? lookupValue : null;
   const navigate = useNavigate();
   const qc = useQueryClient();
 
@@ -54,8 +75,10 @@ export default function TripDetails() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
 
-  // Scroll to top when trip page opens
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [id]);
+  // Scroll to top when trip page opens. Depends on lookupValue (the URL
+  // param's resolved id) so it fires immediately on navigation, not
+  // after the trip fetch resolves.
+  useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [lookupValue]);
 
   // ── 2. User query (must come before anything that uses user) ──
   // For anonymous share-link visitors, base44.auth.me() throws
@@ -67,10 +90,60 @@ export default function TripDetails() {
     retry: false,
   });
 
-  // ── 3. Existing booking check (depends on user) ──────────────
+  // ── 3. Trip fetch — by UUID or short_code depending on what's in the URL.
+  // Direct supabase (not base44) to avoid the SDK's auto-injected
+  // created_by filter that would hide the trip from non-driver viewers
+  // (passengers, anonymous share-link visitors).
+  // RLS already permits public read for status='confirmed' trips.
+  const { data: tripData, isLoading: tripLoading, isError: tripError } = useQuery({
+    queryKey: ["trip", lookupKind, lookupValue],
+    queryFn: async () => {
+      if (!lookupValue) return null;
+      const col = lookupKind === "code" ? "short_code" : "id";
+      const { data, error } = await supabase
+        .from("trips")
+        .select("*")
+        .eq(col, lookupValue)
+        .maybeSingle();
+      if (error) throw error;
+      return data || null;
+    },
+    enabled: !!lookupValue,
+    staleTime: 30000,
+    retry: 1,
+  });
+
+  // After we have the trip, compute its canonical slug. If the URL
+  // is the legacy UUID form but the trip has a short_code (most do
+  // post-migration 022), redirect to the canonical slug URL via
+  // navigate(..., { replace: true }) so:
+  //   1. Browser back-button doesn't bounce between UUID and slug
+  //   2. Google de-dupes to the slug version (canonical also points there)
+  //   3. Existing shared UUID links still work — silent client-side redirect
+  //
+  // Canonical-emitting useSEO call below uses the same slug, so the
+  // <link rel="canonical"> always points to the slug form whether
+  // the visitor arrived via UUID or slug.
+  const canonicalSlug = buildTripSlug(tripData);
+  useEffect(() => {
+    if (!canonicalSlug) return;
+    if (lookupKind === "uuid" && rawId !== canonicalSlug) {
+      navigate(`/trip/${canonicalSlug}`, { replace: true });
+    }
+  }, [canonicalSlug, lookupKind, rawId, navigate]);
+
+  // Resolved trip id — UUID-form for downstream queries.
+  // Pre-fetch: from URL when URL is UUID. Post-fetch: from tripData.id.
+  const id = preFetchId || tripData?.id || null;
+
+  // ── 4. Existing booking check (depends on user + resolved trip) ──
   // Fetch ALL bookings this user has made for this trip — newest first.
-  // Filter to active (non-cancelled) on the client so a stale cancelled booking
-  // doesn't shadow a fresh re-booking. Limit 5 is plenty.
+  // Filter to active (non-cancelled) on the client so a stale cancelled
+  // booking doesn't shadow a fresh re-booking. Limit 5 is plenty.
+  //
+  // Note: this query is gated on BOTH user.email AND `id` being known.
+  // For slug URLs, `id` is null until the trip fetch resolves; once it
+  // does, react-query detects the queryKey change and runs this query.
   const { data: existingBookings = [] } = useQuery({
     queryKey: ["my-booking", id, user?.email],
     queryFn: () => user?.email
@@ -97,15 +170,6 @@ export default function TripDetails() {
     localStorage.setItem(favKey, JSON.stringify([...favs]));
     setFavorited(!favorited);
   };
-
-  // Fetch single trip by ID — smart, no need to load all trips
-  const { data: tripData, isLoading: tripLoading, isError: tripError } = useQuery({
-    queryKey: ["trip", id],
-    queryFn: () => base44.entities.Trip.get(id),
-    enabled: !!id,
-    staleTime: 30000,
-    retry: 1,
-  });
 
   const { data: driverProfile } = useQuery({
     queryKey: ["driver-profile", tripData?.driver_id],
@@ -180,7 +244,12 @@ export default function TripDetails() {
   const seoDescription = trip
     ? `احجز مقعدك في رحلة ${trip.from_city} ← ${trip.to_city} بسعر ${trip.price} شيكل. ${trip.available_seats || 0} مقاعد متاحة.`
     : "تفاصيل الرحلة في مشوارو";
-  const seoCanonical = trip ? absoluteUrl(`/trip/${trip.id}`) : undefined;
+  // Canonical URL prefers the slug form (for SEO consolidation) and
+  // falls back to the UUID form for trips not yet backfilled with
+  // short_code (shouldn't happen post-migration 022 but defensive).
+  const seoCanonical = trip
+    ? absoluteUrl(`/trip/${canonicalSlug || trip.id}`)
+    : undefined;
 
   // ── Per-trip JSON-LD structured data ─────────────────────────────
   // Schema.org doesn't have a perfect "rideshare trip" type, so we use
