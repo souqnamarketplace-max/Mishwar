@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,19 +37,42 @@ export default function DashboardSupport() {
   const PAGE_SIZE = 25;
   const { data: ticketsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["tickets", page],
-    queryFn: () => base44.entities.SupportTicket.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("support_tickets")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const tickets = ticketsData.rows;
   const totalPages = ticketsData.totalPages;
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, status, resolution_note }) => base44.entities.SupportTicket.update(id, { status, ...(resolution_note ? { description: resolution_note } : {}) }),
+    mutationFn: async ({ id, status, resolution_note }) => {
+      const patch = { status, ...(resolution_note ? { description: resolution_note } : {}) };
+      const { error } = await supabase.from("support_tickets").update(patch).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tickets"] }); setReplyingTo(null); setReplyNote(""); toast.success("تم تحديث الحالة"); },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.SupportTicket.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("support_tickets").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["tickets"] }); toast.success("تم حذف التذكرة"); },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   const open = tickets.filter((t) => t.status === "open").length;

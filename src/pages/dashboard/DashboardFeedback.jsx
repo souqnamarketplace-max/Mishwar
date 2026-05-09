@@ -36,17 +36,23 @@ export default function DashboardFeedback() {
 
   const { data: ticketsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["feedback-tickets", typeFilter, statusFilter, page],
-    queryFn: () => {
-      // Build conditions only with non-empty filters
-      const conditions = {};
-      if (typeFilter)   conditions.type   = typeFilter;
-      if (statusFilter) conditions.status = statusFilter;
-      return base44.entities.SupportTicket.paginate({
-        page,
-        pageSize: PAGE_SIZE,
-        sort: "-created_date",
-        conditions,
-      });
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("support_tickets")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (typeFilter)   q = q.eq("type", typeFilter);
+      if (statusFilter) q = q.eq("status", statusFilter);
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
     },
   });
   const filtered = ticketsData.rows;
@@ -88,16 +94,20 @@ export default function DashboardFeedback() {
   const { suggestions, complaints, praise, open } = stats;
 
   const replyMutation = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.SupportTicket.update(id, {
-      status,
-      admin_note: adminReply,
-    }),
+    mutationFn: async ({ id, status }) => {
+      const { error } = await supabase
+        .from("support_tickets")
+        .update({ status, admin_note: adminReply })
+        .eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       toast.success("تم الرد بنجاح");
       qc.invalidateQueries({ queryKey: ["feedback-tickets"] });
       qc.invalidateQueries({ queryKey: ["feedback-stats"] });
       setSelected(null); setAdminReply("");
     },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   return (

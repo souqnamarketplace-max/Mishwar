@@ -45,20 +45,44 @@ export default function DashboardRequests() {
 
   const { data: pageData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["admin-trip-requests", filter, page, search],
-    queryFn: () => base44.entities.TripRequest.paginate({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: "-created_at",
-      conditions: filter === "all" ? {} : { status: filter },
-      searchTerm: search,
-      searchColumns: ["from_city", "to_city", "passenger_email", "passenger_name"],
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("trip_requests")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (filter !== "all") q = q.eq("status", filter);
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(
+          `from_city.ilike.%${s}%,to_city.ilike.%${s}%,passenger_email.ilike.%${s}%,passenger_name.ilike.%${s}%`
+        );
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
 
-  // Stats — independent of filter/page
+  // Stats — independent of filter/page. Capped at 5000 rows for perf;
+  // beyond that count we'd want a SQL aggregation RPC instead.
   const { data: allRequests = [] } = useQuery({
     queryKey: ["admin-trip-requests-all-stats"],
-    queryFn: () => base44.entities.TripRequest.list("-created_at", 5000),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_requests")
+        .select("created_at,status,from_city,to_city")
+        .order("created_at", { ascending: false })
+        .limit(5000);
+      if (error) throw error;
+      return data || [];
+    },
     staleTime: 60_000,
   });
 

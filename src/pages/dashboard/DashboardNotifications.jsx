@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Send, Inbox } from "lucide-react";
 import Pagination from "@/components/dashboard/Pagination";
@@ -36,20 +37,29 @@ export default function DashboardNotifications() {
 
   const { data: notifData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["admin-notifications", page, search, typeFilter, dateRangePreset, customFrom, customTo],
-    queryFn: () => base44.entities.Notification.paginate({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: "-created_date",
-      conditions: typeFilter ? { type: typeFilter } : undefined,
-      searchTerm: search,
-      // Search across the notification's recipient + body so admin can find
-      // "all notifications sent to user X" or "all license_rejected with
-      // word 'expired' in the message".
-      searchColumns: ["user_email", "title", "message"],
-      dateColumn: "created_at",
-      dateFrom,
-      dateTo,
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("notifications")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (typeFilter) q = q.eq("type", typeFilter);
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo)   q = q.lte("created_at", dateTo);
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(`user_email.ilike.%${s}%,title.ilike.%${s}%,message.ilike.%${s}%`);
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
 
   const notifications = notifData.rows;

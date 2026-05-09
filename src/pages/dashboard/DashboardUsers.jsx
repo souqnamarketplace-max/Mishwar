@@ -35,9 +35,26 @@ export default function DashboardUsers() {
 
   const { data: usersData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["users", page],
-    queryFn: () => base44.entities.User.paginate({
-      page, pageSize: PAGE_SIZE, sort: "-created_date"
-    }),
+    queryFn: async () => {
+      // Direct supabase to bypass base44 created_by auto-filter that hid
+      // every user the admin didn't create themselves. Note: profiles
+      // table uses created_at (not created_date) and does NOT have a
+      // created_by column at all, but base44 still filters via current
+      // session user, returning at most one row.
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const users = usersData.rows;
   const totalUsers = usersData.total;

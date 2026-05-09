@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Settings, Save, CheckCircle } from "lucide-react";
@@ -50,7 +51,11 @@ export default function DashboardSettings() {
 
   const { data: settingsArr = [], isLoading } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("app_settings").select("*").limit(10);
+      if (error) throw error;
+      return data || [];
+    },
   });
 
   const existingSettings = settingsArr[0];
@@ -77,7 +82,7 @@ export default function DashboardSettings() {
   }, [existingSettings, isLoading, form]);
 
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       // Build the payload from the explicit allowlist (= keys of
       // defaultSettings) so we don't accidentally send back columns
       // that came in via the existingSettings spread:
@@ -95,9 +100,13 @@ export default function DashboardSettings() {
           .filter((k) => k in form)
           .map((k) => [k, form[k]])
       );
-      return existingSettings
-        ? base44.entities.AppSettings.update(existingSettings.id, payload)
-        : base44.entities.AppSettings.create(payload);
+      if (existingSettings) {
+        const { error } = await supabase.from("app_settings").update(payload).eq("id", existingSettings.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("app_settings").insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["app_settings"] });

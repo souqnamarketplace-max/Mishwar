@@ -15,6 +15,7 @@ import { CITIES } from "@/lib/cities";
 import Pagination from "@/components/dashboard/Pagination";
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Trash2, Edit2, Check, X, Megaphone, MessageSquare, Users, Newspaper, MapPin } from "lucide-react";
@@ -78,12 +79,29 @@ function AnnouncementsTab() {
 
   const { data: annData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["announcements-admin", page],
-    queryFn: () => base44.entities.Announcement.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("announcements")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const rows = annData.rows;
 
   const create = useMutation({
-    mutationFn: (text) => base44.entities.Announcement.create({ text, is_active: true }),
+    mutationFn: async (text) => {
+      const { error } = await supabase.from("announcements").insert({ text, is_active: true });
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["announcements-admin"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });
@@ -93,7 +111,10 @@ function AnnouncementsTab() {
     onError: (e) => toast.error(friendlyError(e, "فشل النشر")),
   });
   const update = useMutation({
-    mutationFn: ({ id, text }) => base44.entities.Announcement.update(id, { text }),
+    mutationFn: async ({ id, text }) => {
+      const { error } = await supabase.from("announcements").update({ text }).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["announcements-admin"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });
@@ -103,7 +124,10 @@ function AnnouncementsTab() {
     onError: (e) => toast.error(friendlyError(e, "فشل التحديث")),
   });
   const del = useMutation({
-    mutationFn: (id) => base44.entities.Announcement.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("announcements").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["announcements-admin"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });
@@ -112,7 +136,10 @@ function AnnouncementsTab() {
     onError: (e) => toast.error(friendlyError(e, "فشل الحذف")),
   });
   const toggle = useMutation({
-    mutationFn: ({ id, is_active }) => base44.entities.Announcement.update(id, { is_active }),
+    mutationFn: async ({ id, is_active }) => {
+      const { error } = await supabase.from("announcements").update({ is_active }).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["announcements-admin"] });
       qc.invalidateQueries({ queryKey: ["announcements-active"] });
@@ -209,17 +236,36 @@ function TestimonialsTab() {
   const PAGE_SIZE = 25;
   const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["testimonials-admin", page],
-    queryFn: () => base44.entities.Testimonial.paginate({
-      page, pageSize: PAGE_SIZE, sort: "sort_order",
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("testimonials")
+        .select("*", { count: "exact" })
+        .order("sort_order", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const rows = rowsData.rows;
   const totalPages = rowsData.totalPages;
 
   const save = useMutation({
-    mutationFn: (form) => form.id
-      ? base44.entities.Testimonial.update(form.id, form)
-      : base44.entities.Testimonial.create(form),
+    mutationFn: async (form) => {
+      if (form.id) {
+        const { id, ...patch } = form;
+        const { error } = await supabase.from("testimonials").update(patch).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("testimonials").insert(form);
+        if (error) throw error;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["testimonials-admin"] });
       qc.invalidateQueries({ queryKey: ["testimonials-published"] });
@@ -229,7 +275,10 @@ function TestimonialsTab() {
     onError: (e) => toast.error(friendlyError(e, "فشل الحفظ")),
   });
   const del = useMutation({
-    mutationFn: (id) => base44.entities.Testimonial.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("testimonials").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["testimonials-admin"] });
       qc.invalidateQueries({ queryKey: ["testimonials-published"] });
@@ -375,17 +424,36 @@ function TeamTab() {
   const PAGE_SIZE = 25;
   const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["team-admin", page],
-    queryFn: () => base44.entities.TeamMember.paginate({
-      page, pageSize: PAGE_SIZE, sort: "sort_order",
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("team_members")
+        .select("*", { count: "exact" })
+        .order("sort_order", { ascending: true })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const rows = rowsData.rows;
   const totalPages = rowsData.totalPages;
 
   const save = useMutation({
-    mutationFn: (form) => form.id
-      ? base44.entities.TeamMember.update(form.id, form)
-      : base44.entities.TeamMember.create(form),
+    mutationFn: async (form) => {
+      if (form.id) {
+        const { id, ...patch } = form;
+        const { error } = await supabase.from("team_members").update(patch).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("team_members").insert(form);
+        if (error) throw error;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team-admin"] });
       qc.invalidateQueries({ queryKey: ["team-members-published"] });
@@ -395,7 +463,10 @@ function TeamTab() {
     onError: (e) => toast.error(friendlyError(e, "فشل الحفظ")),
   });
   const del = useMutation({
-    mutationFn: (id) => base44.entities.TeamMember.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("team_members").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["team-admin"] });
       qc.invalidateQueries({ queryKey: ["team-members-published"] });
@@ -522,19 +593,38 @@ function BlogTab() {
   const PAGE_SIZE = 25;
   const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["blog-admin", page],
-    queryFn: () => base44.entities.BlogPost.paginate({
-      page, pageSize: PAGE_SIZE, sort: "-created_date",
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("blog_posts")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const rows = rowsData.rows;
   const totalPages = rowsData.totalPages;
 
   const save = useMutation({
-    mutationFn: (form) => {
+    mutationFn: async (form) => {
       // If publishing for the first time and no published_at set, stamp it
       const out = { ...form };
       if (out.is_published && !out.published_at) out.published_at = nowISO();
-      return out.id ? base44.entities.BlogPost.update(out.id, out) : base44.entities.BlogPost.create(out);
+      if (out.id) {
+        const { id, ...patch } = out;
+        const { error } = await supabase.from("blog_posts").update(patch).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("blog_posts").insert(out);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["blog-admin"] });
@@ -545,7 +635,10 @@ function BlogTab() {
     onError: (e) => toast.error(friendlyError(e, "فشل الحفظ")),
   });
   const del = useMutation({
-    mutationFn: (id) => base44.entities.BlogPost.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("blog_posts").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["blog-admin"] });
       qc.invalidateQueries({ queryKey: ["blog-posts-published"] });

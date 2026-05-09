@@ -58,17 +58,29 @@ export default function DashboardPayments() {
   // Server-side paginated bookings list (for transactions view)
   const { data: bookingsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["payments-bookings", page, search, statusFilter, dateRangePreset, customFrom, customTo],
-    queryFn: () => base44.entities.Booking.paginate({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: "-created_date",
-      conditions: statusFilter ? { payment_status: statusFilter } : undefined,
-      searchTerm: search,
-      searchColumns: ["passenger_name", "passenger_email", "passenger_phone"],
-      dateColumn: "created_at",
-      dateFrom,
-      dateTo,
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("bookings")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (statusFilter) q = q.eq("payment_status", statusFilter);
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo)   q = q.lte("created_at", dateTo);
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(`passenger_name.ilike.%${s}%,passenger_email.ilike.%${s}%,passenger_phone.ilike.%${s}%`);
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const bookings = bookingsData.rows;
   const totalBookings = bookingsData.total;
@@ -93,10 +105,11 @@ export default function DashboardPayments() {
   const qc = useQueryClient();
   const markPaid = useMutation({
     mutationFn: async ({ id, paid }) => {
-      await base44.entities.Booking.update(id, {
+      const { error } = await supabase.from("bookings").update({
         payment_status: paid ? "paid" : "pending",
         paid_at: paid ? new Date().toISOString() : null,
-      });
+      }).eq("id", id);
+      if (error) throw error;
     },
     onSuccess: (_, { id, paid }) => {
       qc.invalidateQueries({ queryKey: ["payments-bookings"] });
@@ -111,15 +124,16 @@ export default function DashboardPayments() {
   // Server-side filtering — display rows directly
   const filtered = bookings;
 
-  // Read commission rate from app_settings — the RPC may or may not
-  // include it; reading directly from settings is the source of truth
-  // and works whether or not the RPC was updated. Falsy-coalesce had
-  // a bug where commission=0 fell through to the 10% default; we now
-  // explicitly handle 0 by checking for null/undefined (??) instead
-  // of falsy (||).
+  // Read commission rate from app_settings — direct supabase query (the
+  // base44 entity wrapper would inject created_by filter and return zero
+  // rows). app_settings has only one row (config singleton).
   const { data: appSettingsArr = [] } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: async () => {
+      const { data, error } = await supabase.from("app_settings").select("*").limit(1);
+      if (error) throw error;
+      return data || [];
+    },
     staleTime: 60000,
   });
   const settingsRate = appSettingsArr[0]?.commission_rate;

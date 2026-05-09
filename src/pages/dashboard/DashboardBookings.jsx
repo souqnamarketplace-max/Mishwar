@@ -3,6 +3,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -44,21 +45,32 @@ export default function DashboardBookings() {
 
   const { data: bookingsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["bookings", page, search, statusFilter, paymentFilter, dateRangePreset, customFrom, customTo],
-    queryFn: () => {
-      const conditions = {};
-      if (statusFilter)  conditions.status = statusFilter;
-      if (paymentFilter) conditions.payment_status = paymentFilter;
-      return base44.entities.Booking.paginate({
-        page,
-        pageSize: PAGE_SIZE,
-        sort: "-created_date",
-        conditions,
-        searchTerm: search,
-        searchColumns: ["passenger_name", "passenger_email", "passenger_phone"],
-        dateColumn: "created_at",
-        dateFrom,
-        dateTo,
-      });
+    queryFn: async () => {
+      // Direct supabase — see DashboardLicenses for the rationale.
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("bookings")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (statusFilter)  q = q.eq("status", statusFilter);
+      if (paymentFilter) q = q.eq("payment_status", paymentFilter);
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo)   q = q.lte("created_at", dateTo);
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(
+          `passenger_name.ilike.%${s}%,passenger_email.ilike.%${s}%,passenger_phone.ilike.%${s}%`
+        );
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
     },
   });
   const bookings = bookingsData.rows;
@@ -66,8 +78,12 @@ export default function DashboardBookings() {
   const totalPages = bookingsData.totalPages;
 
   const updateStatus = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.Booking.update(id, { status }),
+    mutationFn: async ({ id, status }) => {
+      const { error } = await supabase.from("bookings").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: (_, { id, status }) => { qc.invalidateQueries({ queryKey: ["bookings"] }); toast.success("تم تحديث الحالة"); logAdminAction("admin_update_booking_status", "booking", id, { new_status: status }); },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   // Server-side filtering — display rows directly

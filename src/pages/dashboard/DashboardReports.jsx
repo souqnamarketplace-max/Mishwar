@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Flag, AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -74,21 +75,29 @@ export default function DashboardReports() {
 
   const { data: reportsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["reports", filter, page, search, categoryFilter, dateRangePreset, customFrom, customTo],
-    queryFn: () => {
-      const conditions = {};
-      if (filter !== "all")  conditions.status = filter;
-      if (categoryFilter)    conditions.category = categoryFilter;
-      return base44.entities.UserReport.paginate({
-        page,
-        pageSize: PAGE_SIZE,
-        sort: "-created_at",
-        conditions,
-        searchTerm: search,
-        searchColumns: ["reporter_email", "reported_email", "description"],
-        dateColumn: "created_at",
-        dateFrom,
-        dateTo,
-      });
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("user_reports")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (filter !== "all")  q = q.eq("status", filter);
+      if (categoryFilter)    q = q.eq("category", categoryFilter);
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo)   q = q.lte("created_at", dateTo);
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(`reporter_email.ilike.%${s}%,reported_email.ilike.%${s}%,description.ilike.%${s}%`);
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
     },
   });
   const reports = reportsData.rows;
@@ -96,7 +105,10 @@ export default function DashboardReports() {
   const totalPages = reportsData.totalPages;
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.UserReport.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      const { error } = await supabase.from("user_reports").update(data).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["reports"] });
       qc.invalidateQueries({ queryKey: ["my-reports"] });
@@ -124,10 +136,11 @@ export default function DashboardReports() {
     let fail = 0;
     for (const id of ids) {
       try {
-        await base44.entities.UserReport.update(id, {
+        const { error } = await supabase.from("user_reports").update({
           status,
           reviewed_at: new Date().toISOString(),
-        });
+        }).eq("id", id);
+        if (error) throw error;
         // Audit-trail entry per item so we have a record of who
         // did the bulk action — otherwise bulk operations leave a
         // gap in the moderation log.
@@ -165,14 +178,15 @@ export default function DashboardReports() {
     const notifTemplate = REPORTER_NOTIF_BY_STATUS[status];
     if (notifTemplate && report.reporter_email) {
       try {
-        await base44.entities.Notification.create({
+        await supabase.from("notifications").insert({
           user_email: report.reporter_email,
           title: notifTemplate.title,
           message: note
             ? `${notifTemplate.body}\n\nملاحظة الإدارة: ${note}`
             : notifTemplate.body,
-          type: "system",
+          type: "report_update",
           is_read: false,
+          link: "/settings?section=reports",
         });
       } catch {
         // Non-fatal — the admin update already succeeded.

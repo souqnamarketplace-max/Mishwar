@@ -3,6 +3,7 @@ import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Car, Search, MapPin, ArrowLeft, Clock, Users, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -47,24 +48,45 @@ export default function DashboardTrips() {
 
   const { data: tripsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["trips", page, search, statusFilter, dateRangePreset, customFrom, customTo],
-    queryFn: () => base44.entities.Trip.paginate({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: "-created_date",
-      conditions: statusFilter ? { status: statusFilter } : undefined,
-      searchTerm: search,
-      searchColumns: ["from_city", "to_city", "driver_name", "driver_email"],
-      dateColumn: "created_at",
-      dateFrom,
-      dateTo,
-    }),
+    queryFn: async () => {
+      // Direct supabase — base44.entities.Trip.paginate auto-injects
+      // created_by = admin_email and hides every trip the admin didn't
+      // create themselves (i.e. all of them in production).
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("trips")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (statusFilter) q = q.eq("status", statusFilter);
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo)   q = q.lte("created_at", dateTo);
+      // Search across multiple columns via or() — case-insensitive
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(
+          `from_city.ilike.%${s}%,to_city.ilike.%${s}%,driver_name.ilike.%${s}%,driver_email.ilike.%${s}%`
+        );
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const trips = tripsData.rows;
   const totalTrips = tripsData.total;
   const totalPages = tripsData.totalPages;
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Trip.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("trips").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: (_, tripId) => {
       qc.invalidateQueries({ queryKey: ["trips"] });
       toast.success("تم حذف الرحلة");
@@ -78,8 +100,12 @@ export default function DashboardTrips() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: ({ id, status }) => base44.entities.Trip.update(id, { status }),
+    mutationFn: async ({ id, status }) => {
+      const { error } = await supabase.from("trips").update({ status }).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["trips"] }); toast.success("تم تحديث الحالة"); },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   // No more client-side filter — server does it all. Display rows directly.

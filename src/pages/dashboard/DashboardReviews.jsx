@@ -3,6 +3,7 @@ import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Star, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,27 +30,41 @@ export default function DashboardReviews() {
 
   const { data: reviewsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["reviews", page, search, ratingFilter, dateRangePreset, customFrom, customTo],
-    queryFn: () => base44.entities.Review.paginate({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: "-created_date",
-      conditions: ratingFilter ? { rating: parseInt(ratingFilter, 10) } : undefined,
-      searchTerm: search,
-      // Search across the human-readable fields. comment is plain text so
-      // an admin looking for a specific complaint phrase can find it.
-      searchColumns: ["reviewer_name", "reviewer_email", "comment"],
-      dateColumn: "created_at",
-      dateFrom,
-      dateTo,
-    }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("reviews")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (ratingFilter) q = q.eq("rating", parseInt(ratingFilter, 10));
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo)   q = q.lte("created_at", dateTo);
+      if (search?.trim()) {
+        const s = search.trim();
+        q = q.or(`reviewer_name.ilike.%${s}%,reviewer_email.ilike.%${s}%,comment.ilike.%${s}%`);
+      }
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const reviews = reviewsData.rows;
   const totalReviews = reviewsData.total;
   const totalPages = reviewsData.totalPages;
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Review.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("reviews").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["reviews"] }); toast.success("تم حذف التقييم"); },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   return (

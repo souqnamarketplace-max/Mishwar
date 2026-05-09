@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar from "@/components/dashboard/DashboardFilterBar";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,19 +25,24 @@ export default function DashboardOffers() {
 
   const { data: couponsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["coupons", page, search, activeFilter],
-    queryFn: () => {
-      // is_active filter — translate "true"/"false" string to boolean
-      const conditions = {};
-      if (activeFilter === "true")  conditions.is_active = true;
-      if (activeFilter === "false") conditions.is_active = false;
-      return base44.entities.Coupon.paginate({
-        page,
-        pageSize: PAGE_SIZE,
-        sort: "-created_date",
-        conditions,
-        searchTerm: search,
-        searchColumns: ["code"],
-      });
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      let q = supabase
+        .from("coupons")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (activeFilter === "true")  q = q.eq("is_active", true);
+      if (activeFilter === "false") q = q.eq("is_active", false);
+      if (search?.trim()) q = q.ilike("code", `%${search.trim()}%`);
+      const { data, error, count } = await q;
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
     },
   });
   const coupons = couponsData.rows;
@@ -44,23 +50,37 @@ export default function DashboardOffers() {
   const totalPages = couponsData.totalPages;
 
   const createMutation = useMutation({
-    mutationFn: (data) => base44.entities.Coupon.create({ ...data, is_active: true, uses_count: 0 }),
+    mutationFn: async (data) => {
+      const { error } = await supabase
+        .from("coupons")
+        .insert({ ...data, is_active: true, uses_count: 0 });
+      if (error) throw error;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["coupons"] });
       setShowForm(false);
       setForm({ code: "", discount_percent: 10, max_uses: 100, expires_at: "" });
       toast.success("تم إنشاء الكوبون");
     },
+    onError: (err) => toast.error(err?.message || "تعذر إنشاء الكوبون"),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Coupon.delete(id),
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("coupons").delete().eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["coupons"] }); toast.success("تم حذف الكوبون"); },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   const toggleMutation = useMutation({
-    mutationFn: ({ id, is_active }) => base44.entities.Coupon.update(id, { is_active }),
+    mutationFn: async ({ id, is_active }) => {
+      const { error } = await supabase.from("coupons").update({ is_active }).eq("id", id);
+      if (error) throw error;
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["coupons"] }),
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   const generateCode = () => {

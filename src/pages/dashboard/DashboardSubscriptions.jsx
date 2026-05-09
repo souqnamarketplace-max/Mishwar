@@ -179,15 +179,17 @@ export default function DashboardSubscriptions() {
       try {
         const periodEnd = data?.period_end;
         const endDateStr = periodEnd ? formatArabicDate(periodEnd) : "";
-        await base44.entities.Notification.create({
+        const { error: notifErr } = await supabase.from("notifications").insert({
           user_email: row.driver_email,
           title: "تم تفعيل اشتراكك ✅",
           message: endDateStr
             ? `تم تفعيل اشتراكك في مشوارو. الاشتراك ساري حتى ${endDateStr}.`
             : "تم تفعيل اشتراكك في مشوارو.",
-          type: "system",
+          type: "subscription_approved",
           is_read: false,
+          link: "/driver?tab=subscription",
         });
+        if (notifErr) throw notifErr;
       } catch (notifyErr) {
         // Don't fail the approval if notification creation failed —
         // admin already approved, driver will see active status next
@@ -221,13 +223,15 @@ export default function DashboardSubscriptions() {
         reason,
       });
       try {
-        await base44.entities.Notification.create({
+        const { error: notifErr } = await supabase.from("notifications").insert({
           user_email: row.driver_email,
           title: "لم نتمكن من تفعيل اشتراكك ❌",
           message: `لم نتمكن من التحقق من تحويل الدفع. السبب: ${reason}. يمكنك إعادة الإرسال من صفحة الاشتراك.`,
-          type: "system",
+          type: "subscription_rejected",
           is_read: false,
+          link: "/driver?tab=subscription",
         });
+        if (notifErr) throw notifErr;
       } catch (notifyErr) {
         console.warn("subscription_rejected notification failed:", notifyErr);
       }
@@ -259,13 +263,15 @@ export default function DashboardSubscriptions() {
       });
       if (error) throw error;
       try {
-        await base44.entities.Notification.create({
+        const { error: notifErr } = await supabase.from("notifications").insert({
           user_email: email,
           title: "تم منحك اشتراكاً مجانياً 🎁",
           message: `قامت إدارة مشوارو بتفعيل اشتراك مجاني لك لمدة ${days} يوماً.${note ? " السبب: " + note : ""}`,
-          type: "system",
+          type: "subscription_complimentary",
           is_read: false,
+          link: "/driver?tab=subscription",
         });
+        if (notifErr) throw notifErr;
       } catch (notifyErr) {
         console.warn("comp grant notification failed:", notifyErr);
       }
