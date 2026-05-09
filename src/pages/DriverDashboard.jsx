@@ -13,6 +13,7 @@ import DriverTripsList from "../components/driver/DriverTripsList";
 import DriverPassengers from "../components/driver/DriverPassengers";
 import DriverVehicleEditor from "../components/driver/DriverVehicleEditor";
 import DriverRatePassengers from "../components/driver/DriverRatePassengers";
+import DriverRatingsDashboard from "../components/driver/DriverRatingsDashboard";
 import DriverReviewWizard from "../components/reviews/DriverReviewWizard";
 import { useGPSTripCompletion } from "../lib/gpsTracking";
 import { createPortal } from "react-dom";
@@ -21,14 +22,21 @@ import DriverPaymentSetup from "../components/driver/DriverPaymentSetup";
 import DriverSubscriptionSection from "../components/driver/DriverSubscriptionSection";
 
 // ─── Tab definitions ────────────────────────────────────────────────────────
+// Two rating tabs:
+//   - "my-ratings" — how PASSENGERS rated ME (the driver's reputation,
+//     average + histogram + recent reviews). This was the missing piece.
+//   - "rate-passengers" — pending driver→passenger reviews to leave.
+//     Was previously labeled just "التقييمات" which was confusing because
+//     drivers expected to find their own ratings there.
 const TABS = [
-  { id: "trips",        label: "رحلاتي",       icon: Car,        color: "text-primary"   },
-  { id: "passengers",   label: "الركاب",        icon: Users,      color: "text-blue-600"  },
-  { id: "earnings",     label: "الأرباح",       icon: DollarSign, color: "text-green-600" },
-  { id: "ratings",      label: "التقييمات",     icon: Star,       color: "text-yellow-600" },
-  { id: "vehicle",      label: "مركبتي",        icon: Car,        color: "text-accent"    },
-  { id: "payments",     label: "الدفع",         icon: CreditCard, color: "text-purple-600"},
-  { id: "subscription", label: "اشتراك المنصة", icon: Wallet,     color: "text-orange-600"},
+  { id: "trips",          label: "رحلاتي",         icon: Car,        color: "text-primary"   },
+  { id: "passengers",     label: "الركاب",          icon: Users,      color: "text-blue-600"  },
+  { id: "earnings",       label: "الأرباح",         icon: DollarSign, color: "text-green-600" },
+  { id: "my-ratings",     label: "تقييماتي",        icon: Star,       color: "text-yellow-600" },
+  { id: "rate-passengers", label: "تقييم الركاب",    icon: Star,       color: "text-orange-500" },
+  { id: "vehicle",        label: "مركبتي",          icon: Car,        color: "text-accent"    },
+  { id: "payments",       label: "الدفع",           icon: CreditCard, color: "text-purple-600"},
+  { id: "subscription",   label: "اشتراك المنصة",   icon: Wallet,     color: "text-orange-600"},
 ];
 
 // ─── Mobile dropdown tab selector ──────────────────────────────────────────
@@ -274,7 +282,11 @@ export default function DriverDashboard() {
           <EarningsTab bookings={bookings} trips={trips} totalEarnings={totalEarnings} />
         )}
 
-        {activeTab === "ratings" && (
+        {activeTab === "my-ratings" && (
+          <DriverRatingsDashboard user={user} />
+        )}
+
+        {activeTab === "rate-passengers" && (
           <DriverRatePassengers trips={trips} bookings={bookings} />
         )}
 
