@@ -217,22 +217,13 @@ function VerificationRow({ row, expanded, onToggle, onReviewed }) {
           rejected: `لم نتمكن من قبول طلب التوثيق. السبب: ${reason}. يمكنك إعادة الإرسال بعد معالجة المشكلة.`,
           revoked:  `تم إلغاء توثيق حسابك. السبب: ${reason || "بقرار من الإدارة"}. للتفاصيل تواصل مع الدعم.`,
         };
-        await fetch("https://dimtdwahtwaslmnuakij.supabase.co/rest/v1/notifications", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": "sb_publishable_LlK5ig0ruElVt3Z6j0FNkQ_MAGvKRC_",
-            "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ""}`,
-            "Prefer": "return=minimal",
-          },
-          body: JSON.stringify({
-            user_email: row.user_email,
-            title:      titles[decision],
-            message:    messages[decision],
-            type:       "verification",
-            is_read:    false,
-            link:       decision === "approved" ? "/request-trip" : "/verify-passenger",
-          }),
+        await supabase.from("notifications").insert({
+          user_email: row.user_email,
+          title:      titles[decision],
+          message:    messages[decision],
+          type:       "verification",
+          is_read:    false,
+          link:       decision === "approved" ? "/request-trip" : "/verify-passenger",
         });
       } catch { /* non-fatal */ }
     },
