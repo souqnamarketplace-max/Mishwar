@@ -107,7 +107,7 @@ test these strings appear at permission-prompt time):
 <string>لتحديد وصولك إلى الوجهة خلال الرحلة. لا يتم إرسال موقعك إلى خوادمنا.</string>
 
 <key>CFBundleDisplayName</key>
-<string>مِشوار</string>
+<string>مشوارو</string>
 
 <key>CFBundleLocalizations</key>
 <array>
@@ -153,8 +153,8 @@ Set the app name in `android/app/src/main/res/values/strings.xml`:
 
 ```xml
 <resources>
-    <string name="app_name">مِشوار</string>
-    <string name="title_activity_main">مِشوار</string>
+    <string name="app_name">مشوارو</string>
+    <string name="title_activity_main">مشوارو</string>
     <string name="package_name">ps.mishwar.app</string>
     <string name="custom_url_scheme">ps.mishwar.app</string>
 </resources>

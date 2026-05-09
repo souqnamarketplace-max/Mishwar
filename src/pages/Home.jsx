@@ -9,7 +9,7 @@ import CTASection from "../components/home/CTASection";
 import AnnouncementBanner from "../components/home/AnnouncementBanner";
 
 export default function Home() {
-  useSEO({ title: "الرئيسية", description: "منصة فلسطينية لمشاركة رحلات السيارة بين المدن. وفر المال وسافر بأمان مع مِشوار." });
+  useSEO({ title: "الرئيسية", description: "منصة فلسطينية لمشاركة رحلات السيارة بين المدن. وفر المال وسافر بأمان مع مشوارو." });
 
   return (
     <div>

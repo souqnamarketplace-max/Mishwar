@@ -238,7 +238,7 @@ function StatusBanner({ status }) {
   // never_subscribed
   return (
     <div className="bg-muted/40 border border-border rounded-xl p-4">
-      <h3 className="font-bold text-foreground mb-1">اشترك في مِشوار للسائقين</h3>
+      <h3 className="font-bold text-foreground mb-1">اشترك في مشوارو للسائقين</h3>
       <p className="text-sm text-muted-foreground leading-relaxed">
         فعّل اشتراكك الشهري للنشر بلا قيود. نوفر لك إدارة كاملة لرحلاتك، تواصل مباشر مع الركاب، وحساب موثّق.
       </p>

@@ -1,4 +1,4 @@
-# مِشوار — Pre-Launch Production Audit
+# مشوارو — Pre-Launch Production Audit
 
 **Audit date:** 2026-05-05
 **Auditor scope:** Senior security, architecture, DevOps, QA, performance, privacy, mobile/web release
@@ -753,7 +753,7 @@ Also enable Supabase's password breach detection in dashboard → Auth → Polic
 
 All `SECURITY DEFINER` functions should pin their `search_path` to prevent search-path injection: an attacker who can create objects in any schema (e.g. `pg_temp` for any logged-in role) could shadow `auth.users` or `public.profiles` references and trick the function into reading attacker-controlled data.
 
-Mishwar's functions don't expose much surface for this since the references are `auth.users` and `public.profiles` (qualified), but `RAISE EXCEPTION`, `INSERT`, etc. are called unqualified and could be hijacked through pg_temp casts. It's a one-line fix on each.
+Mishwaro's functions don't expose much surface for this since the references are `auth.users` and `public.profiles` (qualified), but `RAISE EXCEPTION`, `INSERT`, etc. are called unqualified and could be hijacked through pg_temp casts. It's a one-line fix on each.
 
 **Fix:** add `SET search_path = public, pg_catalog` to every `SECURITY DEFINER` function:
 ```sql

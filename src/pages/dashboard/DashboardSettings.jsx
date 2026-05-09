@@ -27,7 +27,7 @@ const defaultSettings = {
   min_price: 10,
   max_price: 500,
   max_seats: 6,
-  app_name: "مِشوار",
+  app_name: "مشوارو",
   // Contact info: empty by default. Footer / Help only render the contact
   // block when these are set, so a fresh DB shows no contact info rather
   // than placeholders that look like real numbers.

@@ -52,7 +52,7 @@ const tips = [
 ];
 
 export default function Safety() {
-  useSEO({ title: "السلامة والأمان", description: "كيف يحمي مِشوار سائقيه ومسافريه" });
+  useSEO({ title: "السلامة والأمان", description: "كيف يحمي مشوارو سائقيه ومسافريه" });
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">
@@ -66,7 +66,7 @@ export default function Safety() {
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <Shield className="w-8 h-8 text-primary" />
         </div>
-        <h1 className="text-3xl font-bold text-foreground mb-3">الأمان في مِشوار</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-3">الأمان في مشوارو</h1>
         <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
           سلامتك أولويتنا القصوى. نطبق أعلى معايير الأمان لضمان تجربة تنقل موثوقة لكل مستخدمينا.
         </p>

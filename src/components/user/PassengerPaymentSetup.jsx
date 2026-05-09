@@ -35,7 +35,7 @@ export default function PassengerPaymentSetup({ user }) {
       <div className="flex items-start gap-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
         <AlertCircle className="w-4 h-4 text-primary mt-0.5 shrink-0" />
         <p className="text-sm text-muted-foreground">
-          اختر طريقتك المفضلة للدفع. الدفع يتم مباشرة للسائق — مِشوار لا تتوسط في المدفوعات.
+          اختر طريقتك المفضلة للدفع. الدفع يتم مباشرة للسائق — مشوارو لا تتوسط في المدفوعات.
         </p>
       </div>
 

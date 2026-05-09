@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 const features = [
   { icon: Shield, title: "رحلة آمنة", desc: "جميع السائقين موثقون من قبل فريق الإدارة قبل نشر رحلاتهم" },
   // Previously claimed "all transactions through the platform" — that's
-  // false. Mishwar does NOT process payments; passengers pay drivers
+  // false. Mishwaro does NOT process payments; passengers pay drivers
   // directly. Replaced with an accurate description of the model.
   { icon: CreditCard, title: "دفع مباشر", desc: "تدفع للسائق مباشرة بالطريقة المتفق عليها — نقداً، جوال باي، ريفلكت، أو تحويل بنكي" },
   { icon: Headphones, title: "دعم سريع", desc: "تواصل مع فريق الدعم في أي وقت من خلال صفحة المساعدة" },
@@ -29,7 +29,7 @@ const tips = [
 ];
 
 export default function HowItWorks() {
-  useSEO({ title: "كيف يعمل مِشوار", description: "3 خطوات بسيطة لاستخدام مِشوار — ابحث، احجز، سافر" });
+  useSEO({ title: "كيف يعمل مشوارو", description: "3 خطوات بسيطة لاستخدام مشوارو — ابحث، احجز، سافر" });
 
   return (
     <div>
@@ -38,7 +38,7 @@ export default function HowItWorks() {
       {/* Features */}
       <section className="py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-10">لماذا تختار مِشوار؟</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-10">لماذا تختار مشوارو؟</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {features.map((f, i) => (
               <motion.div
@@ -105,7 +105,7 @@ export default function HowItWorks() {
                   استرداد المبالغ
                 </h3>
                 <p className="text-muted-foreground">
-                  الدفع يتم مباشرة بينك وبين السائق — لذا أي استرداد يكون باتفاق مباشر معه. مِشوار لا يحتفظ بأموال الرحلات ولا يدير المعاملات المالية.
+                  الدفع يتم مباشرة بينك وبين السائق — لذا أي استرداد يكون باتفاق مباشر معه. مشوارو لا يحتفظ بأموال الرحلات ولا يدير المعاملات المالية.
                 </p>
               </div>
               <div className="p-4 bg-primary/5 rounded-xl border border-primary/20">

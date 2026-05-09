@@ -19,7 +19,7 @@ const values = [
 // section hides entirely.
 
 export default function AboutUs() {
-  useSEO({ title: "من نحن", description: "تعرف على مِشوار — منصة فلسطينية لمشاركة الرحلات" });
+  useSEO({ title: "من نحن", description: "تعرف على مشوارو — منصة فلسطينية لمشاركة الرحلات" });
 
   const { data: team = [] } = useQuery({
     queryKey: ["team-members-published"],
@@ -41,7 +41,7 @@ export default function AboutUs() {
         </div>
         <h1 className="text-3xl font-bold text-foreground mb-3">من نحن</h1>
         <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
-          مِشوار هي منصة فلسطينية لمشاركة الرحلات، تهدف إلى ربط السائقين بالمسافرين بطريقة آمنة وموثوقة واقتصادية.
+          مشوارو هي منصة فلسطينية لمشاركة الرحلات، تهدف إلى ربط السائقين بالمسافرين بطريقة آمنة وموثوقة واقتصادية.
           انطلقنا عام 2023 من رام الله بحلم واحد: تسهيل التنقل لكل فلسطيني.
         </p>
       </div>

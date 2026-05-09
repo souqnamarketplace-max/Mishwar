@@ -1,7 +1,7 @@
-# Mishwar — Branded Email Templates
+# Mishwaro — Branded Email Templates
 
 Custom HTML templates that replace Supabase's default plain-text auth emails.
-Designed in the Mishwar brand (forest green `#1a3d2a`, gold `#c9a227`,
+Designed in the Mishwaro brand (forest green `#1a3d2a`, gold `#c9a227`,
 cream `#faf5e6`) with bulletproof email HTML — works in Gmail, Outlook,
 Apple Mail, Yahoo, and ProtonMail.
 
@@ -19,8 +19,8 @@ Apple Mail, Yahoo, and ProtonMail.
    signup")
 3. **Subject** field — set it manually (Supabase doesn't pull subject
    from the HTML body):
-   - Confirm signup:  `أكّد بريدك الإلكتروني — مِشوار`
-   - Reset password:  `إعادة تعيين كلمة المرور — مِشوار`
+   - Confirm signup:  `أكّد بريدك الإلكتروني — مشوارو`
+   - Reset password:  `إعادة تعيين كلمة المرور — مشوارو`
 4. **Message body** — open the corresponding `.html` file in this folder,
    copy the entire contents, paste into the body field
 5. Click **Save**

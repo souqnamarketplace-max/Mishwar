@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Validation & sanitization utilities for مِشوار
+// Validation & sanitization utilities for مشوارو
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── PHONE: accepts any valid international phone number (7–15 digits)
@@ -389,10 +389,10 @@ export function containsContactRequest(text) {
  */
 export function getContactViolation(text) {
   if (containsPhoneNumber(text)) {
-    return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. التواصل يتم عبر مِشوار فقط.";
+    return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. التواصل يتم عبر مشوارو فقط.";
   }
   if (containsContactRequest(text)) {
-    return "🚫 يُمنع طلب أو مشاركة معلومات التواصل الخارجية. استخدم مِشوار للتواصل مع السائقين والركاب.";
+    return "🚫 يُمنع طلب أو مشاركة معلومات التواصل الخارجية. استخدم مشوارو للتواصل مع السائقين والركاب.";
   }
   return null;
 }

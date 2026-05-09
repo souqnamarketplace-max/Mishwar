@@ -1,6 +1,6 @@
 # Mobile app (Capacitor) — runbook
 
-This document covers turning the مِشوار web app into native iOS and
+This document covers turning the مشوارو web app into native iOS and
 Android apps for App Store / Play Store submission. Capacitor is the
 chosen wrapper because it keeps the React/Vite SPA as the source of
 truth — the same code that runs at https://mishwar-nu.vercel.app is
@@ -80,7 +80,7 @@ links, push permissions) and want JS hot-reload from your laptop:
 | Setting | Value | Why |
 |---|---|---|
 | `appId` | `ps.mishwar.app` | Reverse-DNS bundle ID. Globally unique. **Cannot change post-launch.** |
-| `appName` | `مِشوار` | Display name |
+| `appName` | `مشوارو` | Display name |
 | `webDir` | `dist` | Output of `vite build` |
 | Splash background | `#1a3d2a` | Brand forest green |
 | Status bar style | `DARK` | Matches dark-on-cream UI |
@@ -191,7 +191,7 @@ if (Capacitor.isNativePlatform()) {
   AND add `App.addListener("appUrlOpen")` handlers.
 - **Stores' commission policy on rideshare** — Apple and Google both
   exempt physical-world transport (Uber, Lyft, BlaBlaCar pattern).
-  Mishwar is in the same category. The IAP rules apply to digital
+  Mishwaro is in the same category. The IAP rules apply to digital
   goods only — cash / Jawwal Pay / Reflect / bank transfers are fine.
 
 ## Related docs

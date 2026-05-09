@@ -1,4 +1,4 @@
-# Operations runbook — مِشوار
+# Operations runbook — مشوارو
 
 Audit findings closed by following this runbook: M-08 (backups), M-09 (alerting), and
 the incident-response side of M-10 (rate limiting).

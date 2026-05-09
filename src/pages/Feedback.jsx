@@ -28,7 +28,7 @@ const STATUS_CONFIG = {
 };
 
 export default function Feedback() {
-  useSEO({ title: "الاقتراحات والشكاوى", description: "شاركنا رأيك لتحسين مِشوار" });
+  useSEO({ title: "الاقتراحات والشكاوى", description: "شاركنا رأيك لتحسين مشوارو" });
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -83,7 +83,7 @@ export default function Feedback() {
           <MessageSquarePlus className="w-8 h-8 text-primary" />
         </div>
         <h1 className="text-2xl font-black text-foreground">اقتراحات وشكاوى</h1>
-        <p className="text-muted-foreground text-sm mt-1">رأيك يهمنا — ساعدنا في تحسين مِشوار</p>
+        <p className="text-muted-foreground text-sm mt-1">رأيك يهمنا — ساعدنا في تحسين مشوارو</p>
       </div>
 
       {/* Form */}

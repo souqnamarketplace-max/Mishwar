@@ -33,7 +33,7 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
         base44.entities.Notification.create({
           user_email: b.passenger_email,
           title: "اكتملت رحلتك! قيّم السائق ⭐",
-          message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مِشوارو!`,
+          message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مشواروو!`,
           type: "system", trip_id: trip.id, is_read: false,
         })
       ));

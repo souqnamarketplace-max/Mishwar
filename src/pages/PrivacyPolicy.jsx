@@ -23,7 +23,7 @@ function formatArabicMonthYear(iso) {
 }
 
 export default function PrivacyPolicy() {
-  useSEO({ title: "سياسة الخصوصية", description: "سياسة خصوصية وحماية البيانات في مِشوار" });
+  useSEO({ title: "سياسة الخصوصية", description: "سياسة خصوصية وحماية البيانات في مشوارو" });
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12" dir="rtl">

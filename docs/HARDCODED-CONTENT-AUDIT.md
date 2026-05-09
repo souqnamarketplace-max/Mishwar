@@ -1,4 +1,4 @@
-# Hardcoded content audit — مِشوار
+# Hardcoded content audit — مشوارو
 
 A sweep of every place in the app where hardcoded content stands in for
 what should be either real data, configurable settings, or honestly absent.
@@ -26,7 +26,7 @@ visitor sees these inflated numbers as fact.
 
 A. **Honest mode (recommended for launch):** show real numbers without
    fallback inflation. New app + small numbers is fine — say "نمنح
-   التنقل العادل لمجتمع مِشوار" without specific counts.
+   التنقل العادل لمجتمع مشوارو" without specific counts.
 
 B. **Hide stats until a real threshold:** if `users.length < 100`, don't
    render the StatsBar at all. The home page works without it.
@@ -60,7 +60,7 @@ B. **New `testimonials` table** + admin UI. Wire the carousel to
 **Fix options:**
 
 A. **List real founders/team only.** If you're solo, say "تم تطوير
-   مِشوار من قبل [your name]" and skip the fake team grid.
+   مشوارو من قبل [your name]" and skip the fake team grid.
 
 B. **Remove the team section.** AboutUs reads fine with just values +
    mission paragraphs.
@@ -71,7 +71,7 @@ C. **Move to `app_settings.team_members` JSON column** — admin-editable
 ### 4. Fake blog posts — `src/pages/Blog.jsx`
 
 **What's wrong:** lines 7-44 hardcode 4 fake blog posts dated 2024,
-including "مِشوار launches in Nablus — 50+ verified drivers" — a
+including "مشوارو launches in Nablus — 50+ verified drivers" — a
 specific factual claim that's almost certainly untrue today.
 
 **Fix options:**
@@ -112,7 +112,7 @@ on the hero. Same false-claim problem as StatsBar.
 
 **Fix:** Remove the badge until you have real users to count, OR pull
 from `app_settings`, OR change wording to a non-numeric claim
-("نخدم مجتمع مِشوار في فلسطين" — "we serve the Mishwar community
+("نخدم مجتمع مشوارو في فلسطين" — "we serve the Mishwaro community
 in Palestine").
 
 ### 8. Twitter handle — `index.html:107` + `index.html:65`

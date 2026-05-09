@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import EmptyState from "@/components/shared/EmptyState";
 
 export default function Community() {
-  useSEO({ title: "المجتمع", description: "مجتمع مِشوار من المسافرين والسائقين" });
+  useSEO({ title: "المجتمع", description: "مجتمع مشوارو من المسافرين والسائقين" });
 
   // Real DB queries — top drivers, popular routes, stats
   const { data: drivers = [] } = useQuery({
@@ -87,7 +87,7 @@ export default function Community() {
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
           <Users className="w-7 h-7 text-primary" />
         </div>
-        <h1 className="text-3xl font-bold text-foreground mb-2">مجتمع مِشوار</h1>
+        <h1 className="text-3xl font-bold text-foreground mb-2">مجتمع مشوارو</h1>
         <p className="text-muted-foreground">كل رحلة توصلك لأحبايك وتدعم مجتمعك</p>
       </div>
 

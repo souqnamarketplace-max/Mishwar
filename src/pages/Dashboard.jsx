@@ -277,7 +277,7 @@ const pageTitles = {
 };
 
 export default function Dashboard() {
-  useSEO({ title: "لوحة الإدارة", description: "لوحة إدارة منصة مِشوار" });
+  useSEO({ title: "لوحة الإدارة", description: "لوحة إدارة منصة مشوارو" });
   const { user, isLoadingAuth } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   // URL-driven tab state. Bookmarking /dashboard?tab=payments now lands

@@ -40,7 +40,7 @@ async function uploadToSupabase(file) {
 
 export default function Onboarding() {
   const qc = useQueryClient();
-  useSEO({ title: "إعداد الحساب", description: "أكمل إعداد حسابك في مِشوار" });
+  useSEO({ title: "إعداد الحساب", description: "أكمل إعداد حسابك في مشوارو" });
 
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
@@ -126,10 +126,10 @@ export default function Onboarding() {
 
       const isDriver = accountType === "driver" || accountType === "both";
       if (isDriver) {
-        toast.success("مرحباً بك في مِشوار! 🎉 أكمل رفع وثائقك من الإعدادات لتصبح سائقاً موثقاً");
+        toast.success("مرحباً بك في مشوارو! 🎉 أكمل رفع وثائقك من الإعدادات لتصبح سائقاً موثقاً");
         navigate("/settings", { replace: true });
       } else {
-        toast.success("مرحباً بك في مِشوار! 🎉");
+        toast.success("مرحباً بك في مشوارو! 🎉");
         navigate("/", { replace: true });
       }
     },
@@ -189,7 +189,7 @@ export default function Onboarding() {
           <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3">
             <img src="/logo.png" alt="مشوارو" className="w-12 h-12 rounded-xl object-cover" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">مرحباً في مِشوار</h1>
+          <h1 className="text-2xl font-bold text-foreground">مرحباً في مشوارو</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {user?.full_name ? `أهلاً ${user.full_name}،` : ""} لنكمل إعداد حسابك
           </p>
@@ -227,7 +227,7 @@ export default function Onboarding() {
           {step === 0 && (
             <motion.div key="step0" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="bg-card rounded-2xl border border-border p-6">
-                <h2 className="text-lg font-bold text-foreground mb-2">كيف ستستخدم مِشوار؟</h2>
+                <h2 className="text-lg font-bold text-foreground mb-2">كيف ستستخدم مشوارو؟</h2>
                 <p className="text-sm text-muted-foreground mb-6">يمكنك الاختيار كراكب أو سائق أو كليهما</p>
                 <div className="space-y-3">
                   {[

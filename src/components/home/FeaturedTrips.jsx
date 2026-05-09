@@ -54,7 +54,7 @@ function FeaturedCard({ trip, index }) {
     const url = `${window.location.origin}/trip/${trip.id}`;
     // url-only share — see TripCard.jsx for rationale (avoids text+url
     // fusion when shares are forwarded across platforms)
-    if (navigator.share) navigator.share({ title: "مِشوار", url }).catch(()=>{});
+    if (navigator.share) navigator.share({ title: "مشوارو", url }).catch(()=>{});
     else navigator.clipboard.writeText(url).catch(()=>{});
   };
 

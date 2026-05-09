@@ -175,7 +175,7 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
 export default function DriverDashboard() {
   const [reviewWizard, setReviewWizard] = useState(null); // { trip, passengers }
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
-  useSEO({ title: "لوحة السائق", description: "لوحة قيادة السائق في مِشوار" });
+  useSEO({ title: "لوحة السائق", description: "لوحة قيادة السائق في مشوارو" });
 
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "trips");

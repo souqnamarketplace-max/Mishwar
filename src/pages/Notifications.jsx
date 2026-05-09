@@ -23,7 +23,7 @@ const emptyForm = {
 };
 
 export default function Notifications() {
-  useSEO({ title: "الإشعارات", description: "إشعارات حسابك في مِشوار" });
+  useSEO({ title: "الإشعارات", description: "إشعارات حسابك في مشوارو" });
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);

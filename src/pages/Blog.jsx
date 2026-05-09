@@ -24,7 +24,7 @@ function formatArabicDate(iso) {
 }
 
 export default function Blog() {
-  useSEO({ title: "المدونة", description: "مقالات ونصائح من فريق مِشوار" });
+  useSEO({ title: "المدونة", description: "مقالات ونصائح من فريق مشوارو" });
 
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ["blog-posts-published"],
@@ -44,8 +44,8 @@ export default function Blog() {
       </Link>
 
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-foreground mb-2">مدونة مِشوار</h1>
-        <p className="text-muted-foreground">أخبار، نصائح، وقصص من مجتمع مِشوار</p>
+        <h1 className="text-3xl font-bold text-foreground mb-2">مدونة مشوارو</h1>
+        <p className="text-muted-foreground">أخبار، نصائح، وقصص من مجتمع مشوارو</p>
       </div>
 
       {!isLoading && posts.length === 0 && (

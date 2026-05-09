@@ -1,4 +1,4 @@
-# Post-deploy smoke test — مِشوار
+# Post-deploy smoke test — مشوارو
 
 A 5-10 minute click-through that verifies the most-broken-if-broken paths
 still work. Run after:

@@ -107,7 +107,7 @@ export default function DashboardSidebar({ activePage, setActivePage }) {
             <img src="/logo.png" alt="مشوارو" className="w-8 h-8 rounded-lg object-cover" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-sidebar-foreground">مِشوار</h1>
+            <h1 className="text-base font-bold text-sidebar-foreground">مشوارو</h1>
             <p className="text-[10px] text-sidebar-foreground/50">شارك الطريق، وفر أكثر</p>
           </div>
         </div>

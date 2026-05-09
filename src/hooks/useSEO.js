@@ -9,7 +9,7 @@ import { useEffect } from "react";
  */
 export function useSEO({ title, description, canonical, ogImage }) {
   useEffect(() => {
-    const fullTitle = title ? `${title} | مِشوار` : "مِشوار — شارك الطريق، وفر أكثر";
+    const fullTitle = title ? `${title} | مشوارو` : "مشوارو — شارك الطريق، وفر أكثر";
     document.title = fullTitle;
 
     // Update meta description
@@ -60,7 +60,7 @@ export function useSEO({ title, description, canonical, ogImage }) {
       let twDesc = document.querySelector('meta[name="twitter:description"]');
       if (twDesc) twDesc.setAttribute("content", description);
       let twTitle = document.querySelector('meta[name="twitter:title"]');
-      const ft = title ? `${title} | مِشوار` : "مِشوار — شارك الطريق، وفر أكثر";
+      const ft = title ? `${title} | مشوارو` : "مشوارو — شارك الطريق، وفر أكثر";
       if (twTitle) twTitle.setAttribute("content", ft);
     }
   }, [title, description, canonical, ogImage]);

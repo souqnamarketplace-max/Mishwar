@@ -49,7 +49,7 @@ const STEPS = [
 const TODAY_ISO = () => new Date().toISOString().split("T")[0];
 
 export default function BecomeDriver() {
-  useSEO({ title: "كن سائقاً في مِشوار", description: "تفعيل حساب السائق في 5 خطوات سهلة" });
+  useSEO({ title: "كن سائقاً في مشوارو", description: "تفعيل حساب السائق في 5 خطوات سهلة" });
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user, refreshUser } = useAuth();
@@ -381,7 +381,7 @@ function StepIntro({ existingLicense }) {
       <div className="w-20 h-20 rounded-3xl bg-primary/10 flex items-center justify-center mx-auto mb-4 text-4xl">
         🚗
       </div>
-      <h2 className="text-2xl font-black text-foreground mb-2">كن سائقاً في مِشوار</h2>
+      <h2 className="text-2xl font-black text-foreground mb-2">كن سائقاً في مشوارو</h2>
       <p className="text-sm text-muted-foreground mb-6 leading-relaxed max-w-md mx-auto">
         التحقق من الوثائق يستغرق 3-5 دقائق فقط. سنحتاج صور رخصتك ومستندات سيارتك وسيلفي للهوية.
       </p>

@@ -20,7 +20,7 @@ import { useSEO } from "@/hooks/useSEO";
  * Renders a master list when no section selected, or the selected section's content.
  */
 export default function AccountHub() {
-  useSEO({ title: "الحساب", description: "إدارة إعدادات حسابك في مِشوار" });
+  useSEO({ title: "الحساب", description: "إدارة إعدادات حسابك في مشوارو" });
   const auth = useAuth();
   const user = auth?.user;
   const refreshUser = auth?.refreshUser;
@@ -125,7 +125,7 @@ export default function AccountHub() {
               🚗
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-primary-foreground">كن سائقاً في مِشوار</p>
+              <p className="font-bold text-primary-foreground">كن سائقاً في مشوارو</p>
               <p className="text-xs text-primary-foreground/80 mt-0.5">اربح من مقاعدك الفارغة — التسجيل 5 دقائق</p>
             </div>
             <ChevronLeft className="w-4 h-4 text-primary-foreground/70 shrink-0" />
@@ -186,7 +186,7 @@ export default function AccountHub() {
       </div>
 
       <p className="text-xs text-muted-foreground text-center mt-6">
-        نسخة مِشوارو {import.meta.env?.VITE_APP_VERSION || "1.0"}
+        نسخة مشواروو {import.meta.env?.VITE_APP_VERSION || "1.0"}
       </p>
     </div>
   );

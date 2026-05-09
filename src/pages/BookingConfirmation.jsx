@@ -17,7 +17,7 @@ function paymentLabel(m) {
 }
 
 export default function BookingConfirmation() {
-  useSEO({ title: "تأكيد الحجز", description: "تم تأكيد حجزك بنجاح في مِشوار" });
+  useSEO({ title: "تأكيد الحجز", description: "تم تأكيد حجزك بنجاح في مشوارو" });
   const [searchParams] = useSearchParams();
   const tripId = searchParams.get("trip");
 
@@ -206,7 +206,7 @@ export default function BookingConfirmation() {
 
         <div className="p-2.5 bg-muted/50 rounded-lg">
           <p className="text-[11px] text-muted-foreground text-center">
-            المبلغ يذهب مباشرة للسائق — مِشوار تأخذ عمولتها من السائق
+            المبلغ يذهب مباشرة للسائق — مشوارو تأخذ عمولتها من السائق
           </p>
         </div>
       </div>

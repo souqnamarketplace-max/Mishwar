@@ -157,7 +157,7 @@ export default function TripDetails() {
     : "تفاصيل الرحلة";
   const seoDescription = trip
     ? `احجز مقعدك في رحلة ${trip.from_city} ← ${trip.to_city} بسعر ${trip.price} شيكل. ${trip.available_seats || 0} مقاعد متاحة.`
-    : "تفاصيل الرحلة في مِشوار";
+    : "تفاصيل الرحلة في مشوارو";
   const seoCanonical = trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined;
   useSEO({ title: seoTitle, description: seoDescription, canonical: seoCanonical });
 

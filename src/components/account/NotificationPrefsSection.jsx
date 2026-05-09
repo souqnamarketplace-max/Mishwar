@@ -80,7 +80,7 @@ export default function NotificationPrefsSection({ user, onSaved }) {
           why they aren't getting messages they never could have received. */}
       <Toggle checked={sms} onChange={setSms} icon={MessageSquare} title="الرسائل النصية SMS" desc="للحجوزات الجديدة والإلغاءات فقط" comingSoon />
       <Toggle checked={email} onChange={setEmail} icon={Mail} title="البريد الإلكتروني" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" comingSoon />
-      <Toggle checked={marketing} onChange={setMarketing} icon={Megaphone} title="العروض والتسويق" desc="عروض خاصة، ميزات جديدة، أخبار مِشوارو" />
+      <Toggle checked={marketing} onChange={setMarketing} icon={Megaphone} title="العروض والتسويق" desc="عروض خاصة، ميزات جديدة، أخبار مشواروو" />
 
       <Button onClick={save} disabled={saving} className="w-full rounded-xl bg-primary text-primary-foreground mt-4">
         {saving ? "جاري الحفظ..." : "تأكيد"}

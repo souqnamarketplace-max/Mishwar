@@ -345,7 +345,7 @@ function TestimonialEditor({ value, onChange, onSave, onCancel, saving }) {
         <label className="text-xs text-muted-foreground mb-1 block">نص الرأي *</label>
         <textarea value={value.text || ""} onChange={(e) => set("text", e.target.value)}
           rows={3} maxLength={600}
-          placeholder="ما رأيه/ها في مِشوار..."
+          placeholder="ما رأيه/ها في مشوارو..."
           className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none" />
         <p className="text-[11px] text-muted-foreground mt-1">{(value.text || "").length}/600 — يجب أن يكون رأياً حقيقياً وموافقاً عليه من المستخدم</p>
       </div>

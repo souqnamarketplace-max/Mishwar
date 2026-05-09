@@ -13,7 +13,7 @@ import { supabase, setRememberMe, getRememberMe } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
 
 export default function Login() {
-  useSEO({ title: "تسجيل الدخول", description: "سجل دخولك إلى حسابك في مِشوار" });
+  useSEO({ title: "تسجيل الدخول", description: "سجل دخولك إلى حسابك في مشوارو" });
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -317,7 +317,7 @@ export default function Login() {
           <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <Car className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">مِشوار</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">مشوارو</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">منصة مشاركة الرحلات</p>
         </div>
 
@@ -340,7 +340,7 @@ export default function Login() {
                   اختر كلمة مرور جديدة
                 </h3>
                 <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  اكتب كلمة المرور الجديدة لحسابك في مِشوار. ستستخدمها لتسجيل الدخول من الآن.
+                  اكتب كلمة المرور الجديدة لحسابك في مشوارو. ستستخدمها لتسجيل الدخول من الآن.
                 </p>
               </div>
               <form onSubmit={handleUpdatePassword} className="space-y-4">

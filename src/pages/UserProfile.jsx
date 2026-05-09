@@ -35,7 +35,7 @@ function formatJoinedDate(dateStr) {
 }
 
 export default function UserProfile() {
-  useSEO({ title: "الملف الشخصي", description: "الملف الشخصي للمستخدم في مِشوار" });
+  useSEO({ title: "الملف الشخصي", description: "الملف الشخصي للمستخدم في مشوارو" });
 
   const [searchParams] = useSearchParams();
   const email = searchParams.get("email");

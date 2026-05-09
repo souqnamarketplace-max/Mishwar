@@ -41,7 +41,7 @@ function share(e, id) {
   e.preventDefault(); e.stopPropagation();
   const url = `${window.location.origin}/trip/${id}`;
   if (navigator.share) {
-    navigator.share({ title: "مِشوار", url }).catch(() => {});
+    navigator.share({ title: "مشوارو", url }).catch(() => {});
   } else {
     navigator.clipboard.writeText(url)
       .then(() => import("sonner").then(m => m.toast.success("تم نسخ رابط الرحلة! 📋")))

@@ -1,6 +1,6 @@
 /**
  * mapUtils.js
- * Geocoding + routing utilities for Mishwar
+ * Geocoding + routing utilities for Mishwaro
  *
  * - Static lat/lng table for all West Bank cities (fast, no API call)
  * - Nominatim fallback for unlisted cities

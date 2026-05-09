@@ -183,8 +183,8 @@ export default function DashboardSubscriptions() {
           user_email: row.driver_email,
           title: "تم تفعيل اشتراكك ✅",
           message: endDateStr
-            ? `تم تفعيل اشتراكك في مِشوار. الاشتراك ساري حتى ${endDateStr}.`
-            : "تم تفعيل اشتراكك في مِشوار.",
+            ? `تم تفعيل اشتراكك في مشوارو. الاشتراك ساري حتى ${endDateStr}.`
+            : "تم تفعيل اشتراكك في مشوارو.",
           type: "system",
           is_read: false,
         });
@@ -262,7 +262,7 @@ export default function DashboardSubscriptions() {
         await base44.entities.Notification.create({
           user_email: email,
           title: "تم منحك اشتراكاً مجانياً 🎁",
-          message: `قامت إدارة مِشوار بتفعيل اشتراك مجاني لك لمدة ${days} يوماً.${note ? " السبب: " + note : ""}`,
+          message: `قامت إدارة مشوارو بتفعيل اشتراك مجاني لك لمدة ${days} يوماً.${note ? " السبب: " + note : ""}`,
           type: "system",
           is_read: false,
         });
@@ -286,7 +286,7 @@ export default function DashboardSubscriptions() {
     mutationFn: async ({ days, note }) => {
       const { data, error } = await supabase.rpc("bulk_grant_grace_to_unsubscribed_drivers", {
         p_days: days,
-        p_note: note || "فترة سماح من إدارة مِشوار",
+        p_note: note || "فترة سماح من إدارة مشوارو",
       });
       if (error) throw error;
       await logAdminAction("subscription_bulk_granted", "driver_subscription", null, {
@@ -754,7 +754,7 @@ function GrantSingleModal({ onClose, onSubmit, submitting }) {
 // ─── Bulk grace grant — to all current drivers without active subs ───────
 function GrantBulkModal({ onClose, onSubmit, submitting }) {
   const [days, setDays] = useState(30);
-  const [note, setNote] = useState("فترة سماح من إدارة مِشوار");
+  const [note, setNote] = useState("فترة سماح من إدارة مشوارو");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>

@@ -320,7 +320,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   // a mobile passenger has no obvious in-app path into
                   // the upgrade wizard from the side drawer.
                   ...(user && user.account_type === "passenger"
-                    ? [{ icon: Car, label: "كن سائقاً في مِشوار", path: "/become-driver" }]
+                    ? [{ icon: Car, label: "كن سائقاً في مشوارو", path: "/become-driver" }]
                     : []
                   ),
                   // Safety / moderation entries — without these, mobile users
@@ -380,14 +380,14 @@ export default function MobileLayout({ children, user, showHeader = true, header
               <div className="py-2">
                 <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">معلومات</p>
                 {[
-                  { icon: BookOpen,        label: "كيف يعمل مِشوار",    path: "/how-it-works" },
-                { icon: Users,             label: "مجتمع مِشوارو",      path: "/community" },
+                  { icon: BookOpen,        label: "كيف يعمل مشوارو",    path: "/how-it-works" },
+                { icon: Users,             label: "مجتمع مشواروو",      path: "/community" },
                 { icon: Bell,           label: "إشعاراتي ومساراتي",  path: "/notifications" },
                 { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
                 { icon: HelpCircle,     label: "المساعدة",            path: "/help" },
                 { icon: Shield,         label: "الخصوصية والأمان",    path: "/privacy" },
                 { icon: FileText,       label: "الشروط والأحكام",     path: "/terms" },
-                { icon: Info,           label: "عن مِشوار",            path: "/about" },
+                { icon: Info,           label: "عن مشوارو",            path: "/about" },
                 ].map(({ icon: Icon, label, path }) => (
                   <Link
                     key={path}

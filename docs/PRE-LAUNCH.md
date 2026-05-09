@@ -1,4 +1,4 @@
-# Pre-launch tracker — مِشوار
+# Pre-launch tracker — مشوارو
 
 Live status of every audit finding from
 [`docs/audits/2026-05-05-pre-launch-audit.md`](audits/2026-05-05-pre-launch-audit.md).

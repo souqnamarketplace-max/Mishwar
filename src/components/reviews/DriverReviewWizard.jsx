@@ -260,9 +260,9 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
             <div className="text-center py-6">
               <div className="text-5xl mb-4">🙌</div>
               <h2 className="text-2xl font-bold text-foreground mb-2">شكراً لك!</h2>
-              <p className="text-muted-foreground mb-6">تقييماتك تساعد في بناء مجتمع مِشوارو وتجعل التجربة أفضل للجميع</p>
+              <p className="text-muted-foreground mb-6">تقييماتك تساعد في بناء مجتمع مشواروو وتجعل التجربة أفضل للجميع</p>
               <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-6">
-                <p className="text-sm text-primary font-medium">💚 شارك مِشوارو مع أصدقائك في فلسطين</p>
+                <p className="text-sm text-primary font-medium">💚 شارك مشواروو مع أصدقائك في فلسطين</p>
                 <p className="text-xs text-muted-foreground mt-1">كل مشارك يساعد في نمو شبكة التنقل الفلسطينية</p>
               </div>
               <Button onClick={onClose} className="w-full rounded-xl bg-primary text-primary-foreground">

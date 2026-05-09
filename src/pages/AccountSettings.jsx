@@ -722,7 +722,7 @@ export default function AccountSettings() {
                   🚗
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-foreground text-base">كن سائقاً في مِشوار</h3>
+                  <h3 className="font-bold text-foreground text-base">كن سائقاً في مشوارو</h3>
                   <p className="text-xs text-muted-foreground mt-0.5">5 خطوات سهلة • 3-5 دقائق</p>
                 </div>
                 <Shield className="w-5 h-5 text-primary shrink-0" />
