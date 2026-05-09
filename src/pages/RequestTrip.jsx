@@ -105,59 +105,10 @@ export default function RequestTrip() {
     return null;
   }
 
-  // ID verification gate — render a "verify first" panel instead of the
-  // form when the user isn't approved yet. Admin role auto-passes via
-  // is_passenger_verified RPC.
-  if (!verifyLoading && isVerified === false) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="w-4 h-4 rotate-180" />
-          رجوع
-        </Link>
-
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-6 mb-5">
-          <div className="flex items-center gap-3 mb-3">
-            <ShieldCheck className="w-7 h-7" />
-            <h1 className="text-2xl font-bold">يتطلب توثيق الهوية</h1>
-          </div>
-          <p className="text-sm leading-relaxed opacity-95">
-            لحماية السائقين والمنصة من الطلبات المُسيئة، نطلب توثيق هويتك مرة
-            واحدة قبل أول طلب رحلة. التوثيق سريع وبياناتك تبقى خاصة لا تظهر
-            لأي مستخدم آخر.
-          </p>
-        </div>
-
-        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-          <h3 className="font-bold text-foreground">ما تحتاجه:</h3>
-          <ul className="space-y-2 text-sm text-foreground/80">
-            <li className="flex items-start gap-2">
-              <span className="text-primary shrink-0">✓</span>
-              صورة واضحة لهويتك (الوجه الأمامي)
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary shrink-0">✓</span>
-              صورة شخصية لك مع الهوية في يدك
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary shrink-0">✓</span>
-              الاسم الرباعي كما يظهر على الهوية
-            </li>
-          </ul>
-          <p className="text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/60">
-            🔒 الصور مخزنة في خوادم خاصة. الإدارة فقط تراها للمراجعة لمدة قصيرة،
-            ولا تظهر لأي مستخدم آخر إطلاقاً.
-          </p>
-          <Link to="/verify-passenger">
-            <Button className="w-full h-12 text-base font-bold gap-2">
-              <ShieldCheck className="w-5 h-5" />
-              ابدأ التوثيق الآن
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // ID verification gate is enforced AFTER all hooks (below) — placing
+  // it here would change hook count between renders and crash React
+  // (rules-of-hooks). The gate JSX is rendered just before the form's
+  // own return statement.
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -215,6 +166,60 @@ export default function RequestTrip() {
 
   const canSubmit = issues.length === 0 && !submit.isPending && activeCount < 3;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // ─── ID verification gate (rendered AFTER all hooks to keep hook
+  // order stable across renders — earlier placement violated rules-
+  // of-hooks and crashed when verification status flipped to false).
+  if (!verifyLoading && isVerified === false) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
+        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+          <ArrowLeft className="w-4 h-4 rotate-180" />
+          رجوع
+        </Link>
+
+        <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-6 mb-5">
+          <div className="flex items-center gap-3 mb-3">
+            <ShieldCheck className="w-7 h-7" />
+            <h1 className="text-2xl font-bold">يتطلب توثيق الهوية</h1>
+          </div>
+          <p className="text-sm leading-relaxed opacity-95">
+            لحماية السائقين والمنصة من الطلبات المُسيئة، نطلب توثيق هويتك مرة
+            واحدة قبل أول طلب رحلة. التوثيق سريع وبياناتك تبقى خاصة لا تظهر
+            لأي مستخدم آخر.
+          </p>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+          <h3 className="font-bold text-foreground">ما تحتاجه:</h3>
+          <ul className="space-y-2 text-sm text-foreground/80">
+            <li className="flex items-start gap-2">
+              <span className="text-primary shrink-0">✓</span>
+              صورة واضحة لهويتك (الوجه الأمامي)
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary shrink-0">✓</span>
+              صورة شخصية لك مع الهوية في يدك
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary shrink-0">✓</span>
+              الاسم الرباعي كما يظهر على الهوية
+            </li>
+          </ul>
+          <p className="text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/60">
+            🔒 الصور مخزنة في خوادم خاصة. الإدارة فقط تراها للمراجعة لمدة قصيرة،
+            ولا تظهر لأي مستخدم آخر إطلاقاً.
+          </p>
+          <Link to="/verify-passenger">
+            <Button className="w-full h-12 text-base font-bold gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              ابدأ التوثيق الآن
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
