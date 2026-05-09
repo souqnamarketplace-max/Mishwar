@@ -84,7 +84,18 @@ CREATE INDEX IF NOT EXISTS trip_requests_route_idx
 CREATE INDEX IF NOT EXISTS trip_requests_expiry_idx
   ON public.trip_requests (expires_at) WHERE status = 'open';
 
--- updated_at trigger (reuses set_updated_at from earlier migrations)
+-- updated_at trigger (creates set_updated_at helper defensively if it
+-- doesn't already exist — earlier migrations referenced it but never
+-- defined it, so fresh DBs that apply 019 first would fail without this)
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END $$;
+
 DO $$ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_trigger WHERE tgname = 'trip_requests_set_updated_at'
