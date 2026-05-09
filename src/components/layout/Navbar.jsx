@@ -94,7 +94,27 @@ export default function Navbar() {
                   </Button>
                 </Link>
               </>
-            ) : null}
+            ) : (
+              // Anonymous visitors: surface auth CTAs in the top nav.
+              // Without these, a first-time visitor's only login path was
+              // the burger-menu (mobile) or profile dropdown (desktop) —
+              // both of which are invisible until you know they exist.
+              // The "إنشاء حساب" pill is shown on every viewport so it's
+              // visible on the cramped mobile nav too. "تسجيل الدخول" is
+              // a secondary text link, hidden on the narrowest screens
+              // to keep the bell + burger reachable. Login route uses
+              // ?signup=1 to land directly on the signup tab.
+              <>
+                <Link to="/login" className="hidden sm:inline-flex text-sm font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg transition-colors">
+                  تسجيل الدخول
+                </Link>
+                <Link to="/login?signup=1">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl px-3 sm:px-4">
+                    إنشاء حساب
+                  </Button>
+                </Link>
+              </>
+            )}
             <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>

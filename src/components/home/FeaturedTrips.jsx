@@ -199,9 +199,43 @@ export default function FeaturedTrips() {
 
   const blockedSet = useBlockedEmails();
   const trips = useMemo(
-    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email")
-            .filter((t) => !isTripExpired(t))
-            .slice(0, 4),
+    () => {
+      const filtered = filterByBlocks(trips_unfiltered, blockedSet, "driver_email")
+        .filter((t) => !isTripExpired(t));
+
+      // De-dup by (from_city, to_city, date). Live data has shown a single
+      // driver posting the same route 6+ times for the same day, which used
+      // to fill every visible card on the home page with one route from one
+      // person — making the section look repetitive and the marketplace look
+      // empty. Group by route+day, keep the trip with the most available
+      // seats (most useful to a passenger landing on the home page); on a
+      // tie, keep the first one we saw — since the supabase query returns
+      // newest-first, that means the most recently posted wins. We let the
+      // SQL return up to 20 rows (unchanged) so we have a healthy pool to
+      // de-dup from, then cap the post-dedup result at 6 — the card grid
+      // below still slices to the first 3 for display.
+      const seen = new Map();
+      for (const t of filtered) {
+        const key = `${t.from_city}|${t.to_city}|${t.date}`;
+        const cur = seen.get(key);
+        if (!cur || (t.available_seats || 0) > (cur.available_seats || 0)) {
+          seen.set(key, t);
+        }
+      }
+      // Preserve original (newest-first) ordering: walk `filtered` again
+      // and emit each route's representative the first time we encounter
+      // it. Without this the iteration order would be Map insertion order,
+      // which still works but is fragile if seat-tie replacement re-inserts.
+      const emitted = new Set();
+      const deduped = [];
+      for (const t of filtered) {
+        const key = `${t.from_city}|${t.to_city}|${t.date}`;
+        if (emitted.has(key)) continue;
+        emitted.add(key);
+        deduped.push(seen.get(key));
+      }
+      return deduped.slice(0, 6);
+    },
     [trips_unfiltered, blockedSet]
   );
 

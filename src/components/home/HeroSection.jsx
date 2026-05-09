@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, Star, Calendar, ArrowLeftRight } from "lucide-react";
+import { Search, Star, ArrowLeftRight } from "lucide-react";
 import { motion } from "framer-motion";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
+import DateInput from "@/components/shared/DateInput";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
@@ -133,9 +134,16 @@ export default function HeroSection() {
           <CityAutocomplete value={to} onChange={setTo} placeholder="إلى أين؟" iconColor="accent" />
         </div>
         <div className="relative bg-muted/30 rounded-xl">
-          <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-          <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)}
-            className="w-full h-12 pr-10 pl-3 rounded-xl bg-transparent border-0 text-sm text-foreground focus:outline-none cursor-pointer" />
+          {/* DateInput renders an Arabic placeholder ("اختر التاريخ") and the
+              picked date in Arabic-formatted Gregorian. The native picker is
+              hidden behind it, so the literal yyyy-mm-dd text browsers leak
+              before selection never appears. Previously this was a raw
+              <input type="date">, which on iOS Safari and most Android
+              browsers shows the placeholder format text — looks like a
+              dev artifact on first impression. The padding is on DateInput
+              itself rather than the wrapper so the entire pill (not just
+              the text) is a click target for the picker. */}
+          <DateInput value={date} onChange={(e) => setDate(e.target.value)} min={today} className="w-full h-12 px-3" />
         </div>
         <Button type="submit" disabled={!from && !to}
           className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold gap-2 text-sm disabled:opacity-50 active:scale-95 transition-all">

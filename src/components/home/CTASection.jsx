@@ -1,9 +1,19 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Search, Car, ArrowLeft } from "lucide-react";
+import { Search, Car, Plus } from "lucide-react";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function CTASection() {
+  const { user } = useAuth();
+  // Drivers and "both" accounts post trips; everyone else (passengers and
+  // anonymous visitors) requests them. The previous version hard-coded
+  // "أنشر رحلتك" for everyone — passengers and visitors clicking the
+  // bottom-CTA landed on /create-trip, which is a driver-only page.
+  // Pattern matches the role detection used in RequestsTeaser.jsx and
+  // the navbar primary CTA.
+  const isDriver = user?.account_type === "driver" || user?.account_type === "both";
+
   return (
     <section className="py-14 md:py-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -32,12 +42,21 @@ export default function CTASection() {
                   احجز رحلة الآن
                 </Button>
               </Link>
-              <Link to="/create-trip">
-                <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 rounded-xl px-8 gap-2 font-bold text-base h-12 bg-white/5">
-                  <Car className="w-4 h-4" />
-                  أنشر رحلتك
-                </Button>
-              </Link>
+              {isDriver ? (
+                <Link to="/create-trip">
+                  <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 rounded-xl px-8 gap-2 font-bold text-base h-12 bg-white/5">
+                    <Car className="w-4 h-4" />
+                    أنشر رحلتك
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/request-trip">
+                  <Button size="lg" variant="outline" className="border-white/40 text-white hover:bg-white/10 rounded-xl px-8 gap-2 font-bold text-base h-12 bg-white/5">
+                    <Plus className="w-4 h-4" />
+                    اطلب رحلتك
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
