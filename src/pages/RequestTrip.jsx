@@ -296,7 +296,7 @@ export default function RequestTrip() {
           </Label>
           <DateInput
             value={form.requested_date}
-            onChange={(v) => set("requested_date", v)}
+            onChange={(e) => set("requested_date", e.target.value)}
             min={todayISO()}
           />
         </div>

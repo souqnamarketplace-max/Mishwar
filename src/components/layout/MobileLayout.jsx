@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet, Inbox } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { base44 } from "@/api/base44Client";
@@ -350,6 +350,16 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   // the upgrade wizard from the side drawer.
                   ...(user && user.account_type === "passenger"
                     ? [{ icon: Car, label: "كن سائقاً في مشوارو", path: "/become-driver" }]
+                    : []
+                  ),
+                  // Trip-requests feature surfaces — without these, users
+                  // had no in-app path from the mobile drawer to manage
+                  // their requests (passenger) or browse them (driver).
+                  // The center FAB shows a chooser but doesn't surface
+                  // ongoing/historical lists.
+                  { icon: Inbox, label: "طلباتي",       path: "/my-requests" },
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                    ? [{ icon: Inbox, label: "طلبات الركاب", path: "/passenger-requests" }]
                     : []
                   ),
                   // Safety / moderation entries — without these, mobile users
