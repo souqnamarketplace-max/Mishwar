@@ -148,7 +148,13 @@ export default async function handler(req, res) {
     ].filter(Boolean).join(" · ");
 
     const ogImage = `${APP_URL}/og-trip-placeholder.png`; // static placeholder
-    const tripUrl = `${APP_URL}/trip/${id}`;
+    // tripUrl uses the original URL form (UUID or slug) the visitor hit.
+    // For canonical SEO consolidation the rendered <link rel="canonical">
+    // and <meta property="og:url"> always point to whatever was in the
+    // URL — the React app handles the silent redirect to slug form
+    // client-side after hydration. Using the request param avoids
+    // building a slug server-side (we don't have the slug helper here).
+    const tripUrl = `${APP_URL}/trip/${rawId}`;
 
     // Inject title
     html = html.replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`);
