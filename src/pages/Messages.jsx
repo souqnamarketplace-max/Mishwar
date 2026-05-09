@@ -253,13 +253,16 @@ export default function Messages() {
       const otherEmail = msg.sender_email === user?.email ? msg.receiver_email : msg.sender_email;
       const otherName  = msg.sender_email === user?.email ? msg.receiver_name : msg.sender_name;
       if (!otherEmail) continue;
-      // Per-trip grouping: when a message has trip_id, key by trip+emailPair so
-      // trip A and trip B between the same two users render as separate threads.
-      // Falls back to conversation_id (legacy) then email (oldest legacy).
+      // Per-trip / per-request grouping: when a message has trip_id OR request_id,
+      // key by that-id+emailPair so trip A vs trip B vs request X between the
+      // same two users render as separate threads. Falls back to conversation_id
+      // (legacy) then email (oldest legacy).
       const emailPairKey = [user?.email || "", otherEmail].sort().join("__");
       const key = msg.trip_id
         ? `trip_${msg.trip_id}__${emailPairKey}`
-        : (msg.conversation_id || otherEmail);
+        : (msg.request_id
+          ? `request_${msg.request_id}__${emailPairKey}`
+          : (msg.conversation_id || otherEmail));
       if (!groups.has(key)) {
         groups.set(key, {
           id: key,
@@ -461,14 +464,29 @@ export default function Messages() {
       const cleaned = sanitizeText(text).slice(0, 5000);
       const violation = getContactViolation(cleaned);
       if (violation) { toast.error(violation, { duration: 5000 }); return; }
-      // Per-trip conversation IDs: a passenger booking 2 different trips with the
-      // same driver gets 2 separate threads. Falls back to email-pair if no trip context.
+      // Per-trip / per-request conversation IDs: a passenger booking 2 different
+      // trips with the same driver gets 2 separate threads. Trip-request
+      // conversations get their OWN thread too — request_id and trip_id are
+      // mutually exclusive in practice. Falls back to email-pair if neither.
       // Use the active conv's trip context, NOT the stale URL paramTrip.
       // getTripIdForConv() already falls back to paramTrip when conv.id === '__new__'.
       const tripIdToPersist = getTripIdForConv(activeConv);
+      // request_id is persisted ONLY when there's no trip context — they're
+      // alternates, not stackable. paramRequest takes effect on the first
+      // message (activeConv.id === '__new__' from /messages?...&request=X)
+      // and then follow-ups inherit via the stored column.
+      const lastRequestId = activeConv.messages
+        ?.slice().reverse().find(m => m.request_id)?.request_id || null;
+      const requestIdToPersist = !tripIdToPersist
+        ? (lastRequestId || (activeConv.id === "__new__" ? paramRequest : null))
+        : null;
       const emailPair = [user.email, activeConv.otherEmail].sort().join("__");
       const convId = activeConv.id === "__new__"
-        ? (tripIdToPersist ? `trip_${tripIdToPersist}__${emailPair}` : emailPair)
+        ? (tripIdToPersist
+            ? `trip_${tripIdToPersist}__${emailPair}`
+            : (requestIdToPersist
+                ? `request_${requestIdToPersist}__${emailPair}`
+                : emailPair))
         : activeConv.id;
       const { error: msgErr } = await supabase.from("messages").insert({
         conversation_id: convId,
@@ -480,27 +498,25 @@ export default function Messages() {
         is_read:        false,
         message_type:   "text",
         trip_id:        tripIdToPersist || null,
+        request_id:     requestIdToPersist,
       });
       if (msgErr) { console.error("Message insert error:", msgErr); throw new Error(msgErr.message); }
 
-      // ─── Trip-request notification (added with feature commits) ───
+      // ─── Trip-request notification (audit-fixed in commit ?) ───
       // When a driver sends their first message about a passenger trip
       // request, the passenger gets a notification "سائق مهتم برحلتك".
       // Conditions:
       //   - paramRequest is present (driver navigated from /passenger-requests)
-      //   - We're sending TO the passenger (not them sending to driver)
       //   - This is the first message in the thread for this request
+      // Uses the SECURITY DEFINER RPC notify_request_contact (migration 021)
+      // which substitutes for the RLS path the driver doesn't have — they
+      // can't INSERT into notifications.user_email != caller's email under
+      // notifications_insert policy. The RPC validates the request exists,
+      // refuses self-contact, and respects block-pair.
       // Best-effort: failures don't block the message send.
       if (paramRequest && activeConv.id === "__new__") {
         try {
-          await base44.entities.Notification.create({
-            user_email: activeConv.otherEmail,
-            title:      "سائق مهتم برحلتك! 🚗",
-            message:    `${user.full_name || user.email.split("@")[0]} يريد التواصل بشأن طلب الرحلة الذي نشرته. اضغط لفتح المحادثة.`,
-            type:       "request_contact",
-            is_read:    false,
-            link:       `/messages?to=${encodeURIComponent(user.email)}&request=${paramRequest}`,
-          });
+          await supabase.rpc("notify_request_contact", { p_request_id: paramRequest });
         } catch (e) { console.warn("Request-contact notification failed:", e); }
       }
 

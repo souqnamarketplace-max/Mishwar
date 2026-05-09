@@ -59,6 +59,7 @@ export default function SuggestCityModal({ initialName, onClose }) {
         await notifyAdmin({
           title: "🗺️ اقتراح مدينة جديدة",
           message: `اقترح مستخدم إضافة "${cleanName}"${notes.trim() ? ` — ${notes.trim().slice(0, 120)}` : ""}`,
+          link: "/dashboard?tab=cities",
         });
         setStage("success");
       }

@@ -116,6 +116,7 @@ export default function Onboarding() {
         await notifyAdmin({
           title: "🪪 طلب تحقق من رخصة قيادة",
           message: `${user?.full_name || user?.email} قدّم طلب للتحقق من رخصة القيادة`,
+          link: "/dashboard?tab=licenses",
         });
       }
     },

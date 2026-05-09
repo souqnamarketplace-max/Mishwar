@@ -128,6 +128,7 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
       await notifyAdmin({
         title: "🚩 بلاغ جديد من مستخدم",
         message: `${user.full_name || user.email} قدّم بلاغاً ضد ${targetEmail}. السبب: ${data.category}`,
+        link: "/dashboard?tab=reports",
       });
 
       // 4) Audit-trail entry on the report submission itself. The admin

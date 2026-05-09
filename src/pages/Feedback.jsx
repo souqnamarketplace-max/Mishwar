@@ -64,6 +64,7 @@ export default function Feedback() {
       await notifyAdmin({
         title: `${titleEmoji} ${typeLabel} جديد${type === "complaint" ? "ة" : ""} من ${user?.full_name || "مستخدم"}`,
         message: (subject || message).slice(0, 200),
+        link: "/dashboard?tab=feedback",
       });
       return ticket;
     },

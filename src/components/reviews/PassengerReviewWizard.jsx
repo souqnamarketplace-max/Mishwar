@@ -78,6 +78,7 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
           title: `⚠️ تقييم منخفض (${rating}/5) للسائق`,
           message: `${passengerUser?.full_name || "راكب"} قيّم السائق بـ ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${publicReview ? ` — "${publicReview.slice(0, 100)}"` : ""}`,
           trip_id: trip.id,
+          link: "/dashboard?tab=reviews",
         });
       }
       setStep(5);

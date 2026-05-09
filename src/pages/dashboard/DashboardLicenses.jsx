@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { resolveDocumentUrls } from "@/lib/licenseUrls";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -48,9 +49,30 @@ export default function DashboardLicenses() {
     }).then(urls => { if (!cancelled) setResolvedUrls(urls); });
     return () => { cancelled = true; };
   }, [selectedLicense?.id]);
+  // CRITICAL: must use supabase client directly here, NOT base44.entities.DriverLicense.paginate.
+  // The base44 SDK auto-injects a `created_by = auth.email()` filter on every
+  // entity read, which means the admin only sees licenses they themselves
+  // created (zero — admin isn't a driver). The result was an empty list
+  // even though the table held real data, blocking the entire driver
+  // verification workflow. Direct supabase respects RLS instead, and
+  // driver_licenses RLS already permits admins to read every row.
   const { data: licensesData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["licenses", page],
-    queryFn: () => base44.entities.DriverLicense.paginate({ page, pageSize: PAGE_SIZE, sort: "-created_date" }),
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      const { data, error, count } = await supabase
+        .from("driver_licenses")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
   });
   const licenses = licensesData.rows;
   const totalPages = licensesData.totalPages;
@@ -58,21 +80,34 @@ export default function DashboardLicenses() {
   const approveMutation = useMutation({
     mutationFn: async (licenseId) => {
       const license = licenses.find((l) => l.id === licenseId);
-      await base44.entities.DriverLicense.update(licenseId, {
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        approved_by: "admin",
-      });
-      // Notify driver
-      await base44.entities.Notification.create({
-        user_email: license.driver_email,
-        title: "تم توثيق حسابك ✓",
-        message: `تم التحقق من جميع وثائقك. يمكنك الآن نشر الرحلات بصفة سائق موثّق.`,
-        type: "system",
-        is_read: false,
-      });
+      // Use supabase directly: base44.entities.X.update can fail when admin
+      // didn't create the row originally (created_by mismatch).
+      const { error: updErr } = await supabase
+        .from("driver_licenses")
+        .update({
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          approved_by: "admin",
+        })
+        .eq("id", licenseId);
+      if (updErr) throw updErr;
+      // Notify driver — use supabase direct (admin RLS path) so the bell
+      // entry gets written and tappable. Includes link straight to driver
+      // dashboard so the driver can immediately start posting trips.
+      const { error: notifErr } = await supabase
+        .from("notifications")
+        .insert({
+          user_email: license.driver_email,
+          title: "تم توثيق حسابك ✓",
+          message: "تم التحقق من جميع وثائقك. يمكنك الآن نشر الرحلات بصفة سائق موثّق.",
+          type: "license_approved",
+          is_read: false,
+          link: "/driver",
+        });
+      if (notifErr) console.warn("notif insert error:", notifErr); // non-fatal
     },
     onSuccess: (_, licenseId) => {
+      qc.invalidateQueries({ queryKey: ["licenses"] });
       qc.invalidateQueries({ queryKey: ["all-licenses"] });
       qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("✓ تم توثيق السائق");
@@ -82,26 +117,36 @@ export default function DashboardLicenses() {
       });
       setSelectedLicense(null);
     },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   const rejectMutation = useMutation({
     mutationFn: async (licenseId) => {
       const license = licenses.find((l) => l.id === licenseId);
       const reason = rejectionReason || "لم يتم توفير سبب";
-      await base44.entities.DriverLicense.update(licenseId, {
-        status: "rejected",
-        rejection_reason: reason,
-      });
-      // Notify driver
-      await base44.entities.Notification.create({
-        user_email: license.driver_email,
-        title: "لم يتم توثيق حسابك ✗",
-        message: `لم يتم التحقق من وثائقك. السبب: ${reason}. يمكنك إعادة الرفع من صفحة الإعدادات.`,
-        type: "system",
-        is_read: false,
-      });
+      const { error: updErr } = await supabase
+        .from("driver_licenses")
+        .update({
+          status: "rejected",
+          rejection_reason: reason,
+        })
+        .eq("id", licenseId);
+      if (updErr) throw updErr;
+      // Notify driver — direct supabase write
+      const { error: notifErr } = await supabase
+        .from("notifications")
+        .insert({
+          user_email: license.driver_email,
+          title: "لم يتم توثيق حسابك ✗",
+          message: `لم يتم التحقق من وثائقك. السبب: ${reason}. يمكنك إعادة الرفع من صفحة الإعدادات.`,
+          type: "license_rejected",
+          is_read: false,
+          link: "/account-settings?section=verification",
+        });
+      if (notifErr) console.warn("notif insert error:", notifErr); // non-fatal
     },
     onSuccess: (_, licenseId) => {
+      qc.invalidateQueries({ queryKey: ["licenses"] });
       qc.invalidateQueries({ queryKey: ["all-licenses"] });
       qc.invalidateQueries({ queryKey: ["all-notifications"] });
       toast.success("✗ تم رفض التوثيق");
@@ -113,6 +158,7 @@ export default function DashboardLicenses() {
       setSelectedLicense(null);
       setRejectionReason("");
     },
+    onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
   });
 
   const filteredLicenses = licenses.filter((l) => {

@@ -332,6 +332,7 @@ function SubscribeForm({ user, price, periodDays, settings, variant = "new", onS
       await notifyAdmin({
         title: "💳 طلب اشتراك جديد",
         message: `${user.full_name || user.email} أرسل طلب ${variant === "renewal" ? "تجديد" : "اشتراك"} عبر ${methodLabels[method] || method} (مرجع: ${reference}) — ₪${price}`,
+        link: "/dashboard?tab=subscriptions",
       });
       return data;
     },
