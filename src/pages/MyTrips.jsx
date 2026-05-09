@@ -231,11 +231,24 @@ export default function MyTrips() {
         <div className="text-center py-20">
           <Car className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-foreground mb-2">لا توجد رحلات</h3>
-          <p className="text-muted-foreground text-sm mb-4">ابدأ بحجز رحلة أو أنشئ رحلة جديدة</p>
-          <div className="flex justify-center gap-3">
+          <p className="text-muted-foreground text-sm mb-4">
+            {isDriver
+              ? "ابدأ بنشر رحلة أو ابحث عن رحلة كراكب"
+              : "ابحث عن رحلة، أو اطلب من السائقين أن يأخذوك إلى وجهتك"}
+          </p>
+          <div className="flex flex-wrap justify-center gap-3">
             <Link to="/search"><Button className="rounded-xl">ابحث عن رحلة</Button></Link>
-            <Link to="/create-trip"><Button variant="outline" className="rounded-xl">أنشر رحلة</Button></Link>
+            {isDriver ? (
+              <Link to="/create-trip"><Button variant="outline" className="rounded-xl">أنشر رحلة</Button></Link>
+            ) : (
+              <Link to="/request-trip"><Button variant="outline" className="rounded-xl">اطلب رحلة</Button></Link>
+            )}
           </div>
+          {/* Always surface "طلباتي" so users can find existing requests
+              even if they have no trips. */}
+          <Link to="/my-requests" className="inline-block text-xs text-muted-foreground hover:text-primary mt-4 underline">
+            عرض طلبات الرحلات الخاصة بي ←
+          </Link>
         </div>
       ) : (
         <div className="space-y-8">

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -67,11 +67,14 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
-            {/* Primary CTA — context-aware. Drivers see "post a trip"
-                (the action they actually want); passengers see the
-                upgrade pitch. Previously every user saw "أنشر رحلة"
-                and passengers got bounced through a gate to /become-driver
-                — wasted click + felt broken. */}
+            {/* Primary CTA — context-aware.
+                - Drivers / both         → "أنشر رحلة" (their primary action)
+                - Passengers             → "اطلب رحلة" (primary, green)
+                                           + "كن سائقاً" (secondary, outlined)
+                - Anonymous / no account → no CTA (login flow surfaces from header)
+                Previously passengers only saw "كن سائقاً", which forced
+                them to discover the trip-request feature elsewhere — most
+                never did. */}
             {(user?.account_type === "driver" || user?.account_type === "both") ? (
               <Link to="/create-trip">
                 <Button size="sm" className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
@@ -79,11 +82,18 @@ export default function Navbar() {
                 </Button>
               </Link>
             ) : user ? (
-              <Link to="/become-driver">
-                <Button size="sm" variant="outline" className="hidden sm:flex border-primary/30 text-primary hover:bg-primary/5 rounded-xl">
-                  كن سائقاً
-                </Button>
-              </Link>
+              <>
+                <Link to="/request-trip">
+                  <Button size="sm" className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
+                    اطلب رحلة
+                  </Button>
+                </Link>
+                <Link to="/become-driver">
+                  <Button size="sm" variant="outline" className="hidden md:flex border-primary/30 text-primary hover:bg-primary/5 rounded-xl">
+                    كن سائقاً
+                  </Button>
+                </Link>
+              </>
             ) : null}
             <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
@@ -106,7 +116,7 @@ export default function Navbar() {
               </button>
               
               {profileOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]">
+                <div className="absolute right-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]">
                   <Link
                     to={`/profile?email=${user?.email}`}
                     onClick={() => setProfileOpen(false)}
@@ -115,6 +125,53 @@ export default function Navbar() {
                     <Settings className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">ملفي الشخصي</span>
                   </Link>
+
+                  {/* Trip-requests entries — primary actions for any user.
+                      Drivers (and "both") also see these because they may
+                      occasionally need a ride themselves. */}
+                  {(user?.account_type !== "driver") && (
+                    <Link
+                      to="/request-trip"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <Plus className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">اطلب رحلة</span>
+                    </Link>
+                  )}
+                  <Link
+                    to="/my-requests"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                  >
+                    <Inbox className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">طلباتي</span>
+                  </Link>
+                  {(user?.account_type === "driver" || user?.account_type === "both") && (
+                    <Link
+                      to="/passenger-requests"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <Inbox className="w-4 h-4 text-accent" />
+                      <span className="text-sm font-medium">طلبات الركاب</span>
+                    </Link>
+                  )}
+
+                  {/* Verification entry — passengers and "both" need this
+                      before they can post requests. Drivers don't (they
+                      don't post passenger requests). */}
+                  {(user?.account_type !== "driver") && (
+                    <Link
+                      to="/verify-passenger"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">توثيق الهوية</span>
+                    </Link>
+                  )}
+
                   <Link
                     to="/settings"
                     onClick={() => setProfileOpen(false)}
@@ -174,11 +231,18 @@ export default function Navbar() {
                   </Button>
                 </Link>
               ) : user ? (
-                <Link to="/become-driver" onClick={() => setMobileOpen(false)}>
-                  <Button variant="outline" className="w-full mt-2 border-primary/30 text-primary rounded-xl">
-                    كن سائقاً
-                  </Button>
-                </Link>
+                <>
+                  <Link to="/request-trip" onClick={() => setMobileOpen(false)}>
+                    <Button className="w-full mt-2 bg-primary text-primary-foreground rounded-xl">
+                      اطلب رحلة
+                    </Button>
+                  </Link>
+                  <Link to="/become-driver" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" className="w-full mt-2 border-primary/30 text-primary rounded-xl">
+                      كن سائقاً
+                    </Button>
+                  </Link>
+                </>
               ) : null}
               <Link
                 to={`/profile?email=${user?.email}`}

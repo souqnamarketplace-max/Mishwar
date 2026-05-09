@@ -34,13 +34,27 @@ export default function RequestsTeaser() {
     staleTime: 60_000,
   });
 
-  if (openCount === 0) return null;
+  // Visibility rules:
+  //   - Passenger / not-yet-logged-in: ALWAYS show. They need a discovery
+  //     path to /request-trip even when no other passenger has posted yet.
+  //     Empty state encourages them to "be the first" by posting.
+  //   - Driver: hide when openCount=0. Drivers visiting the gate page
+  //     would feel deflated by an empty feed; better to surface the
+  //     teaser only when there's something to browse.
+  if (isDriver && openCount === 0) return null;
 
   const ctaHref  = isDriver ? "/passenger-requests" : "/request-trip";
   const ctaLabel = isDriver ? "تصفّح الطلبات" : "اطلب رحلتك";
   const tagline  = isDriver
     ? "ركاب يبحثون عن سائق على مساراتك — ميزة حصرية للمشتركين."
     : "هل لا تجد رحلة تناسب موعدك؟ انشر طلبك وسيتواصل السائقون معك.";
+
+  // Top-of-card badge text — varies by role and request count
+  const badgeText = isDriver
+    ? `${openCount.toLocaleString("ar-EG")} طلب نشط الآن`
+    : openCount > 0
+      ? `${openCount.toLocaleString("ar-EG")} طلب نشط الآن`
+      : "خدمة جديدة، مجانية للراكب";
 
   return (
     <section className="py-8 bg-muted/40" dir="rtl">
@@ -59,7 +73,7 @@ export default function RequestsTeaser() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs opacity-80 mb-1">
-                {openCount.toLocaleString("ar-EG")} طلب نشط الآن
+                {badgeText}
               </p>
               <h3 className="text-lg sm:text-xl font-bold mb-1 leading-tight">
                 {ctaLabel}
