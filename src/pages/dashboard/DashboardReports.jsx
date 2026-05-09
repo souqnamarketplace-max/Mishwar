@@ -47,15 +47,28 @@ export default function DashboardReports() {
   // Stored in component state keyed by report id so each row has its own.
   const [adminNotes, setAdminNotes] = useState({});
 
+  // ─── Bulk-select state ──────────────────────────────────────────────
+  // Set of report IDs the admin has checked. Used to enable bulk action
+  // buttons and to drive the "select all" tristate. Cleared on every
+  // filter/page change so we don't accidentally action items that
+  // scrolled out of view.
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const toggleSelect = (id) => setSelectedIds((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
 
-  const setFilterAndReset       = (v) => { setFilter(v); setPage(1); };
-  const setSearchAndReset       = (v) => { setSearch(v); setPage(1); };
-  const setCategoryAndReset     = (v) => { setCategoryFilter(v); setPage(1); };
-  const setDateRangeAndReset    = (v) => { setDateRangePreset(v); setPage(1); };
-  const setCustomFromAndReset   = (v) => { setCustomFrom(v); setPage(1); };
-  const setCustomToAndReset     = (v) => { setCustomTo(v); setPage(1); };
+  const setFilterAndReset       = (v) => { setFilter(v); setPage(1); clearSelection(); };
+  const setSearchAndReset       = (v) => { setSearch(v); setPage(1); clearSelection(); };
+  const setCategoryAndReset     = (v) => { setCategoryFilter(v); setPage(1); clearSelection(); };
+  const setDateRangeAndReset    = (v) => { setDateRangePreset(v); setPage(1); clearSelection(); };
+  const setCustomFromAndReset   = (v) => { setCustomFrom(v); setPage(1); clearSelection(); };
+  const setCustomToAndReset     = (v) => { setCustomTo(v); setPage(1); clearSelection(); };
 
   const { dateFrom, dateTo } = resolveDateRange(dateRangePreset, customFrom, customTo);
 
@@ -91,6 +104,48 @@ export default function DashboardReports() {
     },
     onError: (err) => toast.error(friendlyError(err, "تعذر التحديث")),
   });
+
+  /** Bulk-apply a status update to every selected report. Walks them
+   *  one at a time (same path as individual handleAction but without
+   *  the per-row admin note — bulk doesn't try to capture a personal
+   *  note for each). Used for sweeping pending → dismissed when an
+   *  obvious wave of spam reports comes in, or pending → reviewed
+   *  when a batch has been triaged in another window. */
+  const handleBulkAction = async (status) => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    const confirmMsg = status === "dismissed"
+      ? `رفض ${ids.length} بلاغ؟`
+      : status === "reviewed"
+        ? `وضع علامة "تمت المراجعة" على ${ids.length} بلاغ؟`
+        : `تطبيق "${status}" على ${ids.length} بلاغ؟`;
+    if (!window.confirm(confirmMsg)) return;
+    let ok = 0;
+    let fail = 0;
+    for (const id of ids) {
+      try {
+        await base44.entities.UserReport.update(id, {
+          status,
+          reviewed_at: new Date().toISOString(),
+        });
+        // Audit-trail entry per item so we have a record of who
+        // did the bulk action — otherwise bulk operations leave a
+        // gap in the moderation log.
+        try {
+          await logAdminAction(`report_bulk_${status}`, "report", id, { bulk: true });
+        } catch { /* non-fatal */ }
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    qc.invalidateQueries({ queryKey: ["reports"] });
+    qc.invalidateQueries({ queryKey: ["my-reports"] });
+    if (fail === 0) toast.success(`تم تحديث ${ok} بلاغ`);
+    else if (ok === 0) toast.error(`فشل تحديث ${fail} بلاغ`);
+    else toast.warning(`نجح ${ok}، فشل ${fail}`);
+    clearSelection();
+  };
 
   const handleAction = async (report, status) => {
     const note = (adminNotes[report.id] || "").trim();
@@ -207,6 +262,40 @@ export default function DashboardReports() {
         </div>
       )}
 
+      {/* ─── Bulk action bar — shown only when items are selected ─── */}
+      {selectedIds.size > 0 && (
+        <div className="bg-primary/10 border border-primary/30 rounded-2xl p-3 mb-3 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-bold text-primary">
+            تم اختيار {selectedIds.size.toLocaleString("ar-EG")} بلاغ
+          </span>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              onClick={() => handleBulkAction("reviewed")}
+              className="rounded-lg text-xs"
+            >
+              وضع علامة "تمت المراجعة"
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleBulkAction("dismissed")}
+              className="rounded-lg text-xs"
+            >
+              رفض الكل
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearSelection}
+              className="rounded-lg text-xs"
+            >
+              إلغاء التحديد
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-3">
         {reports.map(r => {
           const cat = REPORT_CATEGORIES.find(c => c.id === r.category);
@@ -214,6 +303,17 @@ export default function DashboardReports() {
           return (
             <div key={r.id} className="bg-card rounded-2xl border border-border p-4">
               <div className="flex items-start justify-between gap-3 mb-2">
+                {/* Per-row select checkbox — shown to admins for bulk
+                    actions. Only practical for "pending" status reports
+                    in most cases but we render it for every row so
+                    admins can do post-hoc bulk audits too. */}
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(r.id)}
+                  onChange={() => toggleSelect(r.id)}
+                  className="mt-1.5 shrink-0 w-4 h-4 rounded cursor-pointer accent-primary"
+                  aria-label={`تحديد البلاغ من ${r.reporter_email}`}
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground">
                     {r.reporter_email} ← <span className="text-destructive">{r.reported_email}</span>

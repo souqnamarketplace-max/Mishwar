@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import UserHistorySection from "@/components/dashboard/UserHistorySection";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import Pagination from "@/components/dashboard/Pagination";
@@ -491,6 +492,10 @@ export default function DashboardUsers() {
                   <p className="text-[10px] text-muted-foreground">يستخدم للوصول إلى بيانات المستخدمين وإدارتها</p>
                 </div>
               )}
+
+              {/* User history — counts + recent activity, helps admin
+                  triage without leaving the modal. */}
+              <UserHistorySection user={selectedUser} />
 
               {/* Metadata */}
               <div className="col-span-2">
