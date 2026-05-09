@@ -31,6 +31,7 @@ const PAGE_TITLES = {
   "/request-trip":         "اطلب رحلة",
   "/my-requests":          "طلباتي",
   "/passenger-requests":   "طلبات الركاب",
+  "/verify-passenger":     "توثيق الهوية",
   "/driver":               "لوحة السائق",
   "/how-it-works":         "كيف يعمل مشوارو؟",
   "/about":                "عن مشوارو",

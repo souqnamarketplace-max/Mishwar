@@ -189,6 +189,15 @@ export default function AccountHub() {
           onClick={() => setSection("strikes")}
         />
 
+        <Link to="/verify-passenger">
+          <AccountHubItem
+            icon={ShieldCheck}
+            label="توثيق الهوية"
+            sublabel="مطلوب لنشر طلبات الرحلات"
+            onClick={() => {}}
+          />
+        </Link>
+
         <Link to="/account-settings/profile#license">
           <AccountHubItem icon={SettingsIcon} label="إعدادات متقدمة" sublabel="كلمة المرور، رخصة القيادة، حذف الحساب" onClick={() => {}} />
         </Link>

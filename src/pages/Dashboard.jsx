@@ -11,6 +11,7 @@ import DashboardUsers from "./dashboard/DashboardUsers";
 import DashboardTrips from "./dashboard/DashboardTrips";
 import DashboardBookings from "./dashboard/DashboardBookings";
 import DashboardRequests from "./dashboard/DashboardRequests";
+import DashboardPassengerVerifications from "./dashboard/DashboardPassengerVerifications";
 import DashboardReviews from "./dashboard/DashboardReviews";
 import DashboardPayments from "./dashboard/DashboardPayments";
 import DashboardSubscriptions from "./dashboard/DashboardSubscriptions";
@@ -471,6 +472,7 @@ export default function Dashboard() {
         {activePage === "trips" && <DashboardTrips />}
         {activePage === "bookings" && <DashboardBookings />}
         {activePage === "trip-requests" && <DashboardRequests />}
+        {activePage === "passenger-verifications" && <DashboardPassengerVerifications />}
         {activePage === "reviews" && <DashboardReviews />}
         {activePage === "payments" && <DashboardPayments />}
         {activePage === "subscriptions" && <DashboardSubscriptions />}

@@ -11,6 +11,7 @@ const menuItems = [
   { id: "trips", icon: Car, label: "إدارة الرحلات" },
   { id: "bookings", icon: CalendarCheck, label: "إدارة الحجوزات" },
   { id: "trip-requests", icon: Inbox, label: "طلبات الركاب" },
+  { id: "passenger-verifications", icon: Shield, label: "توثيق الركاب" },
   { id: "reviews", icon: Star, label: "التقييمات والمراجعات" },
   { id: "payments", icon: CreditCard, label: "المعاملات والمدفوعات" },
   { id: "subscriptions", icon: Wallet, label: "اشتراكات السائقين" },

@@ -42,6 +42,12 @@ const KNOWN_PATTERNS = [
   [/admin only/i,                                          "هذه العملية متاحة للمشرفين فقط"],
   // Trip-request error patterns (migration 019)
   [/too many active requests/i,                            "وصلت إلى الحد الأقصى من الطلبات النشطة (3). ألغِ أحدها قبل إنشاء جديد"],
+  [/passenger not verified/i,                              "يجب توثيق هويتك أولاً قبل نشر طلب رحلة"],
+  [/already verified/i,                                    "حسابك موثّق بالفعل"],
+  [/rejection reason required/i,                           "يرجى كتابة سبب الرفض"],
+  [/full_name_on_id required/i,                            "يرجى كتابة الاسم كما يظهر على الهوية"],
+  [/id_front and selfie photos are required/i,             "صورة الهوية والصورة الشخصية مطلوبتان"],
+  [/verification not found/i,                              "طلب التوثيق غير موجود"],
   [/request date is in the past/i,                         "لا يمكن إنشاء طلب لتاريخ ماضٍ"],
   [/request not found/i,                                   "الطلب غير موجود"],
   [/request already closed/i,                              "هذا الطلب مغلق بالفعل"],
