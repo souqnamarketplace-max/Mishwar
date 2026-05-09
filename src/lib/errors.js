@@ -38,6 +38,8 @@ const KNOWN_PATTERNS = [
   // so we match that too and route it to the same friendly message
   // (since the only RESTRICTIVE policy on messages INSERT is the block one).
   [/cannot book.*block exists/i,                           "لا يمكنك حجز رحلة هذا السائق — أحدكما حظر الآخر"],
+  [/booking blocked due to strikes/i,                      "تم تعليق إمكانية الحجز مؤقتاً بسبب إلغاءات متكررة في وقت متأخر. حاول مجدداً بعد 30 يوماً من آخر إلغاء"],
+  [/admin only/i,                                          "هذه العملية متاحة للمشرفين فقط"],
   [/new row violates row-level security policy.*messages|messages.*new row violates row-level security/i,
                                                            "لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر"],
   [/not enough seats/i,                                    "لم يتبقَ عدد كافٍ من المقاعد"],

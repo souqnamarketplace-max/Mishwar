@@ -338,7 +338,13 @@ export default function MyTrips() {
                             <button
                               onClick={() => {
                                 const booking = passengerBookings.find(b => b.trip_id === trip.id);
-                                if (booking) setConfirmCancel({ open: true, bookingId: booking.id });
+                                if (booking) setConfirmCancel({
+                                  open: true,
+                                  bookingId: booking.id,
+                                  tripDateTime: trip.date && trip.time
+                                    ? `${trip.date}T${trip.time}:00`
+                                    : (trip.date ? `${trip.date}T00:00:00` : null),
+                                });
                               }}
                               disabled={cancelBookingMutation.isPending}
                               className="text-sm text-destructive hover:underline flex items-center gap-1"
@@ -409,6 +415,27 @@ export default function MyTrips() {
           </div>
           <h3 className="text-lg font-bold text-foreground mb-2">إلغاء الحجز؟</h3>
           <p className="text-sm text-muted-foreground mb-3">هل أنت متأكد من إلغاء هذا الحجز؟ لا يمكن التراجع عن هذا الإجراء.</p>
+
+          {/* Late-cancellation warning — shown when the trip is < 2h
+              away. The DB will count this as a "strike" via migration
+              018; we surface that to the user upfront so they can make
+              an informed choice. 3 strikes in 30 days blocks new
+              bookings until the rolling window passes. */}
+          {(() => {
+            if (!confirmCancel.tripDateTime) return null;
+            const hoursUntil = (new Date(confirmCancel.tripDateTime).getTime() - Date.now()) / 3600000;
+            if (hoursUntil <= 0 || hoursUntil >= 2) return null;
+            return (
+              <div className="mb-3 rounded-xl bg-destructive/5 border border-destructive/30 p-3">
+                <p className="text-xs font-bold text-destructive mb-1 flex items-center gap-1.5">
+                  ⚠️ تحذير: إلغاء متأخر
+                </p>
+                <p className="text-[11px] text-destructive/90 leading-relaxed">
+                  هذا الإلغاء قبل أقل من ساعتين من موعد الرحلة وسيُسجَّل كنقطة سلبية في حسابك. تراكم 3 نقاط خلال 30 يوماً يؤدي إلى تعليق إمكانية الحجز مؤقتاً.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Optional reason — collected so admins can analyse cancel
               patterns later. Six common buckets cover most cases; an

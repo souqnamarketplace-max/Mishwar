@@ -1,6 +1,10 @@
 import React from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/errors";
+import { logAdminAction } from "@/lib/adminAudit";
+import { toast } from "sonner";
 import { Car, Users as UsersIcon, AlertTriangle, Star, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -67,6 +71,16 @@ export default function UserHistorySection({ user }) {
   // Cancellation rate as a percentage. Useful "behavior signal" — chronic
   // cancellers stand out without admin needing to scroll the list.
   const cancelRate    = bookingsCount > 0 ? (bookingsCancelled / bookingsCount) * 100 : 0;
+
+  // Strike status — direct from the profile columns added by migration 018.
+  // Apply the same 30-day rolling expiry the DB does.
+  const storedStrikes = user?.strike_count || 0;
+  const lastCanceled  = user?.last_cancelled_at;
+  const windowMs      = 30 * 24 * 60 * 60 * 1000;
+  const strikesActive = lastCanceled && (Date.now() - new Date(lastCanceled).getTime() < windowMs)
+    ? storedStrikes
+    : 0;
+  const lateLifetime  = user?.late_cancellation_count || 0;
 
   const reportsCount    = reports.length;
   const reportsPending  = reports.filter(r => r.status === "pending").length;
@@ -186,6 +200,76 @@ export default function UserHistorySection({ user }) {
           )}
         </div>
       )}
+
+      {/* Strike status — admin view of the cancellation strike system.
+          Shows active strikes (with rolling-window expiry applied) and
+          gives the admin a one-click "clear strikes" override for cases
+          where a user contacted support with a legitimate reason. */}
+      <StrikeAdminPanel
+        email={email}
+        active={strikesActive}
+        lateLifetime={lateLifetime}
+        lastCanceled={lastCanceled}
+      />
+    </div>
+  );
+}
+
+/** Inline strike admin sub-panel with clear-button. */
+function StrikeAdminPanel({ email, active, lateLifetime, lastCanceled }) {
+  const qc = useQueryClient();
+  const clearMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("admin_clear_user_strikes", { p_email: email });
+      if (error) throw error;
+      try { await logAdminAction("admin_clear_strikes", "user", email, {}); } catch { /* non-fatal */ }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["admin-user-bookings", email] });
+      toast.success("تم إعادة تعيين النقاط");
+    },
+    onError: (err) => toast.error(friendlyError(err, "تعذر إعادة تعيين النقاط")),
+  });
+
+  if (active === 0 && lateLifetime === 0) return null;
+
+  return (
+    <div className={`rounded-xl p-3 mt-3 ${
+      active >= 3 ? "bg-destructive/10 border border-destructive/30" :
+      active > 0  ? "bg-amber-500/10 border border-amber-500/30" :
+                    "bg-muted/40 border border-border"
+    }`} dir="rtl">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className={`text-xs font-bold ${
+            active >= 3 ? "text-destructive" :
+            active > 0  ? "text-amber-700 dark:text-amber-400" :
+                          "text-muted-foreground"
+          }`}>
+            نقاط نشطة: {active} {active >= 3 ? "(الحجز معلّق)" : ""}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            إجمالي الإلغاءات المتأخرة: {lateLifetime}
+            {lastCanceled && (
+              <> — آخر إلغاء: {new Date(lastCanceled).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}</>
+            )}
+          </p>
+        </div>
+        {active > 0 && (
+          <button
+            onClick={() => {
+              if (window.confirm(`إعادة تعيين نقاط ${email} إلى صفر؟`)) {
+                clearMutation.mutate();
+              }
+            }}
+            disabled={clearMutation.isPending}
+            className="text-xs text-primary underline shrink-0"
+          >
+            {clearMutation.isPending ? "جاري..." : "إعادة تعيين"}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

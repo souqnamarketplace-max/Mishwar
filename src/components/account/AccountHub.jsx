@@ -13,6 +13,7 @@ import VerificationStatusSection from "./VerificationStatusSection";
 import PassengerPaymentsSection from "./PassengerPaymentsSection";
 import BlockedUsersSection from "./BlockedUsersSection";
 import MyReportsSection from "./MyReportsSection";
+import StrikeStatusSection from "./StrikeStatusSection";
 
 import { useSEO } from "@/hooks/useSEO";
 /**
@@ -53,6 +54,7 @@ export default function AccountHub() {
       payments:     "سجل المدفوعات",
       blocked:      "المستخدمون المحظورون",
       reports:      "بلاغاتي",
+      strikes:      "حالة الحساب",
     };
 
     return (
@@ -74,6 +76,7 @@ export default function AccountHub() {
           {section === "payments"     && <PassengerPaymentsSection user={user} />}
           {section === "blocked"      && <BlockedUsersSection user={user} />}
           {section === "reports"      && <MyReportsSection user={user} />}
+          {section === "strikes"      && <StrikeStatusSection user={user} />}
         </div>
       </div>
     );
@@ -178,6 +181,12 @@ export default function AccountHub() {
           label="المستخدمون المحظورون"
           sublabel="إدارة قائمة الحظر وإلغاء الحظر"
           onClick={() => setSection("blocked")}
+        />
+        <AccountHubItem
+          icon={ShieldCheck}
+          label="حالة الحساب"
+          sublabel="نقاط الإلغاء وسجل النشاط"
+          onClick={() => setSection("strikes")}
         />
 
         <Link to="/account-settings/profile#license">
