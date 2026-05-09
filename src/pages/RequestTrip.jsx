@@ -49,7 +49,6 @@ export default function RequestTrip() {
   useSEO({
     title: "اطلب رحلة",
     description: "انشر طلب رحلة في مشوارو وسيتواصل معك السائقون المتجهون لوجهتك.",
-    canonical: "https://mishwar-nu.vercel.app/request-trip",
   });
 
   const navigate = useNavigate();

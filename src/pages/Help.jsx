@@ -111,7 +111,9 @@ export default function Help() {
   useSEO({
     title: "المساعدة والدعم",
     description: "إجابات للأسئلة الشائعة وطرق التواصل مع فريق دعم مشوارو",
-    canonical: "https://mishwar-nu.vercel.app/help",
+    // canonical auto-built from window.location.pathname against SITE_URL
+    // (env-driven). Hardcoded URLs would break the moment the production
+    // domain changes.
     jsonLd: helpJsonLd,
   });
 

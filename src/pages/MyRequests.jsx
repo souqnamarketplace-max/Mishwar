@@ -26,7 +26,6 @@ export default function MyRequests() {
   useSEO({
     title: "طلباتي",
     description: "إدارة طلبات الرحلات التي نشرتها",
-    canonical: "https://mishwar-nu.vercel.app/my-requests",
   });
 
   const { user, isAuthenticated, isLoadingAuth } = useAuth();

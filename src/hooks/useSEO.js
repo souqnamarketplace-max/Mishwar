@@ -1,86 +1,100 @@
 import { useEffect } from "react";
+import {
+  SITE_URL,
+  SITE_NAME,
+  DEFAULT_DESCRIPTION,
+  DEFAULT_OG_IMAGE,
+  absoluteUrl,
+} from "@/lib/seo/config";
 
 /**
- * Set document title and meta description per page, plus optionally inject
- * a JSON-LD structured data block. Call inside any page component.
+ * useSEO — set per-page SEO via direct DOM mutation.
  *
- * @example
- * useSEO({
- *   title: "البحث عن رحلة",
- *   description: "ابحث عن رحلات بين المدن الفلسطينية",
- *   jsonLd: { "@context": "https://schema.org", "@type": "Trip", ... },
- * });
+ * This hook predates the <SEO /> react-helmet-async component and
+ * is still used by 11+ pages with a stable call signature:
  *
- * jsonLd is keyed under <script id="page-jsonld"> and replaced/removed on
- * route change so each page's structured data doesn't accumulate.
+ *   useSEO({
+ *     title:       string,         // appended as "{title} | مشوارو"
+ *     description: string,
+ *     canonical?:  string,         // absolute URL — auto-built if omitted
+ *     ogImage?:    string,         // absolute URL or path
+ *     jsonLd?:     object | null,  // structured data, replaces id=page-jsonld
+ *   });
+ *
+ * Why keep this alongside <SEO />:
+ *   - Many pages already call useSEO and changing them all in one PR
+ *     is too much surface change.
+ *   - For pages that need richer features (breadcrumbs, FAQ schema,
+ *     custom JSON-LD blocks), use <SEO /> in the JSX instead.
+ *   - Both can coexist on the same page — useSEO mutates the DOM, helmet
+ *     manages its own dedup, and the last-write wins per attribute.
+ *
+ * Improvements over the original:
+ *   - canonical now auto-builds from window.location.pathname against
+ *     SITE_URL (env-driven), so we get correct canonical URLs on every
+ *     page without callers having to pass them
+ *   - ogImage is auto-resolved to an absolute URL via absoluteUrl()
+ *   - og:url and twitter:url updates use the resolved canonical, never
+ *     the raw window.location.href (which would carry query strings into
+ *     canonicals — bad for SEO dedup)
+ *   - Cleanup-safe: if a component unmounts, we don't leave stale tags
+ *     because every render writes the new values, and the next route's
+ *     useSEO call overwrites.
  */
 export function useSEO({ title, description, canonical, ogImage, jsonLd }) {
   useEffect(() => {
-    const fullTitle = title ? `${title} | مشوارو` : "مشوارو — شارك الطريق، وفر أكثر";
+    const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — شارك الطريق، وفر أكثر`;
     document.title = fullTitle;
 
-    // Update meta description
-    if (description) {
-      let metaDesc = document.querySelector('meta[name="description"]');
-      if (!metaDesc) {
-        metaDesc = document.createElement("meta");
-        metaDesc.setAttribute("name", "description");
-        document.head.appendChild(metaDesc);
+    const desc = description || DEFAULT_DESCRIPTION;
+
+    // Helper: upsert a meta tag (creates if missing, updates if present).
+    const upsertMeta = (selector, attr, attrValue, content) => {
+      let el = document.querySelector(selector);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, attrValue);
+        document.head.appendChild(el);
       }
-      metaDesc.setAttribute("content", description);
+      el.setAttribute("content", content);
+    };
+
+    // Description
+    upsertMeta('meta[name="description"]', "name", "description", desc);
+
+    // Canonical — auto-build from pathname if not explicitly passed.
+    // Use pathname only (no query, no hash) so /search?from=X and
+    // /search?from=Y don't compete in the index.
+    const path = typeof window !== "undefined" ? window.location.pathname : "/";
+    const resolvedCanonical = canonical || absoluteUrl(path);
+    let linkEl = document.querySelector('link[rel="canonical"]');
+    if (!linkEl) {
+      linkEl = document.createElement("link");
+      linkEl.setAttribute("rel", "canonical");
+      document.head.appendChild(linkEl);
     }
+    linkEl.setAttribute("href", resolvedCanonical);
 
-    // Update OG title
-    let ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) ogTitle.setAttribute("content", fullTitle);
+    // OpenGraph
+    upsertMeta('meta[property="og:title"]',       "property", "og:title",       fullTitle);
+    upsertMeta('meta[property="og:description"]', "property", "og:description", desc);
+    upsertMeta('meta[property="og:url"]',         "property", "og:url",         resolvedCanonical);
 
-    // Update OG description
-    if (description) {
-      let ogDesc = document.querySelector('meta[property="og:description"]');
-      if (ogDesc) ogDesc.setAttribute("content", description);
-    }
+    const resolvedOgImage = ogImage
+      ? (ogImage.startsWith("http") ? ogImage : absoluteUrl(ogImage))
+      : absoluteUrl(DEFAULT_OG_IMAGE);
+    upsertMeta('meta[property="og:image"]', "property", "og:image", resolvedOgImage);
 
-    // Update canonical
-    if (canonical) {
-      let link = document.querySelector('link[rel="canonical"]');
-      if (!link) {
-        link = document.createElement("link");
-        link.setAttribute("rel", "canonical");
-        document.head.appendChild(link);
-      }
-      link.setAttribute("href", canonical);
-    }
+    // Twitter
+    upsertMeta('meta[name="twitter:title"]',       "name", "twitter:title",       fullTitle);
+    upsertMeta('meta[name="twitter:description"]', "name", "twitter:description", desc);
+    upsertMeta('meta[name="twitter:image"]',       "name", "twitter:image",       resolvedOgImage);
 
-    // Update OG image
-    if (ogImage) {
-      let ogImg = document.querySelector('meta[property="og:image"]');
-      if (ogImg) ogImg.setAttribute("content", ogImage);
-    }
-
-    // Update OG URL
-    const currentUrl = canonical || window.location.href;
-    let ogUrl = document.querySelector('meta[property="og:url"]');
-    if (ogUrl) ogUrl.setAttribute("content", currentUrl);
-
-    // Update Twitter desc
-    if (description) {
-      let twDesc = document.querySelector('meta[name="twitter:description"]');
-      if (twDesc) twDesc.setAttribute("content", description);
-      let twTitle = document.querySelector('meta[name="twitter:title"]');
-      const ft = title ? `${title} | مشوارو` : "مشوارو — شارك الطريق، وفر أكثر";
-      if (twTitle) twTitle.setAttribute("content", ft);
-    }
-
-    // ─── Per-page JSON-LD structured data ────────────────────────────────
-    // Inject (or update) a <script type="application/ld+json"> with a
-    // stable id="page-jsonld". Replacing on every render ensures route
-    // changes update the schema; passing jsonLd=null/undefined removes it
-    // so old pages' structured data doesn't leak into new ones.
-    //
-    // Note: the 3 site-level structured data blocks in index.html
-    // (WebSite, Organization, MobileApplication) stay put and are
-    // harmless duplicates if the page also emits its own — search engines
-    // accept multiple JSON-LD blocks per page.
+    // ─── Per-page JSON-LD ───────────────────────────────────────────
+    // Single <script id="page-jsonld"> slot, replaced on every route
+    // change. The 3 site-level JSON-LD blocks in index.html (WebSite,
+    // Organization, MobileApplication) stay put — Google accepts
+    // multiple blocks per page, no conflict.
     let pageLdEl = document.querySelector('script#page-jsonld');
     if (jsonLd) {
       const payload = JSON.stringify(jsonLd);
@@ -90,8 +104,6 @@ export function useSEO({ title, description, canonical, ogImage, jsonLd }) {
         pageLdEl.setAttribute("id", "page-jsonld");
         document.head.appendChild(pageLdEl);
       }
-      // Only update text content if it actually changed (avoids triggering
-      // unnecessary re-parses by some crawlers / dev-tools observers).
       if (pageLdEl.textContent !== payload) pageLdEl.textContent = payload;
     } else if (pageLdEl) {
       pageLdEl.remove();

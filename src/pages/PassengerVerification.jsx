@@ -43,7 +43,6 @@ export default function PassengerVerification() {
   useSEO({
     title: "توثيق هوية الراكب",
     description: "وثّق هويتك لتتمكن من نشر طلبات الرحلات في مشوارو",
-    canonical: "https://mishwar-nu.vercel.app/verify-passenger",
   });
 
   const navigate = useNavigate();

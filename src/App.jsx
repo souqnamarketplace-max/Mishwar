@@ -21,6 +21,7 @@ import { Toaster as SonnerToaster } from "sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 
@@ -59,6 +60,15 @@ const BookingConfirmation = lazy(() => import('./pages/BookingConfirmation'));
 const Feedback = lazy(() => import('./pages/Feedback'));
 const PrivacyPolicy    = lazy(() => import('./pages/PrivacyPolicy'));
 const Terms            = lazy(() => import('./pages/Terms'));
+
+// SEO landing pages — Arabic-keyword-targeted public routes. Lazy-loaded
+// so the main bundle stays lean for users who never visit them. Each
+// page renders the SeoLandingLayout shell with hand-written Arabic copy.
+const RouteRamallahNablus     = lazy(() => import('./pages/seo/RouteRamallahNablus'));
+const RouteJerusalemBethlehem = lazy(() => import('./pages/seo/RouteJerusalemBethlehem'));
+const RouteHebronJerusalem    = lazy(() => import('./pages/seo/RouteHebronJerusalem'));
+const CityRamallah            = lazy(() => import('./pages/seo/CityRamallah'));
+const CityNablus              = lazy(() => import('./pages/seo/CityNablus'));
 
 // Page-level loading fallback
 const PageFallback = () => (
@@ -140,6 +150,16 @@ const AuthenticatedApp = () => {
         <Route path="/terms" element={<Terms />} />
         <Route path="/terms-of-service" element={<Terms />} />
 
+        {/* SEO landing pages — public, Arabic-keyword-targeted. Built to
+            rank on queries like "رحلات رام الله نابلس" / "مشاوير القدس".
+            Each page is a hand-written Arabic article + FAQ + CTAs into
+            /search and /request-trip. */}
+        <Route path="/routes/ramallah-nablus"     element={<RouteRamallahNablus />} />
+        <Route path="/routes/jerusalem-bethlehem" element={<RouteJerusalemBethlehem />} />
+        <Route path="/routes/hebron-jerusalem"    element={<RouteHebronJerusalem />} />
+        <Route path="/cities/ramallah"            element={<CityRamallah />} />
+        <Route path="/cities/nablus"              element={<CityNablus />} />
+
         {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />
         <Route path="/favorites" element={<Favorites />} />
@@ -168,21 +188,23 @@ const AuthenticatedApp = () => {
 
 function App() {
   return (
-    <ErrorBoundary><AuthProvider>
-      <QueryClientProvider client={queryClientInstance}>
-        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <ScrollToTop />
-          <Routes>
-            {/* Public login route — always accessible */}
-            <Route path="/login" element={<Login />} />
-            {/* All other routes go through auth check */}
-            <Route path="/*" element={<AuthenticatedApp />} />
-          </Routes>
-        </Router>
-        <Toaster />
-        <SonnerToaster position="top-center" richColors />
-      </QueryClientProvider>
-    </AuthProvider></ErrorBoundary>
+    <HelmetProvider>
+      <ErrorBoundary><AuthProvider>
+        <QueryClientProvider client={queryClientInstance}>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <ScrollToTop />
+            <Routes>
+              {/* Public login route — always accessible */}
+              <Route path="/login" element={<Login />} />
+              {/* All other routes go through auth check */}
+              <Route path="/*" element={<AuthenticatedApp />} />
+            </Routes>
+          </Router>
+          <Toaster />
+          <SonnerToaster position="top-center" richColors />
+        </QueryClientProvider>
+      </AuthProvider></ErrorBoundary>
+    </HelmetProvider>
   )
 }
 

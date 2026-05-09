@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
 import { useSEO } from "@/hooks/useSEO";
+import { absoluteUrl, SITE_URL } from "@/lib/seo/config";
 import { friendlyError } from "@/lib/errors";
 import { useBlockedEmails } from "@/lib/blockUtils";
 
@@ -179,7 +180,7 @@ export default function TripDetails() {
   const seoDescription = trip
     ? `احجز مقعدك في رحلة ${trip.from_city} ← ${trip.to_city} بسعر ${trip.price} شيكل. ${trip.available_seats || 0} مقاعد متاحة.`
     : "تفاصيل الرحلة في مشوارو";
-  const seoCanonical = trip ? `https://mishwar-nu.vercel.app/trip/${trip.id}` : undefined;
+  const seoCanonical = trip ? absoluteUrl(`/trip/${trip.id}`) : undefined;
 
   // ── Per-trip JSON-LD structured data ─────────────────────────────
   // Schema.org doesn't have a perfect "rideshare trip" type, so we use
@@ -218,7 +219,7 @@ export default function TripDetails() {
     "provider": {
       "@type": "Organization",
       "name": "مشوارو",
-      "url": "https://mishwar-nu.vercel.app",
+      "url": SITE_URL,
     },
   } : null;
 

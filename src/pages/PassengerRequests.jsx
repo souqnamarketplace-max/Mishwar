@@ -53,7 +53,6 @@ export default function PassengerRequests() {
   useSEO({
     title: "طلبات الركاب",
     description: "تصفح طلبات الرحلات من الركاب وتواصل معهم مباشرة",
-    canonical: "https://mishwar-nu.vercel.app/passenger-requests",
   });
 
   const { user, isAuthenticated, isLoadingAuth } = useAuth();

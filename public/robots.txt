@@ -25,6 +25,8 @@ Allow: /privacy-policy
 Allow: /terms
 Allow: /terms-of-service
 Allow: /trip/
+Allow: /routes/
+Allow: /cities/
 
 Disallow: /api/
 Disallow: /dashboard
