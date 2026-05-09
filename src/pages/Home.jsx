@@ -2,6 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import React from "react";
 import HeroSection from "../components/home/HeroSection";
 import StatsBar from "../components/home/StatsBar";
+import RequestsTeaser from "../components/home/RequestsTeaser";
 import HowItWorks from "../components/home/HowItWorks";
 import FeaturedTrips from "../components/home/FeaturedTrips";
 import TrustBadges from "../components/home/TrustBadges";
@@ -16,6 +17,7 @@ export default function Home() {
       <AnnouncementBanner />
       <HeroSection />
       <StatsBar />
+      <RequestsTeaser />
       <FeaturedTrips />
       <HowItWorks />
       <TrustBadges />

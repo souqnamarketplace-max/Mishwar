@@ -77,6 +77,44 @@ export default function HowItWorks() {
         </div>
       </section>
 
+      {/* Trip requests — new feature explaining both directions */}
+      <section className="py-16 bg-muted/30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-3">
+            اطلب رحلتك أو ابحث عن ركاب
+          </h2>
+          <p className="text-center text-muted-foreground mb-10 max-w-2xl mx-auto">
+            مشوارو يربطك بطريقتين: السائق ينشر رحلته، أو الراكب يطلب رحلة ويختار السائقُ المناسبَ التواصلَ معه.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3 text-xl">🧍</div>
+              <h3 className="font-bold text-foreground mb-2">للراكب: اطلب رحلتك</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                لا تجد سائقاً يناسب موعدك؟ انشر طلب رحلة من أين إلى أين، التاريخ والسعر المقترح. السائقون المشتركون سيرونه ويتواصلون معك.
+              </p>
+              <ul className="text-xs text-foreground/80 space-y-1.5">
+                <li>• مجاناً، لا اشتراك مطلوب</li>
+                <li>• حتى 3 طلبات نشطة في نفس الوقت</li>
+                <li>• هاتفك لا يظهر — التواصل عبر رسائل التطبيق فقط</li>
+              </ul>
+            </div>
+            <div className="bg-card rounded-2xl border border-border p-6">
+              <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center mb-3 text-xl">🚗</div>
+              <h3 className="font-bold text-foreground mb-2">للسائق: تصفّح طلبات الركاب</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                ميزة حصرية للسائقين المشتركين. تصفح طلبات الركاب على مساراتك، فلتر "بالقرب مني" 5–30 كم، وتواصل مباشرة مع من تختار.
+              </p>
+              <ul className="text-xs text-foreground/80 space-y-1.5">
+                <li>• فلاتر: مدينة، تاريخ، سعر أقصى، مقاعد، قرب الموقع</li>
+                <li>• ضمن اشتراك المنصة الشهري</li>
+                <li>• لا حجز ولا التزام — مجرد تواصل</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Cancellation Policy — simplified to reflect the actual model.
           Previously this section described two cancellation windows
           (24h for "electronic payment", 2h for cash). The app has no

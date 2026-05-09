@@ -86,9 +86,24 @@ export default function Messages() {
   const messagesEndRef = useRef(null);
 
   const { user } = useAuth();
-  const paramTo   = searchParams.get("to");
-  const paramName = searchParams.get("name");
-  const paramTrip = searchParams.get("trip");
+  const paramTo      = searchParams.get("to");
+  const paramName    = searchParams.get("name");
+  const paramTrip    = searchParams.get("trip");
+  const paramRequest = searchParams.get("request");
+
+  // Track that the driver opened a conversation about a passenger trip
+  // request — increments contact_count on the request (deduped server-
+  // side via UNIQUE INDEX on trip_request_contacts). Fires once per
+  // (driver, request) regardless of how many times they reopen.
+  // We only call this when a request param exists AND the current user
+  // is the contacting party (not the passenger receiving), to avoid
+  // self-tracking when the passenger views their own conversation.
+  React.useEffect(() => {
+    if (!paramRequest || !paramTo || !user?.email) return;
+    if (paramTo === user.email) return; // passenger viewing their own conv
+    supabase.rpc("track_request_contact", { p_request_id: paramRequest })
+      .catch(() => { /* non-fatal — analytics only */ });
+  }, [paramRequest, paramTo, user?.email]);
 
   // ─── Fetch all messages where user is sender or receiver ───
   const { data: rawMessages = [], isLoading } = useQuery({
@@ -467,6 +482,28 @@ export default function Messages() {
         trip_id:        tripIdToPersist || null,
       });
       if (msgErr) { console.error("Message insert error:", msgErr); throw new Error(msgErr.message); }
+
+      // ─── Trip-request notification (added with feature commits) ───
+      // When a driver sends their first message about a passenger trip
+      // request, the passenger gets a notification "سائق مهتم برحلتك".
+      // Conditions:
+      //   - paramRequest is present (driver navigated from /passenger-requests)
+      //   - We're sending TO the passenger (not them sending to driver)
+      //   - This is the first message in the thread for this request
+      // Best-effort: failures don't block the message send.
+      if (paramRequest && activeConv.id === "__new__") {
+        try {
+          await base44.entities.Notification.create({
+            user_email: activeConv.otherEmail,
+            title:      "سائق مهتم برحلتك! 🚗",
+            message:    `${user.full_name || user.email.split("@")[0]} يريد التواصل بشأن طلب الرحلة الذي نشرته. اضغط لفتح المحادثة.`,
+            type:       "request_contact",
+            is_read:    false,
+            link:       `/messages?to=${encodeURIComponent(user.email)}&request=${paramRequest}`,
+          });
+        } catch (e) { console.warn("Request-contact notification failed:", e); }
+      }
+
       setDraft("");
       setNewConv(null);
       // Only change activeId if we just transitioned out of "__new__".
