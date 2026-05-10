@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { CreditCard, MapPin, Calendar } from "lucide-react";
 
 /**
@@ -17,9 +18,35 @@ export default function PassengerPaymentsSection({ user }) {
     enabled: !!user?.email,
   });
 
-  const { data: allTrips = [] } = useQuery({
-    queryKey: ["all-trips-payments-lookup"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 200),
+  // Collect distinct trip_ids referenced by the user's bookings, then
+  // fetch ONLY those trips (not the latest 200 platform-wide trips).
+  // The previous Trip.list("-created_date", 200) approach had two real
+  // problems:
+  //   1. If the user's booking was on a trip older than the latest
+  //      200 platform trips (likely on a busy week), the .find()
+  //      lookup returned undefined and the row degraded to "رحلة"
+  //      with no route — confusing for someone reviewing their own
+  //      payment history.
+  //   2. Wasteful — fetching 200 trips to look up at most 100 of the
+  //      user's bookings, often duplicating ids when the user takes
+  //      the same route weekly.
+  // Using supabase.from('trips').select(...).in('id', ids) hits the
+  // exact rows needed, scoped by the user's actual bookings. RLS
+  // (trips_select_public) returns these for any authenticated user
+  // since trips are public for browse.
+  const tripIds = [...new Set(bookings.map(b => b.trip_id).filter(Boolean))];
+  const { data: trips = [] } = useQuery({
+    queryKey: ["passenger-payments-trips", tripIds.join(",")],
+    queryFn: async () => {
+      if (tripIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("trips")
+        .select("id, from_city, to_city, date")
+        .in("id", tripIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: tripIds.length > 0,
   });
 
   const yearBookings = bookings.filter(b => {
@@ -31,7 +58,7 @@ export default function PassengerPaymentsSection({ user }) {
     .filter(b => b.status !== "cancelled")
     .reduce((sum, b) => sum + (Number(b.total_price) || 0), 0);
 
-  const tripById = (id) => allTrips.find(t => t.id === id);
+  const tripById = (id) => trips.find(t => t.id === id);
 
   const statusConfig = {
     paid:      { label: "مدفوع",   className: "bg-green-100 text-green-700" },
