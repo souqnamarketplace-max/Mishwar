@@ -50,7 +50,7 @@ const DIST_PATH = path.join(ROOT, "dist", "sitemap.xml");
 // back to the production fallback so the generated sitemap is at least
 // self-consistent. Production deploys MUST have VITE_SITE_URL set on
 // Vercel for the canonical URLs to be correct.
-const SITE_URL = (process.env.VITE_SITE_URL || "https://mishwar-nu.vercel.app").replace(/\/$/, "");
+const SITE_URL = (process.env.VITE_SITE_URL || "https://www.mishwaro.com").replace(/\/$/, "");
 
 const SUPABASE_URL    = process.env.VITE_SUPABASE_URL    || "https://dimtdwahtwaslmnuakij.supabase.co";
 const SUPABASE_ANON   = process.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_LlK5ig0ruElVt3Z6j0FNkQ_MAGvKRC_";

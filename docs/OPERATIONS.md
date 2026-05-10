@@ -64,8 +64,8 @@ the incident-response side of M-10 (rate limiting).
    - Egress bandwidth
    - Auth users
 3. **Uptime monitoring.** Free tier of UptimeRobot or Better Stack:
-   - GET https://mishwar-nu.vercel.app/ every 5 min, alert on 2 consecutive failures
-   - GET https://mishwar-nu.vercel.app/api/trip?id=00000000-0000-0000-0000-000000000000
+   - GET https://www.mishwaro.com/ every 5 min, alert on 2 consecutive failures
+   - GET https://www.mishwaro.com/api/trip?id=00000000-0000-0000-0000-000000000000
      every 5 min — should return 200 even for invalid id
    - Alert via email + Telegram/SMS for after-hours
 4. **Once Sentry is wired (H-03):** alert on:
@@ -95,7 +95,7 @@ the incident-response side of M-10 (rate limiting).
 When something breaks in production, work this checklist:
 
 ### 1. Triage (first 5 minutes)
-- Visit https://mishwar-nu.vercel.app/ in incognito — does it load?
+- Visit https://www.mishwaro.com/ in incognito — does it load?
 - Check Vercel Dashboard → Deployments → most recent deploy: green or rolled?
 - Check Supabase Dashboard → Health: project running, no notices?
 

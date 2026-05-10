@@ -313,7 +313,7 @@ Before clicking "Submit for review":
 
 | Reason | Fix |
 |---|---|
-| Privacy policy URL doesn't load | Verify https://mishwar-nu.vercel.app/privacy returns HTML |
+| Privacy policy URL doesn't load | Verify https://www.mishwaro.com/privacy returns HTML |
 | App requests permission without explanation | Make sure NSCameraUsageDescription etc. are set |
 | "App is just a webview" (Apple Guideline 4.2) | Add native features: haptics, push, share, camera, biometric login. Even one or two natively-implemented features satisfies this |
 | Sign-in not provided | Apple may require a test account. Have one ready and document it in the review notes |

@@ -20,7 +20,7 @@ import { rateLimit } from "./_rate-limit.js";
 // instead of silently using a baked-in key.
 const SUPA_URL = process.env.VITE_SUPABASE_URL || "";
 const SUPA_KEY = process.env.VITE_SUPABASE_ANON_KEY || "";
-const APP_URL  = process.env.VITE_APP_URL || "https://mishwar-nu.vercel.app";
+const APP_URL  = process.env.VITE_APP_URL || "https://www.mishwaro.com";
 
 // Palestinian cities → Arabic weekday dates helper
 function formatDate(dateStr) {

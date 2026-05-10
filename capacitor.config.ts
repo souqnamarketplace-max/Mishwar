@@ -4,7 +4,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 /**
  * Capacitor wrapper for مِشوار.
  *
- * The same Vite-built SPA that runs at https://mishwar-nu.vercel.app
+ * The same Vite-built SPA that runs at https://www.mishwaro.com
  * is what ships inside the iOS / Android shells. After `vite build`,
  * the contents of `dist/` are bundled into the native app.
  *

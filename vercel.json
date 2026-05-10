@@ -34,6 +34,16 @@
       ]
     }
   ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        { "type": "host", "value": "mishwar-nu.vercel.app" }
+      ],
+      "destination": "https://www.mishwaro.com/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/trip/:id",

@@ -3,7 +3,7 @@
 This document covers turning the مشوارو web app into native iOS and
 Android apps for App Store / Play Store submission. Capacitor is the
 chosen wrapper because it keeps the React/Vite SPA as the source of
-truth — the same code that runs at https://mishwar-nu.vercel.app is
+truth — the same code that runs at https://www.mishwaro.com is
 what runs inside the native shells.
 
 The repo ships with the **scaffolding only** (`capacitor.config.ts`

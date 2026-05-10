@@ -119,7 +119,7 @@ After pasting the HTML into Supabase:
    - The spam-folder hint shows in amber, not white-on-white
    - On mobile, the card scales to fit the screen (no horizontal scroll)
 4. Click the CTA in the test email — it should land on
-   `https://mishwar-nu.vercel.app/login` with the appropriate auth flow
+   `https://www.mishwaro.com/login` with the appropriate auth flow
 
 ## Troubleshooting
 

