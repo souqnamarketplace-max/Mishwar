@@ -140,7 +140,36 @@ export default function UserProfile() {
     ? Math.round((bookings.filter((b) => b.status !== "cancelled").length / bookings.length) * 100)
     : 92;
 
-  const confirmedWithUser = bookings.some((b) => b.status === "confirmed");
+  // confirmedWithUser gates the phone-call button below the avatar.
+  //
+  // Was previously `bookings.some(b => b.status === 'confirmed')`, which
+  // was a privacy leak: the bookings query is keyed by `passenger_email:
+  // targetEmail`, so the array contains the TARGET'S own passenger
+  // bookings — totally unrelated to whether the VIEWING user has a
+  // booking with them. The old check evaluated to true whenever the
+  // target had ever confirmed any booking on the platform as a
+  // passenger — which means the target's phone number leaked to any
+  // viewer the moment the target took their first ride.
+  //
+  // The correct check is: does the bookings array contain a confirmed
+  // row that pairs the current user with the target as the
+  // counterparty? Two scenarios:
+  //   (1) target was passenger AND current user was the driver
+  //   (2) target was driver AND current user was the passenger
+  // The bookings query is keyed on passenger_email = targetEmail, so
+  // (1) is covered directly. (2) requires looking at this user's own
+  // trip-side bookings, which we don't fetch here — the phone for that
+  // direction is already shown on /my-trips for the booking, which is
+  // a more contextual surface anyway. Limiting to (1) is conservative
+  // and privacy-preserving: it under-reveals rather than over-reveals.
+  // If we later want to expand to (2), add a second query keyed on
+  // driver_email = targetEmail.
+  //
+  // Also gated on !isOwnProfile so the call button never appears on
+  // your own profile (where it would be a no-op).
+  const confirmedWithUser = !isOwnProfile && currentUser?.email && bookings.some(
+    b => b.status === "confirmed" && b.driver_email === currentUser.email
+  );
   const showCarInfo = (accountType === "driver" || accountType === "both") && (carModel || carPlate);
 
   // Initials for avatar fallback
@@ -211,7 +240,14 @@ export default function UserProfile() {
                 </>
               ) : (
                 <>
-                  <Link to="/messages">
+                  {/* "تواصل" — opens (or starts) a message thread with this
+                      user. Was just <Link to="/messages"> with no params,
+                      which dropped the viewer on the bare messages page
+                      and offered no obvious next step to actually start
+                      chatting with this profile owner. Same ?to/name
+                      pattern used in MyTrips:341 and PassengerRequests's
+                      card click. */}
+                  <Link to={`/messages?to=${encodeURIComponent(targetEmail)}&name=${encodeURIComponent(displayName)}`}>
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5 h-9">
                       <MessageCircle className="w-4 h-4" />
                       تواصل
