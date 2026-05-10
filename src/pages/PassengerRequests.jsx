@@ -333,10 +333,27 @@ export default function PassengerRequests() {
           <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
+        // The previous copy ("لا توجد طلبات تطابق فلاترك / جرّب توسيع
+        // الفلاتر") implied filters were the cause even when the
+        // platform itself had zero open requests — confusing for
+        // drivers visiting a fresh deployment or after all requests
+        // got claimed. Distinguish by `requests.length`: if the raw
+        // feed is empty there's nothing to filter, so show a
+        // non-blaming message that frames the empty state as a
+        // "check back" moment instead.
         <div className="bg-card border border-border rounded-2xl p-8 text-center">
           <Search className="w-10 h-10 mx-auto text-muted-foreground mb-3 opacity-50" />
-          <p className="text-sm font-bold text-foreground mb-1">لا توجد طلبات تطابق فلاترك</p>
-          <p className="text-xs text-muted-foreground">جرّب توسيع الفلاتر أو إزالة بعضها</p>
+          {requests.length === 0 ? (
+            <>
+              <p className="text-sm font-bold text-foreground mb-1">لا توجد طلبات حالياً</p>
+              <p className="text-xs text-muted-foreground">تابع الموقع — ركاب جدد ينشرون طلباتهم يومياً.</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-bold text-foreground mb-1">لا توجد طلبات تطابق فلاترك</p>
+              <p className="text-xs text-muted-foreground">جرّب توسيع الفلاتر أو إزالة بعضها</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
