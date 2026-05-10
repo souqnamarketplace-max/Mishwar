@@ -97,7 +97,7 @@ const AuthenticatedApp = () => {
 
   // Public routes — accessible without sign-in
   const PUBLIC_PATHS = new Set([
-    "/", "/search", "/how-it-works", "/community", "/help",
+    "/", "/search", "/how-it-works", "/community", "/help", "/support", "/contact",
     "/about", "/about-us", "/blog", "/safety", "/privacy", "/privacy-policy", "/terms", "/terms-of-service",
   ]);
   // /trip/:id is also public (view-only) — handled by prefix
@@ -141,6 +141,12 @@ const AuthenticatedApp = () => {
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/community" element={<Community />} />
         <Route path="/help" element={<Help />} />
+        {/* Aliases for /help — App Store + Play Store reviewers expect
+            "support"; some users land via "contact". Same Help page,
+            different entry points. Mirrors the /privacy + /privacy-policy
+            dual-route pattern. */}
+        <Route path="/support" element={<Help />} />
+        <Route path="/contact" element={<Help />} />
         <Route path="/about" element={<AboutUs />} />
         <Route path="/about-us" element={<AboutUs />} />
         <Route path="/blog" element={<Blog />} />
