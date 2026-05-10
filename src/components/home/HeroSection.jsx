@@ -8,37 +8,43 @@ import DateInput from "@/components/shared/DateInput";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
-// Palestinian cities slideshow — real Unsplash photos
+// Last-resort fallback used ONLY when the admin has not configured
+// any hero_city_slides AND the DB query fails. In production the
+// admin DOES populate hero_city_slides (verified live — the
+// Palestinian-flag/sunset image you see on the home page comes from
+// Supabase, not from this fallback). Previously this array contained
+// six Unsplash URLs (Jerusalem/Bethlehem/Nablus/Jericho/Hebron/Gaza)
+// which were orphaned the moment admin slides went live — they sat
+// here being defensively kept but were never user-visible. They also
+// added an external network dep (images.unsplash.com) that the page
+// could fall back into on DB outages, an additional thing to break.
+//
+// Replaced with a single inline SVG data-URI fallback: a brand-color
+// gradient rendered entirely from the bundled HTML, no network call.
+// Forms a clean visual placeholder if anything goes catastrophically
+// wrong with admin slides AND DB AND react-query.
+//
+// The data URI uses brand forest-green #1a3d2a → gold #c9a227 so the
+// hero still looks like Mishwaro's identity even without a photo.
+// Caption defaults to "فلسطين" / "وصّل للمكان الصح" as a safe
+// universal label (no city-specific claim a passenger would notice
+// is wrong).
+const FALLBACK_GRADIENT_SVG =
+  "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800" preserveAspectRatio="xMidYMid slice">` +
+      `<defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">` +
+        `<stop offset="0%" stop-color="#1a3d2a"/>` +
+        `<stop offset="100%" stop-color="#c9a227"/>` +
+      `</linearGradient></defs>` +
+      `<rect width="1400" height="800" fill="url(#g)"/>` +
+    `</svg>`
+  );
+
 const CITY_SLIDES = [
   {
-    city: "القدس",
-    subtitle: "المدينة المقدسة",
-    img: "https://images.unsplash.com/photo-1552423314-cf29ab68ad73?w=1400&h=800&fit=crop&q=80",
-  },
-  {
-    city: "بيت لحم",
-    subtitle: "مهد المسيح",
-    img: "https://images.unsplash.com/photo-1549900932-5f7a1f04e17f?w=1400&h=800&fit=crop&q=80",
-  },
-  {
-    city: "نابلس",
-    subtitle: "جبل النار",
-    img: "https://images.unsplash.com/photo-1578895101408-1a36b834405b?w=1400&h=800&fit=crop&q=80",
-  },
-  {
-    city: "أريحا",
-    subtitle: "أقدم مدينة في العالم",
-    img: "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=1400&h=800&fit=crop&q=80",
-  },
-  {
-    city: "الخليل",
-    subtitle: "مدينة الآباء",
-    img: "https://images.unsplash.com/photo-1580834341580-8c17a3a630ca?w=1400&h=800&fit=crop&q=80",
-  },
-  {
-    city: "غزة",
-    subtitle: "عروس البحر",
-    img: "https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1400&h=800&fit=crop&q=80",
+    city: "فلسطين",
+    subtitle: "وصّل للمكان الصح",
+    img: FALLBACK_GRADIENT_SVG,
   },
 ];
 
