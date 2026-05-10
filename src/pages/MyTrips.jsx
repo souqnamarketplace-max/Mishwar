@@ -228,6 +228,22 @@ export default function MyTrips() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
+        // Distinguish "you have NO trips at all" from "you have trips but
+        // none match the current tab filter". The previous copy
+        // ("لا توجد رحلات / ابدأ بنشر رحلة") was misleading for the
+        // second case — drivers with active confirmed trips would see
+        // a "no trips, start posting!" state when they tapped "completed"
+        // before they had any completed ones. Same UX pattern shipped
+        // for /passenger-requests in commit 780db6d.
+        trips.length > 0 ? (
+          <div className="text-center py-16">
+            <Car className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <h3 className="font-bold text-foreground mb-1">لا توجد رحلات في هذا التبويب</h3>
+            <p className="text-xs text-muted-foreground">
+              لديك رحلات في تبويبات أخرى — جرّب &ldquo;الكل&rdquo; لرؤيتها جميعاً.
+            </p>
+          </div>
+        ) : (
         <div className="text-center py-20">
           <Car className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-foreground mb-2">لا توجد رحلات</h3>
@@ -250,6 +266,7 @@ export default function MyTrips() {
             عرض طلبات الرحلات الخاصة بي ←
           </Link>
         </div>
+        )
       ) : (
         <div className="space-y-8">
           {Object.entries(grouped).map(([status, statusTrips]) => {
