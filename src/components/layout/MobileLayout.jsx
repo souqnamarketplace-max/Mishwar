@@ -156,7 +156,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
       {showHeader && (
         <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-md border-b border-border safe-area-inset-top">
           <div className="flex items-center justify-between h-14 px-4 gap-2" dir="rtl">
-            {/* RIGHT side (RTL start): Hamburger + Bell */}
+            {/* RIGHT side (RTL start): Hamburger + (signup pill if anonymous) + Bell */}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
@@ -164,6 +164,23 @@ export default function MobileLayout({ children, user, showHeader = true, header
               >
                 {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
               </button>
+              {/* Anonymous CTA — without this, mobile visitors had zero
+                  visible auth surface anywhere on the screen (Navbar.jsx
+                  handles the desktop case but is hidden under 1024px).
+                  Lands on /login?signup=1 so the signup tab opens directly
+                  rather than the login tab — matches the desktop nav's
+                  "إنشاء حساب" button. Slightly compact (px-2.5 h-9) so it
+                  doesn't crowd the centered page title on a 375px viewport. */}
+              {!user && (
+                <Link to="/login?signup=1">
+                  <Button
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl px-2.5 h-9 text-xs font-bold whitespace-nowrap"
+                  >
+                    إنشاء حساب
+                  </Button>
+                </Link>
+              )}
               <NotificationBell userEmail={user?.email} />
             </div>
 
@@ -303,6 +320,8 @@ export default function MobileLayout({ children, user, showHeader = true, header
           <div className="fixed top-0 right-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
             style={{ borderRadius: "24px 0 0 24px" }}>
 
+            {user ? (
+              <>
             {/* User Header */}
             <div className="bg-primary px-4 pt-6 pb-3">
               <div className="flex items-center gap-2.5">
@@ -488,6 +507,94 @@ export default function MobileLayout({ children, user, showHeader = true, header
               </button>
               <p className="text-center text-[11px] text-muted-foreground pb-2">مشوارو · النسخة 1.0</p>
             </div>
+              </>
+            ) : (
+              // ───────── Anonymous drawer ─────────
+              // The drawer used to render the authenticated entries (Account
+              // settings, verification, payments, sign-out, etc.) regardless
+              // of auth state — anonymous visitors saw a header reading
+              // "مرحباً" with an empty email line and links to features
+              // they couldn't actually use, plus a "تسجيل الخروج" button
+              // that did nothing for them. This branch shows a welcome
+              // header with explicit sign-in/sign-up CTAs and only the
+              // public surfaces (browse, info, support) that work without
+              // an account.
+              <>
+                {/* Welcome header with auth CTAs */}
+                <div className="bg-primary px-4 pt-6 pb-5" dir="rtl">
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-primary-foreground/15 flex items-center justify-center overflow-hidden shrink-0">
+                      <img src="/logo.png" alt="" className="w-full h-full object-cover" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-primary-foreground font-bold text-sm">أهلاً بك في مشوارو</p>
+                      <p className="text-primary-foreground/75 text-[11px] truncate">سجّل دخولك لحجز ونشر الرحلات</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link to="/login?signup=1" onClick={() => setShowMobileMenu(false)}>
+                      <Button className="w-full h-10 bg-white text-primary hover:bg-white/90 rounded-xl text-xs font-bold">
+                        إنشاء حساب
+                      </Button>
+                    </Link>
+                    <Link to="/login" onClick={() => setShowMobileMenu(false)}>
+                      <Button variant="outline" className="w-full h-10 bg-transparent border-white/40 text-primary-foreground hover:bg-white/10 rounded-xl text-xs font-bold">
+                        تسجيل الدخول
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto" dir="rtl">
+                  {/* Browse — public, no account needed */}
+                  <div className="py-2">
+                    <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">تصفح</p>
+                    {[
+                      { icon: Home,     label: "الرئيسية",        path: "/" },
+                      { icon: Search,   label: "بحث عن رحلة",     path: "/search" },
+                      { icon: BookOpen, label: "كيف يعمل مشوارو", path: "/how-it-works" },
+                      { icon: Users,    label: "مجتمع مشوارو",    path: "/community" },
+                    ].map(({ icon: Icon, label, path }) => (
+                      <Link
+                        key={path}
+                        to={path}
+                        onClick={() => setShowMobileMenu(false)}
+                        className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted transition-colors text-foreground"
+                      >
+                        <Icon className="w-5 h-5 text-primary shrink-0" />
+                        <span className="text-sm font-medium">{label}</span>
+                      </Link>
+                    ))}
+                  </div>
+
+                  <div className="mx-4 my-1 border-t border-border" />
+
+                  <div className="py-2">
+                    <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">معلومات</p>
+                    {[
+                      { icon: HelpCircle, label: "المساعدة",            path: "/help" },
+                      { icon: Shield,     label: "الخصوصية والأمان",     path: "/privacy" },
+                      { icon: FileText,   label: "الشروط والأحكام",     path: "/terms" },
+                      { icon: Info,       label: "عن مشوارو",            path: "/about" },
+                    ].map(({ icon: Icon, label, path }) => (
+                      <Link
+                        key={path}
+                        to={path}
+                        onClick={() => setShowMobileMenu(false)}
+                        className="flex items-center gap-3 px-4 py-2 hover:bg-muted transition-colors text-muted-foreground"
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-sm">{label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-border py-2" dir="rtl">
+                  <p className="text-center text-[11px] text-muted-foreground pb-1">مشوارو · النسخة 1.0</p>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}
