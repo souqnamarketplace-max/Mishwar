@@ -615,10 +615,33 @@ const functions = {
       if (!isCash && hoursUntilTrip < 24)
         throw new Error('لا يمكن إلغاء الحجوزات المدفوعة إلا قبل 24 ساعة من الرحلة');
 
-      // Cancel via direct REST PATCH
-      await restFetch(`/bookings?id=eq.${encodeURIComponent(booking_id)}`, {
-        method: 'PATCH',
-        body: { status: 'cancelled', updated_at: new Date().toISOString() },
+      // Cancel via the cancel_booking RPC (migration 018) instead of
+      // a direct PATCH to /bookings. The RPC handles atomically:
+      //   1. Authorization (passenger / driver / admin)
+      //   2. Status update to 'cancelled'
+      //   3. Seat refund — for BOTH 'pending' AND 'confirmed' bookings
+      //      with bounds checking (LEAST/GREATEST guards). The previous
+      //      direct PATCH never refunded seats from the passenger side
+      //      at all, leaving trips understated for the rest of their
+      //      lifetime — passengers cancelling their own bookings made
+      //      the trip's available_seats stay wrong, blocking future
+      //      passengers from booking real capacity.
+      //   4. Late-cancellation strike enforcement (2h threshold). The
+      //      direct PATCH skipped the strike system entirely, so even
+      //      after migration 018 shipped the strike logic, no
+      //      passenger ever actually got a strike for a late cancel.
+      // The client-side 2h/24h pre-check above is kept as a UX gate —
+      // it shows a friendly Arabic error before the user wastes a
+      // round-trip. The RPC enforces its own (different, stricter on
+      // strikes side) rules server-side regardless. If a malicious
+      // client bypassed the JS check, the RPC would still apply the
+      // strike correctly.
+      await restFetch('/rpc/cancel_booking', {
+        method: 'POST',
+        body: {
+          booking_id_param: booking_id,
+          reason_param: 'passenger_self_cancel',
+        },
       });
 
       return { success: true, message: 'تم إلغاء الحجز بنجاح' };

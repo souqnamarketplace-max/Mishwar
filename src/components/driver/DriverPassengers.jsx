@@ -1,6 +1,7 @@
 import React from "react";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, MapPin, ArrowLeft, Phone, Star, CheckCircle, XCircle, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -23,20 +24,41 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
 
   const updateBooking = useMutation({
     mutationFn: async ({ id, status }) => {
-      await base44.entities.Booking.update(id, { status });
-      // Restore seats if driver cancels/rejects a pending booking
+      // Cancel path goes through the cancel_booking RPC (migration 018)
+      // so seat refund, authorization, and strike enforcement happen
+      // atomically server-side. The previous code did:
+      //   1. Booking.update({status:'cancelled'}) — direct table write
+      //   2. If old status was 'pending', read trip from cache and
+      //      Trip.update with restoredSeats
+      // Two real bugs in that flow:
+      //   (a) Cancelling a CONFIRMED booking didn't restore seats at
+      //       all. The check `booking.status === 'pending'` on line 31
+      //       skipped seat restoration for the (much more common)
+      //       confirmed-then-cancel path. Trip's available_seats stays
+      //       understated for the rest of the trip's life.
+      //   (b) The two writes weren't atomic — a network failure
+      //       between them left the booking cancelled but seats not
+      //       refunded. No retry path.
+      //   (c) Reading current trip seats from react-query cache then
+      //       writing back the increment is a classic lost-update
+      //       race: two drivers (or driver + admin) cancelling
+      //       concurrent bookings on the same trip would both read
+      //       the same seat count, both add +1, write back the same
+      //       new value — losing one cancellation's refund.
+      // The RPC fixes all three: PostgreSQL transaction wraps the
+      // status update + seat refund (with bounds checks via
+      // LEAST/GREATEST), and refunds for both pending AND confirmed.
+      // Approve/confirm path still uses Booking.update — that flow
+      // doesn't change seat counts.
       if (status === "cancelled") {
-        const allBookings = qc.getQueryData(["driver-bookings"]) || [];
-        const booking = allBookings.find(b => b.id === id);
-        if (booking?.trip_id && booking?.status === "pending") {
-          const allTrips = qc.getQueryData(["trips"]) || [];
-          const trip = allTrips.find(t => t.id === booking.trip_id);
-          if (trip) {
-            const restoredSeats = (trip.available_seats || 0) + (booking.seats_booked || 1);
-            await base44.entities.Trip.update(booking.trip_id, { available_seats: restoredSeats });
-          }
-        }
+        const { error } = await supabase.rpc("cancel_booking", {
+          booking_id_param: id,
+          reason_param: "driver_cancel",
+        });
+        if (error) throw error;
+        return;
       }
+      await base44.entities.Booking.update(id, { status });
     },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ["bookings"] });
