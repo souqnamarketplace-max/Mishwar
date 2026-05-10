@@ -6,19 +6,20 @@ import { useAuth } from "@/lib/AuthContext";
 import { Inbox, ArrowLeft, Sparkles } from "lucide-react";
 
 /**
- * RequestsTeaser — homepage band that surfaces the new trip-requests
+ * RequestsTeaser — homepage band that surfaces the trip-requests
  * feature with a role-aware CTA:
- *   - Passenger / not-yet-logged-in → "اطلب رحلتك"  → /request-trip
- *   - Driver (subscribed)           → "تصفّح الطلبات" → /passenger-requests
- *   - Driver (not subscribed)       → "تصفّح الطلبات" → /passenger-requests
+ *   - Passenger / not-yet-logged-in → "اطلب رحلتك"        → /request-trip
+ *   - Driver (subscribed)           → "تصفّح طلبات الركاب" → /passenger-requests
+ *   - Driver (not subscribed)       → "تصفّح طلبات الركاب" → /passenger-requests
  *     (gate page persuades them to subscribe)
  *
  * The live "X طلب نشط" count uses public_open_requests_count which is
  * SECURITY DEFINER, so it works for everyone (no subscription needed
  * for the aggregate badge — only for accessing individual rows).
  *
- * Hidden when there are zero open requests — no point showing an
- * empty-state teaser on a marketing band.
+ * Always rendered. Empty-state copy is role-specific so a brand-new
+ * deployment (zero requests) still shows the teaser to drivers as a
+ * discovery surface for /passenger-requests.
  */
 export default function RequestsTeaser() {
   const { user } = useAuth();
@@ -38,20 +39,28 @@ export default function RequestsTeaser() {
   //   - Passenger / not-yet-logged-in: ALWAYS show. They need a discovery
   //     path to /request-trip even when no other passenger has posted yet.
   //     Empty state encourages them to "be the first" by posting.
-  //   - Driver: hide when openCount=0. Drivers visiting the gate page
-  //     would feel deflated by an empty feed; better to surface the
-  //     teaser only when there's something to browse.
-  if (isDriver && openCount === 0) return null;
+  //   - Driver: ALSO always show. The previous rule hid the teaser when
+  //     openCount === 0 because an empty feed felt deflating, but in
+  //     practice this meant brand-new deployments (or any moment between
+  //     requests being claimed and new ones being posted) silently lost
+  //     the only home-page surface to /passenger-requests for drivers —
+  //     audit kept reporting the driver variant "didn't exist". A
+  //     dedicated empty-state copy ("be the first to respond") preserves
+  //     discoverability without lying about activity.
 
   const ctaHref  = isDriver ? "/passenger-requests" : "/request-trip";
-  const ctaLabel = isDriver ? "تصفّح الطلبات" : "اطلب رحلتك";
+  const ctaLabel = isDriver ? "تصفّح طلبات الركاب" : "اطلب رحلتك";
   const tagline  = isDriver
-    ? "ركاب يبحثون عن سائق على مساراتك — ميزة حصرية للمشتركين."
+    ? (openCount > 0
+        ? "ركاب يبحثون عن سائق لمسارك — ميزة حصرية للمشتركين."
+        : "كن أول من يردّ على طلبات الركاب على مسارك.")
     : "هل لا تجد رحلة تناسب موعدك؟ انشر طلبك وسيتواصل السائقون معك.";
 
   // Top-of-card badge text — varies by role and request count
   const badgeText = isDriver
-    ? `${openCount.toLocaleString("ar-EG")} طلب نشط الآن`
+    ? (openCount > 0
+        ? `${openCount.toLocaleString("ar-EG")} طلب نشط الآن`
+        : "لا توجد طلبات حالياً")
     : openCount > 0
       ? `${openCount.toLocaleString("ar-EG")} طلب نشط الآن`
       : "خدمة جديدة، مجانية للراكب";
