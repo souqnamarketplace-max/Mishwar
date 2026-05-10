@@ -1,0 +1,22 @@
+/* 
+  InfoPlist.strings (Arabic — ar)
+  Mishwaro / مشوارو
+  
+  iPhones with Arabic as system language pick this up automatically.
+  CFBundleDisplayName below overrides the default "Mishwaro" string in
+  Info.plist for ar-locale users — they'll see مشوارو under the icon.
+  
+  Permission strings are localized here too so the OS-level prompts
+  ("App wants to use your location") appear in Arabic. The same strings
+  exist in Info.plist as defaults; iOS picks the locale-matching one
+  at runtime based on the device's preferred language order.
+*/
+
+CFBundleDisplayName = "مشوارو";
+CFBundleName = "مشوارو";
+
+NSLocationWhenInUseUsageDescription = "نحتاج موقعك لتحديد نقطة الانطلاق المناسبة وتتبع تقدم الرحلة";
+NSLocationAlwaysAndWhenInUseUsageDescription = "نحتاج موقعك لتتبع تقدم الرحلة بدقة حتى الوصول إلى الوجهة";
+NSCameraUsageDescription = "للتحقق من هوية السائقين والركاب من خلال صورة سيلفي ورخصة القيادة";
+NSPhotoLibraryUsageDescription = "لاختيار صورة الملف الشخصي وصور وثائق التحقق";
+NSPhotoLibraryAddUsageDescription = "لحفظ صور الرحلات وإيصالات الدفع في معرض الصور";

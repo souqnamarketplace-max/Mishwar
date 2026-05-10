@@ -1,0 +1,18 @@
+/* 
+  InfoPlist.strings (English — en)
+  Mishwaro / مشوارو
+  
+  Default for non-Arabic system languages. App Store listings, App
+  Store Connect "Promotional Text" and "Subtitle" fields are set
+  separately in App Store Connect — those are what users see when
+  searching the App Store, not these strings.
+*/
+
+CFBundleDisplayName = "Mishwaro";
+CFBundleName = "Mishwaro";
+
+NSLocationWhenInUseUsageDescription = "We need your location to set your pickup point and track trip progress.";
+NSLocationAlwaysAndWhenInUseUsageDescription = "We need your location to track trip progress accurately until you reach your destination.";
+NSCameraUsageDescription = "To verify driver and passenger identity via selfie and driver's license photo.";
+NSPhotoLibraryUsageDescription = "To choose your profile picture and verification document photos.";
+NSPhotoLibraryAddUsageDescription = "To save trip photos and payment receipts to your photo library.";

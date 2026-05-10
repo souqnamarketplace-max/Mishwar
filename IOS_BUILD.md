@@ -17,7 +17,7 @@ If any of those are missing, stop and resolve them before continuing.
 
 1. [One-time Mac setup](#one-time-mac-setup)
 2. [First-time iOS project initialization](#first-time-ios-project-initialization)
-3. [App icon + splash screen](#app-icon--splash-screen)
+3. [App icon + splash screen](#app-icon--splash-screen)  *(includes 2.5 — Arabic localization)*
 4. [Test on simulator](#test-on-simulator)
 5. [Test on real iPhone](#test-on-real-iphone)
 6. [Code signing setup](#code-signing-setup)
@@ -166,6 +166,53 @@ Open the project: `npm run cap:ios` (this builds + syncs + opens Xcode).
 In Xcode's left panel, navigate to **App > App > Assets.xcassets >
 AppIcon**. You should see all icon sizes filled in. If any are missing,
 the App Store submission will be rejected.
+
+---
+
+### 2.5 Wire up Arabic localization (one-time, ~2 min)
+
+The repo includes `ios/App/App/ar.lproj/InfoPlist.strings` and
+`ios/App/App/en.lproj/InfoPlist.strings` — these localize:
+
+- The display name under the home-screen icon (Arabic users see مشوارو,
+  English users see Mishwaro)
+- All permission prompts ("App wants to use your location") in the
+  user's preferred language
+
+These files exist on disk but Xcode doesn't auto-pick them up — you
+need to add them to the project once. Do this:
+
+1. In Xcode's left panel, find the **App** group (top-level folder)
+2. **Right-click** → **Add Files to "App"...**
+3. In the file picker, navigate to `ios/App/App/`
+4. Select **both** `ar.lproj` and `en.lproj` folders (Cmd+click both)
+5. **Important:** check that **"Create folder references"** is selected
+   (NOT "Create groups") — you want Xcode to track the folders, not
+   copy the contents
+6. Verify "Add to targets: ☑ App" is checked
+7. Click **Add**
+
+After this, Xcode's left panel shows `ar.lproj` and `en.lproj` under
+**App**, each with `InfoPlist.strings` inside. Build the project
+(Product → Build) — no errors expected.
+
+To verify it worked:
+- Open Settings on your iPhone → General → Language & Region → set
+  iPhone language to **العربية (Arabic)**
+- Reinstall the app via Xcode
+- Home screen icon now shows **مشوارو**, not **Mishwaro**
+- When the app asks for location permission, the prompt is in Arabic
+
+If you see "Mishwaro" with Arabic system language, the strings file
+isn't wired up — re-do step 5 making sure "Create folder references"
+was selected.
+
+> **Why dual format?** Apple's HIG (Human Interface Guidelines) says
+> non-Latin display names work but English-first improves App Store
+> search discoverability. The clean solution: keep the English string
+> as the default, override per-locale via InfoPlist.strings. The App
+> Store listing name (set in App Store Connect, not in code) can be
+> "Mishwaro — مشوارو" so search results show both scripts.
 
 ---
 
