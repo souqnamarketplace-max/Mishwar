@@ -37,6 +37,26 @@ import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { useAuth } from "@/lib/AuthContext";
 import { compressImage } from "@/lib/compressImage";
+import { resolveDocumentUrl, isPublicHttpUrl } from "@/lib/licenseUrls";
+
+// Hook that resolves a stored document value to a renderable URL for
+// in-form previews. After migration moved sensitive uploads from the
+// public bucket to uploads-private, the stored value is now a path
+// (e.g. "<uid>/<timestamp>-<rand>.jpg") rather than a public URL.
+// resolveDocumentUrl signs the path via the storage API for ~60 seconds.
+// Legacy rows where the column still holds a full https://... URL pass
+// through unchanged via the isPublicHttpUrl branch inside the helper.
+function usePreviewUrl(stored) {
+  const [url, setUrl] = useState(() => (isPublicHttpUrl(stored) ? stored : null));
+  useEffect(() => {
+    if (!stored) { setUrl(null); return; }
+    if (isPublicHttpUrl(stored)) { setUrl(stored); return; }
+    let cancelled = false;
+    resolveDocumentUrl(stored).then(u => { if (!cancelled) setUrl(u); });
+    return () => { cancelled = true; };
+  }, [stored]);
+  return url;
+}
 
 const STEPS = [
   { id: 0, title: "البداية",         icon: Sparkles },
@@ -146,10 +166,25 @@ export default function BecomeDriver() {
 
       const ext = (compressed.name || file.name).split(".").pop();
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("uploads").upload(path, compressed, { upsert: true });
+      // Upload to the PRIVATE bucket. Driver license, car registration,
+      // insurance documents, and selfies are identity-grade PII — license
+      // numbers, ID photos, addresses. Previously these went to 'uploads'
+      // (the public-read bucket) and the column stored the full publicUrl,
+      // which meant anyone with the URL — admins reviewing a license,
+      // support staff with screenshots, anyone who later got hold of an
+      // audit log entry — had permanent unauthenticated read access to
+      // the document. The private bucket gates reads through createSignedUrl
+      // (60s TTL) plus the owner-or-admin RLS policy from migration 004.
+      const { error: upErr } = await supabase.storage
+        .from("uploads-private")
+        .upload(path, compressed, { upsert: true });
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);
-      set(fieldKey, publicUrl);
+      // Store the PATH (not a publicUrl). Display sites — the admin
+      // license review modal, the AccountSettings driver-license card,
+      // anything else that renders these — already use resolveDocumentUrl
+      // (src/lib/licenseUrls.js) which signs paths transparently and
+      // continues to handle legacy public-URL values for older rows.
+      set(fieldKey, path);
       toast.success(`✅ تم رفع ${label}`);
     } catch (err) {
       toast.error(`خطأ في رفع ${label}: ${friendlyError(err, "حاول مجدداً")}`);
@@ -578,15 +613,7 @@ function StepReview({ form }) {
 
         <div className="grid grid-cols-3 gap-2">
           {docs.map((d) => (
-            <div key={d.label} className="text-center">
-              <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-1 flex items-center justify-center">
-                {d.url
-                  ? <img src={d.url} alt={d.label} className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                  : <ImageIcon className="w-6 h-6 text-muted-foreground/40" />}
-              </div>
-              <p className="text-[10px] text-muted-foreground leading-tight">{d.label}</p>
-              {d.url && <Check className="w-3 h-3 text-primary mx-auto mt-0.5" />}
-            </div>
+            <DocPreviewTile key={d.label} label={d.label} stored={d.url} />
           ))}
         </div>
 
@@ -598,8 +625,35 @@ function StepReview({ form }) {
   );
 }
 
+// ── Document preview tile for the final review step ────────────────────────
+// Uses the same path-or-URL resolution as UploadField so the review grid
+// works regardless of whether the stored value is a private-bucket path
+// (post-migration uploads) or a legacy public URL (pre-migration uploads).
+function DocPreviewTile({ label, stored }) {
+  const url = usePreviewUrl(stored);
+  return (
+    <div className="text-center">
+      <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-1 flex items-center justify-center">
+        {url
+          ? <img src={url} alt={label} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+          : stored
+            ? <div className="w-full h-full bg-muted flex items-center justify-center">
+                <ImageIcon className="w-6 h-6 text-muted-foreground/40" />
+              </div>
+            : <ImageIcon className="w-6 h-6 text-muted-foreground/40" />}
+      </div>
+      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+      {stored && <Check className="w-3 h-3 text-primary mx-auto mt-0.5" />}
+    </div>
+  );
+}
+
 // ── Reusable upload field with thumbnail preview ────────────────────────────
 function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
+  // value is a stored path or legacy URL — resolve to a signed URL for the
+  // preview img. Reverts to null while resolving (or on resolve failure),
+  // matching the "no value yet" branch below.
+  const previewUrl = usePreviewUrl(value);
   return (
     <div>
       <Label className="text-sm">{label} <span className="text-destructive">*</span></Label>
@@ -614,7 +668,11 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
       />
       {value ? (
         <div className="mt-1.5 flex items-center gap-3 p-2 bg-green-500/5 border border-green-500/20 rounded-xl">
-          <img src={value} alt="" className="w-14 h-14 rounded-lg object-cover" loading="lazy" decoding="async" />
+          {previewUrl
+            ? <img src={previewUrl} alt="" className="w-14 h-14 rounded-lg object-cover" loading="lazy" decoding="async" />
+            : <div className="w-14 h-14 rounded-lg bg-muted flex items-center justify-center">
+                <ImageIcon className="w-5 h-5 text-muted-foreground/40" />
+              </div>}
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
               <Check className="w-3 h-3" /> تم الرفع

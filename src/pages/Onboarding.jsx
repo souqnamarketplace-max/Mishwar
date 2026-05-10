@@ -24,7 +24,23 @@ const STEPS_PASSENGER = ["اختيار الدور", "معلوماتك"];
 const STEPS_DRIVER = ["اختيار الدور", "معلوماتك", "بيانات السيارة", "رخصة القيادة"];
 
 
-async function uploadToSupabase(file) {
+// Upload helper. Two buckets used:
+//   - 'uploads'         (public-read) for AVATARS only — they're shown to
+//                        other users in profile cards, message threads,
+//                        notification rows. Public URL caches forever in
+//                        the browser/CDN, no per-view signing roundtrip.
+//   - 'uploads-private' (owner-or-admin via RLS) for IDENTITY DOCUMENTS —
+//                        driver license, car registration, insurance,
+//                        selfies. Stored as a path; display sites resolve
+//                        via createSignedUrl (60s TTL) through the
+//                        licenseUrls.js helper.
+//
+// Returns a publicUrl string for the public bucket and a path string for
+// the private bucket. Callers should treat both as opaque and store as-is.
+// Display sites that need to render either kind use resolveDocumentUrl
+// (src/lib/licenseUrls.js) which detects http URLs and passes them through
+// while signing private paths.
+async function uploadToSupabase(file, { bucket = 'uploads' } = {}) {
   // Resolve the user UUID via the centralized session helper so the path
   // matches the ownership policy in migrations/004_storage_hardening.sql.
   const userId = readSessionUserId();
@@ -32,10 +48,17 @@ async function uploadToSupabase(file) {
 
   const ext = file.name.split('.').pop() || 'jpg';
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-  const { error } = await supabase.storage.from('uploads').upload(path, file, { upsert: true });
+  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
   if (error) throw error;
-  const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(path);
-  return publicUrl;
+  if (bucket === 'uploads') {
+    // Avatar path — return the public URL so existing display sites
+    // (UserProfile, MessageBubble, etc.) work without changes.
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(path);
+    return publicUrl;
+  }
+  // Private bucket — return the path. Stored verbatim in DB; resolved on
+  // display via licenseUrls.resolveDocumentUrl.
+  return path;
 }
 
 export default function Onboarding() {
@@ -455,7 +478,7 @@ export default function Onboarding() {
                       const file = e.target.files?.[0]; if (!file) return;
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
-                      try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, license_image_url: url })); toast.success("✅ تم رفع صورة الرخصة"); }
+                      try { const url = await uploadToSupabase(file, { bucket: 'uploads-private' }); setForm(f => ({ ...f, license_image_url: url })); toast.success("✅ تم رفع صورة الرخصة"); }
                       catch (err) { console.error("License upload error:", err); toast.error("فشل رفع الصورة. حجم الملف يجب أن يكون أقل من 5MB وبصيغة صورة أو PDF"); }
                       finally { setUploading(false); }
                     }} />
@@ -484,7 +507,7 @@ export default function Onboarding() {
                       const file = e.target.files?.[0]; if (!file) return;
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
-                      try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, car_reg_url: url })); toast.success("✅ تم رفع الاستمارة"); }
+                      try { const url = await uploadToSupabase(file, { bucket: 'uploads-private' }); setForm(f => ({ ...f, car_reg_url: url })); toast.success("✅ تم رفع الاستمارة"); }
                       catch (err) { toast.error(friendlyError(err, "تعذر رفع الملف")); }
                       finally { setUploading(false); }
                     }} />
@@ -513,7 +536,7 @@ export default function Onboarding() {
                       const file = e.target.files?.[0]; if (!file) return;
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
-                      try { const url = await uploadToSupabase(file); setForm(f => ({ ...f, insurance_url: url })); toast.success("✅ تم رفع وثيقة التأمين"); }
+                      try { const url = await uploadToSupabase(file, { bucket: 'uploads-private' }); setForm(f => ({ ...f, insurance_url: url })); toast.success("✅ تم رفع وثيقة التأمين"); }
                       catch (err) { toast.error(friendlyError(err, "تعذر رفع الملف")); }
                       finally { setUploading(false); }
                     }} />
@@ -539,7 +562,7 @@ export default function Onboarding() {
                     if (file.size > 10*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 10 MB"); return; }
                     setUploading(true);
                     try {
-                      const url = await uploadToSupabase(file);
+                      const url = await uploadToSupabase(file, { bucket: 'uploads-private' });
                       setForm(f => ({ ...f, selfie_url: url }));
                       toast.success("✅ تم رفع الصورة الشخصية بنجاح");
                     } catch (err) {
