@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { useSEO } from "@/hooks/useSEO";
@@ -54,11 +54,27 @@ export default function RequestTrip() {
   const navigate = useNavigate();
   const qc       = useQueryClient();
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
+  const [searchParams] = useSearchParams();
+
+  // Pre-fill from URL: ?from=<city>&to=<city>&date=<yyyy-mm-dd>
+  // Surfaced from /search empty-state CTA — passenger searches a route,
+  // gets no results, taps "اطلب رحلتك على هذا المسار" → lands here with
+  // the route/date already filled. Saves them re-typing what they just
+  // typed on /search.
+  // CITY_COORDS lookup happens in submit; passing arbitrary city strings
+  // is fine because validation runs on submit anyway. Date is also
+  // accepted defensively — if the URL date is in the past, todayISO()
+  // wins as the fallback (see initializer below).
+  const prefilledFromCity = searchParams.get("from") || "";
+  const prefilledToCity   = searchParams.get("to")   || "";
+  const prefilledDate     = searchParams.get("date");
+  const validPrefilledDate = prefilledDate && prefilledDate >= todayISO()
+    ? prefilledDate : null;
 
   const [form, setForm] = useState({
-    from_city:        "",
-    to_city:          "",
-    requested_date:   todayISO(),
+    from_city:        prefilledFromCity,
+    to_city:          prefilledToCity,
+    requested_date:   validPrefilledDate || todayISO(),
     requested_time:   "",
     time_flexibility: "flexible",
     seats_needed:     1,

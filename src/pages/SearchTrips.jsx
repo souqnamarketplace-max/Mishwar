@@ -343,6 +343,22 @@ export default function SearchTrips() {
               : "جرّب البحث بمدينة أو تاريخ مختلف"}
           </p>
           <div className="flex gap-3 justify-center flex-wrap">
+            {/* Trip-request CTA — when the user gave us a specific route
+                and got nothing, the highest-value next action is to post
+                a request so drivers heading that way can find them. The
+                trip-request feature is the headline new addition; hiding
+                it on this surface left users with only a soft-fallback
+                "browse all" button that mostly produces the same empty
+                state on a low-traffic platform. Pre-fills from/to/date
+                so the user doesn't re-type what they just typed above. */}
+            {activeFilters.from && activeFilters.to && (
+              <Link
+                to={`/request-trip?from=${encodeURIComponent(activeFilters.from)}&to=${encodeURIComponent(activeFilters.to)}${activeFilters.date ? `&date=${encodeURIComponent(activeFilters.date)}` : ""}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-bold"
+              >
+                اطلب رحلتك على هذا المسار
+              </Link>
+            )}
             <button onClick={() => { setFrom(""); setTo(""); setDate(""); handleSearch(); }}
               className="text-sm text-primary hover:underline">
               عرض كل الرحلات المتاحة
