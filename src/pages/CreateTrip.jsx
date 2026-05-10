@@ -89,24 +89,18 @@ export default function CreateTrip() {
     queryFn: () => base44.auth.me(),
   });
 
-  // Role gate — only drivers (or both) can access this page
+  // Role gate evaluated here, ENFORCED below (after all hooks).
+  // The early-return that used to live here triggered React error #310
+  // ("Rendered more hooks than during the previous render") because the
+  // useQuery/useMemo/useState/useEffect calls below it would run on the
+  // first render (when user is still undefined) and then be skipped on
+  // the next render once user resolves to a non-driver — React tracks
+  // hook calls by call order, so any time the count changes between
+  // renders the whole tree throws and the page crashes inside the
+  // ErrorBoundary. We compute isDriver here and short-circuit BELOW the
+  // hook section. All useQuery/useEffect calls remain unconditional;
+  // the role-gate UI replaces the form output at render time only.
   const isDriver = user?.account_type === "driver" || user?.account_type === "both";
-  if (user && !isDriver) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-20 text-center" dir="rtl">
-        <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl">🚗</span>
-        </div>
-        <h2 className="text-xl font-bold text-foreground mb-2">حسابك راكب فقط</h2>
-        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-          لنشر الرحلات تحتاج لتفعيل حساب السائق وإكمال التحقق من الوثائق.
-        </p>
-        <Link to="/become-driver" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
-          تفعيل حساب السائق
-        </Link>
-      </div>
-    );
-  }
 
 
   const { data: licenses = [] } = useQuery({
@@ -235,6 +229,29 @@ export default function CreateTrip() {
       setFormInitialized(true);
     }
   }, [user, formInitialized]);
+
+  // Role gate — render-time guard. All hooks above run unconditionally
+  // on every render (rules-of-hooks compliant). When the resolved user
+  // is a passenger we render the upgrade-account CTA in place of the
+  // multi-step form. This used to be an early `return` above the
+  // hooks; that crashed the page with React error #310 because the
+  // hook-call count differed between renders.
+  if (user && !isDriver) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-20 text-center" dir="rtl">
+        <div className="w-16 h-16 rounded-2xl bg-yellow-500/10 flex items-center justify-center mx-auto mb-4">
+          <span className="text-3xl">🚗</span>
+        </div>
+        <h2 className="text-xl font-bold text-foreground mb-2">حسابك راكب فقط</h2>
+        <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+          لنشر الرحلات تحتاج لتفعيل حساب السائق وإكمال التحقق من الوثائق.
+        </p>
+        <Link to="/become-driver" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
+          تفعيل حساب السائق
+        </Link>
+      </div>
+    );
+  }
 
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
