@@ -136,18 +136,20 @@
     <link rel="preconnect" href="https://dimtdwahtwaslmnuakij.supabase.co" />
     <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
     <link rel="dns-prefetch" href="https://unpkg.com" />
-    <!-- Hero slideshow images load from Unsplash. Preconnect early so
-         the TLS handshake is done by the time React resolves which
-         slide to show. The first-slide preload below targets the
-         FALLBACK image (CITY_SLIDES[0]) — admin-uploaded slides come
-         from Supabase and can't be preloaded statically since they're
-         resolved at runtime. -->
+    <!-- Hero slideshow images load from Unsplash (admin-uploaded slide
+         URLs are typically Unsplash links). Preconnect early so the TLS
+         handshake is done by the time React resolves which slide to show.
+
+         No <link rel="preload"> for the first-slide image — admin-
+         uploaded slides come from Supabase and can't be preloaded
+         statically. We previously preloaded CITY_SLIDES[0] (the Dome
+         of the Rock fallback), but once admins populated their own
+         hero_city_slides that preload became wasted bandwidth — the
+         browser fetched a 248kB image users never saw. The mobile
+         hero's <img> tag uses fetchpriority="high" + loading="eager"
+         already (HeroSection.jsx line 174-177), which gets us most of
+         the LCP benefit for the actual displayed slide. -->
     <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
-    <link rel="preload" as="image" fetchpriority="high"
-          href="https://images.unsplash.com/photo-1552423314-cf29ab68ad73?w=1200&h=700&fit=crop&q=80"
-          imagesrcset="https://images.unsplash.com/photo-1552423314-cf29ab68ad73?w=800&h=500&fit=crop&q=80 800w,
-                       https://images.unsplash.com/photo-1552423314-cf29ab68ad73?w=1200&h=700&fit=crop&q=80 1200w"
-          imagesizes="100vw" />
 
     <!-- ── Google Analytics (replace GA_MEASUREMENT_ID) ── -->
     <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
