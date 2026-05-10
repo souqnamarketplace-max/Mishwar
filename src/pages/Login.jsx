@@ -20,7 +20,17 @@ export default function Login() {
   const auth = useAuth();
   const { login, register, resendConfirmation, isAuthenticated } = auth;
 
-  const [mode, setMode] = useState(searchParams.get('signup') === '1' ? 'signup' : 'login');
+  // ?signup=1 in the URL pre-selects the registration tab. Without this
+  // initializer a user clicking "إنشاء حساب" anywhere in the app would
+  // land on the login tab and have to switch manually.
+  //
+  // CRITICAL: the value MUST match the tab IDs declared at the form
+  // toggle below ('login' / 'register'). Earlier this was 'signup'
+  // which silently set mode to an unrecognized value — neither tab
+  // lit up, and BOTH forms hid (lines below check `mode === 'login'`
+  // and `mode === 'register'` strictly). Users saw a blank panel
+  // between the tab strip and the footer.
+  const [mode, setMode] = useState(searchParams.get('signup') === '1' ? 'register' : 'login');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
