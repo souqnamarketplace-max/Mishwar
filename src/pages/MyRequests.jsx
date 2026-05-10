@@ -9,6 +9,16 @@ import { friendlyError } from "@/lib/errors";
 import { toast } from "sonner";
 import { Plus, Inbox, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import RequestCard from "@/components/requests/RequestCard";
 
 /**
@@ -32,6 +42,12 @@ export default function MyRequests() {
   const qc       = useQueryClient();
   const navigate = useNavigate();
   const [tab, setTab] = useState("open");
+  // Custom-modal cancellation state — replaces the previous
+  // window.confirm() call which is forbidden in App Store / Play Store
+  // submissions (per app-stores compliance memo). Stores the request
+  // id whose cancellation is awaiting user confirmation; null when no
+  // modal is showing.
+  const [cancelTargetId, setCancelTargetId] = useState(null);
 
   if (!isLoadingAuth && !isAuthenticated) {
     navigate("/login?returnTo=/my-requests", { replace: true });
@@ -123,9 +139,7 @@ export default function MyRequests() {
               action={r.status === "open" ? (
                 <div className="flex items-center justify-end gap-3 pt-3 mt-3 border-t border-border/60">
                   <button
-                    onClick={() => {
-                      if (window.confirm("إلغاء هذا الطلب؟")) cancelMutation.mutate(r.id);
-                    }}
+                    onClick={() => setCancelTargetId(r.id)}
                     disabled={cancelMutation.isPending}
                     className="text-xs text-destructive hover:underline"
                   >
@@ -137,6 +151,36 @@ export default function MyRequests() {
           ))}
         </div>
       )}
+
+      {/* Cancel-confirmation modal — replaces window.confirm() for
+          App Store / Play Store compliance. Open is driven by
+          cancelTargetId state; a non-null id mounts the modal. */}
+      <AlertDialog
+        open={!!cancelTargetId}
+        onOpenChange={(open) => { if (!open) setCancelTargetId(null); }}
+      >
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>إلغاء هذا الطلب؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              لن يتمكن السائقون من رؤية طلبك بعد الإلغاء. يمكنك دائماً نشر طلب جديد لاحقاً.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>تراجع</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const id = cancelTargetId;
+                setCancelTargetId(null);
+                if (id) cancelMutation.mutate(id);
+              }}
+            >
+              نعم، ألغِ الطلب
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
