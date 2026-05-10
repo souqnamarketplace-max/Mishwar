@@ -11,6 +11,48 @@ updates:
       time: "07:00"
       timezone: "Asia/Jerusalem"
     open-pull-requests-limit: 5
+    # Ignore major-version bumps on packages that need a coordinated
+    # migration story. Dependabot was opening unmergeable PRs for these
+    # weekly, each one failing the Vercel preview build (and emailing on
+    # every retry). The PRs failed at `npm install` step — peer-dep
+    # conflicts that can't be resolved without bumping related packages
+    # together — long before vite or vercel had anything to do with it.
+    #
+    # When a real migration window opens for one of these, drop the
+    # corresponding ignore rule (or temporarily widen it to allow the
+    # specific bump). Until then, Dependabot will skip these and avoid
+    # filling the inbox with failed-build emails.
+    ignore:
+      # React 19 — needs a coordinated bump of react, react-dom,
+      # @types/react, @types/react-dom in one go, plus a sweep of any
+      # components using lifecycle patterns that React 19 deprecated.
+      # The auto-PR bumped only @types/react and broke peer deps.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      # Tailwind 4 is a complete rewrite — config syntax changed,
+      # @apply rules behave differently, plugin API is new. Needs a
+      # planned migration. Auto-PR also reverted unrelated changes
+      # because it was based on a stale package.json snapshot.
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      # @types/node major must match the runtime Node major Vercel
+      # provisions (currently node 22.x). Bumping types ahead of the
+      # runtime gives spurious errors for APIs that don't exist yet.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript major bumps frequently introduce stricter checks
+      # that surface latent issues across the whole codebase. Plan
+      # these manually rather than as drive-by Dependabot PRs. (The
+      # specific bump TypeScript 5→6 was also a misfire — TS 6 isn't
+      # a stable release at time of writing.)
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     # Group minor + patch bumps together so the inbox doesn't fill up.
     # Major bumps come as individual PRs since they need attention.
     groups:
