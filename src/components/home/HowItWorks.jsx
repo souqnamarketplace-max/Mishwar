@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, CheckCircle, Car, Users, DollarSign, MapPin, Clock, Star, Zap, Bell, Heart, ArrowRight } from "lucide-react";
+import { Search, CheckCircle, Car, Users, DollarSign, MapPin, Clock, Star, Zap, Bell, Heart, ArrowRight, Send, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 // ── Real app screen mockups ──────────────────────────────────────────────────
@@ -190,7 +190,101 @@ function ScreenEarnings() {
   );
 }
 
-// Phone wrapper
+// ── Trip-request flow mockups (the "اطلب رحلتك" tab) ─────────────────────────
+// Three screens walking the requester's journey:
+//   1. ScreenRequestForm — passenger fills out the request (route, date, price)
+//   2. ScreenDriversInterested — drivers on the route are messaging
+//   3. ScreenRequestMatched — passenger picked a driver and is in chat
+
+function ScreenRequestForm() {
+  return (
+    <div className="bg-gray-50 flex-1 p-2 space-y-2">
+      <div className="text-[9px] font-black text-center mb-1">اطلب رحلتك</div>
+      {[
+        { label: "من",      val: "رام الله",      icon: "🟢" },
+        { label: "إلى",     val: "القدس",          icon: "🔴" },
+        { label: "التاريخ", val: "بكرا 08:00",     icon: "📅" },
+        { label: "السعر",   val: "₪25 مقترح",     icon: "💰" },
+        { label: "المقاعد", val: "1 راكب",         icon: "👤" },
+      ].map(f => (
+        <div key={f.label} className="bg-white rounded-lg px-2 py-1.5 flex items-center gap-1.5 shadow-sm">
+          <span className="text-[9px]">{f.icon}</span>
+          <div className="flex-1">
+            <div className="text-[7px] text-gray-400">{f.label}</div>
+            <div className="text-[8px] font-medium">{f.val}</div>
+          </div>
+        </div>
+      ))}
+      <div className="bg-primary rounded-lg py-1.5 text-center mt-1 flex items-center justify-center gap-1">
+        <Send className="w-2.5 h-2.5 text-white" />
+        <span className="text-white text-[9px] font-bold">انشر الطلب</span>
+      </div>
+    </div>
+  );
+}
+
+function ScreenDriversInterested() {
+  return (
+    <div className="bg-gray-50 flex-1 p-2 space-y-2">
+      <div className="text-[9px] font-black text-center">سائقون مهتمون 🚗</div>
+      <div className="bg-amber-50 border border-amber-200 rounded-lg p-1.5 text-center">
+        <div className="text-[7.5px] text-amber-700 font-bold">3 سائقين تواصلوا معك</div>
+      </div>
+      {[
+        { name: "خالد الطيبي", car: "هيونداي إلنترا", rating: "4.9", price: "25" },
+        { name: "محمود نجار",   car: "كيا بيكانتو",   rating: "4.8", price: "22" },
+        { name: "سامر الحاج",   car: "تويوتا كورولا", rating: "4.9", price: "30" },
+      ].map((d, i) => (
+        <div key={i} className="bg-white rounded-xl p-2 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-0.5">
+            <div className="text-[8px] font-bold">{d.name}</div>
+            <div className="flex items-center gap-0.5">
+              <Star className="w-2 h-2 text-yellow-400 fill-yellow-400" />
+              <span className="text-[7.5px]">{d.rating}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="text-[7.5px] text-gray-400">{d.car}</div>
+            <div className="text-[8px] font-black text-primary">₪{d.price}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ScreenRequestMatched() {
+  return (
+    <div className="bg-gray-50 flex-1 flex flex-col">
+      <div className="bg-white px-2 py-1.5 flex items-center gap-1.5 shadow-sm border-b border-gray-100">
+        <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+          <span className="text-[8px] font-bold text-primary">خ</span>
+        </div>
+        <div className="flex-1">
+          <div className="text-[8px] font-bold">خالد الطيبي</div>
+          <div className="text-[7px] text-green-600">متصل الآن</div>
+        </div>
+        <Star className="w-2.5 h-2.5 text-yellow-400 fill-yellow-400" />
+      </div>
+      <div className="flex-1 p-2 space-y-1.5 overflow-hidden">
+        <div className="bg-white rounded-xl rounded-tr-sm p-1.5 max-w-[80%] shadow-sm self-start">
+          <div className="text-[7.5px]">مرحبا، شفت طلبك من رام الله للقدس. متاح بكرا 8 صبح بـ₪25</div>
+        </div>
+        <div className="bg-primary text-white rounded-xl rounded-tl-sm p-1.5 max-w-[80%] shadow-sm self-end ml-auto">
+          <div className="text-[7.5px]">ممتاز! نقطة الانطلاق دوار المنارة؟</div>
+        </div>
+        <div className="bg-white rounded-xl rounded-tr-sm p-1.5 max-w-[80%] shadow-sm self-start">
+          <div className="text-[7.5px]">تمام، باستناك هناك ✓</div>
+        </div>
+      </div>
+      <div className="bg-green-50 border-t border-green-200 px-2 py-1 text-center">
+        <span className="text-[7.5px] text-green-700 font-bold">✓ اتفقتوا على التفاصيل</span>
+      </div>
+    </div>
+  );
+}
+
+
 function PhoneFrame({ children, headerTitle, headerColor = "bg-primary" }) {
   return (
     <motion.div
@@ -266,7 +360,7 @@ const SCENARIOS = {
       },
       {
         num: 2, title: "استقبل الركاب",
-        desc: "خلال 20 دقيقة حجز 3 ركاب — محمود وافق على طلباتهم بضغطة واحدة من شاشته",
+        desc: "خلال 20 دقيقة حجز 3 ركاب — محمود وافق على طلباتهم بضغطة واحدة من شاشته. وكمان شاف طلبات راكبين تانيين على نفس مساره وتواصل معهم",
         screen: <ScreenPassengers />, headerTitle: "إدارة الحجوزات",
         color: "from-primary to-primary/80", icon: Users, saving: null,
       },
@@ -275,6 +369,36 @@ const SCENARIOS = {
         desc: "محمود كان رايح على أي حال — الآن بيغطي تكاليف البنزين ويربح ₪380 فوقها أسبوعياً",
         screen: <ScreenEarnings />, headerTitle: "لوحة الأرباح",
         color: "from-amber-500 to-amber-600", icon: DollarSign, saving: "₪380 ربح إضافي أسبوعياً",
+      },
+    ],
+  },
+  // The "requester" scenario added as the third pillar of the platform's
+  // UX. Previously the home-page How-It-Works only had passenger (search +
+  // book) and driver (publish + earn), making the trip-request feature
+  // invisible on the highest-traffic surface. Without this tab, a passenger
+  // who searched and got zero results had no on-ramp into the request
+  // flow from the front door — the discovery surface was buried inside
+  // /search's empty state and the full /how-it-works page only.
+  requester: {
+    story: "سارة من رام الله، بدها تروح القدس بكرا الصبح",
+    steps: [
+      {
+        num: 1, title: "اطلب بدقيقة",
+        desc: "سارة ما لقيت رحلة جاهزة بوقتها — نشرت طلب: من رام الله للقدس، الساعة 8، ₪25 مقترح",
+        screen: <ScreenRequestForm />, headerTitle: "طلب رحلة",
+        color: "from-purple-500 to-purple-600", icon: Send, saving: null,
+      },
+      {
+        num: 2, title: "السائقون يبادرون",
+        desc: "خلال ساعتين، 3 سائقين بنفس المسار شافوا طلبها وبعتولها رسائل — كل واحد بسعره وموعده",
+        screen: <ScreenDriversInterested />, headerTitle: "ردود السائقين",
+        color: "from-primary to-primary/80", icon: Bell, saving: null,
+      },
+      {
+        num: 3, title: "اختاري وانطلقي",
+        desc: "اختارت سارة سائق بتقييم 4.9 — اتفقوا على نقطة الانطلاق ووصلت القدس بأمان",
+        screen: <ScreenRequestMatched />, headerTitle: "محادثة مع السائق",
+        color: "from-green-600 to-green-500", icon: MessageCircle, saving: "مجاناً — لا اشتراك",
       },
     ],
   },
@@ -307,16 +431,27 @@ export default function HowItWorks() {
             كيف يشتغل <span className="text-primary">مشوارو؟</span>
           </h2>
           <p className="text-muted-foreground max-w-lg mx-auto">
-            سواء كنت مسافراً أو سائقاً — مشوارو يوصلك في 3 خطوات بسيطة
+            مسافر، طالب رحلة، أو سائق — مشوارو يوصلك في 3 خطوات بسيطة
           </p>
-          {/* Toggle */}
-          <div className="flex justify-center gap-3 mt-8">
+          {/* Toggle — 3 tabs (passenger / requester / driver). On
+              375px-wide mobile screens these wrap to 2 rows when
+              needed; on tablets and up they fit on one row.
+              Sizing: shrunk px-5→px-4 and gap-3→gap-2 so all three
+              fit comfortably below the headline without horizontal
+              scroll. The middle "اطلب رحلتك" tab is intentionally
+              between passenger and driver because it's a direction
+              passengers go to AFTER they fail to find a matching
+              listed trip — natural reading order from "I want to
+              travel" → "but no trip matches, request one" → "I
+              want to drive". */}
+          <div className="flex flex-wrap justify-center gap-2 mt-8">
             {[
-              { id: "passenger", label: "🎫 أريد أسافر", sub: "ابحث واحجز" },
-              { id: "driver",    label: "🚗 أريد أوصّل", sub: "أنشر واكسب" },
+              { id: "passenger", label: "🎫 أريد أسافر",      sub: "ابحث واحجز" },
+              { id: "requester", label: "🙋 أريد أطلب رحلة", sub: "انشر طلبك" },
+              { id: "driver",    label: "🚗 أريد أوصّل",      sub: "أنشر واكسب" },
             ].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className={`px-5 py-3 rounded-2xl text-sm font-bold transition-all duration-300 text-right ${
+                className={`px-4 py-2.5 rounded-2xl text-sm font-bold transition-all duration-300 text-right ${
                   tab === t.id
                     ? "bg-primary text-primary-foreground shadow-lg scale-105"
                     : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -394,7 +529,7 @@ export default function HowItWorks() {
               <motion.div key={`chips-${tab}-${activeStep}`}
                 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 className="flex flex-wrap gap-2 justify-center max-w-xs">
-                {tab === "passenger" ? (
+                {tab === "passenger" && (
                   <>
                     <div className="flex items-center gap-1.5 bg-card border border-border rounded-full px-3 py-1.5 text-xs font-medium shadow-sm">
                       <MapPin className="w-3 h-3 text-primary" /> رام الله ← نابلس
@@ -406,7 +541,21 @@ export default function HowItWorks() {
                       💰 وفّر ₪75 عن التاكسي
                     </div>
                   </>
-                ) : (
+                )}
+                {tab === "requester" && (
+                  <>
+                    <div className="flex items-center gap-1.5 bg-card border border-border rounded-full px-3 py-1.5 text-xs font-medium shadow-sm">
+                      <Send className="w-3 h-3 text-primary" /> رام الله ← القدس
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-card border border-border rounded-full px-3 py-1.5 text-xs font-medium shadow-sm">
+                      <Users className="w-3 h-3 text-accent" /> 3 سائقين تواصلوا
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1.5 text-xs font-bold text-purple-700">
+                      ✨ مجاناً — لا اشتراك
+                    </div>
+                  </>
+                )}
+                {tab === "driver" && (
                   <>
                     <div className="flex items-center gap-1.5 bg-card border border-border rounded-full px-3 py-1.5 text-xs font-medium shadow-sm">
                       <Car className="w-3 h-3 text-primary" /> نابلس ← رام الله
@@ -424,17 +573,21 @@ export default function HowItWorks() {
           </div>
         </div>
 
-        {/* CTA */}
+        {/* CTA — three-way to match the three tabs above */}
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
           className="text-center mt-14">
           <p className="text-muted-foreground mb-5 text-sm">جرّب بنفسك — الحجز الأول مجاناً</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
             <Link to="/search"
-              className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-8 py-3.5 rounded-2xl font-bold text-base hover:bg-primary/90 transition-all shadow-lg active:scale-95">
-              <Search className="w-5 h-5" /> ابحث عن رحلة الآن
+              className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground px-6 py-3.5 rounded-2xl font-bold text-base hover:bg-primary/90 transition-all shadow-lg active:scale-95">
+              <Search className="w-5 h-5" /> ابحث عن رحلة
+            </Link>
+            <Link to="/request-trip"
+              className="inline-flex items-center justify-center gap-2 bg-card border-2 border-primary/30 text-primary px-6 py-3.5 rounded-2xl font-bold text-base hover:bg-primary/5 transition-all active:scale-95">
+              <Send className="w-5 h-5" /> اطلب رحلة
             </Link>
             <Link to="/create-trip"
-              className="inline-flex items-center justify-center gap-2 bg-card border-2 border-border text-foreground px-8 py-3.5 rounded-2xl font-bold text-base hover:border-primary/30 hover:bg-muted/50 transition-all active:scale-95">
+              className="inline-flex items-center justify-center gap-2 bg-card border-2 border-border text-foreground px-6 py-3.5 rounded-2xl font-bold text-base hover:border-primary/30 hover:bg-muted/50 transition-all active:scale-95">
               <Car className="w-5 h-5" /> أنشر رحلتك
             </Link>
           </div>
