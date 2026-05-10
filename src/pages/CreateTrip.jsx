@@ -426,7 +426,12 @@ export default function CreateTrip() {
     };
 
     if (form.is_recurring && form.recurring_days.length > 0) {
-      // Create a trip for each selected recurring day
+      // Create a trip for each selected recurring day. We use
+      // allSettled (not all) so a date conflict on one specific day
+      // — e.g. the driver already published a trip for next Tuesday
+      // and the trigger blocks the duplicate — doesn't tank the whole
+      // batch. The other days still publish, and we report a partial-
+      // success toast so the driver knows exactly what landed.
       const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
       const baseDate = new Date(form.date);
       const promises = form.recurring_days.map(dayIndex => {
@@ -440,10 +445,41 @@ export default function CreateTrip() {
           driver_note: (baseData.driver_note || "") + " (رحلة يومية - " + dayNames[dayIndex] + ")",
         });
       });
-      const createdTrips = await Promise.all(promises);
-      toast.success(`تم نشر ${form.recurring_days.length} رحلات متكررة بنجاح! 🎉`);
-      // Notify matching preferences for first recurring trip
-      if (createdTrips[0]) notifyMatchingPreferences({ ...baseData, id: createdTrips[0]?.id || createdTrips[0] });
+      const results = await Promise.allSettled(promises);
+      const succeeded = results.filter(r => r.status === "fulfilled");
+      const failed    = results.filter(r => r.status === "rejected");
+
+      // Cache invalidation — was missing before, so the driver hit
+      // /my-trips and saw stale data without the new recurring rows
+      // until react-query's stale-while-revalidate kicked in. Also
+      // matches the single-trip path below.
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["featured-trips"] });
+
+      if (failed.length === 0) {
+        toast.success(`تم نشر ${succeeded.length} رحلات متكررة بنجاح! 🎉`);
+      } else if (succeeded.length === 0) {
+        // All failed — show first error message (likely the same
+        // reason for all of them, e.g. eligibility or date conflict)
+        const firstErr = failed[0].reason;
+        toast.error(friendlyError(firstErr, "تعذر نشر الرحلات المتكررة"));
+        return; // don't navigate away — let user fix and retry
+      } else {
+        // Partial success — most useful case, let the driver know
+        // exactly what landed and what didn't
+        toast.warning(
+          `نشرنا ${succeeded.length} من ${promises.length} رحلات. ` +
+          `${failed.length} رحلة لم تُنشر — تحقق من التواريخ المتعارضة.`
+        );
+      }
+
+      // Notify matching preferences for first recurring trip that
+      // actually succeeded (was using results[0] before which could
+      // be a rejected one).
+      const firstOk = succeeded[0]?.value;
+      if (firstOk) notifyMatchingPreferences({ ...baseData, id: firstOk?.id || firstOk });
     } else {
       try {
         const newTrip = await base44.entities.Trip.create(baseData);
