@@ -4,10 +4,9 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
-import { CheckCircle, MapPin, Calendar, Clock, Users, MessageCircle, ArrowLeft } from "lucide-react";
+import { CheckCircle, MapPin, Calendar, Clock, Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-function cleanPhone(p) { return (p || "").split("").filter(c => c >= "0" && c <= "9").join(""); }
 function paymentLabel(m) {
   if (m === "bank_transfer") return "🏦 تحويل بنكي";
   if (m === "reflect")       return "💜 Reflect";
@@ -25,18 +24,43 @@ export default function BookingConfirmation() {
 
   const { data: bookings = [] } = useQuery({
     queryKey: ["booking-confirm", tripId, user?.email],
-    queryFn: () => base44.entities.Booking.filter({ passenger_email: user?.email }, "-created_date", 5),
-    enabled: !!user?.email,
+    queryFn: () => user?.email && tripId
+      // Filter by trip_id so the page shows the booking on THIS trip
+      // rather than whichever booking happened to be most recent
+      // for this user. Previously a passenger who booked Trip A
+      // then opened /booking-confirmation?trip=B (e.g. by clicking
+      // an old notification link) would see Trip A's booking ref
+      // number and seat count rendered against Trip B's route.
+      // Filter to {trip_id, passenger_email} for an exact match.
+      ? base44.entities.Booking.filter({ trip_id: tripId, passenger_email: user.email }, "-created_date", 1)
+      : [],
+    enabled: !!user?.email && !!tripId,
   });
 
-  const { data: trips = [] } = useQuery({
+  const { data: trip } = useQuery({
     queryKey: ["trip-confirm", tripId],
-    queryFn: () => base44.entities.Trip.list("-created_date", 100),
+    // Direct lookup. The previous code did Trip.list("-created_date",
+    // 100) then array.find(t => t.id === tripId) || trips[0]. Two real
+    // problems with that:
+    //   (a) Fetched up to 100 trips to find one — wasteful and slow.
+    //   (b) The `|| trips[0]` fallback was actively dangerous. If the
+    //       requested trip wasn't in the latest 100 (older trip a
+    //       passenger booked weeks ago, then revisited the
+    //       confirmation page), the page silently rendered an
+    //       UNRELATED trip's route, driver, car, and payment
+    //       details against this passenger's booking. They could
+    //       end up reading payment instructions for the wrong
+    //       driver — including a wrong bank account number to
+    //       transfer to.
+    // .get() returns the single trip or null. Null falls through to
+    // the existing \"جاري تحميل تفاصيل الحجز...\" empty state, which
+    // is the correct behaviour: better to show \"loading\" than the
+    // wrong trip.
+    queryFn: () => tripId ? base44.entities.Trip.get(tripId) : null,
     enabled: !!tripId,
   });
 
   const booking = bookings[0];
-  const trip    = trips.find(t => t.id === tripId) || trips[0];
 
   // Fetch the driver's payment info via the get_driver_payment_info RPC
   // (migration 006). The RPC enforces authorization server-side: only
@@ -64,11 +88,6 @@ export default function BookingConfirmation() {
   const refNum      = (booking?.id || "").slice(-8).toUpperCase() || "--------";
   const method      = booking?.payment_method || "cash";
   const amount      = booking?.total_price || trip?.price || 0;
-  const waText      = encodeURIComponent(
-    user && trip
-      ? `مرحباً، أنا ${user.full_name || user.email}. حجزت ${booking?.seats_booked || 1} مقعد في رحلتك من ${trip.from_city} إلى ${trip.to_city} بتاريخ ${trip.date}. رقم الحجز: #${refNum}`
-      : "مرحباً"
-  );
 
   if (!trip || !booking) {
     return (
