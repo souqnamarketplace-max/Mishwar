@@ -35,29 +35,89 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const cancelMutation = useMutation({
     mutationFn: async (tripId) => {
       await base44.entities.Trip.update(tripId, { status: "cancelled" });
-      // Pull confirmed bookings on this trip so we can flip them to the
-      // driver-cancelled state. If a passenger had already paid (cash or
-      // transfer), set refund_required so admins can see the open obligation
-      // in the payments tab. Without this flag, paid bookings on cancelled
-      // trips were invisible to the refund queue.
-      const bookings = await base44.entities.Booking.filter({ trip_id: tripId, status: "confirmed" }, "-created_date", 100);
-      for (const b of bookings) {
-        try {
+      // Pull BOTH pending and confirmed bookings on this trip so they
+      // all get flipped to cancelled_by_driver. Previously this only
+      // pulled confirmed bookings, leaving pending ones stuck — a
+      // passenger whose request was waiting for driver approval at
+      // the moment the driver cancelled the trip ended up with a
+      // pending booking on a cancelled trip forever, with no UI to
+      // get out of that state.
+      // Also captures the trip data here (name + cities) so we can
+      // include them in the passenger notifications below.
+      const tripData = await base44.entities.Trip.get(tripId).catch(() => null);
+      const bookings = await base44.entities.Booking.filter(
+        { trip_id: tripId },
+        "-created_date",
+        200
+      );
+      const affected = bookings.filter(b => b.status === "pending" || b.status === "confirmed");
+
+      // Update booking rows. Track failures so the toast can report
+      // accurately instead of claiming success when half the bookings
+      // didn't actually move. allSettled lets independent updates
+      // proceed if one row hits a transient error.
+      const updateResults = await Promise.allSettled(
+        affected.map(b => {
+          // Cash bookings can't be "paid" in-flight, but transfer/Jawwal/
+          // Reflect bookings can be — flag those for the admin refund queue.
           const refundFields = b.payment_status === "paid"
             ? { refund_required: true, refund_status: "pending" }
             : {};
-          await base44.entities.Booking.update(b.id, {
+          return base44.entities.Booking.update(b.id, {
             status: "cancelled_by_driver",
             ...refundFields,
           });
-        } catch (e) {
-          console.warn("Failed to cancel booking:", b.id, e);
-        }
-      }
-      return tripId;
+        })
+      );
+      const failedUpdates = updateResults.filter(r => r.status === "rejected").length;
+
+      // Send actual notifications. The previous toast claimed
+      // \"وإعلام الركاب\" but there was no Notification.create call
+      // anywhere in this flow — passengers got zero notification.
+      // They saw their booking status flip in /my-trips next time
+      // they opened the app but had no push, no bell-icon nudge,
+      // no Arabic explanation of what happened.
+      // Best-effort: we still flipped the bookings even if some
+      // notification inserts fail (allSettled, silent).
+      const route = tripData
+        ? `من ${tripData.from_city} إلى ${tripData.to_city}`
+        : "";
+      const date = tripData?.date || "";
+      await Promise.allSettled(
+        affected.map(b =>
+          base44.entities.Notification.create({
+            user_email: b.passenger_email,
+            title: "تم إلغاء الرحلة من قبل السائق",
+            message: `نأسف، السائق ألغى الرحلة ${route} ${date ? `بتاريخ ${date}` : ""}. ` +
+              (b.payment_status === "paid"
+                ? "سيتم استرداد المبلغ المدفوع — تابع الإشعارات."
+                : "ابحث عن رحلة بديلة على نفس المسار."),
+            type: "system",
+            trip_id: tripId,
+            link: "/my-trips",
+            is_read: false,
+          })
+        )
+      );
+
+      return { tripId, affected: affected.length, failedUpdates };
     },
-    onSuccess: () => {
-      toast.success("تم إلغاء الرحلة وإعلام الركاب");
+    onSuccess: ({ affected, failedUpdates }) => {
+      // Honest toast — match what actually happened. The previous
+      // \"تم إلغاء الرحلة وإعلام الركاب\" claimed success even when
+      // notifications were never sent.
+      if (failedUpdates === 0) {
+        toast.success(
+          affected === 0
+            ? "تم إلغاء الرحلة"
+            : `تم إلغاء الرحلة وإشعار ${affected} راكب`
+        );
+      } else {
+        toast.warning(
+          `تم إلغاء الرحلة، لكن لم نتمكن من تحديث ${failedUpdates} حجز. ` +
+          `يمكنك مراجعتها من قائمة الرحلات.`
+        );
+      }
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });

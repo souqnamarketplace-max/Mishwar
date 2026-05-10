@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/adminAudit";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -68,18 +69,29 @@ export default function BookingRequestPopup({ user }) {
 
   const updateBooking = useMutation({
     mutationFn: async ({ id, status }) => {
-      await base44.entities.Booking.update(id, { status });
-      // Restore seats if driver rejects a pending booking
+      // Reject path → cancel_booking RPC (migration 018) for atomic
+      // status flip + seat refund + strike-aware authorization. The
+      // previous implementation did Booking.update + manual seat
+      // restore from react-query cache, with the same lost-update
+      // race as the other three cancel sites we cleaned up this
+      // session (DriverPassengers, base44Client.cancelBooking,
+      // MyTrips passenger cancel — see commits a0c5587 and 2b2028b).
+      // Driver rejecting from a popup is a pending-booking case in
+      // practice (popups don't fire for already-confirmed bookings)
+      // so this surface didn't have the confirmed-booking seat-leak
+      // bug, but the racy cache write + non-atomic two-step pattern
+      // applies the same. RPC fixes both for free.
+      // Approve path keeps Booking.update — confirming doesn't change
+      // seat counts and the RPC has no equivalent for that direction.
       if (status === "cancelled") {
-        const booking = allBookings.find(b => b.id === id);
-        if (booking?.trip_id) {
-          const trip = myTrips.find(t => t.id === booking.trip_id);
-          if (trip) {
-            const restoredSeats = (trip.available_seats || 0) + (booking.seats_booked || 1);
-            await base44.entities.Trip.update(booking.trip_id, { available_seats: restoredSeats });
-          }
-        }
+        const { error } = await supabase.rpc("cancel_booking", {
+          booking_id_param: id,
+          reason_param: "driver_reject_popup",
+        });
+        if (error) throw error;
+        return;
       }
+      await base44.entities.Booking.update(id, { status });
     },
     onSuccess: async (_, { id, status }) => {
       qc.invalidateQueries({ queryKey: ["popup-bookings", user.email] });
