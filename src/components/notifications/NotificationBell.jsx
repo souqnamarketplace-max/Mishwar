@@ -10,47 +10,13 @@ import {
   ensurePermission,
   showIncomingNotification,
 } from "@/lib/pushNotifications";
+import { getNotifTarget } from "@/lib/notificationRouting";
 
-// Determine where each notification should navigate.
-// Priority order:
-//   1. notif.link — explicit deep-link set by the producer (verification
-//      requests, subscription decisions, license review, report status,
-//      etc.). Set everywhere we need a precise destination that title-
-//      matching can't infer reliably.
-//   2. notif.trip_id — booking/trip family of notifications, route by
-//      title heuristics into the right driver/passenger surface.
-//   3. Title-based fallback — legacy notifications without trip_id or
-//      link still get a sensible target instead of dumping the user
-//      on /notifications.
-function getNotifTarget(notif) {
-  const t = notif.title || "";
-  const type = notif.type || "system";
-
-  // 1. Explicit deep-link wins — used by every admin-targeted notification
-  //    (passenger verification queue, subscription approvals, etc.) and by
-  //    every admin→user notification (license approve/reject, subscription
-  //    approve/reject, report status update, trip-request contact). Without
-  //    this, the bell-icon click landed on /notifications and forced the
-  //    user to tap the row a second time to reach the actual destination.
-  if (notif.link) return notif.link;
-
-  if (notif.trip_id) {
-    // Booking requests → driver dashboard
-    if (t.includes("حجز جديد") || t.includes("طلب حجز")) return "/driver?tab=passengers";
-    // Trip started/completed for passenger → my trips
-    if (t.includes("انطلقت") || t.includes("اكتملت") || t.includes("قيّم السائق")) return "/my-trips";
-    // New trip match → trip details
-    if (type === "new_trip") return `/trip/${notif.trip_id}`;
-    // Rating received → driver ratings
-    if (t.includes("تقييم جديد")) return "/driver?tab=ratings";
-    // Default with trip_id → trip details
-    return `/trip/${notif.trip_id}`;
-  }
-  // No trip_id, no link — title-based fallback for legacy rows
-  if (t.includes("تقييم")) return "/driver?tab=ratings";
-  if (t.includes("حجز")) return "/my-trips";
-  return "/notifications";
-}
+// Notification routing logic moved to src/lib/notificationRouting.js
+// so the bell popup AND the full-page Notifications list use the
+// same destination logic — they used to disagree, sending users to
+// different places for identical notification rows. See the util's
+// docstring for the full priority order.
 
 // Icon per notification type
 function NotifIcon({ type, title }) {

@@ -1,5 +1,6 @@
 import { CITIES } from "@/lib/cities";
 import { useSEO } from "@/hooks/useSEO";
+import { getNotifTarget } from "@/lib/notificationRouting";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -358,21 +359,20 @@ export default function Notifications() {
                       qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
                       qc.invalidateQueries({ queryKey: ["notifications"] });
                     }
-                    // Type-based routing
-                    const link = notif.link;
-                    if (link) { navigate(link); return; }
-                    switch (notif.type) {
-                      case 'booking_received':    navigate('/my-trips?tab=driver'); break;
-                      case 'booking_cancelled':   navigate('/my-trips?tab=driver'); break;
-                      case 'trip_cancelled':      navigate('/my-trips'); break;
-                      case 'license_approved':
-                      case 'license_rejected':    navigate('/settings'); break;
-                      case 'new_message':         navigate('/messages'); break;
-                      case 'new_review':
-                      default:
-                        if (notif.trip_id) navigate(`/trip/${notif.trip_id}`);
-                        break;
-                    }
+                    // Routing — single source of truth shared with the bell
+                    // popup (src/lib/notificationRouting.js). Was previously
+                    // a switch on notif.type with cases for values nothing
+                    // in the producer side actually emits (booking_received,
+                    // booking_cancelled, etc. — every insert uses
+                    // type='system' and differentiates via title/trip_id).
+                    // Result: every real notification fell into the default
+                    // and either no-oped (no trip_id) or sent the user to
+                    // a different place than the bell would have. The util
+                    // implements the same priority order both surfaces had
+                    // implicitly agreed on (notif.link > trip_id+title >
+                    // type > title-fallback > /notifications safety net).
+                    const target = getNotifTarget(notif);
+                    if (target) navigate(target);
                   }}
                 >
                   <div className="flex items-start justify-between gap-3">
