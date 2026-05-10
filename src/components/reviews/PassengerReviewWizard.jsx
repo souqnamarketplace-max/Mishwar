@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { base44 } from "@/api/base44Client";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { notifyUser } from "@/lib/notifyUser";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
@@ -54,19 +55,21 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
 
       // Notify driver
       if (publicReview) {
-        await base44.entities.Notification.create({
+        await notifyUser({
           user_email: driverEmail,
           title: `تقييم جديد من ${passengerUser?.full_name || "راكب"} ⭐`,
           message: `حصلت على ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${publicReview ? `: "${publicReview}"` : ""}`,
-          type: "system", trip_id: trip.id, is_read: false,
+          type: "system",
+          trip_id: trip.id,
         });
       }
       if (privateMsg) {
-        await base44.entities.Notification.create({
+        await notifyUser({
           user_email: driverEmail,
           title: "رسالة خاصة من راكب 📩",
           message: privateMsg,
-          type: "system", trip_id: trip.id, is_read: false,
+          type: "system",
+          trip_id: trip.id,
         });
       }
       // Low-rating signal to admin — gives admin a quality signal to

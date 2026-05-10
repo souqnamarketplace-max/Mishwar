@@ -5,6 +5,7 @@ import GPSTripTracker from "@/components/driver/GPSTripTracker";
 import { createPortal } from "react-dom";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
+import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -85,7 +86,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       const date = tripData?.date || "";
       await Promise.allSettled(
         affected.map(b =>
-          base44.entities.Notification.create({
+          notifyUser({
             user_email: b.passenger_email,
             title: "تم إلغاء الرحلة من قبل السائق",
             message: `نأسف، السائق ألغى الرحلة ${route} ${date ? `بتاريخ ${date}` : ""}. ` +
@@ -95,7 +96,6 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             type: "system",
             trip_id: tripId,
             link: "/my-trips",
-            is_read: false,
           })
         )
       );
@@ -147,11 +147,12 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         // Notify all confirmed passengers
         const passengers = (tripBookings || []).filter(b => b.trip_id === id && b.status === "confirmed");
         await Promise.allSettled(passengers.map(b =>
-          base44.entities.Notification.create({
+          notifyUser({
             user_email: b.passenger_email,
             title: "رحلتك انطلقت! 🚗",
             message: `السائق ${trip?.driver_name || ""} انطلق من ${trip?.from_city} إلى ${trip?.to_city}. استعد للوصول خلال ${trip?.duration || "المدة المحددة"}.`,
-            type: "system", trip_id: id, is_read: false,
+            type: "system",
+            trip_id: id,
           })
         ));
       } else if (data.status === "completed") {
@@ -159,11 +160,12 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         // Notify passengers trip completed — with rating prompt
         const passengers = (tripBookings || []).filter(b => b.trip_id === id && b.status === "confirmed");
         await Promise.allSettled(passengers.map(b =>
-          base44.entities.Notification.create({
+          notifyUser({
             user_email: b.passenger_email,
             title: "اكتملت الرحلة ✅ — قيّم السائق",
             message: `وصلت رحلتك من ${trip?.from_city} إلى ${trip?.to_city} مع السائق ${trip?.driver_name || ""}. شكراً لاستخدامك مشوارو! اذهب إلى رحلاتي وقيّم السائق لمساعدة المجتمع.`,
-            type: "system", trip_id: id, is_read: false,
+            type: "system",
+            trip_id: id,
           })
         ));
       } else {

@@ -7,6 +7,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
+import { notifyUser } from "@/lib/notifyUser";
 import { logAudit } from "@/lib/adminAudit";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -100,27 +101,27 @@ export default function BookingRequestPopup({ user }) {
 
       const booking = allBookings.find(b => b.id === id);
       if (booking?.passenger_email) {
-        try {
-          if (status === "confirmed") {
-            await base44.entities.Notification.create({
-              user_email: booking.passenger_email,
-              title: "تم قبول حجزك ✅",
-              message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}.`,
-              type: "system", trip_id: booking.trip_id, is_read: false,
-            });
-            logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
-            toast.success("✅ تم قبول الحجز");
-          } else {
-            await base44.entities.Notification.create({
-              user_email: booking.passenger_email,
-              title: "تم رفض حجزك ❌",
-              message: "نأسف، تم رفض طلب حجزك من قبل السائق.",
-              type: "system", trip_id: booking.trip_id, is_read: false,
-            });
-            logAudit("driver_reject_booking", "booking", id, { passenger_email: booking.passenger_email });
-            toast.error("❌ تم رفض الحجز");
-          }
-        } catch {}
+        if (status === "confirmed") {
+          await notifyUser({
+            user_email: booking.passenger_email,
+            title: "تم قبول حجزك ✅",
+            message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}.`,
+            type: "system",
+            trip_id: booking.trip_id,
+          });
+          logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
+          toast.success("✅ تم قبول الحجز");
+        } else {
+          await notifyUser({
+            user_email: booking.passenger_email,
+            title: "تم رفض حجزك ❌",
+            message: "نأسف، تم رفض طلب حجزك من قبل السائق.",
+            type: "system",
+            trip_id: booking.trip_id,
+          });
+          logAudit("driver_reject_booking", "booking", id, { passenger_email: booking.passenger_email });
+          toast.error("❌ تم رفض الحجز");
+        }
       }
     },
     onError: (err) => toast.error(friendlyError(err, "فشل تحديث الحجز — حاول مجدداً")),

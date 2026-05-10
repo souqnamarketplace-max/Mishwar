@@ -73,20 +73,22 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
 
           // 3. Notify passenger of public review
           if (p.public_review) {
-            await base44.entities.Notification.create({
+            await notifyUser({
               user_email: p.email,
               title: "تقييم جديد على ملفك ⭐",
               message: `كتب السائق تقييماً عن رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
-              type: "system", trip_id: trip.id, is_read: false,
+              type: "system",
+              trip_id: trip.id,
             });
           }
           // 4. Private message as notification
           if (p.private_message) {
-            await base44.entities.Notification.create({
+            await notifyUser({
               user_email: p.email,
               title: "رسالة خاصة من السائق 📩",
               message: p.private_message,
-              type: "system", trip_id: trip.id, is_read: false,
+              type: "system",
+              trip_id: trip.id,
             });
           }
         }

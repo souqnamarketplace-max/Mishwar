@@ -7,6 +7,7 @@ import { base44 } from "@/api/base44Client";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { notifyUser } from "@/lib/notifyUser";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,19 +91,24 @@ export default function MyTrips() {
       qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
       logAudit("booking_cancelled_by_passenger", "booking", bookingId, { passenger_email: user?.email });
       toast.success("تم إلغاء الحجز بنجاح");
-      // Notify driver that the booking was cancelled
+      // Notify driver that the booking was cancelled. Routes through
+      // notifyUser → create_notification RPC (migration 027) so the
+      // cross-user insert clears the migration 002 RLS check via Rule D
+      // (caller and target share a booking on a trip). Previously this
+      // hit notifications_insert directly and the RLS rejection was
+      // silently swallowed by the catch block — drivers never actually
+      // got the bell ping when a passenger self-cancelled.
       try {
         const booking = passengerBookings?.find(b => b.id === bookingId);
         const trip = allTrips?.find(t => t.id === booking?.trip_id);
         if (trip?.driver_email && user?.email) {
-          await base44.entities.Notification.create({
+          await notifyUser({
             user_email: trip.driver_email,
             title: "تم إلغاء حجز على رحلتك",
             message: `${user.full_name || user.email} ألغى حجزه في رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
-            type: "booking_cancelled",
+            type: "system",
             trip_id: trip.id,
             link: "/my-trips?tab=driver",
-            is_read: false,
           });
         }
       } catch (e) { console.warn("[Notif] booking_cancelled:", e?.message); }

@@ -22,7 +22,8 @@
  *  - One place to add things later (rate-limiting, dedup, push fan-out).
  */
 
-import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
+import { captureException } from "@/lib/sentry";
 
 export const ADMIN_EMAIL = "souqnamarketplace@gmail.com";
 
@@ -46,20 +47,38 @@ export async function notifyAdmin({
     return null;
   }
   try {
-    return await base44.entities.Notification.create({
-      user_email: ADMIN_EMAIL,
-      title,
-      message,
-      type,
-      trip_id,
-      link,
-      is_read: false,
+    // Route through the create_notification RPC (migration 027) instead of
+    // a direct Notification.create. Rationale:
+    //
+    // The notifications_insert RLS policy from migration 002 only admits
+    // self-targeted writes OR admin-role writes. Regular users pinging the
+    // admin (city suggestions, reports, verification queue, license queue,
+    // subscription requests, review flags) failed the WITH CHECK silently —
+    // the previous direct create call here triggered an RLS rejection that
+    // the catch block below swallowed. Net effect: the admin (you) was
+    // never getting bell pings about user activity. The admin dashboard's
+    // tab queues (which poll directly) showed the items, but the
+    // notification badge never lit up.
+    //
+    // The RPC has Rule C: any authenticated user can ping admins. The
+    // admin-target check is server-side via profiles.role. So this works
+    // for the ADMIN_EMAIL constant AND would continue to work if the admin
+    // role is ever granted to a different account.
+    const { data, error } = await supabase.rpc("create_notification", {
+      p_user_email: ADMIN_EMAIL,
+      p_title:      title,
+      p_message:    message,
+      p_type:       type,
+      p_trip_id:    trip_id,
+      p_link:       link,
     });
+    if (error) throw error;
+    return data; // returns the new notification's UUID
   } catch (err) {
     // Swallow — admin notification failures should NEVER break the
     // user-facing action that triggered them. Log so we can see it
-    // in dev console, but don't bubble.
-    console.warn("[notifyAdmin] failed to deliver:", err?.message || err);
+    // in Sentry without disrupting the user.
+    captureException(err, { msg: "[notifyAdmin] failed to create admin notification" });
     return null;
   }
 }

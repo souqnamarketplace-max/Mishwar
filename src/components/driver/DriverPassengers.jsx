@@ -2,6 +2,7 @@ import React from "react";
 import { logAudit } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
+import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, MapPin, ArrowLeft, Phone, Star, CheckCircle, XCircle, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -82,24 +83,22 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
         const booking = allBookings.find(b => b.id === id);
         if (booking?.passenger_email) {
           if (status === "confirmed") {
-            await base44.entities.Notification.create({
+            await notifyUser({
               user_email: booking.passenger_email,
               title: "تم قبول حجزك ✅",
               message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}. تحقق من تفاصيل الدفع في صفحة تأكيد الحجز.`,
               type: "system",
               trip_id: booking.trip_id,
-              is_read: false,
             });
             logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
             toast.success("تم قبول الحجز وإخطار الراكب ✅");
           } else if (status === "cancelled") {
-            await base44.entities.Notification.create({
+            await notifyUser({
               user_email: booking.passenger_email,
               title: "تم رفض حجزك ❌",
               message: "عذراً، قام السائق برفض حجزك. يمكنك البحث عن رحلة أخرى.",
               type: "system",
               trip_id: booking.trip_id,
-              is_read: false,
             });
             logAudit("driver_reject_booking", "booking", id, { passenger_email: booking.passenger_email });
             toast.info("تم رفض الحجز وإخطار الراكب");

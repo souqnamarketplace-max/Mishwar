@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { useGPSTripCompletion } from "@/lib/gpsTracking";
 import { base44 } from "@/api/base44Client";
+import { notifyUser } from "@/lib/notifyUser";
 import { useQueryClient } from "@tanstack/react-query";
 import { Navigation, MapPin, Clock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,11 +31,12 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
       await base44.entities.Trip.update(trip.id, { status: "completed" });
       // Notify all passengers
       await Promise.all(passengers.map(b =>
-        base44.entities.Notification.create({
+        notifyUser({
           user_email: b.passenger_email,
           title: "اكتملت رحلتك! قيّم السائق ⭐",
           message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مشواروو!`,
-          type: "system", trip_id: trip.id, is_read: false,
+          type: "system",
+          trip_id: trip.id,
         })
       ));
       qc.invalidateQueries({ queryKey: ["trips"] });
