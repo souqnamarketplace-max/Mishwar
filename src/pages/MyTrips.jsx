@@ -64,18 +64,25 @@ export default function MyTrips() {
       // id keep working — reason just stays null in that case.
       const bookingId = typeof input === "string" ? input : input?.bookingId;
       const reason = typeof input === "string" ? null : (input?.reason || null);
-      const updatePayload = { status: "cancelled" };
-      if (reason) updatePayload.cancel_reason = reason;
-      const { data: booking, error: bErr } = await supabase
-        .from("bookings")
-        .update(updatePayload)
-        .eq("id", bookingId)
-        .select()
-        .single();
-      if (bErr) throw bErr;
-      if (!booking) throw new Error("لم يتم العثور على الحجز");
-      // Seat restoration is handled by the bookings_restore_seats DB trigger.
-      return { success: true, booking };
+      // Route through the cancel_booking RPC (migration 018) so seat
+      // refund, authorization, and late-cancellation strikes happen
+      // atomically server-side. The previous implementation did a
+      // direct supabase.from("bookings").update({status:'cancelled'})
+      // and the comment claimed "Seat restoration is handled by the
+      // bookings_restore_seats DB trigger" — but NO such trigger has
+      // ever shipped (verified: zero hits in migrations/ and the
+      // public schema file). So this surface was the third site
+      // leaking seats: passengers cancelling from /my-trips left
+      // their trip's available_seats stuck at the lower count, and
+      // the strike system never ran for late cancellations from
+      // here either. Now matches the pattern used in
+      // base44Client.cancelBooking and DriverPassengers.
+      const { error: rpcErr } = await supabase.rpc("cancel_booking", {
+        booking_id_param: bookingId,
+        reason_param: reason || "passenger_self_cancel",
+      });
+      if (rpcErr) throw rpcErr;
+      return { success: true };
     },
     onSuccess: async (_, input) => {
       const bookingId = typeof input === "string" ? input : input?.bookingId;
