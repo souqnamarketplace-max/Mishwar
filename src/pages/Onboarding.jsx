@@ -76,6 +76,22 @@ export default function Onboarding() {
 
   const save = useMutation({
     mutationFn: async () => {
+      // Validate driver-specific fields BEFORE any DB writes. The
+      // previous order had auth.updateMe (with onboarding_completed:
+      // true) running first, then the license fields validation. If
+      // the validation threw, the user was left with onboarding_
+      // completed=true but no license entry — App.jsx's onboarding
+      // redirect would no longer bounce them here, so they'd land on
+      // /settings as a half-set-up driver with no license submission.
+      // Resubmitting the form redoes updateMe (idempotent) so it
+      // worked in practice, but the half-baked state surfaced for
+      // anyone who closed the tab between the two writes.
+      if (accountType === "driver" || accountType === "both") {
+        if (!form.license_number || !form.license_expiry || !form.license_image_url) {
+          throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
+        }
+      }
+
       await base44.auth.updateMe({
         account_type: accountType,
         phone: form.phone,
@@ -92,11 +108,8 @@ export default function Onboarding() {
         onboarding_completed: true,
       });
 
-      // Create driver license for drivers
+      // Create driver license for drivers (validation moved above)
       if (accountType === "driver" || accountType === "both") {
-        if (!form.license_number || !form.license_expiry || !form.license_image_url) {
-          throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
-        }
         await base44.entities.DriverLicense.create({
           driver_email:                 user?.email,
           driver_name:                  user?.full_name,
