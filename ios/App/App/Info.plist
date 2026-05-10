@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ar</string>
+	<key>CFBundleDisplayName</key>
+        <string>Mishwaro</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ar</string>
+		<string>en</string>
+	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<!-- Portrait-only. Ride-share UX has no use case for landscape and
+	     supporting both doubles the QA burden. App Store reviewers never
+	     reject for portrait-only. Easy to add landscape later. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+
+	<!-- ─── Permission usage descriptions (REQUIRED by App Store) ──────
+	     If the app uses an iOS API that requires permission and these
+	     strings are missing, App Store review WILL reject. The strings
+	     are shown to the user in the system permission prompt — Arabic
+	     because Mishwaro's primary locale is ar_PS.
+
+	     Add new ones here ONLY for APIs the app actually uses. Apple
+	     also rejects for permission strings present without a
+	     corresponding API call. -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>نحتاج موقعك لتحديد نقطة الانطلاق المناسبة وتتبع تقدم الرحلة</string>
+	<key>NSCameraUsageDescription</key>
+	<string>للتحقق من هوية السائقين والركاب من خلال صورة سيلفي ورخصة القيادة</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>لاختيار صورة الملف الشخصي وصور وثائق التحقق</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>لحفظ صور الرحلات وإيصالات الدفع في معرض الصور</string>
+
+	<!-- ─── App Transport Security ──────────────────────────────
+	     Default is to require HTTPS for all network connections,
+	     which is what we want. No NSAllowsArbitraryLoads exception
+	     here because the production app talks to www.mishwaro.com
+	     (HTTPS), Supabase (HTTPS), and OpenStreetMap tiles (HTTPS).
+	     Ride-share apps that ship NSAllowsArbitraryLoads usually
+	     get rejected during App Store review without justification. -->
+
+	<!-- ─── URL scheme for deep links (optional, future-ready) ──────
+	     Allows other apps to open mishwaro:// URLs and route into the
+	     native shell. Not used today; commented for documentation.
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.mishwaro.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mishwaro</string>
+			</array>
+		</dict>
+	</array>
+	-->
+</dict>
+</plist>
