@@ -395,8 +395,15 @@ export default function Notifications() {
                         </div>
                       </div>
                     </div>
+                    {/* Delete button — stopPropagation is critical: the
+                        parent <div> above has an onClick that marks-read
+                        and navigates away. Without this, tapping the trash
+                        icon would (a) delete the notification AND (b)
+                        navigate the user away from the list mid-action.
+                        The bell popup variant in NotificationBell.jsx
+                        already does this correctly; the list page didn't. */}
                     <button
-                      onClick={() => deleteNotif.mutate(notif.id)}
+                      onClick={(e) => { e.stopPropagation(); deleteNotif.mutate(notif.id); }}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
