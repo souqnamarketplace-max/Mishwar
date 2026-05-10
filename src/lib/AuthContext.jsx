@@ -69,6 +69,20 @@ export const AuthProvider = ({ children }) => {
       } else if (event === 'SIGNED_OUT') {
         clearSentryUser();
         setUser(null);
+        // Mirror the setQueryData(["me"], fullUser) call from
+        // loadUserProfile — without this, components consuming the
+        // ["me"] query directly via useQuery (AppLayout → MobileLayout,
+        // Navbar) retain the stale user object after SIGNED_OUT events
+        // that don't go through base44.auth.logout()'s hard reload:
+        //   - server-side session expiry / refresh token revoked
+        //   - another tab signing out
+        //   - any programmatic supabase.auth.signOut() that skips the
+        //     window.location.href = '/login' redirect
+        // In those scenarios the user prop into MobileLayout stayed
+        // truthy and the React tree kept rendering the authenticated
+        // UI. Setting null here makes the query consumers immediately
+        // reflect the logged-out state.
+        try { queryClientInstance.setQueryData(["me"], null); } catch {}
         invalidateBlockCache();
         setIsAuthenticated(false);
         setAuthError(null);
