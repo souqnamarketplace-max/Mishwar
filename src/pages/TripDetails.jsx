@@ -234,6 +234,25 @@ export default function TripDetails() {
   // Detect if current user is the driver of this trip
   const isOwnTrip = !!user?.email && !!trip?.created_by && user.email === trip.created_by;
 
+  // Book-button click handler — used by both the desktop sidebar book
+  // button and the mobile sticky-bottom book button. Previously both
+  // sites called setShowConfirm(true) unconditionally, so an anonymous
+  // visitor would tap "احجز الآن", see the confirm modal, tap "تأكيد",
+  // and get a generic "فشل الحجز، حاول مجدداً" toast when the
+  // book_seat RPC rejected them with 42501 (auth required). Useless
+  // guidance — they had no idea they needed to log in. Tightening
+  // here surfaces the real next step (sign in or sign up) instead of
+  // a dead-end error after two taps.
+  // returnTo brings them straight back to this trip after auth, so
+  // they can resume the booking with one more tap on the same button.
+  const handleBookClick = () => {
+    if (!user?.email) {
+      navigate(`/login?returnTo=${encodeURIComponent(`/trip/${id}`)}`);
+      return;
+    }
+    setShowConfirm(true);
+  };
+
   // Per-trip SEO. Each trip page becomes an indexable landing page for the
   // route — drives organic traffic for queries like "رام الله إلى نابلس
   // مشاركة سيارة". The OG meta is also set server-side by /api/trip when
@@ -450,7 +469,7 @@ export default function TripDetails() {
                   ) : (
                     <Button
                       className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                      onClick={() => setShowConfirm(true)}
+                      onClick={handleBookClick}
                       disabled={bookingMutation.isPending}
                     >
                       احجز الآن
@@ -952,7 +971,7 @@ export default function TripDetails() {
                   ) : (
                     <Button
                       className="flex-1 h-12 rounded-xl font-black text-base bg-primary text-primary-foreground shadow-lg shadow-primary/30 active:scale-95 transition-transform"
-                      onClick={() => setShowConfirm(true)}
+                      onClick={handleBookClick}
                       disabled={bookingMutation.isPending}
                     >
                       احجز الآن
