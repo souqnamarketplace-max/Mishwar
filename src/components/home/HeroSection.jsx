@@ -196,13 +196,20 @@ export default function HeroSection() {
             <h1 className="text-2xl font-black text-white leading-tight">
               وصّل للمكان الصح <span className="text-accent">بنص السعر</span>
             </h1>
-            {/* Dot indicators — count must match the rendered slideshow above */}
-            <div className="flex gap-1.5 mt-3">
-              {slides.map((_, i) => (
-                <button key={i} onClick={() => setSlideIdx(i)}
-                  className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-4 bg-accent" : "w-1.5 bg-white/40"}`} />
-              ))}
-            </div>
+            {/* Dot indicators — count must match the rendered slideshow above.
+                Hidden when there's only one slide because a single dot
+                visually reads as a stray accent mark below the headline
+                (audit kept reporting it as a misplaced "ب" character).
+                The component is interactive — multiple dots are pagination,
+                a single dot is just visual noise. */}
+            {slides.length > 1 && (
+              <div className="flex gap-1.5 mt-3">
+                {slides.map((_, i) => (
+                  <button key={i} onClick={() => setSlideIdx(i)}
+                    className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-4 bg-accent" : "w-1.5 bg-white/40"}`} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -251,13 +258,16 @@ export default function HeroSection() {
           })}
           <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/55 to-black/15" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-          {/* Slide dot indicators */}
-          <div className="absolute bottom-6 left-6 flex gap-1.5">
-            {slides.map((_, i) => (
-              <button key={i} onClick={() => setSlideIdx(i)}
-                className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-accent" : "w-1.5 bg-white/40"}`} />
-            ))}
-          </div>
+          {/* Slide dot indicators — single dot reads as visual noise, hide it.
+              Same rationale as the mobile hero above. */}
+          {slides.length > 1 && (
+            <div className="absolute bottom-6 left-6 flex gap-1.5">
+              {slides.map((_, i) => (
+                <button key={i} onClick={() => setSlideIdx(i)}
+                  className={`h-1.5 rounded-full transition-all ${i === slideIdx ? "w-5 bg-accent" : "w-1.5 bg-white/40"}`} />
+              ))}
+            </div>
+          )}
         </div>
         <div className="relative w-full max-w-7xl mx-auto px-4 sm:px-10 flex items-center" style={{ minHeight: "560px" }}>
           <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.55 }}
