@@ -96,6 +96,7 @@ INSERT INTO public.driver_licenses (
   car_registration_url,
   insurance_url,
   selfie_1_url,
+  selfie_2_url,
   status,
   submitted_at,
   approved_at,
@@ -113,6 +114,7 @@ SELECT
   'https://www.mishwaro.com/logo.png',
   'https://www.mishwaro.com/logo.png',
   'https://www.mishwaro.com/logo.png',
+  'https://www.mishwaro.com/logo.png',  -- selfie_2_url (production has NOT NULL constraint)
   'approved',
   NOW() - INTERVAL '7 days',
   NOW() - INTERVAL '6 days',
