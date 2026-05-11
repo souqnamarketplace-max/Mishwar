@@ -229,6 +229,13 @@ WHERE NOT EXISTS (
 
 
 -- ─── 4. BOOKING — passenger booked the completed trip ────────────────
+-- The prevent_passenger_booking_conflict trigger blocks INSERTs onto
+-- trips with status='completed' (correct for production: you shouldn't
+-- be able to book a trip that's already happened). For seed data this
+-- guard is wrong — the booking represents historical fact. Bypass the
+-- trigger for the duration of this one INSERT only.
+
+ALTER TABLE public.bookings DISABLE TRIGGER prevent_passenger_booking_conflict;
 
 INSERT INTO public.bookings (
   created_by, trip_id, passenger_name, passenger_email,
@@ -258,6 +265,8 @@ WHERE t.driver_email = 'reviewer-driver@mishwaro.com'
       AND b.passenger_email = 'reviewer-passenger@mishwaro.com'
   )
 LIMIT 1;
+
+ALTER TABLE public.bookings ENABLE TRIGGER prevent_passenger_booking_conflict;
 
 
 -- ─── 5. REVIEW — passenger left 5-star review on completed trip ──────
