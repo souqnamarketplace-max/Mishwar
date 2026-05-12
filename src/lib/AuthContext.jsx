@@ -327,27 +327,7 @@ export const AuthProvider = ({ children }) => {
    * Called from the Login page.
    */
   const login = async (email, password) => {
-    // ── TEMP DIAGNOSTIC (remove after fixing iOS login) ──────────────
-    // Using alert() because Vite drops console.* in production builds.
-    const diagPre = [
-      `URL: ${import.meta.env.VITE_SUPABASE_URL}`,
-      `KEY-prefix: ${String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').slice(0, 20)}`,
-      `KEY-len: ${String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').length}`,
-      `email: ${JSON.stringify(email)}`,
-      `email-len: ${email?.length}`,
-      `pwd-len: ${password?.length}`,
-    ].join('\n');
-    alert('[LOGIN-DIAG PRE]\n' + diagPre);
-    // ─────────────────────────────────────────────────────────────────
-
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-    // ── TEMP DIAGNOSTIC ──────────────────────────────────────────────
-    const diagPost = error
-      ? `ERROR: ${error.message} (status=${error.status}, name=${error.name})`
-      : `OK: user=${data?.user?.email || 'no user'}`;
-    alert('[LOGIN-DIAG POST]\n' + diagPost);
-    // ─────────────────────────────────────────────────────────────────
     
     // Log attempt (best-effort, non-blocking)
     supabase.from('login_attempts').insert({
