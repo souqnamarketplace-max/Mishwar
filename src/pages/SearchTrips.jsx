@@ -1,7 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import DateInput from "@/components/shared/DateInput";
 import React, { useState, useEffect, useMemo} from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
