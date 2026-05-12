@@ -93,8 +93,14 @@ export default function Login() {
     }
   };
 
-  const [form, setForm] = useState({
-    email: '', password: '', fullName: '', phone: '', confirmPassword: '',
+  const [form, setForm] = useState(() => {
+    // Pre-fill email from the last successful login so users don't have to
+    // retype it after sign-out. Convenience for personal-device users (the
+    // primary audience for مشوارو). Cleared explicitly by the user via the
+    // X button in the email field. Password is NEVER stored.
+    let savedEmail = '';
+    try { savedEmail = localStorage.getItem('mishwaro_last_email') || ''; } catch {}
+    return { email: savedEmail, password: '', fullName: '', phone: '', confirmPassword: '' };
   });
 
   useEffect(() => {
@@ -127,6 +133,10 @@ export default function Login() {
       // token to the right backing store on its first write.
       setRememberMe(rememberMe);
       await login(form.email, form.password);
+      // Save email locally so the next visit (after sign-out) pre-fills
+      // it. Password is intentionally never stored — iOS Password Autofill
+      // / iCloud Keychain handle that securely if the user opts in.
+      try { localStorage.setItem('mishwaro_last_email', form.email); } catch {}
       // No manual navigate here — the useEffect at top of this component watches
       // isAuthenticated and handles redirect once React has committed the new state.
       // Manual navigate caused a race: route changed before AuthContext state flushed,
