@@ -327,7 +327,21 @@ export const AuthProvider = ({ children }) => {
    * Called from the Login page.
    */
   const login = async (email, password) => {
+    // ── TEMP DIAGNOSTIC (remove after fixing iOS login) ──────────────
+    console.log('[LOGIN-DIAG] supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+    console.log('[LOGIN-DIAG] anon key first 30:', String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').slice(0, 30));
+    console.log('[LOGIN-DIAG] anon key length:', String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').length);
+    console.log('[LOGIN-DIAG] email being sent:', JSON.stringify(email));
+    console.log('[LOGIN-DIAG] email length:', email?.length);
+    console.log('[LOGIN-DIAG] password length:', password?.length);
+    // ─────────────────────────────────────────────────────────────────
+
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    // ── TEMP DIAGNOSTIC ──────────────────────────────────────────────
+    console.log('[LOGIN-DIAG] supabase response error:', error ? JSON.stringify({ message: error.message, status: error.status, name: error.name }) : 'none');
+    console.log('[LOGIN-DIAG] supabase response data user:', data?.user ? data.user.email : 'no user');
+    // ─────────────────────────────────────────────────────────────────
     
     // Log attempt (best-effort, non-blocking)
     supabase.from('login_attempts').insert({
