@@ -328,19 +328,25 @@ export const AuthProvider = ({ children }) => {
    */
   const login = async (email, password) => {
     // ── TEMP DIAGNOSTIC (remove after fixing iOS login) ──────────────
-    console.log('[LOGIN-DIAG] supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-    console.log('[LOGIN-DIAG] anon key first 30:', String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').slice(0, 30));
-    console.log('[LOGIN-DIAG] anon key length:', String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').length);
-    console.log('[LOGIN-DIAG] email being sent:', JSON.stringify(email));
-    console.log('[LOGIN-DIAG] email length:', email?.length);
-    console.log('[LOGIN-DIAG] password length:', password?.length);
+    // Using alert() because Vite drops console.* in production builds.
+    const diagPre = [
+      `URL: ${import.meta.env.VITE_SUPABASE_URL}`,
+      `KEY-prefix: ${String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').slice(0, 20)}`,
+      `KEY-len: ${String(import.meta.env.VITE_SUPABASE_ANON_KEY || '').length}`,
+      `email: ${JSON.stringify(email)}`,
+      `email-len: ${email?.length}`,
+      `pwd-len: ${password?.length}`,
+    ].join('\n');
+    alert('[LOGIN-DIAG PRE]\n' + diagPre);
     // ─────────────────────────────────────────────────────────────────
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     // ── TEMP DIAGNOSTIC ──────────────────────────────────────────────
-    console.log('[LOGIN-DIAG] supabase response error:', error ? JSON.stringify({ message: error.message, status: error.status, name: error.name }) : 'none');
-    console.log('[LOGIN-DIAG] supabase response data user:', data?.user ? data.user.email : 'no user');
+    const diagPost = error
+      ? `ERROR: ${error.message} (status=${error.status}, name=${error.name})`
+      : `OK: user=${data?.user?.email || 'no user'}`;
+    alert('[LOGIN-DIAG POST]\n' + diagPost);
     // ─────────────────────────────────────────────────────────────────
     
     // Log attempt (best-effort, non-blocking)
