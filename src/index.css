@@ -159,24 +159,26 @@
     }
   }
 
-  @supports (padding: max(0px)) {
-    body {
-      padding-top:    max(var(--safe-area-inset-top),    0);
-      padding-left:   max(var(--safe-area-inset-left),   0);
-      padding-right:  max(var(--safe-area-inset-right),  0);
-      padding-bottom: max(var(--safe-area-inset-bottom), 0);
-    }
-  }
-
-  /* When the iOS keyboard is visible (set by src/lib/native.js), shrink
-   * bottom padding to 0 so fixed-position bottom elements (mobile nav,
-   * compose-message bar) sit flush against the keyboard instead of
-   * floating with a gap. The keyboard plugin already resizes the
-   * viewport via Keyboard.resize:'body' but bottom safe-area inset
-   * still applies, hence the override. */
-  body.keyboard-visible {
-    padding-bottom: 0 !important;
-  }
+  /* Body intentionally does NOT carry safe-area-inset padding.
+   *
+   * Every UI element that needs to respect a device inset already does
+   * so locally — the sticky header (MobileLayout L157), fixed tab bar
+   * (MobileLayout L233), FAB chooser sheet (MobileLayout L610), network
+   * banner (NetworkStatus.jsx L36), and message composer (Messages.jsx
+   * L983) each apply their own env(safe-area-inset-*) padding.
+   *
+   * Adding padding here on top of that would (and previously did)
+   * double-count the inset: the body padding pushed the sticky header
+   * down by ~59px on iPhone 15 Pro, exposing the body's cream
+   * `--background` color behind the header's white `--card` background,
+   * which rendered as a cream stripe above the header — and a matching
+   * stripe below the tab bar. It also added ~59px of wasted vertical
+   * space at the top of every page (the page title sat ~118px from the
+   * viewport edge instead of ~59px).
+   *
+   * Side-margins (left/right insets, used only in landscape) are
+   * applied on the .safe-area-inset-{left,right} utility classes
+   * below; no page currently needs them on the body. */
 
   button, a, [role="button"] {
     @apply select-none;

@@ -48,7 +48,14 @@ const config: CapacitorConfig = {
   // ─── Android-specific runtime config ──────────────────────────────
   android: {
     allowMixedContent: false,    // require https for all network requests
-    backgroundColor: "#faf5e6",  // brand cream — flashes during cold boot
+    // Window background color shown behind the WebView during cold-boot
+    // flash and (if the native nav-bar / status-bar were ever set to
+    // transparent) in the inset zones. Was cream #faf5e6 — visually
+    // matched the brand palette but mismatched the white `--card`
+    // surfaces (header, tab bar) the user actually sees, leaving a
+    // cream halo around the chrome. White makes the inset zone visually
+    // flush with the chrome.
+    backgroundColor: "#ffffff",
     captureInput: true,          // smarter keyboard handling for Arabic IME
     webContentsDebuggingEnabled: false, // disable in production builds
   },
@@ -56,7 +63,13 @@ const config: CapacitorConfig = {
   // ─── iOS-specific runtime config ──────────────────────────────────
   ios: {
     contentInset: "automatic",   // respect safe areas (notch, home bar)
-    backgroundColor: "#faf5e6",
+    // Same rationale as Android above: this is the window background
+    // shown behind the WebView. With StatusBar.overlay:false the
+    // status-bar strip is reserved outside the WebView and filled with
+    // this color; with contentInset:"automatic" the same applies at the
+    // home-indicator edge. Cream here created the visible mismatch
+    // against the white header/tab-bar surfaces.
+    backgroundColor: "#ffffff",
     scrollEnabled: true,
     // Required Info.plist permission strings — set during `npx cap add ios`
     // and editable in ios/App/App/Info.plist:

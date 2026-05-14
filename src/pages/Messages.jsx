@@ -563,7 +563,14 @@ export default function Messages() {
   return (
     <>
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8" dir="rtl">
-        <div className="text-center mb-6">
+        {/* Page title block — hidden on mobile because MobileLayout's
+            sticky header already shows "الرسائل" at the top of the
+            viewport. Rendering it again here on mobile pushed every
+            conversation card ~110px down and wasted the top half of
+            the screen inside an active chat. On md+ (two-pane layout)
+            the title still anchors the page above the side-by-side
+            list+chat columns, so we keep it there. */}
+        <div className="hidden md:block text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
             <MessageCircle className="w-6 h-6 text-primary" />
           </div>
