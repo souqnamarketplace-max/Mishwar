@@ -62,13 +62,19 @@ const config: CapacitorConfig = {
 
   // ─── iOS-specific runtime config ──────────────────────────────────
   ios: {
-    contentInset: "automatic",   // respect safe areas (notch, home bar)
-    // Same rationale as Android above: this is the window background
-    // shown behind the WebView. With StatusBar.overlay:false the
-    // status-bar strip is reserved outside the WebView and filled with
-    // this color; with contentInset:"automatic" the same applies at the
-    // home-indicator edge. Cream here created the visible mismatch
-    // against the white header/tab-bar surfaces.
+    // Was "automatic" — which made WKScrollView add an inset for the
+    // home-indicator safe area. The native window bg then showed
+    // through that inset zone as a cream stripe under our white
+    // bg-card tab bar. With "never" the WebView reaches the screen's
+    // bottom edge and the tab bar's own .safe-area-inset-bottom
+    // utility (env(safe-area-inset-bottom) → ~34px on home-indicator
+    // devices) fills that zone with bg-card white — same color as
+    // the tab bar itself, so no visible seam.
+    contentInset: "never",
+    // Window bg shown behind the WebView during cold-boot flash and
+    // anywhere the WebView itself is transparent. White matches the
+    // header/tab-bar surfaces so the boot flash is the same color
+    // family as the chrome.
     backgroundColor: "#ffffff",
     scrollEnabled: true,
     // Required Info.plist permission strings — set during `npx cap add ios`
@@ -114,9 +120,24 @@ const config: CapacitorConfig = {
     },
 
     StatusBar: {
-      style: "DARK",                       // light icons on dark forest green bg
-      backgroundColor: "#1a3d2a",
-      overlay: false,                      // status bar is its own area, not overlaid
+      // Style names are inverted from intuition: "LIGHT" means "for a
+      // LIGHT background", i.e. it renders DARK icons. Our sticky
+      // header is white bg-card, so we need dark status-bar icons
+      // (time, wifi, battery) to be readable.
+      style: "LIGHT",
+      // No backgroundColor key — iOS ignores it (status-bar bg is
+      // system-managed and effectively transparent over whatever the
+      // WebView paints underneath). Android sets bg at runtime in
+      // src/lib/native.js if needed.
+      // overlay:true makes the WKWebView extend UNDER the status bar
+      // instead of being pushed below it. The sticky header's
+      // safe-area-inset-top padding then fills the notch / dynamic-
+      // island zone with bg-card white — same color as the header
+      // itself — and the status-bar icons render on top of it. Was
+      // false, which reserved that zone OUTSIDE the WebView and
+      // filled it with the iOS native window bg as a visible cream
+      // (now white) stripe disconnected from the header.
+      overlay: true,
     },
 
     Keyboard: {

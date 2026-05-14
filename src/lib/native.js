@@ -61,11 +61,25 @@ export async function initNativeShell() {
     const { CapApp, SplashScreen, StatusBar, Style, Keyboard } =
       await loadNativeModules();
 
-    // 1) Status bar — light icons on the dark brand background.
-    //    Style.Dark = light foreground icons (counterintuitive naming).
-    await StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+    // 1) Status bar — dark icons on the white bg-card header. Both
+    //    iOS and Android now use overlay (StatusBar.overlay:true in
+    //    capacitor.config.ts on iOS; setOverlaysWebView on Android
+    //    below) so the WebView extends UNDER the status bar and the
+    //    sticky header's safe-area-inset-top padding fills the notch
+    //    zone with white. Style.Light = dark foreground icons —
+    //    Capacitor's enum is named for the background brightness,
+    //    not the icon color. Was Style.Dark (light icons) back when
+    //    the status bar had its own forest-green strip.
+    await StatusBar.setStyle({ style: Style.Light }).catch(() => {});
     if (Capacitor.getPlatform() === "android") {
-      await StatusBar.setBackgroundColor({ color: "#1a3d2a" }).catch(() => {});
+      // Tell Android to let the WebView draw under the status bar,
+      // matching iOS overlay:true. Without this, Android reserves a
+      // strip at the top and fills it with the color set below.
+      await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
+      // Transparent so the white header bleeds through. Some Android
+      // versions ignore alpha and fall back to solid — #ffffff is the
+      // safe value either way (matches the header bg).
+      await StatusBar.setBackgroundColor({ color: "#ffffff" }).catch(() => {});
     }
 
     // 2) Splash screen — hide as soon as React has rendered. The

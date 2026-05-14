@@ -194,4 +194,16 @@
   .safe-area-inset-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
   .safe-area-inset-left   { padding-left:   max(1rem, env(safe-area-inset-left)); }
   .safe-area-inset-right  { padding-right:  max(1rem, env(safe-area-inset-right)); }
+
+  /* When an active chat thread takes over the bottom of the screen on
+   * mobile (Messages.jsx sets this class via useEffect when activeConv
+   * is open below md), hide the global tab bar so the message composer
+   * — which sticky-anchors to the visible viewport bottom — can sit
+   * directly above the keyboard. Without this rule the tab bar sits
+   * between the composer and the keyboard, hiding the text field.
+   *
+   * Pairs with `data-mobile-nav` on MobileLayout's tab bar; matches
+   * the WhatsApp/Telegram/iMessage pattern of dropping main nav while
+   * the user is inside a thread. */
+  body.chat-overlay-active [data-mobile-nav] { display: none; }
 }

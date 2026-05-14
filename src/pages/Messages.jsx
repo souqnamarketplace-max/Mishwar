@@ -398,6 +398,41 @@ export default function Messages() {
       .catch(() => {});
   }, [activeId, activeConv, user?.email, qc]);
 
+  // ─── Mobile chat overlay mode ───
+  // When the user opens a conversation on a phone-sized viewport, the
+  // MobileLayout bottom tab bar would otherwise sit between the message
+  // composer and the keyboard, occluding the input field — the
+  // composer is `sticky bottom-0` inside its column and the column's
+  // visible bottom edge IS the tab bar. Toggle a body class that the
+  // CSS rule in index.css uses to hide the tab bar (via the
+  // [data-mobile-nav] attribute on MobileLayout's tab-bar div) for
+  // the duration of an active conversation, matching how WhatsApp /
+  // Telegram / iMessage drop their primary nav inside a thread.
+  //
+  // Listens to resize so the class stays correct if the user rotates
+  // their device or resizes a desktop browser across the md
+  // breakpoint (768px = Tailwind `md`, matching the grid's md:col-*
+  // breakpoint elsewhere on this page).
+  useEffect(() => {
+    const apply = () => {
+      const isMobileViewport = window.innerWidth < 768;
+      if (activeConv && isMobileViewport) {
+        document.body.classList.add("chat-overlay-active");
+      } else {
+        document.body.classList.remove("chat-overlay-active");
+      }
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => {
+      window.removeEventListener("resize", apply);
+      // Always clean up on unmount — leaving the class on the body
+      // after navigating away from /messages would hide the tab bar
+      // on every other page until the next reload.
+      document.body.classList.remove("chat-overlay-active");
+    };
+  }, [activeConv]);
+
   // ─── Find trip for a conversation ───
   // Priority order:
   // 1. trip_id explicitly saved on a message

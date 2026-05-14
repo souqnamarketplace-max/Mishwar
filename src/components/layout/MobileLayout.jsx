@@ -229,8 +229,16 @@ export default function MobileLayout({ children, user, showHeader = true, header
         )}
       </div>
 
-      {/* Bottom Tab Bar — with integrated driver post-trip button */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-inset-bottom">
+      {/* Bottom Tab Bar — with integrated driver post-trip button.
+          The data-mobile-nav attribute is the stable target for CSS
+          rules that need to hide the nav while a full-height surface
+          takes over the bottom edge (e.g. an active chat thread whose
+          composer must sit just above the keyboard). Don't remove or
+          rename without updating the matching rules in index.css. */}
+      <div
+        data-mobile-nav
+        className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border safe-area-inset-bottom"
+      >
         <div className="flex items-end justify-around h-20 px-2 pb-1">
           {MOBILE_TABS.map((tab, idx) => {
             const Icon = tab.icon;
