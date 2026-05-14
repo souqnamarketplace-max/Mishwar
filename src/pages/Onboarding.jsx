@@ -12,7 +12,7 @@ import { supabase } from "@/lib/supabase";
 import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { isValidPalestinianPhone, validatePhone } from "@/lib/validation";
@@ -66,6 +66,7 @@ export default function Onboarding() {
   useSEO({ title: "إعداد الحساب", description: "أكمل إعداد حسابك في مشوارو" });
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { refreshUser } = useAuth();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState(null); // "passenger" | "driver" | "both"
@@ -161,13 +162,28 @@ export default function Onboarding() {
       // in App.jsx still sees onboarding_completed=false and bounces back here (loop bug)
       await refreshUser();
 
+      // Honor ?returnTo so users routed here by the onboarding gate
+      // (useOnboardingGate, e.g. from Book / Send Message / Post Trip)
+      // land back on the page they were trying to act on. Path-safety
+      // check: only allow same-origin paths starting with / and not //
+      // (same pattern as Login.jsx ~L125-127). Strip the param before
+      // navigating so the URL bar doesn't carry it through.
+      const rawReturn = searchParams.get("returnTo");
+      const safeReturn = rawReturn && rawReturn.startsWith("/") && !rawReturn.startsWith("//")
+        ? rawReturn
+        : null;
+
       const isDriver = accountType === "driver" || accountType === "both";
       if (isDriver) {
         toast.success("مرحباً بك في مشوارو! 🎉 أكمل رفع وثائقك من الإعدادات لتصبح سائقاً موثقاً");
+        // Drivers always go to /settings to finish doc uploads
+        // regardless of returnTo — the docs are blocking for becoming
+        // a verified driver, so we don't want them to skip back to a
+        // booking flow and forget about it.
         navigate("/settings", { replace: true });
       } else {
         toast.success("مرحباً بك في مشوارو! 🎉");
-        navigate("/", { replace: true });
+        navigate(safeReturn || "/", { replace: true });
       }
     },
     onError: (err) => {

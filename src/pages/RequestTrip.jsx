@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
+import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import { useSEO } from "@/hooks/useSEO";
 import { supabase } from "@/lib/supabase";
 import { base44 } from "@/api/base44Client";
@@ -53,6 +54,7 @@ export default function RequestTrip() {
 
   const navigate = useNavigate();
   const qc       = useQueryClient();
+  const requireOnboarding = useOnboardingGate();
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const [searchParams] = useSearchParams();
 
@@ -428,7 +430,7 @@ export default function RequestTrip() {
         )}
 
         <Button
-          onClick={() => submit.mutate()}
+          onClick={() => { if (requireOnboarding("/request-trip")) submit.mutate(); }}
           disabled={!canSubmit}
           className="w-full h-12 text-base font-bold"
         >

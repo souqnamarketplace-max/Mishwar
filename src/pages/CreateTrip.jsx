@@ -2,6 +2,7 @@ import { CITIES } from "@/lib/cities";
 import DateInput from "@/components/shared/DateInput";
 import { checkDriverConflict } from "@/lib/tripScheduling";
 import { useSEO } from "@/hooks/useSEO";
+import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
@@ -82,6 +83,7 @@ export default function CreateTrip() {
   useSEO({ title: "أنشر رحلتك", description: "انشر رحلتك واكسب من طريقك اليومي" });
 
   const navigate = useNavigate();
+  const requireOnboarding = useOnboardingGate();
   const [step, setStep] = useState(1);
 
   const { data: user } = useQuery({
@@ -333,6 +335,13 @@ export default function CreateTrip() {
 
   const handleSubmit = async () => {
     if (!user?.id) { toast.error("لم يتم تحميل بيانات المستخدم. حاول مرة أخرى."); return; }
+    // Onboarding gate — even if a non-onboarded user somehow reaches
+    // /create-trip (e.g. via a deep link before App.jsx redirects),
+    // refuse to submit. Mirrors migration 034's RLS policy on
+    // public.trips that would reject the direct insert anyway, but
+    // catching it here gives the user a clear redirect instead of an
+    // opaque RLS error.
+    if (!requireOnboarding("/create-trip")) return;
 
     // ── Pre-submit conflict check (frontend layer; SQL trigger is the source of truth) ──
     try {

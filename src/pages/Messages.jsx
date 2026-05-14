@@ -1,4 +1,5 @@
 import { useSEO } from "@/hooks/useSEO";
+import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
@@ -76,6 +77,7 @@ export default function Messages() {
   useSEO({ title: "الرسائل", description: "محادثاتك مع السائقين والركاب" });
 
   const qc = useQueryClient();
+  const requireOnboarding = useOnboardingGate();
   const navigate = useNavigate();
   const [activeId, setActiveId] = useState(null);
   const [draft, setDraft] = useState("");
@@ -481,6 +483,12 @@ export default function Messages() {
     mutationFn: async (overrideText) => {
       const text = (overrideText !== undefined ? overrideText : draft).trim();
       if (!text || !activeConv || !user?.email) return;
+      // Onboarding gate — RLS policy messages_require_onboarded_insert
+      // (migration 034) is what actually blocks the INSERT server-side
+      // for a non-onboarded user; this client check prevents the
+      // wasted round-trip + opaque RLS error toast, and walks the user
+      // to /onboarding with a returnTo back to /messages.
+      if (!requireOnboarding("/messages")) return;
       // Refuse to send to a deleted (anonymized) account. The DB enforces
       // this with a RESTRICTIVE RLS policy; this client check just gives
       // the user a friendly toast instead of waiting for the 403.

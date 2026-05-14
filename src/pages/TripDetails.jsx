@@ -21,6 +21,7 @@ import { absoluteUrl, SITE_URL } from "@/lib/seo/config";
 import { buildTripSlug, parseTripIdFromSlug } from "@/lib/slug";
 import { friendlyError } from "@/lib/errors";
 import { useBlockedEmails } from "@/lib/blockUtils";
+import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -234,6 +235,18 @@ export default function TripDetails() {
   // Detect if current user is the driver of this trip
   const isOwnTrip = !!user?.email && !!trip?.created_by && user.email === trip.created_by;
 
+  // Onboarding gate — fires AFTER the auth check below, BEFORE the
+  // confirm modal opens. A non-onboarded user (typically a fresh
+  // Google sign-in whose profile row was auto-created by
+  // handle_new_user but has no phone / account_type yet) gets toasted
+  // and redirected to /onboarding with a returnTo back to this trip,
+  // so they finish their profile and land back here ready to book.
+  // The server-side equivalent lives in book_seat (migration 034):
+  // even if a malicious caller skips this client check, the RPC
+  // rejects with 'profile incomplete — finish onboarding before
+  // booking'. Defense in depth.
+  const requireOnboarding = useOnboardingGate();
+
   // Book-button click handler — used by both the desktop sidebar book
   // button and the mobile sticky-bottom book button. Previously both
   // sites called setShowConfirm(true) unconditionally, so an anonymous
@@ -250,6 +263,7 @@ export default function TripDetails() {
       navigate(`/login?returnTo=${encodeURIComponent(`/trip/${id}`)}`);
       return;
     }
+    if (!requireOnboarding(`/trip/${id}`)) return;
     setShowConfirm(true);
   };
 
