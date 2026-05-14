@@ -88,7 +88,32 @@ export default function MyTrips() {
     },
     onSuccess: async (_, input) => {
       const bookingId = typeof input === "string" ? input : input?.bookingId;
+      // Caches that the cancel must invalidate, by where the user is
+      // likely to go next after seeing "تم إلغاء الحجز بنجاح":
+      //
+      //   ["my-passenger-bookings"] — this page's own list, so the row
+      //     drops into the "Cancelled" tab immediately.
+      //   ["my-booking"] — TripDetails reads this PER (trip, email)
+      //     pair to decide between "Book this trip" and the
+      //     "waiting for driver approval" pill. Invalidated by
+      //     prefix so every variant (any trip id) refetches; the
+      //     user may navigate to a different trip than the one
+      //     they just left. WITHOUT this, react-query's default
+      //     staleTime kept the cancelled booking visible as
+      //     "pending approval" for ~1 minute, blocking re-booking —
+      //     exactly the bug souqnamarketplace@gmail.com hit when
+      //     trying to re-book Ramallah → Nablus right after
+      //     cancelling.
+      //   ["trip", *] and ["trips"] / ["all-trips-lookup"] — the
+      //     server-side cancel_booking RPC refunds the seat
+      //     atomically, so available_seats changed; the trip detail
+      //     and any trip-list view (search, my-trips driver tab)
+      //     would otherwise show the old (lower) seat count until
+      //     their own staleTime expired.
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
+      qc.invalidateQueries({ queryKey: ["my-booking"] });
+      qc.invalidateQueries({ queryKey: ["trip"] });
+      qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
       logAudit("booking_cancelled_by_passenger", "booking", bookingId, { passenger_email: user?.email });
       toast.success("تم إلغاء الحجز بنجاح");
