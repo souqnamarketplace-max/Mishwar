@@ -205,9 +205,14 @@ export default function MobileLayout({ children, user, showHeader = true, header
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Content. data-mobile-content is the stable hook the
+          chat-overlay-active body rule uses to remove pb-20 (which
+          exists to clear the tab bar) when the tab bar itself is
+          hidden — otherwise an 80px dead zone sits between the chat
+          and the keyboard. Pairs with index.css. */}
       <div
         ref={contentRef}
+        data-mobile-content
         className="flex-1 overflow-y-auto pb-20 relative"
       >
         {children}

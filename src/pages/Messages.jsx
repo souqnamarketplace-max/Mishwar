@@ -597,7 +597,11 @@ export default function Messages() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8" dir="rtl">
+      <div
+        className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8"
+        data-messages-wrapper
+        dir="rtl"
+      >
         {/* Page title block — hidden on mobile because MobileLayout's
             sticky header already shows "الرسائل" at the top of the
             viewport. Rendering it again here on mobile pushed every
@@ -613,7 +617,11 @@ export default function Messages() {
           <p className="text-muted-foreground text-sm mt-1">محادثاتك مع السائقين والركاب</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 bg-card rounded-2xl border border-border overflow-hidden" style={{ minHeight: "70vh" }}>
+        <div
+          className="grid grid-cols-1 md:grid-cols-3 gap-0 bg-card rounded-2xl border border-border overflow-hidden"
+          style={{ minHeight: "70vh" }}
+          data-messages-grid
+        >
           {/* ── Sidebar ── */}
           <div className={`md:col-span-1 border-l border-border ${activeConv ? "hidden md:block" : ""}`}>
             <div className="p-3 border-b border-border sticky top-0 bg-card z-10">
@@ -711,7 +719,11 @@ export default function Messages() {
                 )}
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-muted/10" style={{ maxHeight: "55vh" }}>
+                <div
+                  className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-muted/10"
+                  style={{ maxHeight: "55vh" }}
+                  data-messages-thread
+                >
                   {groupedMessages.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground text-sm">
                       ابدأ المحادثة بإرسال أول رسالة

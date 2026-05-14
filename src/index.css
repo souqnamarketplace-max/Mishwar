@@ -206,4 +206,58 @@
    * the WhatsApp/Telegram/iMessage pattern of dropping main nav while
    * the user is inside a thread. */
   body.chat-overlay-active [data-mobile-nav] { display: none; }
+
+  /* Hiding the tab bar alone wasn't enough — the chat grid was sized
+   * with minHeight:70vh and the thread with maxHeight:55vh, both
+   * locked to the ORIGINAL viewport. WKWebView with
+   * Keyboard.resize:'native' shrinks its frame when the keyboard
+   * opens but vh stays at the layout-viewport height, so the grid
+   * remained ~650px while the visible content area shrank to ~500px.
+   * Composer (the last child of the chat column) sat at the bottom
+   * of the 650px grid — 150px below the visible area — and sticky
+   * bottom-0 couldn't help because its scroll container (the grid
+   * itself, via overflow-hidden) extended past the viewport.
+   *
+   * In overlay mode the chat needs to fill the visible viewport
+   * exactly. Switch to dvh (dynamic viewport height — DOES update
+   * with the keyboard on iOS 16.4+ / Chrome 108+ / iPhone-class
+   * WebViews) and reset the locked heights to flex-grow so:
+   *   1. MobileLayout content area drops pb-20 (tab-bar gone)
+   *   2. The page wrapper sheds its centering padding so the chat
+   *      can fill edge to edge
+   *   3. The grid becomes a fixed-height container sized to (dvh -
+   *      header height) and rendered without the card radius/border
+   *      that only made sense as a desktop centered card
+   *   4. The thread loses its 55vh ceiling and uses flex:1 to absorb
+   *      whatever space the chat header, status bar, and trip banner
+   *      leave for it
+   *   5. The composer, as the last flex item in the chat column,
+   *      naturally sits at the column's bottom edge = bottom of the
+   *      visible viewport = directly above the keyboard
+   *
+   * The 56px in calc() matches the h-14 on MobileLayout's sticky
+   * header content (line ~158 in MobileLayout.jsx); env() adds the
+   * device's notch inset. Don't change one without the other.
+   * Restricted to <md so desktop's centered two-pane card layout
+   * is untouched. */
+  @media (max-width: 767.98px) {
+    body.chat-overlay-active [data-mobile-content] {
+      padding-bottom: 0;
+    }
+    body.chat-overlay-active [data-messages-wrapper] {
+      max-width: none;
+      padding: 0;
+      height: 100%;
+    }
+    body.chat-overlay-active [data-messages-grid] {
+      min-height: 0 !important;
+      height: calc(100dvh - 56px - env(safe-area-inset-top));
+      border: none;
+      border-radius: 0;
+    }
+    body.chat-overlay-active [data-messages-thread] {
+      max-height: none !important;
+      flex: 1 1 0;
+    }
+  }
 }
