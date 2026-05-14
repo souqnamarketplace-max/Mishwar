@@ -203,7 +203,7 @@ BEGIN
     UPDATE public.trips
     SET available_seats = LEAST(
           GREATEST(available_seats + COALESCE(booking_record.seats_booked, 1), 0),
-          COALESCE(seats_total, 20)
+          COALESCE(seats_total, 20)  -- ⚠ typo — see migration 032
         ),
         updated_at = now()
     WHERE id::text = booking_record.trip_id;
