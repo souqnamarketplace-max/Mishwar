@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { useGPSTripCompletion } from "@/lib/gpsTracking";
+import React, { useState, useEffect } from "react";
 import DriverReviewWizard from "@/components/reviews/DriverReviewWizard";
 import GPSTripTracker from "@/components/driver/GPSTripTracker";
 import { createPortal } from "react-dom";

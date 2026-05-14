@@ -48,22 +48,12 @@ const METHODS = [
 export default function DriverSubscriptionSection({ user }) {
   const qc = useQueryClient();
 
-  // Passenger guard — even though the AccountHub link and mobile drawer
-  // entry are already gated, the /driver route itself isn't account-type
-  // protected, so a curious passenger could URL-hack to ?tab=subscription.
-  // Show them a friendly "this isn't for you" instead of a working form
-  // that could clutter the admin queue with no-op requests.
+  // Whether this is a driver. We compute the flag here but DO NOT
+  // early-return on it yet — hooks below must run on every render
+  // regardless of branch, or we violate React's Rules of Hooks
+  // (same hook order, every time). The actual passenger guard renders
+  // at the bottom, after all hooks have been called unconditionally.
   const isDriver = user?.account_type === "driver" || user?.account_type === "both";
-  if (user && !isDriver) {
-    return (
-      <div className="bg-muted/40 border border-border rounded-2xl p-5">
-        <h3 className="font-bold text-foreground mb-1">هذه الصفحة للسائقين فقط</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          الاشتراك الشهري يخص حسابات السائقين. إذا كنت تريد التسجيل كسائق، يمكنك ذلك من صفحة "كن سائقاً".
-        </p>
-      </div>
-    );
-  }
 
   // ── 1) Read app_settings (price + platform rails) ────────────────────────
   const { data: settingsArr = [] } = useQuery({
@@ -106,6 +96,27 @@ export default function DriverSubscriptionSection({ user }) {
     refetchOnWindowFocus: true,
     retry: 0, // RPC presence shouldn't trigger retries; either it's there or it isn't
   });
+
+  // Passenger guard — even though the AccountHub link and mobile drawer
+  // entry are already gated, the /driver route itself isn't account-type
+  // protected, so a curious passenger could URL-hack to ?tab=subscription.
+  // Show them a friendly "this isn't for you" instead of a working form
+  // that could clutter the admin queue with no-op requests.
+  //
+  // This runs AFTER all hooks above so React always sees the same hook
+  // order on every render (Rules of Hooks). Returning early from inside
+  // a component is fine — what's forbidden is calling a hook below an
+  // early return that may or may not trigger.
+  if (user && !isDriver) {
+    return (
+      <div className="bg-muted/40 border border-border rounded-2xl p-5">
+        <h3 className="font-bold text-foreground mb-1">هذه الصفحة للسائقين فقط</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          الاشتراك الشهري يخص حسابات السائقين. إذا كنت تريد التسجيل كسائق، يمكنك ذلك من صفحة "كن سائقاً".
+        </p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

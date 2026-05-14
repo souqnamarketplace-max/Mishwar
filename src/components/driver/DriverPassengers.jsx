@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, MapPin, ArrowLeft, Phone, Star, CheckCircle, XCircle, MessageCircle } from "lucide-react";
+import { Users, MapPin, ArrowLeft, CheckCircle, XCircle, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

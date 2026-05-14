@@ -11,7 +11,7 @@ import { notifyUser } from "@/lib/notifyUser";
 import { logAudit } from "@/lib/adminAudit";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, MapPin, Users, CheckCircle, XCircle, ChevronRight, X, Clock } from "lucide-react";
+import { MapPin, Users, CheckCircle, XCircle, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
