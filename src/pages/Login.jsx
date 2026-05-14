@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X, ArrowRight } from 'lucide-react';
 import { supabase, setRememberMe, getRememberMe } from '@/lib/supabase';
 import { Checkbox } from '@/components/ui/checkbox';
+import LegalSheet from '@/components/legal/LegalSheet';
 
 export default function Login() {
   useSEO({ title: "تسجيل الدخول", description: "سجل دخولك إلى حسابك في مشوارو" });
@@ -36,6 +37,10 @@ export default function Login() {
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  // Drives the inline Terms / Privacy sheet on the login screen. One
+  // state for both so opening one closes the other automatically.
+  // Pass "terms" / "privacy" / null. See components/legal/LegalSheet.jsx.
+  const [openLegal, setOpenLegal] = useState(null);
   // Resend confirmation flow — shown when login fails with "email not confirmed"
   // OR when a fresh signup completes. Stores the email so the user doesn't
   // have to retype it.
@@ -714,9 +719,31 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          بالتسجيل، أنت توافق على شروط الاستخدام وسياسة الخصوصية
+          بالتسجيل، أنت توافق على{" "}
+          <button
+            type="button"
+            onClick={() => setOpenLegal("terms")}
+            className="underline underline-offset-2 text-slate-500 hover:text-primary active:text-primary font-medium"
+          >
+            شروط الاستخدام
+          </button>
+          {" "}و
+          <button
+            type="button"
+            onClick={() => setOpenLegal("privacy")}
+            className="underline underline-offset-2 text-slate-500 hover:text-primary active:text-primary font-medium"
+          >
+            سياسة الخصوصية
+          </button>
         </p>
       </div>
+
+      {/* Inline Terms / Privacy sheet. Renders nothing while openLegal
+          is null. Lives outside the form card so form state is
+          preserved across opens/closes — a user can tap "شروط
+          الاستخدام", read, close, and return to a fully-filled
+          signup form. */}
+      <LegalSheet kind={openLegal} onClose={() => setOpenLegal(null)} />
 
       {/* Forgot Password Modal — outside the card, always rendered when needed */}
       {showForgot && (

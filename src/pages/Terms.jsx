@@ -1,8 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import React from "react";
-
-// Bump this date whenever the terms text is materially updated.
-const LAST_UPDATED_ISO = "2026-05-01";
+import { TERMS_LAST_UPDATED, TERMS_SECTIONS } from "@/lib/legalContent";
 
 function formatArabicMonthYear(iso) {
   try {
@@ -20,20 +18,9 @@ export default function Terms() {
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12" dir="rtl">
       <h1 className="text-3xl font-black mb-2">شروط الاستخدام</h1>
-      <p className="text-muted-foreground text-sm mb-8">آخر تحديث: {formatArabicMonthYear(LAST_UPDATED_ISO)}</p>
+      <p className="text-muted-foreground text-sm mb-8">آخر تحديث: {formatArabicMonthYear(TERMS_LAST_UPDATED)}</p>
 
-      {[
-        { title: "1. القبول بالشروط", body: "باستخدامك لمنصة مشوارو، فإنك توافق على الالتزام بهذه الشروط. إذا لم توافق على أي بند، يرجى عدم استخدام الخدمة." },
-        { title: "2. وصف الخدمة", body: "مشوارو منصة وسيطة تربط السائقين بالركاب لمشاركة تكاليف الرحلات. لسنا شركة نقل وليس لدينا سائقون موظفون. العلاقة التعاقدية للرحلة تقوم مباشرة بين السائق والراكب." },
-        { title: "3. أهلية المستخدم", body: "يجب أن يكون عمرك 18 سنة أو أكثر. السائقون يجب أن يمتلكوا رخصة قيادة سارية وتأمين مركبة ساري." },
-        { title: "4. مسؤولية السائق", body: "السائق مسؤول عن سلامة المركبة وصلاحيتها للقيادة، والالتزام بقوانين المرور، وتوفير بيانات صحيحة عن الرحلة، والمعاملة اللائقة للركاب." },
-        { title: "5. مسؤولية الراكب", body: "الراكب مسؤول عن الالتزام بموعد الرحلة، ودفع المبلغ المتفق عليه، والمعاملة اللائقة للسائق والركاب الآخرين، وعدم تجاوز عدد المقاعد المحجوزة." },
-        { title: "6. الإلغاء والاسترداد", body: "إلغاء مجاني قبل ساعتين من موعد الرحلة للدفع النقدي. سياسة الاسترداد للمدفوعات الإلكترونية: استرداد كامل قبل 24 ساعة، 50% قبل 2-24 ساعة، لا استرداد بعد ذلك." },
-        { title: "7. حظر الاستخدام", body: "يُحظر استخدام المنصة للنقل التجاري غير المرخص، أو نقل مواد مخالفة للقانون، أو التحرش أو الإساءة، أو نشر معلومات مضللة عن الرحلات." },
-        { title: "8. المسؤولية المحدودة", body: "مشوارو غير مسؤول عن أي أضرار تنشأ عن الرحلات. نحن وسيط فقط. المسؤولية الكاملة عن الرحلة تقع على السائق والراكب." },
-        { title: "9. التعديلات", body: "نحتفظ بحق تعديل هذه الشروط في أي وقت. سيتم إشعار المستخدمين عبر البريد الإلكتروني أو الإشعارات داخل التطبيق." },
-        { title: "10. القانون المطبق", body: "تخضع هذه الشروط لقوانين فلسطين. أي نزاع يُحل بالتوافق أولاً، ثم عبر محاكم رام الله المختصة." },
-      ].map(s => (
+      {TERMS_SECTIONS.map(s => (
         <div key={s.title} className="mb-6">
           <h2 className="text-lg font-bold text-foreground mb-2">{s.title}</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">{s.body}</p>
