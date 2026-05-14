@@ -961,10 +961,26 @@ function QuickReplies({ onPick, disabled, bookingStatus }) {
 }
 
 function MessageInput({ draft, setDraft, onSend, disabled, violation, otherName }) {
+  // When the user taps the input on a mobile device, the OS keyboard
+  // animates up and the WKWebView resizes. Add a small delay then scroll
+  // the input into view — this is the belt-and-suspenders fix that
+  // handles both iOS and Android edge cases where the composer might
+  // otherwise sit just below the keyboard on first focus.
+  const handleFocus = (e) => {
+    const el = e.currentTarget;
+    // 300ms matches the iOS keyboard animation duration (~250ms + buffer).
+    setTimeout(() => {
+      try {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch { /* old browsers without scrollIntoView options */ }
+    }, 300);
+  };
+
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); if (draft.trim()) onSend(); }}
       className="p-3 border-t border-border sticky bottom-0 bg-card"
+      style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
       {violation && (
         <div className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-2 text-right">
@@ -975,6 +991,7 @@ function MessageInput({ draft, setDraft, onSend, disabled, violation, otherName 
         <Input
           value={draft}
           onChange={e => setDraft(e.target.value)}
+          onFocus={handleFocus}
           placeholder={`رسالة إلى ${otherName}...`}
           className={`rounded-full h-11 flex-1 ${violation ? "border-destructive focus-visible:ring-destructive" : ""}`}
           disabled={disabled}

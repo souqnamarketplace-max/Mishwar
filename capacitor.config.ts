@@ -107,11 +107,13 @@ const config: CapacitorConfig = {
     },
 
     Keyboard: {
-      // Fix the common iOS bug where the keyboard pushes the WebView up
-      // and breaks fixed-position elements. "body" mode is the modern
-      // fix for Capacitor 5+; everything renders correctly without
-      // manual safe-area calculation in CSS.
-      resize: "body",
+      // For chat-heavy apps, "native" works better than "body" because
+      // it doesn't reflow the entire web view — the WKWebView shrinks
+      // its visible area and our sticky-bottom composer stays anchored
+      // just above the keyboard. Previously "body" mode caused the
+      // composer to be hidden behind the keyboard when the input field
+      // was focused inside the Messages screen.
+      resize: "native",
       style: "DARK",
       resizeOnFullScreen: true,
     },
