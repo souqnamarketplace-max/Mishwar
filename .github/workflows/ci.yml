@@ -49,9 +49,33 @@ jobs:
         # NODE_ENV=production. Vendor bundles legitimately contain the
         # word "console" inside library source (Supabase debug logger
         # references, etc.) so we only scan our own first-party chunks.
+        #
+        # Regex notes:
+        #   We grep for `console.<ident>(` only — i.e. an actual
+        #   invocation. esbuild's drop:console strips invocations and
+        #   replaces them with `void 0`, but it leaves untouched any
+        #   non-call references such as:
+        #     - type-checks: `typeof console.warn === "function"`
+        #     - capability refs: `console.error || fallback`
+        #     - method references: `const log = console.log;`
+        #     - property paths: `globalThis.console.error`
+        #   These all survive minification but never execute a log.
+        #   Some libraries (e.g. react-helmet-async) ship feature-
+        #   detection code like
+        #     (msg) => console && typeof console.warn === "function" && console.warn(msg)
+        #   The trailing call gets stripped, but the typeof check
+        #   remains. Without the trailing-paren requirement we'd false-
+        #   positive on that residue. With it, we catch only actual
+        #   calls — which is what `drop:console` is meant to remove
+        #   anyway, and what we actually care about.
+        #
+        # Pattern: (?<![.\w])console\.\w+\s*\(
+        #   - negative lookbehind excludes `e.console`, `_console`, etc.
+        #     so we don't fire on minified library locals.
+        #   - `\w+\s*\(` requires a method name followed by `(`, which
+        #     only an actual invocation has.
         run: |
           set -e
-          # Find dist files that are NOT vendor-* and NOT third-party-named
           our_files=$(find dist/assets -name '*.js' \
             ! -name 'vendor-*' \
             ! -name 'recharts*' \
@@ -60,12 +84,12 @@ jobs:
             echo "::warning::no first-party bundles found to scan"
             exit 0
           fi
-          if grep -nH 'console\.' $our_files > /tmp/leaked.txt; then
-            echo "::error::console.* statements found in first-party production bundle:"
+          if grep -nHP '(?<![.\w])console\.\w+\s*\(' $our_files > /tmp/leaked.txt; then
+            echo "::error::console.* invocations found in first-party production bundle:"
             cat /tmp/leaked.txt
             exit 1
           fi
-          echo "OK — no console.* in first-party bundles"
+          echo "OK — no console.* invocations in first-party bundles"
 
       - name: Verify no hardcoded credentials
         # Audit H-02: anon key fallbacks were a foot-gun. Block them at CI.

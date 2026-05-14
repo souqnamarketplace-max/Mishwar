@@ -26,6 +26,21 @@ export default defineConfig({
           'vendor-query':   ['@tanstack/react-query'],
           'vendor-supabase':['@supabase/supabase-js'],
           'vendor-leaflet': ['leaflet', 'react-leaflet'],
+          // Capacitor core ships its plugin-registry runtime with legitimate
+          // calls like `globalThis.console.error(...)` for plugin-load errors.
+          // Those aren't first-party console.log statements and shouldn't be
+          // stripped — but the CI guard at .github/workflows/ci.yml scans
+          // first-party bundles for any `console.` substring, so we put
+          // @capacitor/core in its own vendor chunk to exclude it from the
+          // scan (the guard explicitly skips files named vendor-*).
+          'vendor-capacitor': [
+            '@capacitor/core',
+            '@capacitor/app',
+            '@capacitor/keyboard',
+            '@capacitor/splash-screen',
+            '@capacitor/status-bar',
+            '@capacitor/preferences',
+          ],
           // recharts intentionally NOT split into its own vendor chunk —
           // it's only used by src/components/dashboard/DashboardCharts.jsx
           // which is already lazy-imported. Letting Vite co-locate it
