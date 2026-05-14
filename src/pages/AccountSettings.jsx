@@ -469,6 +469,15 @@ export default function AccountSettings() {
         /* ignore — soft delete is the source of truth */
       }
       toast.success("تم حذف حسابك بنجاح");
+      // Only collapse the modal back to step 1 on SUCCESS — keeping it
+      // open on error means the user (a) sees the error toast in
+      // context, (b) doesn't have to re-confirm by typing "حذف حسابي"
+      // again to retry. Previously this line lived after the catch
+      // and reset the modal on every code path, so any error
+      // (session expired, trigger block, network) silently rolled the
+      // user back to the warning step with no indication that their
+      // deletion didn't go through.
+      setShowDeleteModal(false);
       setTimeout(() => {
         if (base44.auth.logout) base44.auth.logout("/");
         else window.location.href = "/";
@@ -484,7 +493,6 @@ export default function AccountSettings() {
       }
       setDeletionLoading(false);
     }
-    setShowDeleteModal(false);
   };
 
   if (!user) {

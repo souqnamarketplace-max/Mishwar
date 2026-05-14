@@ -28,6 +28,17 @@ const KNOWN_PATTERNS = [
   // Our own RAISE EXCEPTION strings from migration triggers
   [/modifying role requires admin/i,                       "هذه العملية تتطلب صلاحيات إدارية"],
   [/modifying email requires admin/i,                      "لا يمكن تعديل البريد الإلكتروني من هنا"],
+  // The deleted_at protection from migration 002. After migration 035
+  // the deletion RPC bypasses the trigger via the
+  // mishwar.deleting_account session-var handshake, so this should
+  // not fire on the normal delete-account flow. It can still surface
+  // if (a) a legacy direct-UPDATE path is somehow re-introduced, or
+  // (b) an admin tool hits this column without going through an RPC.
+  // Friendly message keeps that case from looking like the unrelated
+  // email error (which was the original prod bug — migration 002's
+  // pattern came up first in friendlyError when the trigger fired and
+  // its message didn't have a more specific match).
+  [/modifying deleted_at requires admin or rpc/i,          "لا يمكن حذف الحساب بهذه الطريقة. يرجى إعادة المحاولة، وإن استمرت المشكلة تواصل مع الدعم"],
   [/passengers cannot change/i,                            "هذه العملية مسموحة للسائق فقط"],
   [/drivers cannot change/i,                               "هذه العملية مسموحة للراكب فقط"],
   [/cannot change.*after first booking/i,                  "لا يمكن تعديل تفاصيل رحلة بعد بدء الحجوزات"],
