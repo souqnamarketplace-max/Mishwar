@@ -13,6 +13,7 @@
  * pending request. Old rejected row stays for audit.
  */
 import React, { useMemo, useState } from "react";
+import ModalPortal from "@/components/shared/ModalPortal";
 import Pagination from "@/components/dashboard/Pagination";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -617,6 +618,7 @@ function SubscriptionRow({ row, showActions, onApprove, onReject, actionPending 
 function RejectModal({ row, onClose, onSubmit, submitting }) {
   const [reason, setReason] = useState("");
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <h3 className="font-bold text-lg mb-1">رفض طلب الاشتراك</h3>
@@ -648,6 +650,7 @@ function RejectModal({ row, onClose, onSubmit, submitting }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -677,6 +680,7 @@ function GrantSingleModal({ onClose, onSubmit, submitting }) {
   });
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
@@ -754,6 +758,7 @@ function GrantSingleModal({ onClose, onSubmit, submitting }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -763,6 +768,7 @@ function GrantBulkModal({ onClose, onSubmit, submitting }) {
   const [note, setNote] = useState("فترة سماح من إدارة مشوارو");
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
@@ -817,5 +823,6 @@ function GrantBulkModal({ onClose, onSubmit, submitting }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

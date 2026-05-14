@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ModalPortal from "@/components/shared/ModalPortal";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
 import { base44 } from "@/api/base44Client";
@@ -286,6 +287,7 @@ export default function DashboardLicenses() {
 
       {/* License Detail Modal */}
       {selectedLicense && (
+        <ModalPortal>
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">{selectedLicense.driver_name}</h2>
@@ -429,6 +431,7 @@ export default function DashboardLicenses() {
             </Button>
           </div>
         </div>
+        </ModalPortal>
       )}
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />

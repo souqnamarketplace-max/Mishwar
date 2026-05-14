@@ -3,6 +3,7 @@ import { logAudit } from "@/lib/adminAudit";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect, useRef } from "react";
+import ModalPortal from "@/components/shared/ModalPortal";
 import { base44 } from "@/api/base44Client";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
 import { useAuth } from "@/lib/AuthContext";
@@ -451,6 +452,16 @@ export default function MyTrips() {
     )}
 
     {confirmCancel.open && (
+      <ModalPortal>
+      {/* Portal to document.body — without this, the fixed-position
+          overlay would inherit its containing block from the closest
+          ancestor with a CSS transform set. On mobile, AppLayout wraps
+          every page in <PageTransition> (framer-motion's motion.div
+          applies transforms during route transitions), which hijacks
+          `position: fixed` and anchors it to the page instead of the
+          viewport. Result: on scrolled pages the modal renders below
+          the fold. ModalPortal escapes the transformed parent by
+          mounting the overlay directly under <body>. */}
       <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmCancel({ open: false, bookingId: null, reason: "" })}>
         <div onClick={e => e.stopPropagation()} className="bg-card rounded-2xl p-6 max-w-sm w-full shadow-2xl" dir="rtl">
           <div className="w-12 h-12 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
@@ -516,6 +527,7 @@ export default function MyTrips() {
           </div>
         </div>
       </div>
+      </ModalPortal>
     )}
     </div>
   );

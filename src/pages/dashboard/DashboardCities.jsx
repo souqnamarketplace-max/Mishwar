@@ -24,6 +24,7 @@
  *   3. Same name can be re-suggested later (e.g., spelling correction).
  */
 import React, { useState } from "react";
+import ModalPortal from "@/components/shared/ModalPortal";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -481,6 +482,7 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
   };
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose} dir="rtl">
       <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
@@ -578,12 +580,14 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
 function RejectModal({ row, onClose, onSubmit, submitting }) {
   const [reason, setReason] = useState("");
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose} dir="rtl">
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
@@ -619,5 +623,6 @@ function RejectModal({ row, onClose, onSubmit, submitting }) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
