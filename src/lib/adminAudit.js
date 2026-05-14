@@ -24,6 +24,7 @@ const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 import { readLocalSession } from "@/lib/session";
+import { captureException } from "@/lib/sentry";
 
 // Thin wrapper that returns just the (token, email) shape this module
 // uses. The expiry check is already done inside readLocalSession.
@@ -71,12 +72,34 @@ export async function logAdminAction(action, targetType, targetId, details = {})
       }),
     });
 
-    if (!r.ok && import.meta.env.DEV) {
-      const text = await r.text().catch(() => "");
-      // eslint-disable-next-line no-console
-      console.warn("[audit] insert failed", r.status, text);
+    if (!r.ok) {
+      // Capture details before consuming the response body
+      let bodyText = "";
+      try { bodyText = await r.text(); } catch { /* body might be empty */ }
+      // Send to Sentry in production AND log to console in dev. The old
+      // code gated this entirely on DEV, which meant prod audit-log
+      // failures (session-expiry races, RLS edge cases, schema drift)
+      // were completely invisible. captureException is wrapped in its
+      // own try/catch so it can never bubble up — the original action
+      // must not fail because the audit logger had a problem.
+      try {
+        captureException(new Error(`[audit] insert ${r.status}`), {
+          msg: "audit log insert failed",
+          extra: { action, targetType, status: r.status, body: bodyText.slice(0, 500) },
+        });
+      } catch { /* ignore — captureException itself failing is non-fatal */ }
+      if (import.meta.env.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn("[audit] insert failed", r.status, bodyText);
+      }
     }
   } catch (e) {
+    try {
+      captureException(e, {
+        msg: "audit log insert threw",
+        extra: { action, targetType },
+      });
+    } catch { /* ignore */ }
     if (import.meta.env.DEV) {
       // eslint-disable-next-line no-console
       console.warn("[audit] insert threw", e);

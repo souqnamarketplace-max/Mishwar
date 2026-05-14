@@ -8,6 +8,8 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/supabase";
+import { captureException } from "@/lib/sentry";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
 
 const STORAGE_KEY = "mishwar_notified_expired_trips";
@@ -47,11 +49,17 @@ export default function ExpiredTripNotifier({ user }) {
       if (!isTripExpired(trip)) continue;
       if (notified.has(trip.id)) continue;
 
-      // Send notification once
+      // Send notification once. Direct supabase.from() insert (not
+      // base44.entities.Notification.create) so we use the live JWT —
+      // base44's restFetch can fall back to the anon key when the
+      // session is stale, which makes auth_user_email() resolve to
+      // NULL inside RLS, which rejects this self-insert. supabase-js
+      // always carries the live token so the self-target RLS check
+      // passes consistently.
       (async () => {
         try {
           const isCompleted = isTripCompleted(trip);
-          await base44.entities.Notification.create({
+          const { error } = await supabase.from("notifications").insert({
             user_email: user.email,
             title: isCompleted ? "رحلتك انتهت ✅" : "موعد رحلتك اقترب ⏰",
             message: isCompleted
@@ -61,9 +69,13 @@ export default function ExpiredTripNotifier({ user }) {
             trip_id: trip.id,
             is_read: false,
           });
+          if (error) throw error;
           markNotified(trip.id);
         } catch (e) {
-          console.warn("ExpiredTripNotifier:", e);
+          // Capture to Sentry so production failures surface instead of
+          // hiding behind a console.warn that nobody reads.
+          captureException(e, { msg: "ExpiredTripNotifier insert failed", extra: { trip_id: trip.id } });
+          console.warn("ExpiredTripNotifier:", e?.message || e);
         }
       })();
     }

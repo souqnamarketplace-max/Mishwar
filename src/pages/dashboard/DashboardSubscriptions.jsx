@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { logAdminAction } from "@/lib/adminAudit";
+import { notifyUser } from "@/lib/notifyUser";
 import { base44 } from "@/api/base44Client";
 import { formatArabicDate } from "@/lib/validation";
 import {
@@ -177,26 +178,22 @@ export default function DashboardSubscriptions() {
       });
       // Notify the driver — formatArabicDate gives Gregorian Arabic
       // ("٧ يونيو ٢٠٢٦") rather than Hijri.
-      try {
-        const periodEnd = data?.period_end;
-        const endDateStr = periodEnd ? formatArabicDate(periodEnd) : "";
-        const { error: notifErr } = await supabase.from("notifications").insert({
-          user_email: row.driver_email,
-          title: "تم تفعيل اشتراكك ✅",
-          message: endDateStr
-            ? `تم تفعيل اشتراكك في مشوارو. الاشتراك ساري حتى ${endDateStr}.`
-            : "تم تفعيل اشتراكك في مشوارو.",
-          type: "subscription_approved",
-          is_read: false,
-          link: "/driver?tab=subscription",
-        });
-        if (notifErr) throw notifErr;
-      } catch (notifyErr) {
-        // Don't fail the approval if notification creation failed —
-        // admin already approved, driver will see active status next
-        // time they refresh. Log to console for triage.
-        console.warn("subscription_approved notification failed:", notifyErr);
-      }
+      // Routes through notifyUser → create_notification RPC (migration 027)
+      // which handles cross-user authorization via Rule B (admin) and
+      // captures any failure via Sentry. Direct insert was working
+      // post-migration-037 but the RPC path is the right pattern in
+      // case the RLS policy ever tightens.
+      const periodEnd = data?.period_end;
+      const endDateStr = periodEnd ? formatArabicDate(periodEnd) : "";
+      await notifyUser({
+        user_email: row.driver_email,
+        title: "تم تفعيل اشتراكك ✅",
+        message: endDateStr
+          ? `تم تفعيل اشتراكك في مشوارو. الاشتراك ساري حتى ${endDateStr}.`
+          : "تم تفعيل اشتراكك في مشوارو.",
+        type: "subscription_approved",
+        link: "/driver?tab=subscription",
+      });
       return data;
     },
     onSuccess: () => {
@@ -223,19 +220,15 @@ export default function DashboardSubscriptions() {
         driver_email: row.driver_email,
         reason,
       });
-      try {
-        const { error: notifErr } = await supabase.from("notifications").insert({
-          user_email: row.driver_email,
-          title: "لم نتمكن من تفعيل اشتراكك ❌",
-          message: `لم نتمكن من التحقق من تحويل الدفع. السبب: ${reason}. يمكنك إعادة الإرسال من صفحة الاشتراك.`,
-          type: "subscription_rejected",
-          is_read: false,
-          link: "/driver?tab=subscription",
-        });
-        if (notifErr) throw notifErr;
-      } catch (notifyErr) {
-        console.warn("subscription_rejected notification failed:", notifyErr);
-      }
+      // Notify driver via the RPC path (handles RLS via Rule B, sends
+      // failures to Sentry instead of dropping them silently).
+      await notifyUser({
+        user_email: row.driver_email,
+        title: "لم نتمكن من تفعيل اشتراكك ❌",
+        message: `لم نتمكن من التحقق من تحويل الدفع. السبب: ${reason}. يمكنك إعادة الإرسال من صفحة الاشتراك.`,
+        type: "subscription_rejected",
+        link: "/driver?tab=subscription",
+      });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-subscriptions"] }); qc.invalidateQueries({ queryKey: ["admin-subscriptions-counts"] });
@@ -263,19 +256,14 @@ export default function DashboardSubscriptions() {
         p_note: note || null,
       });
       if (error) throw error;
-      try {
-        const { error: notifErr } = await supabase.from("notifications").insert({
-          user_email: email,
-          title: "تم منحك اشتراكاً مجانياً 🎁",
-          message: `قامت إدارة مشوارو بتفعيل اشتراك مجاني لك لمدة ${days} يوماً.${note ? " السبب: " + note : ""}`,
-          type: "subscription_complimentary",
-          is_read: false,
-          link: "/driver?tab=subscription",
-        });
-        if (notifErr) throw notifErr;
-      } catch (notifyErr) {
-        console.warn("comp grant notification failed:", notifyErr);
-      }
+      // Notify the recipient driver via the canonical RPC path.
+      await notifyUser({
+        user_email: email,
+        title: "تم منحك اشتراكاً مجانياً 🎁",
+        message: `قامت إدارة مشوارو بتفعيل اشتراك مجاني لك لمدة ${days} يوماً.${note ? " السبب: " + note : ""}`,
+        type: "subscription_complimentary",
+        link: "/driver?tab=subscription",
+      });
       await logAdminAction("subscription_granted", "driver_subscription", data, {
         driver_email: email, days, note,
       });

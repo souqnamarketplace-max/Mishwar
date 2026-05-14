@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { REPORT_CATEGORIES } from "@/lib/blockUtils";
 import { logAdminAction } from "@/lib/adminAudit";
+import { notifyUser } from "@/lib/notifyUser";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 
@@ -175,22 +176,22 @@ export default function DashboardReports() {
 
     // 2) Notify the reporter so they can follow up on their submission.
     //    Without this, reporters never know their report was even seen.
+    //    Routes through notifyUser → create_notification RPC (migration
+    //    027) which handles cross-user authorization via Rule B (admin)
+    //    and captures any failure to Sentry. Previously this was a
+    //    direct insert wrapped in `catch { }` (no logging at all) — so
+    //    every silently-failed notification was completely invisible.
     const notifTemplate = REPORTER_NOTIF_BY_STATUS[status];
     if (notifTemplate && report.reporter_email) {
-      try {
-        await supabase.from("notifications").insert({
-          user_email: report.reporter_email,
-          title: notifTemplate.title,
-          message: note
-            ? `${notifTemplate.body}\n\nملاحظة الإدارة: ${note}`
-            : notifTemplate.body,
-          type: "report_update",
-          is_read: false,
-          link: "/settings?section=reports",
-        });
-      } catch {
-        // Non-fatal — the admin update already succeeded.
-      }
+      await notifyUser({
+        user_email: report.reporter_email,
+        title: notifTemplate.title,
+        message: note
+          ? `${notifTemplate.body}\n\nملاحظة الإدارة: ${note}`
+          : notifTemplate.body,
+        type: "report_update",
+        link: "/settings?section=reports",
+      });
     }
 
     // 3) Audit-trail entry so we have a record of who actioned what.

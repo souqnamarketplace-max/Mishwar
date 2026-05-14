@@ -39,44 +39,24 @@ const amenitiesList = [
   { id: "luggage", label: "متاح للأمتعة", icon: Briefcase },
 ];
 
-// ── Notify users whose route preference matches a new trip ───────────────────
-async function notifyMatchingPreferences(trip) {
-  try {
-    // Fetch all active preferences
-    const prefs = await base44.entities.TripPreference.filter({ is_active: true }, "-created_date", 500);
-    if (!prefs?.length) return;
-
-    const tripStops = Array.isArray(trip.stops) ? trip.stops.map(s => s?.city).filter(Boolean) : [];
-    const tripCities = [trip.from_city, ...tripStops, trip.to_city];
-
-    const matches = prefs.filter(p => {
-      if (!p.from_city || !p.to_city || !p.user_email) return false;
-      // Don't notify the driver about their own trip
-      if (p.user_email === trip.driver_email) return false;
-      // Check if from_city appears before to_city in trip sequence
-      const fromIdx = tripCities.findIndex(c => c === p.from_city);
-      const toIdx   = tripCities.findIndex(c => c === p.to_city);
-      return fromIdx !== -1 && toIdx !== -1 && fromIdx < toIdx;
-    });
-
-    if (!matches.length) return;
-
-    // Send notification to each matching user (in parallel, silently)
-    await Promise.allSettled(matches.map(pref =>
-      base44.entities.Notification.create({
-        user_email: pref.user_email,
-        title: `رحلة جديدة: ${trip.from_city} ← ${trip.to_city} 🚗`,
-        message: `${trip.driver_name || "سائق"} ينشر رحلة من ${trip.from_city} إلى ${trip.to_city} بتاريخ ${trip.date} الساعة ${trip.time}. السعر: ₪${trip.price} للمقعد.`,
-        type: "new_trip",
-        trip_id: trip.id,
-        is_read: false,
-      })
-    ));
-  } catch (e) {
-    // Silent — never block trip creation
-    console.warn("[TripMatch] notification failed:", e?.message);
-  }
-}
+// ── Saved-route-match notifications ──────────────────────────────────────────
+// Previously a notifyMatchingPreferences() function lived here that fetched
+// every active trip_preferences row, computed matches client-side, and tried
+// to insert notifications targeting the matched passengers. This was silently
+// broken in production since the feature shipped:
+//   - Cross-user notification inserts hit the RLS policy that only allows
+//     user_email = auth_user_email() OR caller is admin. Drivers are neither.
+//   - The Promise.allSettled + catch swallowed every RLS rejection.
+//   - So saved-route-match passengers never got the bell ping.
+// Migration 038 replaces the entire flow with a SECURITY DEFINER trigger on
+// trips INSERT that runs the same matching logic server-side and bypasses
+// RLS. The client doesn't need to do anything — the moment Trip.create
+// succeeds, the trigger fires synchronously and the notifications land
+// before this function returns.
+//
+// Side benefit: removing the client query stops exposing every active
+// passenger's saved preferences (city pairs + max_price) to the driver's
+// browser session. Modest privacy win.
 
 export default function CreateTrip() {
   const qc = useQueryClient();
@@ -484,11 +464,10 @@ export default function CreateTrip() {
         );
       }
 
-      // Notify matching preferences for first recurring trip that
-      // actually succeeded (was using results[0] before which could
-      // be a rejected one).
-      const firstOk = succeeded[0]?.value;
-      if (firstOk) notifyMatchingPreferences({ ...baseData, id: firstOk?.id || firstOk });
+      // Saved-route-match notifications fire from the trg_notify_matching_
+      // route_preferences trigger on trips INSERT (migration 038). The
+      // first successful recurring trip's INSERT triggered the notification
+      // cascade automatically; we don't need to do anything from the client.
     } else {
       try {
         const newTrip = await base44.entities.Trip.create(baseData);
@@ -497,8 +476,10 @@ export default function CreateTrip() {
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
       qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
       qc.invalidateQueries({ queryKey: ["featured-trips"] });
-        // Notify users with matching route preferences (fire & forget)
-        notifyMatchingPreferences({ ...baseData, id: newTrip?.id || newTrip });
+        // Saved-route-match notifications are dispatched by the
+        // trg_notify_matching_route_preferences trigger (migration 038)
+        // synchronously inside Trip.create's transaction — no client
+        // action needed.
       } catch (err) {
         const msg = err?.message || "";
         // SQL trigger errors come back with the Arabic text already
