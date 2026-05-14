@@ -132,6 +132,31 @@
     @apply bg-background text-foreground font-tajawal;
     direction: rtl;
     overscroll-behavior: none;
+    /* Prevent double-tap-to-zoom on touch devices. The viewport meta tag
+     * (user-scalable=no, maximum-scale=1.0) handles pinch-zoom; this CSS
+     * disables the secondary double-tap zoom gesture. "manipulation"
+     * keeps single-tap and scroll responsive — only zoom is disabled,
+     * not pan or tap recognition. */
+    touch-action: manipulation;
+    /* iOS Safari auto-zooms when you focus any <input> / <textarea> /
+     * <select> whose effective font-size is less than 16px. Even with
+     * user-scalable=no, the focus-zoom can still fire and leave the
+     * page slightly enlarged. Forcing the text size to 100% (16px)
+     * disables this behavior across the whole app. Individual inputs
+     * can still be styled smaller with Tailwind text-sm / text-xs;
+     * iOS only checks computed font-size at focus time. */
+    -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+  }
+
+  /* Belt-and-suspenders: ensure form controls are at least 16px so iOS
+   * never decides to auto-zoom even if a custom class shrinks them. iOS
+   * applies the zoom heuristic per element, not globally. Only kicks in
+   * on devices where it would have caused zoom (mobile Safari, iPad). */
+  @supports (-webkit-touch-callout: none) {
+    input, select, textarea {
+      font-size: max(16px, 1em);
+    }
   }
 
   @supports (padding: max(0px)) {
