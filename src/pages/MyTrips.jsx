@@ -174,21 +174,38 @@ export default function MyTrips() {
     queryFn: () => base44.entities.Trip.list("-created_date", 200),
   });
 
-  // Filter out cancelled bookings entirely — once a passenger cancels, the trip
-  // should disappear from "رحلاتي" immediately. If they re-book, a new (active)
-  // booking row exists and the trip reappears.
-  const activePassengerBookings = (passengerBookings || []).filter(b => b.status !== "cancelled");
-  // Merge: driver trips + trips the user has an ACTIVE booking on (deduplicated)
-  const bookedTripIds = new Set(activePassengerBookings.map(b => b.trip_id));
-  // Map of trip_id → passenger's booking status. Use the NEWEST active booking per trip
-  // so re-bookings after cancellation correctly show the new pending/confirmed status.
-  const bookingStatusByTripId = new Map();
-  for (const b of activePassengerBookings) {
-    // passengerBookings is already sorted -created_date, so first hit per trip is newest
-    if (!bookingStatusByTripId.has(b.trip_id)) {
-      bookingStatusByTripId.set(b.trip_id, b.status);
+  // Group passenger bookings by trip_id, picking the most relevant booking
+  // per trip. The whole booking object is stored (not just b.status) so the
+  // card renderer can read cancellation_reason and show 'cancelled by you'
+  // vs 'cancelled by driver'.
+  //
+  // Selection rule: prefer the NEWEST non-cancelled booking if one exists
+  // (handles the cancel-then-rebook case — the user should see the active
+  // re-booking, not the older cancelled row). If a trip has ONLY cancelled
+  // bookings, the newest cancelled one wins and the trip shows up in the
+  // الملغاة tab.
+  //
+  // Previously this filtered cancelled bookings out entirely (the old
+  // `activePassengerBookings` variable), which made the الملغاة tab
+  // permanently empty for passengers — the tab existed but no row would
+  // ever populate it because cancelled bookings were stripped before the
+  // tab logic ever ran. Bug report from prod: user cancelled a pending
+  // booking, looked in الملغاة, saw "لا توجد رحلات".
+  const bookingByTripId = new Map();
+  for (const b of (passengerBookings || [])) {
+    // passengerBookings is sorted -created_date desc, so first hit per
+    // trip is the newest. Replace only if we previously stored a
+    // cancelled booking and we now find an active one — that handles
+    // the (rare) case where the sort order isn't strictly newest-first.
+    const existing = bookingByTripId.get(b.trip_id);
+    if (!existing) {
+      bookingByTripId.set(b.trip_id, b);
+    } else if (existing.status === "cancelled" && b.status !== "cancelled") {
+      bookingByTripId.set(b.trip_id, b);
     }
   }
+  // Merge: driver trips + trips the user has any booking on (deduplicated)
+  const bookedTripIds = new Set(bookingByTripId.keys());
   const bookedTrips = allTrips.filter(t => bookedTripIds.has(t.id));
   const trips = [...driverTrips, ...bookedTrips.filter(t => !driverTrips.find(dt => dt.id === t.id))];
 
@@ -211,7 +228,14 @@ export default function MyTrips() {
 
   // For passenger trips, the BOOKING status takes precedence over trip status.
   // For driver trips (no booking on user's behalf), fall back to the trip status.
-  const effectiveStatus = (t) => bookingStatusByTripId.get(t.id) || t.status;
+  // Driver-of-trip takes precedence over passenger-on-trip — the latter shouldn't
+  // happen (book_seat refuses to let a driver book their own trip) but is harmless
+  // to handle. Returns the booking's status when there is one, otherwise the
+  // trip's own status.
+  const effectiveStatus = (t) => {
+    if (driverTrips.find(dt => dt.id === t.id)) return t.status;
+    return bookingByTripId.get(t.id)?.status || t.status;
+  };
   const filtered = activeTab === "all" ? trips : trips.filter((t) => effectiveStatus(t) === activeTab);
   const { data: myReviews = [] } = useQuery({
     queryKey: ["my-reviews", user?.email],
@@ -373,6 +397,41 @@ export default function MyTrips() {
                                   {trip.driver_rating || "4.5"}
                                 </span>
                               </div>
+                              {/* Cancellation attribution. Shown only when the
+                                  trip lands in the cancelled tab — the booking
+                                  row's cancellation_reason tells us who
+                                  triggered it. Values come from the three
+                                  cancel call-sites:
+                                    'passenger_self_cancel' → MyTrips.jsx (this file, cancelBookingMutation)
+                                    'driver_cancel'         → DriverPassengers.jsx
+                                    'driver_reject_popup'   → BookingRequestPopup.jsx
+                                  Driver-side trip cancellation (trip.status=
+                                  'cancelled' without a passenger-booking
+                                  context) falls through to the generic
+                                  'ألغيت' text. */}
+                              {status === "cancelled" && (() => {
+                                const booking = bookingByTripId.get(trip.id);
+                                const reason = booking?.cancellation_reason;
+                                const isDriverTrip = !!driverTrips.find(dt => dt.id === trip.id);
+                                let label;
+                                if (isDriverTrip) {
+                                  label = "ألغيت من قِبلك";
+                                } else if (reason === "passenger_self_cancel") {
+                                  label = "ألغيتَ هذا الحجز";
+                                } else if (reason === "driver_cancel") {
+                                  label = "ألغاه السائق";
+                                } else if (reason === "driver_reject_popup") {
+                                  label = "رفض السائق طلبك";
+                                } else {
+                                  // Unknown / legacy reason — show neutral text
+                                  label = "ملغاة";
+                                }
+                                return (
+                                  <p className="mt-1 text-xs text-destructive/80 font-medium">
+                                    {label}
+                                  </p>
+                                );
+                              })()}
                             </div>
                             <div className="flex items-center gap-3">
                               <Badge className={config?.color}>{config?.label}</Badge>
