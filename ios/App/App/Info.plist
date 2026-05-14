@@ -78,9 +78,20 @@
 	     Ride-share apps that ship NSAllowsArbitraryLoads usually
 	     get rejected during App Store review without justification. -->
 
-	<!-- ─── URL scheme for deep links (optional, future-ready) ──────
-	     Allows other apps to open mishwaro:// URLs and route into the
-	     native shell. Not used today; commented for documentation.
+	<!-- ─── URL scheme for OAuth deep-link callbacks ──────
+	     Allows iOS to route mishwaro:// URLs back into this app
+	     instead of leaving the user stuck in the system browser
+	     after OAuth flows. Specifically used by Sign-in-with-Google
+	     (src/lib/googleAuth.js → @capacitor/browser → Supabase
+	     redirects to mishwaro://auth/callback → iOS routes the URL
+	     here → src/lib/native.js appUrlOpen listener extracts the
+	     tokens and calls supabase.auth.setSession). The matching
+	     redirect URL must be whitelisted in the Supabase dashboard
+	     under Authentication → URL Configuration → Redirect URLs;
+	     without that, Supabase rejects the redirect with "Invalid
+	     redirect URL" after Google auth succeeds. CFBundleURLName
+	     is reverse-DNS and conventionally matches the app's bundle
+	     identifier — Apple's recommendation. -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -92,6 +103,5 @@
 			</array>
 		</dict>
 	</array>
-	-->
 </dict>
 </plist>

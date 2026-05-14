@@ -22,6 +22,34 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- OAuth deep-link callback. Used by Sign-in-with-Google:
+                 src/lib/googleAuth.js opens the OAuth URL in
+                 @capacitor/browser; Supabase redirects to
+                 mishwaro://auth/callback when Google finishes; Android
+                 sees the scheme + host registered here and routes the
+                 URL to this activity instead of asking the user to
+                 pick a handler. The appUrlOpen listener in
+                 src/lib/native.js then parses the tokens out of the
+                 fragment and calls supabase.auth.setSession.
+
+                 The matching redirect URL must be whitelisted in the
+                 Supabase dashboard under Authentication → URL
+                 Configuration → Redirect URLs; without that, the
+                 callback never reaches us because Supabase rejects
+                 the redirect before Android gets involved.
+
+                 autoVerify="false" because we're using a custom scheme,
+                 not an https App Link — App Links would require us to
+                 host an assetlinks.json on www.mishwaro.com and is
+                 only needed if you want https://www.mishwaro.com/...
+                 links to open the app instead of Chrome. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mishwaro" android:host="auth" />
+            </intent-filter>
+
         </activity>
 
         <provider
