@@ -1,6 +1,7 @@
 import { CITIES } from "@/lib/cities";
 import { useSEO } from "@/hooks/useSEO";
 import { getNotifTarget } from "@/lib/notificationRouting";
+import { useNotificationActions } from "@/lib/useNotificationActions";
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -98,35 +99,10 @@ export default function Notifications() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["preferences"] }); toast.success("تم حذف التفضيل"); },
   });
 
-  const markAllRead = useMutation({
-    mutationFn: async () => {
-      const unread = notifications.filter((n) => !n.is_read);
-      if (unread.length === 0) return;
-      const ids = unread.map((n) => n.id);
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
-      qc.invalidateQueries({ queryKey: ["notifications"] });
-    },
-    onError: (err) => toast.error(friendlyError(err, "تعذر تحديث الإشعارات")),
-  });
-
-  const deleteNotif = useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from("notifications").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
-      qc.invalidateQueries({ queryKey: ["notifications"] });
-    },
-    onError: (err) => toast.error(friendlyError(err, "تعذر حذف الإشعار")),
-  });
+  // Unified actions hook — same source of truth as the bell popup. The
+  // hook does optimistic update + RLS-no-op detection + rollback so we
+  // never lie to the user about whether a notification is read.
+  const { markRead, markAllRead, removeNotif } = useNotificationActions(user?.email);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -153,7 +129,7 @@ export default function Notifications() {
           </Button>
         )}
         {activeTab === "inbox" && unreadCount > 0 && (
-          <Button variant="outline" className="rounded-xl gap-2 h-10" onClick={() => markAllRead.mutate()}>
+          <Button variant="outline" className="rounded-xl gap-2 h-10" onClick={() => markAllRead()}>
             <Check className="w-4 h-4" />
             تحديد الكل كمقروء
           </Button>
@@ -351,28 +327,23 @@ export default function Notifications() {
                   key={notif.id}
                   className={`bg-card rounded-2xl border p-4 transition-all cursor-pointer hover:shadow-sm ${!notif.is_read ? "border-primary/30 bg-primary/5" : "border-border"}`}
                   onClick={async () => {
-                    // Mark as read via supabase (base44 created_by filter blocks this)
-                    if (!notif.is_read) {
-                      try {
-                        await supabase.from("notifications").update({ is_read: true }).eq("id", notif.id);
-                      } catch (e) { console.warn("notif markRead error:", e); }
-                      qc.invalidateQueries({ queryKey: ["notifications", user?.email] });
-                      qc.invalidateQueries({ queryKey: ["notifications"] });
-                    }
+                    // Mark-as-read uses the unified hook — handles
+                    // optimistic flip, RLS no-op detection, and rollback.
+                    // We fire-and-forget here so navigation isn't blocked
+                    // on the server round-trip; the UI flips instantly
+                    // via the optimistic cache update.
+                    if (!notif.is_read) markRead(notif.id);
                     // Routing — single source of truth shared with the bell
-                    // popup (src/lib/notificationRouting.js). Was previously
-                    // a switch on notif.type with cases for values nothing
-                    // in the producer side actually emits (booking_received,
-                    // booking_cancelled, etc. — every insert uses
-                    // type='system' and differentiates via title/trip_id).
-                    // Result: every real notification fell into the default
-                    // and either no-oped (no trip_id) or sent the user to
-                    // a different place than the bell would have. The util
-                    // implements the same priority order both surfaces had
-                    // implicitly agreed on (notif.link > trip_id+title >
-                    // type > title-fallback > /notifications safety net).
+                    // popup (src/lib/notificationRouting.js). Returns null
+                    // for notifications with no actionable destination
+                    // (e.g. admin_broadcast already shown inline). When
+                    // null we stay on the page instead of navigating
+                    // back to /notifications (a no-op that would feel
+                    // broken to the user).
                     const target = getNotifTarget(notif);
-                    if (target) navigate(target);
+                    if (target && target !== window.location.pathname + window.location.search) {
+                      navigate(target);
+                    }
                   }}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -403,7 +374,7 @@ export default function Notifications() {
                         The bell popup variant in NotificationBell.jsx
                         already does this correctly; the list page didn't. */}
                     <button
-                      onClick={(e) => { e.stopPropagation(); deleteNotif.mutate(notif.id); }}
+                      onClick={(e) => { e.stopPropagation(); removeNotif(notif.id); }}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground shrink-0"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

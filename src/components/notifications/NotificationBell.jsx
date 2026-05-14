@@ -11,6 +11,7 @@ import {
   showIncomingNotification,
 } from "@/lib/pushNotifications";
 import { getNotifTarget } from "@/lib/notificationRouting";
+import { useNotificationActions } from "@/lib/useNotificationActions";
 
 // Notification routing logic moved to src/lib/notificationRouting.js
 // so the bell popup AND the full-page Notifications list use the
@@ -103,50 +104,11 @@ export default function NotificationBell({ userEmail }) {
     return () => unsub();
   }, [userEmail, qc]);
 
-  const markRead = useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .eq("id", id);
-      if (error) throw error;
-    },
-    // Optimistic update so the dot disappears instantly even before navigate
-    onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: ["notifications", userEmail] });
-      const prev = qc.getQueryData(["notifications", userEmail]);
-      qc.setQueryData(["notifications", userEmail], (old) =>
-        Array.isArray(old) ? old.map(n => n.id === id ? { ...n, is_read: true } : n) : old
-      );
-      return { prev };
-    },
-    onError: (_err, _id, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["notifications", userEmail], ctx.prev);
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
-  });
-
-  const markAllRead = useMutation({
-    mutationFn: async () => {
-      const unread = notifications.filter(n => !n.is_read);
-      if (unread.length === 0) return;
-      const ids = unread.map(n => n.id);
-      const { error } = await supabase
-        .from("notifications")
-        .update({ is_read: true })
-        .in("id", ids);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
-  });
-
-  const deleteNotif = useMutation({
-    mutationFn: async (id) => {
-      const { error } = await supabase.from("notifications").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", userEmail] }),
-  });
+  // Mark-as-read / mark-all / delete actions are unified across surfaces.
+  // The hook handles optimistic updates, rollback on RLS denial, and
+  // cross-cache invalidation so the bell and the /notifications list
+  // page can't disagree about which rows are read.
+  const { markRead, markAllRead, removeNotif } = useNotificationActions(userEmail);
 
   // Close on outside click
   useEffect(() => {
@@ -186,9 +148,12 @@ export default function NotificationBell({ userEmail }) {
   };
 
   const handleNotifClick = (notif) => {
-    if (!notif.is_read) markRead.mutate(notif.id);
+    if (!notif.is_read) markRead(notif.id);
     setOpen(false);
-    navigate(getNotifTarget(notif));
+    const target = getNotifTarget(notif);
+    // Null target = notification has no meaningful destination (e.g.
+    // admin_broadcast). Just close the popup and stay where we are.
+    if (target) navigate(target);
   };
 
   return (
@@ -235,7 +200,7 @@ export default function NotificationBell({ userEmail }) {
                 </div>
                 <div className="flex items-center gap-1">
                   {unreadCount > 0 && (
-                    <button onClick={() => markAllRead.mutate()}
+                    <button onClick={() => markAllRead()}
                       className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground text-xs flex items-center gap-1"
                       title="تحديد الكل كمقروء">
                       <CheckCheck className="w-3.5 h-3.5" />
@@ -289,7 +254,7 @@ export default function NotificationBell({ userEmail }) {
                         <div className="w-2 h-2 rounded-full bg-primary" />
                       )}
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteNotif.mutate(notif.id); }}
+                        onClick={(e) => { e.stopPropagation(); removeNotif(notif.id); }}
                         className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-muted transition-opacity"
                         aria-label="حذف">
                         <X className="w-3 h-3 text-muted-foreground" />

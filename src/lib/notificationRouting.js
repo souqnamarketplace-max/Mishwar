@@ -26,10 +26,11 @@
 //   3. notif.type for explicit broadcasts/system messages with no
 //      trip context.
 //   4. Title-based fallback for legacy rows.
-//   5. /notifications as the safety net so a tap is never a no-op.
+//   5. null — caller decides the safety net (was previously /notifications
+//      which was a no-op when tapped from the list page itself).
 
 export function getNotifTarget(notif) {
-  if (!notif) return "/notifications";
+  if (!notif) return null;
 
   const t    = notif.title || "";
   const type = notif.type || "system";
@@ -59,15 +60,18 @@ export function getNotifTarget(notif) {
   //    if a row is somehow inserted without the link.
   if (type === "request_contact") return "/messages";
   //    admin_broadcast: from broadcast_notification RPC (migration
-  //    024). Has no specific destination — drop user on the
-  //    notifications list so they can re-read the message.
-  if (type === "admin_broadcast") return "/notifications";
+  //    024). Has no specific destination — return null so the caller
+  //    can decide (e.g. expand inline instead of navigating).
+  if (type === "admin_broadcast") return null;
 
   // 4. Title-based fallback for legacy rows with no link, no trip_id,
   //    and a generic type='system'
   if (t.includes("تقييم")) return "/driver?tab=ratings";
   if (t.includes("حجز"))   return "/my-trips";
 
-  // 5. Safety net
-  return "/notifications";
+  // 5. No actionable destination — let caller decide whether to navigate
+  //    at all. Surfaces showing notifications shouldn't navigate the
+  //    user to /notifications when they're already there.
+  return null;
 }
+
