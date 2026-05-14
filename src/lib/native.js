@@ -136,13 +136,64 @@ export async function initNativeShell() {
       }
     });
 
-    // 6) App URL open — handle deep links into the app (e.g. tapping
-     //   a notification or a https://www.mishwaro.com/trip/abc link
-     //   from another app). Capacitor passes the URL; we extract the
-     //   path and feed it to React Router.
-    CapApp.addListener("appUrlOpen", (event) => {
+    // 6) App URL open — handle deep links into the app. Two cases:
+    //
+    //    (a) OAuth callback — `mishwaro://auth/callback#access_token=...&
+    //        refresh_token=...`. After Sign-in-with-Google in @capacitor/
+    //        browser, Supabase redirects to this URL; iOS/Android route
+    //        that scheme back to the app and this listener fires. We
+    //        parse the tokens out of the hash, call setSession() so the
+    //        Supabase client picks the user up (and onAuthStateChange
+    //        fires SIGNED_IN — AuthContext handles navigation from
+    //        there), then close the system browser sheet so the user is
+    //        looking at the app instead of the OAuth page. This branch
+    //        explicitly does NOT fall through to the React Router push
+    //        below — there is no "/callback" route to land on, and we
+    //        don't want the URL bar showing the tokens to the user.
+    //
+    //    (b) Generic deep link — e.g. tapping a notification or a
+    //        https://www.mishwaro.com/trip/abc link from another app.
+    //        Pull the path and feed it to React Router.
+    CapApp.addListener("appUrlOpen", async (event) => {
       try {
         const url = new URL(event.url);
+
+        // (a) Google OAuth callback
+        if (url.protocol === "mishwaro:" && url.host === "auth" && url.pathname === "/callback") {
+          // Tokens come back in the URL fragment per the OAuth implicit
+          // flow that Supabase uses. Hash is "#key=val&key=val" — strip
+          // the leading "#" before URLSearchParams.
+          const hashParams = new URLSearchParams(url.hash.replace(/^#/, ""));
+          const access_token  = hashParams.get("access_token");
+          const refresh_token = hashParams.get("refresh_token");
+          if (access_token && refresh_token) {
+            const { supabase } = await import("@/lib/supabase");
+            try {
+              await supabase.auth.setSession({ access_token, refresh_token });
+            } catch (e) {
+              console.warn("[native] setSession from OAuth callback failed:", e?.message);
+            }
+          } else {
+            // The hash didn't carry tokens — could mean Supabase appended
+            // an error_description=... query param instead. Log it so the
+            // user (and the audit trail) can see what went wrong. Common
+            // causes: redirect URL not whitelisted in Supabase, Google
+            // OAuth consent screen still pending verification, user
+            // tapped Cancel on the consent screen.
+            const errorMsg = url.searchParams.get("error_description") || url.searchParams.get("error");
+            console.warn("[native] OAuth callback without tokens:", errorMsg || "unknown");
+          }
+          // Whatever happened, return the user to the app surface.
+          try {
+            const { Browser } = await import("@capacitor/browser");
+            await Browser.close();
+          } catch {
+            // Browser plugin not installed / already closed — non-fatal.
+          }
+          return;
+        }
+
+        // (b) Generic deep link → React Router
         const path = url.pathname + url.search + url.hash;
         if (path && path !== "/") {
           // history.pushState then dispatch popstate so React Router picks it up

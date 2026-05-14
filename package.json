@@ -13,9 +13,6 @@
     "cap:sync": "npm run build && npx cap sync",
     "cap:ios": "npm run cap:sync && npx cap open ios",
     "cap:android": "npm run cap:sync && npx cap open android",
-    "cap:sync": "npm run build && npx cap sync",
-    "cap:ios": "npm run cap:sync && npx cap open ios",
-    "cap:android": "npm run cap:sync && npx cap open android",
     "build:sitemap": "node scripts/build-sitemap.js"
   },
   "dependencies": {
@@ -23,6 +20,7 @@
     "@base44/vite-plugin": "^1.0.13",
     "@capacitor/android": "^8.3.3",
     "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
     "@capacitor/camera": "^8.2.0",
     "@capacitor/cli": "^8.3.3",
     "@capacitor/core": "^8.3.3",
