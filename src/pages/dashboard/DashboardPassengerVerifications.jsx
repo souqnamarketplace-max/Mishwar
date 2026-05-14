@@ -205,7 +205,22 @@ function VerificationRow({ row, expanded, onToggle, onReviewed }) {
         );
       } catch { /* non-fatal */ }
 
-      // Notify the user
+      // Notify the user. Routes through create_notification (migration
+      // 027) instead of a direct INSERT into public.notifications:
+      //   - Direct INSERT was rejected by the migration 002 RLS policy
+      //     (notifications_insert allows the row only when user_email
+      //     matches the caller — admin notifying another user fails)
+      //   - The custom type ("verification") was ALSO blocked by the
+      //     old CHECK constraint that whitelisted only 4 type values
+      //     (migration 037 loosens that constraint, but going through
+      //     the RPC is still the correct call: it's the single
+      //     authorization chokepoint for cross-user notifications, so
+      //     a future RLS tweak won't quietly break this path again)
+      //   - The `link` column also didn't exist before migration 037,
+      //     so the link field on the old direct insert was being
+      //     ignored entirely
+      // Wrapped in try/catch so a notification failure doesn't roll back
+      // the verification decision (which is the actual action).
       try {
         const titles = {
           approved: "تم توثيق هويتك! ✓",
@@ -217,15 +232,23 @@ function VerificationRow({ row, expanded, onToggle, onReviewed }) {
           rejected: `لم نتمكن من قبول طلب التوثيق. السبب: ${reason}. يمكنك إعادة الإرسال بعد معالجة المشكلة.`,
           revoked:  `تم إلغاء توثيق حسابك. السبب: ${reason || "بقرار من الإدارة"}. للتفاصيل تواصل مع الدعم.`,
         };
-        await supabase.from("notifications").insert({
-          user_email: row.user_email,
-          title:      titles[decision],
-          message:    messages[decision],
-          type:       "verification",
-          is_read:    false,
-          link:       decision === "approved" ? "/request-trip" : "/verify-passenger",
+        const { error: notifErr } = await supabase.rpc("create_notification", {
+          p_user_email: row.user_email,
+          p_title:      titles[decision],
+          p_message:    messages[decision],
+          p_type:       "verification",
+          p_trip_id:    null,
+          p_link:       decision === "approved" ? "/request-trip" : "/verify-passenger",
         });
-      } catch { /* non-fatal */ }
+        if (notifErr) {
+          // Don't swallow silently like the old try/catch did — at least
+          // log so future failures surface in Sentry/devtools instead of
+          // being invisible the way this bug was.
+          console.warn("[verification] notify user failed:", notifErr?.message || notifErr);
+        }
+      } catch (e) {
+        console.warn("[verification] notify user threw:", e?.message || e);
+      }
     },
     onSuccess: () => {
       toast.success(decision === "approved" ? "تم اعتماد التوثيق" : decision === "rejected" ? "تم رفض الطلب" : "تم الإلغاء");
