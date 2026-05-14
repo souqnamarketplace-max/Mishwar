@@ -1,7 +1,7 @@
 import { CITIES } from "@/lib/cities";
 import { captureException } from "@/lib/sentry";
 import { todayISO } from "@/lib/validation";
-import MapCityPicker from "@/components/shared/MapCityPicker";
+import CityAutocomplete from "@/components/shared/CityAutocomplete";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import { readSessionUserId } from "@/lib/session";
@@ -383,7 +383,22 @@ export default function Onboarding() {
                   </div>
                   <div>
                     <label className="text-sm font-medium mb-2 block">مدينتك <span className="text-destructive">*</span></label>
-                    <MapCityPicker
+                    {/* CityAutocomplete provides BOTH typing (autocomplete
+                        against CITIES + map coords + live trip DB via
+                        useAllCities) AND picking from the map (showMapButton
+                        default true → small map icon in the input opens
+                        MapCityPicker as a modal). Matches the pattern used
+                        on HeroSection, CreateTrip, PassengerRequests — the
+                        onboarding screen was the last hold-out on the
+                        map-only MapCityPicker, which forced users with a
+                        keyboard preference (drivers entering a familiar
+                        small village; users on a slow connection where the
+                        map tiles take seconds to load) into a pan-and-zoom
+                        gesture they didn't need. The "suggest a city"
+                        flow inside CityAutocomplete still handles the
+                        long-tail case where a locality isn't in any of
+                        the three sources yet. */}
+                    <CityAutocomplete
                       value={form.city}
                       onChange={(city) => setForm({ ...form, city })}
                     />
