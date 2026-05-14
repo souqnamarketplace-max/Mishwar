@@ -449,6 +449,17 @@ export default function AccountSettings() {
       }
 
       // Confirm to the audit trail that the deletion actually persisted.
+      // Cascade counts (migration 036) tell admins how many dangling
+      // artifacts this deletion auto-resolved — useful for spotting
+      // patterns like 'we keep seeing users with 5+ open requests
+      // delete their accounts, are we sending too many notifications?'
+      const cascadeCounts = rpcSucceeded
+        ? {
+            cancelled_bookings: rpcResult?.cancelled_bookings_count ?? 0,
+            cancelled_requests: rpcResult?.cancelled_requests_count ?? 0,
+          }
+        : { cancelled_bookings: 0, cancelled_requests: 0 };
+
       await logAdminAction(
         "account_self_deleted",
         "user",
@@ -460,6 +471,7 @@ export default function AccountSettings() {
           confirmed_deleted_at: rpcSucceeded
             ? (rpcResult?.deleted_at || new Date().toISOString())
             : updatedRows[0].deleted_at,
+          ...cascadeCounts,
         }
       );
 
@@ -468,7 +480,34 @@ export default function AccountSettings() {
       } catch (_) {
         /* ignore — soft delete is the source of truth */
       }
-      toast.success("تم حذف حسابك بنجاح");
+
+      // Compose a summary toast. The common case (no pending bookings,
+      // no open requests) gets the plain message; users who had
+      // dangling artifacts get an explicit reassurance that we handled
+      // them, since they might be wondering whether their pending
+      // bookings on driver dashboards needed manual follow-up.
+      const cleanupBits = [];
+      if (cascadeCounts.cancelled_bookings > 0) {
+        cleanupBits.push(
+          cascadeCounts.cancelled_bookings === 1
+            ? "ألغينا حجزاً معلقاً واحداً"
+            : `ألغينا ${cascadeCounts.cancelled_bookings} حجوزات معلقة`
+        );
+      }
+      if (cascadeCounts.cancelled_requests > 0) {
+        cleanupBits.push(
+          cascadeCounts.cancelled_requests === 1
+            ? "وطلب رحلة واحد"
+            : `و${cascadeCounts.cancelled_requests} طلبات رحلة`
+        );
+      }
+      if (cleanupBits.length > 0) {
+        toast.success("تم حذف حسابك بنجاح", {
+          description: cleanupBits.join(" ") + ".",
+        });
+      } else {
+        toast.success("تم حذف حسابك بنجاح");
+      }
       // Only collapse the modal back to step 1 on SUCCESS — keeping it
       // open on error means the user (a) sees the error toast in
       // context, (b) doesn't have to re-confirm by typing "حذف حسابي"
