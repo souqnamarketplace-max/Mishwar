@@ -63,17 +63,30 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
     },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ["bookings"] });
-      const prev = qc.getQueryData(["bookings"]);
+      const prevBookings = qc.getQueryData(["bookings"]);
+      // Capture the booking's pre-mutation status so onSuccess can
+      // pick the right notification template and audit action. The
+      // optimistic setQueryData below stamps the NEW status onto
+      // every cache slice, so by the time onSuccess runs we can't
+      // recover the previous state from the cache alone. Check both
+      // ["bookings"] (admin-style) and ["driver-bookings"] (driver
+      // dashboard) — whichever one was loaded first wins, and it
+      // doesn't matter which because they're snapshots of the same
+      // row.
+      const previousStatus =
+        prevBookings?.find(b => b.id === id)?.status ||
+        qc.getQueryData(["driver-bookings"])?.find(b => b.id === id)?.status ||
+        null;
       qc.setQueryData(["bookings"], old => 
         old?.map(b => b.id === id ? { ...b, status } : b) || []
       );
-      return prev;
+      return { prevBookings, previousStatus };
     },
     onError: (err, vars, ctx) => {
-      qc.setQueryData(["bookings"], ctx);
+      qc.setQueryData(["bookings"], ctx?.prevBookings);
       toast.error(friendlyError(err, "فشل تحديث الحجز"));
     },
-    onSuccess: async (_, { id, status }) => {
+    onSuccess: async (_, { id, status }, ctx) => {
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
       qc.invalidateQueries({ queryKey: ["bookings"] });
       // Notify the passenger about the booking status change
@@ -93,15 +106,47 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
             logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
             toast.success("تم قبول الحجز وإخطار الراكب ✅");
           } else if (status === "cancelled") {
-            await notifyUser({
-              user_email: booking.passenger_email,
-              title: "تم رفض حجزك ❌",
-              message: "عذراً، قام السائق برفض حجزك. يمكنك البحث عن رحلة أخرى.",
-              type: "system",
-              trip_id: booking.trip_id,
-            });
-            logAudit("driver_reject_booking", "booking", id, { passenger_email: booking.passenger_email });
-            toast.info("تم رفض الحجز وإخطار الراكب");
+            // Branch on the booking's pre-cancel status. Today the UI
+            // gates the رفض button to booking.status === "pending"
+            // (line ~270 of this file), so the confirmed branch below
+            // doesn't fire in practice — but a future change that
+            // exposes a "remove confirmed passenger" surface would
+            // otherwise silently send "your booking was rejected" to
+            // a passenger whose booking was previously accepted, and
+            // file the action under driver_reject_booking. Defending
+            // against that here costs ~10 lines and makes the audit
+            // log materially more useful: admins can now tell apart
+            // a driver who rejects requests pre-confirm from one who
+            // bails on confirmed passengers (very different patterns
+            // for strike review).
+            const wasConfirmed = ctx?.previousStatus === "confirmed";
+            if (wasConfirmed) {
+              await notifyUser({
+                user_email: booking.passenger_email,
+                title: "السائق ألغى حجزك",
+                message: "نأسف، قام السائق بإلغاء حجزك المؤكد. ابحث عن رحلة بديلة على نفس المسار.",
+                type: "system",
+                trip_id: booking.trip_id,
+              });
+              logAudit("driver_cancel_confirmed_booking", "booking", id, {
+                passenger_email: booking.passenger_email,
+                previous_status: "confirmed",
+              });
+              toast.info("تم إلغاء الحجز وإخطار الراكب");
+            } else {
+              await notifyUser({
+                user_email: booking.passenger_email,
+                title: "تم رفض حجزك ❌",
+                message: "عذراً، قام السائق برفض حجزك. يمكنك البحث عن رحلة أخرى.",
+                type: "system",
+                trip_id: booking.trip_id,
+              });
+              logAudit("driver_reject_booking", "booking", id, {
+                passenger_email: booking.passenger_email,
+                previous_status: ctx?.previousStatus || "pending",
+              });
+              toast.info("تم رفض الحجز وإخطار الراكب");
+            }
           } else {
             toast.success("تم تحديث الحجز");
           }

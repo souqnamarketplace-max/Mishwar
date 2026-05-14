@@ -119,7 +119,18 @@ export default function BookingRequestPopup({ user }) {
             type: "system",
             trip_id: booking.trip_id,
           });
-          logAudit("driver_reject_booking", "booking", id, { passenger_email: booking.passenger_email });
+          logAudit("driver_reject_booking", "booking", id, {
+            passenger_email: booking.passenger_email,
+            // Popup query filters Booking.filter({status:"pending"})
+            // upstream (see queryFn line ~40), so every row that
+            // reaches this branch is pending by construction. Stamp
+            // it explicitly so admin queries like
+            //   logAudit.action = 'driver_reject_booking'
+            //   AND metadata->>'previous_status' = 'confirmed'
+            // get the answer 'none from this surface, all from
+            // DriverPassengers' without further code archaeology.
+            previous_status: "pending",
+          });
           toast.error("❌ تم رفض الحجز");
         }
       }

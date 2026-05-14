@@ -101,7 +101,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
 
       return { tripId, affected: affected.length, failedUpdates };
     },
-    onSuccess: ({ affected, failedUpdates }) => {
+    onSuccess: ({ tripId, affected, failedUpdates }) => {
       // Honest toast — match what actually happened. The previous
       // \"تم إلغاء الرحلة وإعلام الركاب\" claimed success even when
       // notifications were never sent.
@@ -120,6 +120,27 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+      // Audit log — was previously missing. The matching driver_delete_trip
+      // path lower in this file (deleteMutation.onSuccess) already writes
+      // its own entry; this restores parity so admins reviewing
+      // strike-eligible behaviour can see BOTH soft cancellations
+      // (trip stays in the DB with status='cancelled', bookings flip to
+      // 'cancelled_by_driver') AND hard deletes, and tell which one
+      // happened on any given driver/date pair. The metadata schema is
+      // intentionally identical to driver_delete_trip's so the two
+      // actions can be union-queried without column gymnastics. The
+      // affected_passengers + failed_updates counters are unique to
+      // cancellation — deletes happen on trips with zero non-cancelled
+      // bookings (enforced by the UI confirm step) so they're not
+      // meaningful there.
+      const trip = trips?.find(t => t.id === tripId);
+      logAudit("driver_cancel_trip", "trip", tripId, {
+        route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
+        date:  trip?.date,
+        driver_email: trip?.driver_email,
+        affected_passengers: affected,
+        failed_updates: failedUpdates,
+      });
     },
     onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الرحلة")),
   });
@@ -154,6 +175,20 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             trip_id: id,
           })
         ));
+        // Audit log — trip lifecycle transitions were previously
+        // unaudited, so admins reviewing complaints ("driver started
+        // the trip late" / "driver never marked complete") had no
+        // server-side timestamp to compare against the passenger's
+        // claim. logAudit goes through logAdminAction (lib/adminAudit
+        // .js) and stamps the call site's auth.uid + now() server-
+        // side, so this is the canonical record of when the driver
+        // tapped Start.
+        logAudit("driver_start_trip", "trip", id, {
+          route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
+          date:  trip?.date,
+          driver_email: trip?.driver_email,
+          notified_passengers: passengers.length,
+        });
       } else if (data.status === "completed") {
         toast.success("✅ تم إنهاء الرحلة بنجاح!");
         // Notify passengers trip completed — with rating prompt
@@ -167,6 +202,17 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             trip_id: id,
           })
         ));
+        // Same rationale as the in_progress branch above. Distinct
+        // action name so an admin reviewing a single trip's audit
+        // trail sees the full lifecycle: created → start → complete
+        // (or → cancel). Without these entries the trail had a hole
+        // from create to either complete-by-cron or cancel.
+        logAudit("driver_complete_trip", "trip", id, {
+          route: trip ? `${trip.from_city} → ${trip.to_city}` : null,
+          date:  trip?.date,
+          driver_email: trip?.driver_email,
+          notified_passengers: passengers.length,
+        });
       } else {
         toast.success("تم تحديث الحالة");
       }
