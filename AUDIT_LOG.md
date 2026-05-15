@@ -374,10 +374,10 @@ Plus retroactive fix: **DriverReviewWizard.jsx had the same defect as PassengerR
 | 24 | DriverRatingsDashboard.jsx | 185 | ✅ done | 1 real (review filter missed review_type — driver saw their OWN outgoing reviews mixed with incoming, inflating count + skewing average) |
 
 Plus retroactive: **UserHistorySection.jsx had the same review_type filter defect** — fixed alongside DriverRatingsDashboard. Admin's "متوسط التقييم" card for a driver was averaging ratings the driver gave passengers WITH ratings passengers gave the driver. Same fix.
-| 25 | DriverRatePassengers.jsx | 171 | pending | |
-| 26 | DriverVehicleEditor.jsx | 170 | pending | |
-| 27 | StrikeStatusSection.jsx | 170 | pending | |
-| 28 | PassengerPaymentsSection.jsx | 169 | pending | |
+| 25 | DriverRatePassengers.jsx | 171 | ✅ done | 2 real (HIGH: Review.create missing critical fields; MEDIUM: no onError + missing notifyUser/audit) |
+| 26 | DriverVehicleEditor.jsx | 170 | ✅ done | 2 real (HIGH: same async-user data-loss as DriverPaymentSetup; MEDIUM: handleSave try/finally with no catch) |
+| 27 | StrikeStatusSection.jsx | 170 | ✅ done | 0 real (clean) |
+| 28 | PassengerPaymentsSection.jsx | 169 | ✅ done | 1 LOW (payment method ID shown raw instead of Arabic label) |
 | 29 | RequestCard.jsx | 143 | pending | |
 | 30 | StatsBar.jsx | 149 | pending | |
 | 31 | DashboardFilterBar.jsx | 149 | pending | |
@@ -681,4 +681,81 @@ Impact on the "تقييماتي" (My Ratings) tab:
 Found the same defect by grep — UserHistorySection's admin "متوسط التقييم" card had the same unfiltered Review.filter. Admin investigating a user saw their reputation score corrupted by the user's own outgoing ratings. Same one-line fix (add `review_type: "passenger_rates_driver"`).
 
 **Audit-wide cross-check:** I greped for all `Review.filter` and `Review.list` calls. Other call sites already filter by review_type correctly (UserProfile.jsx, RatingSummary.jsx, ReviewsList.jsx, StatsBar.jsx, MyTrips.jsx, DriverRatePassengers.jsx). Only DriverRatingsDashboard + UserHistorySection were missing the filter.
+
+
+## Component Batch 7 — Findings
+
+### Component 25 — DriverRatePassengers.jsx (171 LOC)
+
+**🟠 HIGH — Review.create missing critical fields → admin queries broke**
+
+DriverRatePassengers is the "cleanup" surface for drivers who finished a trip without going through DriverReviewWizard (e.g. dismissed the prompt, or rated late). But the Review row it created was missing fields that DriverReviewWizard sets:
+- `driver_email` (not just `reviewer_email`) — queries like UserHistorySection's `Review.filter({driver_email: ...})` admin view DEPEND on this column being populated for both directions. Rows from this surface were INVISIBLE to those queries.
+- `reviewer_role: "driver"` — used by downstream filters
+- `public_review` (mirror of `comment`) — read by RatingSummary
+
+Net effect: a driver who used the wizard had ratings showing up in admin reports; a driver who used this tab created "ghost" ratings invisible to the same reports. Two paths, two data shapes.
+
+**🟡 MEDIUM — No `onError` + missing notifyUser/audit**
+
+The mutation had `onSuccess` (cache invalidate + success toast) but **no `onError`**. RLS denials, network failures → silent. Driver clicked submit, button re-enabled, no feedback. Plus no notifyUser to the passenger (passenger never learns the driver rated them — DriverReviewWizard does this), no logAudit (admin trail incomplete for "driver rates passenger" events that came from this surface vs the wizard).
+
+**Fix:** rewrote the mutation to:
+- Write the full Review.create shape matching DriverReviewWizard's exactly.
+- Add `onError` with `friendlyError` toast.
+- Fire-and-forget notifyUser + logAudit in `onSuccess` (each with `.catch`, matching the defect-resistant pattern from batch 4 — these are best-effort and must not cause "failed" toast if the review succeeded).
+- Tagged `source: "rate_passengers_tab"` in the audit metadata so admins can distinguish reviews from this tab vs the wizard if they ever need to. ✅
+
+### Component 26 — DriverVehicleEditor.jsx (170 LOC)
+
+**🟠 HIGH — Same async-user data-loss pattern as DriverPaymentSetup**
+
+The form-init was:
+```js
+const [form, setForm] = useState(null);
+const currentForm = form || { car_model: user?.car_model || "", ... };
+const set = (key, val) => setForm((prev) => ({ ...(prev || currentForm), [key]: val }));
+```
+
+If the driver types BEFORE `user` resolves from the network (rare but possible with cached pages), `form` becomes a fresh object derived from an EMPTY `currentForm`. From that point, every render reads `form` (not user). User resolves later — irrelevant, form is now locked away. Driver clicks save → wipes saved car_model, car_year, car_plate with empty strings.
+
+Less likely to trigger than DriverPaymentSetup because there are no auto-tabs to click while loading, but the data-loss potential is the same.
+
+**🟡 MEDIUM — `handleSave` try/finally with no catch**
+
+```js
+const handleSave = async () => {
+  setSaving(true);
+  try {
+    await api.auth.updateMe(currentForm);
+    qc.invalidateQueries({ queryKey: ["me"] });
+    toast.success("...");
+  } finally {
+    setSaving(false);
+  }
+};
+```
+
+Missing `catch` block — errors uncaught, no toast, no feedback. Driver sees the saving spinner clear and assumes success; nothing actually saved. They'd discover the issue later by re-opening the page.
+
+**Fix:** added the `useEffect` + `hydratedRef` rehydration pattern from DriverPaymentSetup (initialise form from `EMPTY_FORM`, then re-hydrate when `user.email` becomes available, gated by hydratedRef to not clobber in-progress edits). Plus explicit `catch` block with `friendlyError` toast. Replaced all `currentForm.X` references with `form.X` since the fallback computation is no longer needed. ✅
+
+### Component 27 — StrikeStatusSection.jsx (170 LOC)
+
+**0 real bugs.** Component is read-only display, clear data flow, well-commented. The 30-day rolling window logic is applied client-side as a fast-path for an accurate live view (mirroring the DB's behaviour). The educational panel at the bottom is a nice touch — surfacing the rules proactively instead of after a user is blocked.
+
+Minor: `Profile.filter({email}, "-created_at", 1)` could be simplified to a `.eq("email", email).maybeSingle()` but it's not a bug, just suboptimal — and `Profile.filter` is the established api surface in this codebase.
+
+### Component 28 — PassengerPaymentsSection.jsx (169 LOC)
+
+**🟢 LOW — Payment method shown raw instead of Arabic label**
+
+`b.payment_method === "cash" ? "نقداً" : b.payment_method` — only cash got Arabic. Non-cash methods (bank_transfer, credit_card, jawwal_pay, reflect) appeared as their raw English IDs in the passenger's payment history rows.
+
+**Fix:** added a `methodLabel` map mirroring DriverDashboard.methodLabel and DriverSubscriptionSection.methodLabels. (Deferred follow-up: extract to a shared `@/lib/paymentMethods` util — currently duplicated across 3 surfaces, but extracting is a refactor that touches more files than this audit scope.) ✅
+
+**Otherwise: 0 real bugs.** This component is exemplary — it's already been hardened with explicit migration comments showing the developer worked through:
+- The platform-newest-N anti-pattern (migrated to `.in('id', tripIds)` per-user lookup)
+- The cancelled-vs-pending payment_status confusion (explicit `badgeFor` hierarchy where status='cancelled' wins over payment_status='pending', precisely because `cancel_booking` RPC doesn't touch payment_status)
+- A `tripById` lookup that gracefully degrades to "رحلة" with date fallback
 

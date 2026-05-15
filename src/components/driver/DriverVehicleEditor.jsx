@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Car, Save, Camera, Loader2 } from "lucide-react";
@@ -9,6 +9,11 @@ import { friendlyError } from "@/lib/errors";
 
 const COLORS = ["أبيض", "أسود", "فضي", "رمادي", "أحمر", "أزرق", "بيج"];
 
+const EMPTY_FORM = {
+  car_model: "", car_year: "", car_color: "",
+  car_plate: "", car_image: "", driver_note: "",
+};
+
 export default function DriverVehicleEditor() {
   const qc = useQueryClient();
 
@@ -17,29 +22,47 @@ export default function DriverVehicleEditor() {
     queryFn: () => api.auth.me(),
   });
 
-  const [form, setForm] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Initialize form once user loads
-  const currentForm = form || {
-    car_model: user?.car_model || "",
-    car_year: user?.car_year || "",
-    car_color: user?.car_color || "",
-    car_plate: user?.car_plate || "",
-    car_image: user?.car_image || "",
-    driver_note: user?.driver_note || "",
-  };
+  // Hydrate form from user when it first arrives. Same fix as
+  // DriverPaymentSetup batch 6: useState initializer only runs on
+  // first render, so if user=undefined (auth still loading), the
+  // form starts with EMPTY_FORM and stays there if the driver
+  // types BEFORE user resolves. Saving then wipes the driver's
+  // car_model / car_year / etc with empty strings.
+  // hydratedRef ensures we only do this once per user.email so a
+  // background re-fetch of 'me' doesn't clobber in-progress edits.
+  const hydratedRef = useRef(null);
+  useEffect(() => {
+    if (!user?.email) return;
+    if (hydratedRef.current === user.email) return;
+    hydratedRef.current = user.email;
+    setForm({
+      car_model:   user.car_model   || "",
+      car_year:    user.car_year    || "",
+      car_color:   user.car_color   || "",
+      car_plate:   user.car_plate   || "",
+      car_image:   user.car_image   || "",
+      driver_note: user.driver_note || "",
+    });
+  }, [user?.email, user?.car_model, user?.car_year, user?.car_color,
+      user?.car_plate, user?.car_image, user?.driver_note]);
 
-  const set = (key, val) => setForm((prev) => ({ ...(prev || currentForm), [key]: val }));
+  const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await api.auth.updateMe(currentForm);
+      await api.auth.updateMe(form);
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم حفظ بيانات المركبة بنجاح ✅");
+    } catch (err) {
+      // Was: try/finally with NO catch — errors silently swallowed,
+      // user got no feedback, clicked save again. Now surfaces.
+      toast.error(friendlyError(err, "فشل حفظ بيانات المركبة — حاول مجدداً"));
     } finally {
       setSaving(false);
     }
@@ -65,8 +88,8 @@ export default function DriverVehicleEditor() {
       {/* Car preview */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         <div className="relative h-44 bg-muted flex items-center justify-center">
-          {currentForm.car_image ? (
-            <img loading="lazy" src={currentForm.car_image} alt="المركبة" className="w-full h-full object-cover" />
+          {form.car_image ? (
+            <img loading="lazy" src={form.car_image} alt="المركبة" className="w-full h-full object-cover" />
           ) : (
             <div className="text-center text-muted-foreground">
               <Car className="w-12 h-12 mx-auto mb-2 opacity-30" />
@@ -109,7 +132,7 @@ export default function DriverVehicleEditor() {
             <label className="block text-sm font-medium text-foreground mb-1">موديل السيارة</label>
             <Input
               placeholder="مثال: كيا سيراتو"
-              value={currentForm.car_model}
+              value={form.car_model}
               onChange={(e) => set("car_model", e.target.value)}
               className="rounded-xl"
             />
@@ -118,7 +141,7 @@ export default function DriverVehicleEditor() {
             <label className="block text-sm font-medium text-foreground mb-1">سنة الصنع</label>
             <Input
               placeholder="مثال: 2020"
-              value={currentForm.car_year}
+              value={form.car_year}
               onChange={(e) => set("car_year", e.target.value)}
               className="rounded-xl"
             />
@@ -126,7 +149,7 @@ export default function DriverVehicleEditor() {
           <div>
             <label className="block text-sm font-medium text-foreground mb-1">لون السيارة</label>
             <select
-              value={currentForm.car_color}
+              value={form.car_color}
               onChange={(e) => set("car_color", e.target.value)}
               className="w-full h-9 px-3 rounded-xl bg-muted/50 border border-input text-sm"
             >
@@ -138,7 +161,7 @@ export default function DriverVehicleEditor() {
             <label className="block text-sm font-medium text-foreground mb-1">رقم اللوحة</label>
             <Input
               placeholder="مثال: 6-1234-95"
-              value={currentForm.car_plate}
+              value={form.car_plate}
               onChange={(e) => set("car_plate", e.target.value)}
               className="rounded-xl"
             />
@@ -152,7 +175,7 @@ export default function DriverVehicleEditor() {
         <textarea
           rows={3}
           placeholder="اكتب ملاحظة للركاب..."
-          value={currentForm.driver_note}
+          value={form.driver_note}
           onChange={(e) => set("driver_note", e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-input bg-transparent text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
         />

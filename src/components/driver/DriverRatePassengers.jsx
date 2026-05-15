@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { notifyUser } from "@/lib/notifyUser";
+import { logAudit } from "@/lib/adminAudit";
+import { friendlyError } from "@/lib/errors";
 import { Star, CheckCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -46,12 +49,70 @@ export default function DriverRatePassengers({ trips, bookings }) {
 
   const reviewedIds = new Set(myReviews.map((r) => r.trip_id + "_" + r.rated_user_email));
 
+  // Review creation. Mirrors the fields DriverReviewWizard writes —
+  // previously this surface was missing driver_email, reviewer_role,
+  // and public_review which meant rows created here were INVISIBLE to
+  // queries that filter on those columns (e.g. UserHistorySection's
+  // admin view groups reviews by driver_email; rows missing the
+  // column never appeared, skewing admin stats).
+  //
+  // Side-effects (notifyUser to inform passenger, logAudit) follow
+  // the same defect-resistant pattern as the review wizards in
+  // batch 4: Review.create is authoritative; failures here surface
+  // to the user. Side-effects are fire-and-forget with .catch — a
+  // notifyUser failure must NOT trigger a misleading "failed" toast,
+  // or driver retries → duplicate review.
   const submitReview = useMutation({
-    mutationFn: (data) => api.entities.Review.create(data),
-    onSuccess: () => {
+    mutationFn: async ({ booking, trip }) => {
+      const rating = ratings[booking.id];
+      const comment = comments[booking.id] || "";
+      // Authoritative — the Review row. Must match the shape
+      // DriverReviewWizard writes, otherwise downstream queries
+      // can't find it.
+      await api.entities.Review.create({
+        trip_id: booking.trip_id,
+        reviewer_name: user?.full_name || "سائق",
+        reviewer_email: user?.email,
+        driver_email: user?.email,                      // ← was missing
+        rated_user_email: booking.passenger_email,
+        review_type: "driver_rates_passenger",
+        reviewer_role: "driver",                         // ← was missing
+        rating,
+        comment,
+        public_review: comment,                          // ← was missing (mirror of comment, used by some surfaces)
+        is_anonymous: true,
+      });
+      return { booking, trip, rating, comment };
+    },
+    onSuccess: ({ booking, trip, rating, comment }) => {
       qc.invalidateQueries({ queryKey: ["driver-given-reviews", user?.email] });
       toast.success("تم إرسال التقييم بنجاح ✅");
+      // Best-effort side-effects. Each call has its own .catch so a
+      // notifyUser failure can't surface as a misleading "review
+      // failed" toast (same pattern as PassengerReviewWizard and
+      // DriverReviewWizard fixes in batch 4).
+      if (comment && booking.passenger_email) {
+        notifyUser({
+          user_email: booking.passenger_email,
+          title: "تقييم جديد على ملفك ⭐",
+          message: `كتب السائق تقييماً عن رحلتك من ${trip?.from_city || ""} إلى ${trip?.to_city || ""}`,
+          type: "system",
+          trip_id: booking.trip_id,
+          link: "/my-trips?tab=completed",
+        }).catch(() => { /* non-fatal */ });
+      }
+      try {
+        logAudit("driver_review_submitted", "review", booking.trip_id, {
+          driver_email:    user?.email,
+          passenger_email: booking.passenger_email,
+          trip_id:         booking.trip_id,
+          rating,
+          source:          "rate_passengers_tab", // distinguishes from the wizard
+          has_public_text: !!comment,
+        });
+      } catch { /* non-fatal */ }
     },
+    onError: (err) => toast.error(friendlyError(err, "فشل إرسال التقييم")),
   });
 
   // Completed trips by this driver
@@ -136,17 +197,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
                   size="sm"
                   className="bg-primary text-primary-foreground rounded-xl"
                   disabled={!ratings[booking.id] || submitReview.isPending}
-                  onClick={() =>
-                    submitReview.mutate({
-                      trip_id: booking.trip_id,
-                      reviewer_name: user?.full_name,
-                      reviewer_email: user?.email,
-                      rated_user_email: booking.passenger_email,
-                      review_type: "driver_rates_passenger",
-                      rating: ratings[booking.id],
-                      comment: comments[booking.id] || "",
-                    })
-                  }
+                  onClick={() => submitReview.mutate({ booking, trip })}
                 >
                   إرسال التقييم
                 </Button>

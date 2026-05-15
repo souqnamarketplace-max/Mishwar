@@ -70,6 +70,20 @@ export default function PassengerPaymentsSection({ user }) {
 
   const tripById = (id) => trips.find(t => t.id === id);
 
+  // Arabic payment method labels — mirrors DriverDashboard.methodLabel
+  // and DriverSubscriptionSection.methodLabels. (Deferred: extract to
+  // a shared @/lib/paymentMethods util — currently duplicated across
+  // 3 surfaces.) Without this, non-cash methods appeared as their raw
+  // English IDs ('bank_transfer', 'jawwal_pay') in the passenger's
+  // payment-history rows.
+  const methodLabel = {
+    cash:          "نقداً",
+    bank_transfer: "تحويل بنكي",
+    credit_card:   "بطاقة",
+    jawwal_pay:    "Jawwal Pay",
+    reflect:       "Reflect",
+  };
+
   const statusConfig = {
     paid:      { label: "مدفوع",   className: "bg-green-100 text-green-700" },
     pending:   { label: "بانتظار", className: "bg-yellow-100 text-yellow-700" },
@@ -153,7 +167,7 @@ export default function PassengerPaymentsSection({ user }) {
                   <span className="flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
                     {trip?.date || new Date(b.created_date || b.created_at).toLocaleDateString("ar-EG")}
-                    {b.payment_method && ` · ${b.payment_method === "cash" ? "نقداً" : b.payment_method}`}
+                    {b.payment_method && ` · ${methodLabel[b.payment_method] || b.payment_method}`}
                   </span>
                   <span className="font-bold text-primary text-sm">
                     ₪{Number(b.total_price || 0).toFixed(2)}
