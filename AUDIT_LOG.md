@@ -349,10 +349,10 @@ After the 20-page audit completed, extending the same methodology to
 | 2 | MobileLayout.jsx | 646 | ✅ done | 3 real (stale isMobile, back arrow always to /, logout fire-and-forget) |
 | 3 | HowItWorks.jsx | 598 | ✅ done | 0 real (pure presentational mockup) |
 | 4 | DriverSubscriptionSection.jsx | 517 | ✅ done | 1 CRITICAL (payment proofs to public bucket) |
-| 5 | MapCityPicker.jsx | 472 | pending | |
-| 6 | HeroSection.jsx | 362 | pending | |
-| 7 | DriverPassengers.jsx | 359 | pending | |
-| 8 | UserActionsMenu.jsx | 357 | pending | |
+| 5 | MapCityPicker.jsx | 472 | ✅ done | 2 real (race in click handler + stale closure on disposed map, duplicate maxZoom key) |
+| 6 | HeroSection.jsx | 362 | ✅ done | 0 real (defensive code handles edge cases correctly) |
+| 7 | DriverPassengers.jsx | 359 | ✅ done | 2 real (optimistic on wrong queryKey x2, no optimistic on markPaid) |
+| 8 | UserActionsMenu.jsx | 357 | ✅ done | 1 CRITICAL (rules-of-hooks violation — hook count varied 8 vs 10 between renders) |
 | 9 | RouteMap.jsx | 353 | pending | |
 | 10 | DriverReviewWizard.jsx | 336 | pending | |
 | 11 | Navbar.jsx | 331 | pending | |
@@ -424,4 +424,57 @@ The mobile header's back arrow rendered a `<Link to="/">` — every back tap fro
 `supabase.storage.from("uploads").upload(...)` then stored the full publicUrl in `driver_subscriptions.proof_url`. Payment proofs are **financial PII** — they commonly include bank / Reflect / Jawwal transaction screenshots showing the driver's bank account number, transaction amount, recipient information, sometimes phone numbers. Anyone with the URL — admins, screenshot leaks, audit log entries — had permanent unauthenticated read access.
 Identical defect pattern to the AccountSettings license-docs fix in batch 5 (audit phase 1). Mishwaro's subscription-proof flow regressed back to public storage while the rest of the app converged on private.
 **Fix:** route to `uploads-private` bucket; store the path (not URL); display layer already handles both via `licenseUrls.resolveDocumentUrl` pass-through. ✅
+
+
+## Component Batch 2 — Findings
+
+### Component 5 — MapCityPicker.jsx (472 LOC)
+
+**🟠 HIGH — Race condition in map click → reverse-geocode flow**
+`map.on("click", async (e) => { ... await reverseGeocode(...); selectCity(...); })` had two failure modes:
+1. **Rapid double-click**: both handlers start, both await Nominatim, results resolve in any order. The second click's loading marker stays orphaned on the map; the FIRST click's later-resolving response can overwrite the SECOND click's selection.
+2. **Modal close during await**: cleanup effect (lines 299-306) nulls `leafletMapRef.current` when the modal closes. If the await resolves AFTER cleanup, `selectCity` runs on a disposed map — orphaned imports + potential silent Leaflet errors.
+**Fix:** added `clickSeqRef = useRef(0)`. Each click captures `mySeq = ++clickSeqRef.current` then checks `mySeq !== clickSeqRef.current || !leafletMapRef.current` after the await. Stale clicks silently drop their loading marker without selection. ✅
+
+**🟡 LOW — Duplicate `maxZoom` key in tile layer options**
+`L.tileLayer(..., { subdomains: "abcd", maxZoom: 20, attribution: "...", maxZoom: 18 })`. JS uses the second value (18), the first is dead. Probably a leftover from when the developer adjusted the cap and didn't remove the old one. Cosmetic but confusing.
+**Fix:** removed the dead first key. Kept 18 since that's what was actually being applied. ✅
+
+**False alarm investigated:**
+- `nearestCity` uses Euclidean distance in degrees, not great-circle. At Palestine's latitude, 1° longitude ≈ 94km vs 1° latitude ≈ 111km, so there's a small bias. But cities are well-separated (>5km typically) and the 2km cutoff handles edge cases. Not a real bug.
+
+### Component 6 — HeroSection.jsx (362 LOC)
+
+**0 real bugs.** Defensive parsing of admin-edited `hero_city_slides` JSON (try/catch + shape filter + `typeof === "string"` on `s.img`) handles malformed input correctly. The fallback SVG gradient handles the no-slides case. Slide cycling uses `slides.length` (the live array) not the hardcoded fallback length. All edge cases I could think of are already guarded.
+
+### Component 7 — DriverPassengers.jsx (359 LOC)
+
+**🟡 MEDIUM — Optimistic update only touched `["bookings"]` queryKey, not `["driver-bookings"]`**
+Same pattern as the DriverTripsList fix in component batch 1. The driver dashboard reads `["driver-bookings", email, tripIds]` (we wired this up in phase 1 batch 8). The optimistic update here only wrote to `["bookings"]` (which the admin dashboard reads). So drivers tapping accept/reject saw no optimistic UI update — ~200ms freeze each tap.
+**Fix:** apply optimistic updates to both queryKeys; rollback context stores both previous snapshots. ✅
+
+**🟡 MEDIUM — `markPaid` mutation had no optimistic update at all**
+Mark-paid fires once per passenger when the trip ends — typically 2-4 quick taps in a row as the driver confirms cash received. Without optimistic, each tap froze the UI for ~200ms.
+**Fix:** added dual-queryKey optimistic update + rollback. Same pattern as updateBooking. ✅
+
+### Component 8 — UserActionsMenu.jsx (357 LOC)
+
+**🔴 CRITICAL — Rules-of-hooks violation, hook count varied between renders**
+This component is mounted **pervasively** — TripCard, Messages, profile pages, anywhere a 3-dot user menu appears. Hook order BEFORE the fix:
+
+```js
+useAuth          // ← always
+useQueryClient   // ← always
+useNavigate      // ← always
+useState x5      // ← always
+if (!user || user.email === targetEmail || isDeletedUserEmail(targetEmail)) return null;
+useMutation x2   // ← skipped on render-time guard
+```
+
+Hook count: 8 if guards pass, 10 if guards fail. The guards' conditions depend on `user.email` and `targetEmail` — both can change during the component's lifetime. Critical scenarios:
+- User logs out → `user` becomes null → next render returns early → hook count drops from 10 to 8 → React crash
+- Switch from viewing one user's profile to your own → guard suddenly fires → same drop
+
+The fact that this hasn't been crashing production constantly suggests most usages don't hit the transition. But on every logout, every "view profile" → "back to my profile" navigation, this risks `Rendered fewer hooks than expected`. Audit phase 1 already fixed this pattern in 4 page-level pieces; here it's in a component used everywhere.
+**Fix:** moved all early-return guards AFTER both useMutation calls. Render-time guards live immediately before the JSX `return`. Hook count is now invariant — always 10. ✅
 

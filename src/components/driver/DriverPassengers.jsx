@@ -62,8 +62,18 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
       await api.entities.Booking.update(id, { status });
     },
     onMutate: async ({ id, status }) => {
-      await qc.cancelQueries({ queryKey: ["bookings"] });
-      const prevBookings = qc.getQueryData(["bookings"]);
+      // Optimistic on BOTH the global bookings key AND the per-driver
+      // bookings key — same pattern as the DriverTripsList fix in
+      // component batch 1. Driver dashboard reads ['driver-bookings',
+      // email, tripIds]; previously only ['bookings'] got the
+      // optimistic update so the driver saw a ~200ms freeze on every
+      // accept/reject tap.
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["bookings"] }),
+        qc.cancelQueries({ queryKey: ["driver-bookings"] }),
+      ]);
+      const prevBookings       = qc.getQueryData(["bookings"]);
+      const prevDriverBookings = qc.getQueryData(["driver-bookings"]);
       // Capture the booking's pre-mutation status so onSuccess can
       // pick the right notification template and audit action. The
       // optimistic setQueryData below stamps the NEW status onto
@@ -75,15 +85,16 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
       // row.
       const previousStatus =
         prevBookings?.find(b => b.id === id)?.status ||
-        qc.getQueryData(["driver-bookings"])?.find(b => b.id === id)?.status ||
+        prevDriverBookings?.find(b => b.id === id)?.status ||
         null;
-      qc.setQueryData(["bookings"], old => 
-        old?.map(b => b.id === id ? { ...b, status } : b) || []
-      );
-      return { prevBookings, previousStatus };
+      const apply = (old) => old?.map(b => b.id === id ? { ...b, status } : b) || [];
+      qc.setQueryData(["bookings"], apply);
+      qc.setQueryData(["driver-bookings"], apply);
+      return { prevBookings, prevDriverBookings, previousStatus };
     },
     onError: (err, vars, ctx) => {
       qc.setQueryData(["bookings"], ctx?.prevBookings);
+      qc.setQueryData(["driver-bookings"], ctx?.prevDriverBookings);
       toast.error(friendlyError(err, "فشل تحديث الحجز"));
     },
     onSuccess: async (_, { id, status }, ctx) => {
@@ -180,13 +191,37 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
         paid_at: paid ? new Date().toISOString() : null,
       });
     },
+    // Optimistic — mark-paid fires once per passenger at trip end
+    // (typically 2-4 quick taps in a row). Without optimistic each
+    // tap would freeze the UI for ~200ms during invalidate→refetch.
+    // Same dual-queryKey pattern as updateBooking above.
+    onMutate: async ({ id, paid }) => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["bookings"] }),
+        qc.cancelQueries({ queryKey: ["driver-bookings"] }),
+      ]);
+      const prevBookings       = qc.getQueryData(["bookings"]);
+      const prevDriverBookings = qc.getQueryData(["driver-bookings"]);
+      const apply = (old) => old?.map(b =>
+        b.id === id
+          ? { ...b, payment_status: paid ? "paid" : "pending", paid_at: paid ? new Date().toISOString() : null }
+          : b
+      ) || [];
+      qc.setQueryData(["bookings"], apply);
+      qc.setQueryData(["driver-bookings"], apply);
+      return { prevBookings, prevDriverBookings };
+    },
     onSuccess: (_, { paid }) => {
       qc.invalidateQueries({ queryKey: ["bookings"] });
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
       qc.invalidateQueries({ queryKey: ["payments-summary"] });
       toast.success(paid ? "تم تسجيل الدفع ✓" : "تم التراجع عن تسجيل الدفع");
     },
-    onError: (err) => toast.error(friendlyError(err, "فشل تحديث الحجز — حاول مجدداً")),
+    onError: (err, vars, ctx) => {
+      qc.setQueryData(["bookings"], ctx?.prevBookings);
+      qc.setQueryData(["driver-bookings"], ctx?.prevDriverBookings);
+      toast.error(friendlyError(err, "فشل تحديث الحجز — حاول مجدداً"));
+    },
   });
 
   // Realtime: booking list updates when any booking changes

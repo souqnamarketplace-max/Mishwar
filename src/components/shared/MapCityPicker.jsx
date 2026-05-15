@@ -83,6 +83,17 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
   const leafletMapRef = useRef(null);
   const markersRef = useRef([]);
   const selectedMarkerRef = useRef(null);
+  // Click-sequence guard. Each map click increments this counter; the
+  // awaited reverseGeocode response checks whether its captured value
+  // still equals the current value before applying. Stale results
+  // (user clicked twice in rapid succession, or closed the modal
+  // before Nominatim responded) are dropped. Without this, double-
+  // clicks could orphan loading markers on the map or have the
+  // SECOND click's selection overwritten by the LATER-resolving FIRST
+  // click. Modal-close case is also covered: leafletMapRef.current
+  // becomes null in the cleanup effect, so the post-await guard
+  // short-circuits before touching a disposed map.
+  const clickSeqRef = useRef(0);
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(forceOpen);
   // Lock both html + body scroll while map modal is open. 
@@ -145,9 +156,16 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         attributionControl: false,
       });
 
-      // OpenStreetMap tile layer
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {subdomains: "abcd", maxZoom: 20, attribution: "© OpenStreetMap contributors",
-        maxZoom: 18,}).addTo(map);
+      // OpenStreetMap tile layer.
+      // maxZoom was previously declared twice in this object literal —
+      // the second value (18) overwrote the first (20). Single value
+      // now; if you need deeper zoom, change it here and verify the
+      // CartoCDN voyager tileset supports it.
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        subdomains: "abcd",
+        maxZoom: 18,
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
         // ── Arabic city label overlay ─────────────────────────────────
         const labelsLayer = L.layerGroup();
         const renderArabicLabels = () => {
@@ -227,7 +245,14 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         }
       });
 
-      // Click on map → use known city if close, else reverse geocode
+      // Click on map → use known city if close, else reverse geocode.
+      // Each click increments clickSeqRef; the post-await branches
+      // check that the captured sequence is still current before
+      // applying. This prevents (a) rapid double-clicks from
+      // orphaning loading markers or having the older response
+      // overwrite the newer click's selection, and (b) the modal
+      // being closed during an in-flight geocode from poking a
+      // disposed map.
       map.on("click", async (e) => {
         const { lat, lng } = e.latlng;
         const { city, dist } = nearestCity(lat, lng);
@@ -235,6 +260,7 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
         if (dist < 0.02 && city) {
           selectCity(city.name, city.lat, city.lng, L, map);
         } else {
+          const mySeq = ++clickSeqRef.current;
           // Show loading indicator on map
           const loadingMarker = L.marker([lat, lng], {
             icon: L.divIcon({
@@ -245,6 +271,14 @@ export default function MapCityPicker({ value, onChange, forceOpen = false, onCl
           }).addTo(map);
 
           const placeName = await reverseGeocode(lat, lng);
+
+          // Stale result? Drop it. mySeq stops matching as soon as
+          // the user clicks again; leafletMapRef.current is null if
+          // the cleanup effect ran while we were awaiting.
+          if (mySeq !== clickSeqRef.current || !leafletMapRef.current) {
+            try { map.removeLayer(loadingMarker); } catch { /* map may be disposed */ }
+            return;
+          }
           map.removeLayer(loadingMarker);
 
           if (placeName) {

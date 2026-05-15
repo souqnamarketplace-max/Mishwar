@@ -33,11 +33,14 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
   const [showReportSuccess, setShowReportSuccess] = useState(false);
   const [reportCategory, setReportCategory] = useState("");
 
-  // Don't show menu if targeting self or no user
-  if (!user || !targetEmail || user.email === targetEmail) return null;
-  // Don't show menu for deleted (anonymized) accounts — there's no one to
-  // block or report, and the actions would just create noise in the audit log.
-  if (isDeletedUserEmail(targetEmail)) return null;
+  // NOTE: the render-time guards (no user / targeting self / deleted
+  // account) live AFTER all useMutation hooks below. Returning null
+  // here, BEFORE useMutation, would skip the mutation hooks on those
+  // renders and crash React with "rendered fewer hooks than expected"
+  // the next time the props/user resolve. This component is mounted
+  // pervasively — TripCard, Messages, profile pages — and re-renders
+  // on every auth transition, so the guards must be the absolute last
+  // thing before the JSX, not interleaved with hook calls.
 
   // Helper: invalidate every cache that depends on the block list. Pulled
   // out so block-from-report and explicit-block both go through the same
@@ -175,6 +178,13 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
     }
     reportMutation.mutate({ category: reportCategory, details });
   };
+
+  // ─── Render-time guards (all hooks above are called unconditionally) ──
+  // Don't show menu if targeting self or no user.
+  if (!user || !targetEmail || user.email === targetEmail) return null;
+  // Don't show menu for deleted (anonymized) accounts — there's no one to
+  // block or report, and the actions would just create noise in the audit log.
+  if (isDeletedUserEmail(targetEmail)) return null;
 
   return (
     <>
