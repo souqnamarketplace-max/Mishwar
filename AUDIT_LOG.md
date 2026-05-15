@@ -35,8 +35,8 @@ For each page:
 | 4 | MyTrips.jsx | 644 | ✅ done | 3 real (duplicate statusConfig key, allTrips fetching wrong rows hiding old bookings, knock-on driver-not-notified) |
 | 5 | Messages.jsx | 1127 | ✅ done | 2 real (chatEmails array mutation, N parallel mark-as-read UPDATEs) |
 | 6 | CreateTrip.jsx | 1189 | ✅ done | 1 cross-page (payment method ID inconsistency across booking/display/creation surfaces — fixed in TripDetails) |
-| 7 | Onboarding.jsx | 712 | pending | |
-| 8 | Login.jsx | 859 | pending | |
+| 7 | Onboarding.jsx | 738 | ✅ done | 2 real (no MIME validation on 4 uploads, no bio maxLength) |
+| 8 | Login.jsx | 866 | ✅ done | 3 real (rate-limit dead code, email format unchecked, rate-limit never reset on success) |
 | 9 | AccountSettings.jsx | 1340 | pending | |
 | 10 | BecomeDriver.jsx | 717 | pending | |
 | 11 | UserProfile.jsx | 528 | pending | |
@@ -147,6 +147,33 @@ Consequence: a driver enables bank_transfer at trip creation → trip row stores
 
 **False alarms / deferred:**
 - Recurring trip date logic at line 425-437: when picked date IS one of the recurring days, the trip publishes for +7 days from picked date rather than ALSO for the picked date. May be intentional UX; flagging for product review. 🟡
+
+### Page 7 — Onboarding.jsx
+
+**🟠 HIGH — 4 file-upload handlers had no MIME validation**
+`accept="image/*"` (or `image/*,application/pdf`) is a UX hint only. Browsers (especially Android Capacitor WebView and accessibility-mode pickers) often ignore it — users can select a `.txt` / `.exe` / random binary file and it goes straight to Supabase storage. A non-image stored as an avatar then renders as a broken image everywhere it's shown.
+**Fix:** new `isAllowedUpload(file, { imageOnly })` helper checks `file.type` is `image/*` (avatars/selfies) or `image/* + application/pdf` (license docs). Wired into all 4 upload handlers (avatar, license, car-reg, insurance, selfie). User sees a clear Arabic toast on bad types instead of a silent malformed upload. ✅
+
+**🟡 MEDIUM — bio textarea had no maxLength**
+A user could paste 100k characters into the bio field. DB write either bloats the profiles table (no schema cap visible) or fails with a non-friendly Postgres error. Either way, bad UX.
+**Fix:** added `maxLength={500}` matching the bio width shown elsewhere in the app, plus a live counter that turns red at 90% capacity. The counter is hidden when empty so it doesn't clutter the field. ✅
+
+### Page 8 — Login.jsx
+
+**🟠 HIGH — `incrementAttempts()` defined but NEVER CALLED**
+The rate-limit infrastructure looked complete: `checkRateLimit()`, `incrementAttempts()`, `getRateLimit()`, comment claiming "Brute force protection — max 5 attempts per 15 minutes." But `incrementAttempts` was never invoked anywhere in the file. The whole rate-limit was dead code — `checkRateLimit()` always returned true because nothing wrote to the storage key. A client could hammer the login endpoint indefinitely (subject only to Supabase's server-side limit, which DOES catch this — so not a critical security hole, but the UX intent was completely broken).
+**Fix:** call `incrementAttempts()` on every failed auth attempt EXCEPT the "email not confirmed" case (that's a legitimate user trying to recover, not a brute-force). Now after 5 bad password attempts within 15 minutes the user sees the timeout toast. ✅
+
+**🟠 HIGH — Email format never validated before submit**
+Login form accepted `user@gmail` (no TLD), `user@`, `@gmail.com` and similar typos. Server rejected with a generic "failed" toast. Also: the rate-limit check ran BEFORE the field-presence check, so empty-form submits theoretically counted against the limit (though see above — the limit was dead anyway).
+**Fix:** validate `isValidEmail(form.email)` before submit, with a specific "صيغة البريد الإلكتروني غير صحيحة" toast. Moved field-presence + email-format BEFORE the rate-limit check so unrelated input errors don't burn rate-limit slots. ✅
+
+**🟡 MEDIUM — Rate-limit never reset on successful login**
+A user at 4 attempts who finally gets the password right keeps the counter pinned at 4 across sessions. Next time they typo their password, ONE attempt locks them out for 15 minutes.
+**Fix:** `localStorage.removeItem('mishwaro_login_rl')` on successful login. Canonical reset-on-success pattern. ✅
+
+**False alarms:**
+- Client-side rate limit being bypassable via incognito / devtools — true, but server-side Supabase rate limit handles it. Worth noting in comments (already done).
 
 
 

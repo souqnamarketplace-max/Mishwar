@@ -159,12 +159,17 @@ export default function Login() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    // Field-presence check BEFORE rate-limit so users who accidentally
+    // submit an empty form don't burn a rate-limit slot. Same idea for
+    // email format — a malformed local string never reaches the auth
+    // endpoint, so it shouldn't count as an attempt.
+    if (!form.email || !form.password) { toast.error('يرجى ملء جميع الحقول'); return; }
+    if (!isValidEmail(form.email)) { toast.error('صيغة البريد الإلكتروني غير صحيحة'); return; }
     if (!checkRateLimit()) {
       const mins = Math.ceil((getRateLimit().until - Date.now()) / 60000);
       toast.error(`تم تجاوز عدد المحاولات. انتظر ${mins} دقيقة`);
       return;
     }
-    if (!form.email || !form.password) { toast.error('يرجى ملء جميع الحقول'); return; }
     setLoading(true);
     try {
       // Persist the remember-me choice BEFORE the login request so the
@@ -172,6 +177,11 @@ export default function Login() {
       // token to the right backing store on its first write.
       setRememberMe(rememberMe);
       await login(form.email, form.password);
+      // Login succeeded — clear the rate-limit counter so a future
+      // typo on the next session doesn't immediately lock the user out.
+      // Without this, a user at 4 attempts who finally gets in keeps
+      // the counter pinned at 4 across sessions.
+      try { localStorage.removeItem('mishwaro_login_rl'); } catch {}
       // Save email locally so the next visit (after sign-out) pre-fills
       // it. Password is intentionally never stored — iOS Password Autofill
       // / iCloud Keychain handle that securely if the user opts in.
@@ -187,11 +197,23 @@ export default function Login() {
       // they signed up, the confirmation email never arrived (spam, ISP
       // delays, throttling), and now they're trying to log in. Detect
       // this specific error and offer a resend instead of just toasting.
+      // This case is NOT counted against the rate limit — it's a valid
+      // user trying to recover, not a brute-force attempt.
       if (/email not confirmed|email_not_confirmed/i.test(msg)) {
         setConfirmEmail(form.email);
         setNeedsConfirm(true);
         return;
       }
+      // Every other failure (wrong password, account doesn't exist,
+      // network error) increments the rate-limit counter. Previously
+      // incrementAttempts() was defined at the top of the file but
+      // NEVER CALLED — so the rate limit was dead code despite the
+      // comment claiming "Brute force protection — max 5 attempts per
+      // 15 minutes." A malicious actor could try unlimited passwords
+      // subject only to Supabase's server-side limit. Wiring this up
+      // now means checkRateLimit() at the top of handleLogin will
+      // actually trip after 5 bad attempts.
+      incrementAttempts();
       toast.error(friendlyError(err, "فشل تسجيل الدخول"));
     }
   };

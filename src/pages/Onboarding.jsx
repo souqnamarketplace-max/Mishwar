@@ -41,6 +41,21 @@ const STEPS_DRIVER = ["اختيار الدور", "معلوماتك", "بيانا
 // Display sites that need to render either kind use resolveDocumentUrl
 // (src/lib/licenseUrls.js) which detects http URLs and passes them through
 // while signing private paths.
+// File-type validation helper. `accept="image/*"` is a UX hint that
+// browsers (especially Android WebView / Capacitor) sometimes ignore.
+// This server-of-truth check rejects non-image MIME types before we
+// even hit Supabase storage. Used by every upload handler in this
+// component.
+//
+// imageOnly=true → image/* only (avatars, selfies)
+// imageOnly=false → image/* + application/pdf (license docs)
+function isAllowedUpload(file, { imageOnly }) {
+  if (!file?.type) return false;
+  if (file.type.startsWith("image/")) return true;
+  if (!imageOnly && file.type === "application/pdf") return true;
+  return false;
+}
+
 async function uploadToSupabase(file, { bucket = 'uploads' } = {}) {
   // Resolve the user UUID via the centralized session helper so the path
   // matches the ownership policy in migrations/004_storage_hardening.sql.
@@ -211,6 +226,13 @@ export default function Onboarding() {
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // MIME check — accept='image/*' is advisory; some Android WebViews
+    // and screen-reader pickers ignore it. Reject non-images here so
+    // we don't end up storing PDFs as avatars (or worse).
+    if (!isAllowedUpload(file, { imageOnly: true })) {
+      toast.error("يجب رفع صورة بصيغة JPG / PNG / WebP");
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) { toast.error("حجم الصورة يجب أن يكون أقل من 5 MB"); return; }
     setUploading(true);
     try {
@@ -452,10 +474,21 @@ export default function Onboarding() {
                     <textarea
                       placeholder="اكتب شيئاً عن نفسك..."
                       value={form.bio}
+                      maxLength={500}
                       onChange={(e) => setForm({ ...form, bio: e.target.value })}
                       rows={2}
                       className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
                     />
+                    {/* Counter shows once the user starts typing — keeps the
+                        field clean when empty (the placeholder is enough).
+                        Approaches the cap visually (red text at 90%+) so
+                        users know they're running out of room before the
+                        input silently rejects their next keystroke. */}
+                    {form.bio.length > 0 && (
+                      <p className={`text-[10px] mt-0.5 text-left ${form.bio.length > 450 ? "text-destructive" : "text-muted-foreground"}`}>
+                        {form.bio.length} / 500
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -542,6 +575,7 @@ export default function Onboarding() {
                     </Button>
                     <input id="upload-license" type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0]; if (!file) return;
+                      if (!isAllowedUpload(file, { imageOnly: false })) { toast.error("يجب رفع صورة JPG / PNG أو ملف PDF"); return; }
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
                       try { const url = await uploadToSupabase(file, { bucket: 'uploads-private' }); setForm(f => ({ ...f, license_image_url: url })); toast.success("✅ تم رفع صورة الرخصة"); }
@@ -571,6 +605,7 @@ export default function Onboarding() {
                     </Button>
                     <input id="upload-car-reg" type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0]; if (!file) return;
+                      if (!isAllowedUpload(file, { imageOnly: false })) { toast.error("يجب رفع صورة JPG / PNG أو ملف PDF"); return; }
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
                       try { const url = await uploadToSupabase(file, { bucket: 'uploads-private' }); setForm(f => ({ ...f, car_reg_url: url })); toast.success("✅ تم رفع الاستمارة"); }
@@ -600,6 +635,7 @@ export default function Onboarding() {
                     </Button>
                     <input id="upload-insurance" type="file" accept="image/*,application/pdf" className="hidden" onChange={async (e) => {
                       const file = e.target.files?.[0]; if (!file) return;
+                      if (!isAllowedUpload(file, { imageOnly: false })) { toast.error("يجب رفع صورة JPG / PNG أو ملف PDF"); return; }
                       if (file.size > 5*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 5 MB"); return; }
                       setUploading(true);
                       try { const url = await uploadToSupabase(file, { bucket: 'uploads-private' }); setForm(f => ({ ...f, insurance_url: url })); toast.success("✅ تم رفع وثيقة التأمين"); }
@@ -625,6 +661,7 @@ export default function Onboarding() {
                   </Button>
                   <input id="upload-selfie" type="file" accept="image/*" capture="user" className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0]; if (!file) return;
+                    if (!isAllowedUpload(file, { imageOnly: true })) { toast.error("يجب رفع صورة بصيغة JPG / PNG"); return; }
                     if (file.size > 10*1024*1024) { toast.error("حجم الملف يجب أن يكون أقل من 10 MB"); return; }
                     setUploading(true);
                     try {
