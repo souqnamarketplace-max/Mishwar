@@ -4,6 +4,7 @@ import GPSTripTracker from "@/components/driver/GPSTripTracker";
 import { createPortal } from "react-dom";
 import { logAudit } from "@/lib/adminAudit";
 import { api } from "@/api/apiClient";
+import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
@@ -31,6 +32,11 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [confirmDialog, setConfirmDialog] = useState(null); // { tripId, action: "start"|"complete" }
   const [deleteConfirm, setDeleteConfirm] = useState(null); // tripId to delete
   const [confirmCancel, setConfirmCancel] = useState(null); // tripId to cancel
+  // Time-change dialog state. action='change_time' with the current
+  // trip object so the modal can pre-fill the time input + show
+  // the route header. Sized to ~60 minutes either side so the
+  // server-side delta gate doesn't reject a legitimate adjustment.
+  const [timeChangeDialog, setTimeChangeDialog] = useState(null); // { trip, newTime }
 
   const cancelMutation = useMutation({
     mutationFn: async (tripId) => {
@@ -149,7 +155,23 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => api.entities.Trip.update(id, data),
+    mutationFn: async ({ id, data }) => {
+      // Lifecycle transitions go through SECURITY DEFINER RPCs
+      // (migration 048) which enforce: driver ownership, status
+      // precondition, time gate on start. Other field edits
+      // (price, seats, driver_note, etc.) keep using Trip.update.
+      if (data.status === "in_progress") {
+        const { error } = await supabase.rpc("start_trip", { p_trip_id: id });
+        if (error) throw error;
+        return { id };
+      }
+      if (data.status === "completed") {
+        const { error } = await supabase.rpc("complete_trip", { p_trip_id: id });
+        if (error) throw error;
+        return { id };
+      }
+      return api.entities.Trip.update(id, data);
+    },
     onMutate: async ({ id, data }) => {
       await qc.cancelQueries({ queryKey: ["trips"] });
       const prev = qc.getQueryData(["trips"]);
@@ -227,6 +249,42 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         toast.success("تم تحديث الحالة");
       }
     },
+  });
+
+  // Time-change mutation — calls the change_trip_time RPC (migration
+  // 048) which enforces driver ownership + ≤60-minute delta + same
+  // date + status=confirmed + past-date guard, AND inserts a
+  // notification row for every active booking with the new time and
+  // a deep-link to /my-trips?tab=confirmed where the passenger can
+  // cancel if the change doesn't suit them. Notifications happen
+  // server-side inside the RPC so they're atomic with the time update
+  // — no race where the time updates but notifications fail.
+  const changeTimeMutation = useMutation({
+    mutationFn: async ({ tripId, newTime }) => {
+      const { data, error } = await supabase.rpc("change_trip_time", {
+        p_trip_id:  tripId,
+        p_new_time: newTime,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (updatedTrip, { tripId, newTime, oldTime, bookingsCount }) => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+      setTimeChangeDialog(null);
+      toast.success(
+        bookingsCount > 0
+          ? `تم تحديث الوقت وإشعار ${bookingsCount} ${bookingsCount === 1 ? "راكب" : "ركاب"} ✅`
+          : "تم تحديث الوقت ✅"
+      );
+      logAudit("driver_change_trip_time", "trip", tripId, {
+        old_time: oldTime,
+        new_time: newTime,
+        notified_passengers: bookingsCount || 0,
+      });
+    },
+    onError: (err) => toast.error(friendlyError(err, "فشل تحديث الوقت")),
   });
 
   // Real-time subscription — status updates instantly without reload
@@ -395,6 +453,22 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     </Button>
                   )}
 
+                  {/* Time-change — only on confirmed trips. Passengers are
+                      notified server-side via the change_trip_time RPC.
+                      Server enforces ≤60-min delta; anything bigger
+                      requires cancel & repost. */}
+                  {trip.status === "confirmed" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg text-xs gap-1 text-blue-600 border-blue-200"
+                      onClick={() => setTimeChangeDialog({ trip, newTime: trip.time || "" })}
+                    >
+                      <Clock className="w-3 h-3" />
+                      تعديل الوقت
+                    </Button>
+                  )}
+
                   {trip.status === "in_progress" && (
                     <Button
                       size="sm"
@@ -502,6 +576,217 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                 {cancelMutation.isPending ? "جاري الإلغاء..." : "نعم، إلغاء الرحلة"}
               </Button>
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ─── Start / Complete Trip Confirmation Modal ──────────────────
+          Was previously declared via setConfirmDialog state but never
+          rendered — the buttons set state, no modal ever appeared, and
+          the trip lifecycle was completely unreachable in production.
+          This is the fix that ships in the same commit as the
+          start_trip / complete_trip RPCs (migration 048).
+
+          Two actions: 'start' (confirmed → in_progress) and 'complete'
+          (in_progress → completed). Each shows its own copy + passenger
+          count + GPS hint where appropriate.
+
+          createPortal so fixed-position layout escapes any
+          framer-motion transform on ancestors (same reason as the
+          other modals in this component). */}
+      {confirmDialog && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/50"
+          dir="rtl"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmDialog(null); }}
+        >
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
+            {(() => {
+              const isStart = confirmDialog.action === "start";
+              const trip = confirmDialog.trip;
+              const pax = bookings?.filter(b => b.trip_id === confirmDialog.tripId && b.status === "confirmed").length || 0;
+              return (
+                <>
+                  <div className="text-center mb-4">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${
+                      isStart ? "bg-yellow-500/10" : "bg-green-500/10"
+                    }`}>
+                      {isStart
+                        ? <Play className="w-6 h-6 text-yellow-600" />
+                        : <Flag className="w-6 h-6 text-green-600" />}
+                    </div>
+                    <h3 className="font-bold text-lg text-foreground">
+                      {isStart ? "بدء الرحلة" : "إنهاء الرحلة"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {isStart
+                        ? "هل تريد بدء هذه الرحلة الآن؟ سيتم إشعار الركاب وتفعيل تتبع GPS لإنهاء الرحلة تلقائياً عند الوصول."
+                        : "هل تريد تأكيد إنهاء هذه الرحلة؟ سيتم إشعار الركاب وفتح صفحة تقييم الركاب."}
+                    </p>
+                    {/* Trip identity — gives the driver a chance to
+                        bail if they tapped the wrong trip card */}
+                    {trip && (
+                      <div className="mt-3 p-2 bg-muted/40 rounded-lg text-xs text-muted-foreground">
+                        {trip.from_city} ← {trip.to_city}
+                        {trip.date ? ` · ${trip.date}` : ""}
+                        {trip.time ? ` · ${trip.time}` : ""}
+                      </div>
+                    )}
+                    {/* Passenger-count line: for 'start' it's an FYI
+                        ('N passengers will be notified'); for
+                        'complete' it's the same FYI plus a hint that
+                        the review wizard will open. */}
+                    <div className="mt-2 p-2 bg-primary/5 rounded-lg text-xs text-primary font-medium">
+                      {pax > 0
+                        ? `${pax} ${pax === 1 ? "راكب مؤكد" : "ركاب مؤكدون"} ${isStart ? "سيتم إشعارهم" : "سيتم إشعارهم بانتهاء الرحلة"}`
+                        : "لا يوجد ركاب مؤكدون"}
+                    </div>
+                    {isStart && (
+                      <p className="mt-2 text-[11px] text-muted-foreground">
+                        📍 سيُطلب منك السماح بالوصول إلى الموقع لإنهاء الرحلة تلقائياً
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setConfirmDialog(null)}>
+                      تراجع
+                    </Button>
+                    <Button
+                      className={`flex-1 rounded-xl text-white ${
+                        isStart ? "bg-yellow-600 hover:bg-yellow-700" : "bg-green-600 hover:bg-green-700"
+                      }`}
+                      onClick={() => {
+                        const tripBookings = bookings?.filter(b => b.trip_id === confirmDialog.tripId) || [];
+                        updateMutation.mutate({
+                          id: confirmDialog.tripId,
+                          data: { status: isStart ? "in_progress" : "completed" },
+                          trip: trip,
+                          bookings: tripBookings,
+                        });
+                        setConfirmDialog(null);
+                      }}
+                      disabled={updateMutation.isPending}
+                    >
+                      {updateMutation.isPending
+                        ? "جاري..."
+                        : isStart ? "نعم، ابدأ الرحلة" : "نعم، أنهِ الرحلة"}
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ─── Time-Change Modal ──────────────────────────────────────────
+          Driver picks a new departure time. Server enforces same-date
+          and ≤60-minute delta. Passengers get notifications with the
+          new time + a deep-link to /my-trips?tab=confirmed where they
+          can cancel via the existing booking-cancel flow if the new
+          time doesn't suit them. */}
+      {timeChangeDialog && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/50"
+          dir="rtl"
+          onClick={(e) => { if (e.target === e.currentTarget) setTimeChangeDialog(null); }}
+        >
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
+            {(() => {
+              const trip = timeChangeDialog.trip;
+              const pax = bookings?.filter(
+                b => b.trip_id === trip.id && (b.status === "confirmed" || b.status === "pending")
+              ).length || 0;
+              // Compute delta in minutes for live feedback. Both
+              // values are 'HH:MM' or 'HH:MM:SS' strings; parse the
+              // first two segments as hours and minutes.
+              const toMin = (t) => {
+                if (!t) return 0;
+                const [h, m] = t.split(":");
+                return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
+              };
+              const delta = Math.abs(toMin(timeChangeDialog.newTime) - toMin(trip.time));
+              const deltaSign = toMin(timeChangeDialog.newTime) > toMin(trip.time) ? "+" : "-";
+              const tooLarge = delta > 60;
+              const noChange = timeChangeDialog.newTime === trip.time || !timeChangeDialog.newTime;
+              return (
+                <>
+                  <div className="text-center mb-4">
+                    <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto mb-3">
+                      <Clock className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="font-bold text-lg text-foreground">تعديل وقت الرحلة</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      اختر موعداً جديداً للانطلاق. سيتم إشعار جميع الركاب بالتغيير.
+                    </p>
+                    <div className="mt-3 p-2 bg-muted/40 rounded-lg text-xs text-muted-foreground">
+                      {trip.from_city} ← {trip.to_city} · {trip.date}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-foreground">الموعد الحالي</label>
+                      <span className="text-sm font-mono text-muted-foreground" dir="ltr">
+                        {trip.time || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground block mb-1">الموعد الجديد</label>
+                      <input
+                        type="time"
+                        value={timeChangeDialog.newTime}
+                        onChange={(e) => setTimeChangeDialog(prev => ({ ...prev, newTime: e.target.value }))}
+                        className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm font-mono"
+                        dir="ltr"
+                      />
+                    </div>
+
+                    {/* Live delta feedback. Three states:
+                          - no change yet: show nothing
+                          - within 60min: green hint with the delta
+                          - over 60min: red error + cancel/repost hint */}
+                    {!noChange && !tooLarge && (
+                      <div className="p-2 bg-green-500/10 rounded-lg text-xs text-green-700 font-medium">
+                        ✓ الفرق: {deltaSign}{delta} دقيقة
+                      </div>
+                    )}
+                    {tooLarge && (
+                      <div className="p-2 bg-destructive/10 rounded-lg text-xs text-destructive font-medium">
+                        ⚠️ الفرق أكبر من 60 دقيقة. للتغييرات الكبيرة يجب إلغاء الرحلة وإعادة نشرها.
+                      </div>
+                    )}
+                    {pax > 0 && !noChange && !tooLarge && (
+                      <div className="p-2 bg-primary/5 rounded-lg text-xs text-primary font-medium">
+                        🔔 سيتم إشعار {pax} {pax === 1 ? "راكب" : "ركاب"} وسيكون بإمكانهم إلغاء الحجز إذا لم يناسبهم الوقت الجديد
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 mt-4">
+                    <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setTimeChangeDialog(null)}>
+                      تراجع
+                    </Button>
+                    <Button
+                      className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => {
+                        changeTimeMutation.mutate({
+                          tripId: trip.id,
+                          newTime: timeChangeDialog.newTime,
+                          oldTime: trip.time,
+                          bookingsCount: pax,
+                        });
+                      }}
+                      disabled={noChange || tooLarge || changeTimeMutation.isPending}
+                    >
+                      {changeTimeMutation.isPending ? "جاري..." : "تحديث وإشعار الركاب"}
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>,
         document.body
