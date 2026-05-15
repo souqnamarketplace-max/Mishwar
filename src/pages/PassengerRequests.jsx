@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -96,8 +96,12 @@ export default function PassengerRequests() {
   const driverCoord = user?.city ? CITY_COORDS[user.city] : null;
 
   // ─── Fetch requests ───────────────────────────────────────────
+  // Note: queryKey scoped to user.email even though the FEED is
+  // global. Otherwise user A's feed leaks via react-query cache to
+  // user B after a sign-out/sign-in cycle. Same data ultimately but
+  // a stale-across-sessions footgun otherwise.
   const { data: requests = [], isLoading } = useQuery({
-    queryKey: ["passenger-requests-feed"],
+    queryKey: ["passenger-requests-feed", user?.email],
     queryFn: () => api.entities.TripRequest.filter(
       { status: "open" }, "-created_at", 200
     ),
@@ -144,9 +148,21 @@ export default function PassengerRequests() {
   }, [requests, blocked, user?.email, fromCity, toCity, maxPrice, minSeats, datePreset, nearMe, radiusKm, driverCoord]);
 
   // ─── Auth gate ────────────────────────────────────────────────
+  // navigate-during-render is a React anti-pattern (strict mode warns).
+  // Use a useEffect side-effect instead, then return a splash while the
+  // route change happens.
+  useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated) {
+      navigate("/login?returnTo=/passenger-requests", { replace: true });
+    }
+  }, [isLoadingAuth, isAuthenticated, navigate]);
+
   if (!isLoadingAuth && !isAuthenticated) {
-    navigate("/login?returnTo=/passenger-requests", { replace: true });
-    return null;
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
+      </div>
+    );
   }
 
   // ─── Subscription gate UI ─────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -50,10 +50,11 @@ export default function PassengerVerification() {
   const qc       = useQueryClient();
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
 
-  if (!isLoadingAuth && !isAuthenticated) {
-    navigate("/login?returnTo=/verify-passenger", { replace: true });
-    return null;
-  }
+  // NOTE: auth-gate redirect is handled by useEffect AFTER all hooks
+  // below, NOT by an inline `if (!authed) return null` here. The old
+  // pattern violated rules-of-hooks because subsequent useQuery /
+  // useState / useMutation calls would be skipped on un-authed
+  // renders, changing the hook count between renders.
 
   // ─── Existing verification state ────────────────────────────
   const { data: existing, isLoading } = useQuery({
@@ -135,6 +136,24 @@ export default function PassengerVerification() {
     },
     onError: (err) => toast.error(friendlyError(err, "تعذر إرسال طلب التوثيق")),
   });
+
+  // Auth gate as a side-effect, AFTER all hooks have been called.
+  // Same fix as RequestTrip — inline `if (!authed) return null`
+  // before/between hooks changes hook count across renders, which
+  // violates React's rules-of-hooks (and crashes in dev mode).
+  useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated) {
+      navigate("/login?returnTo=/verify-passenger", { replace: true });
+    }
+  }, [isLoadingAuth, isAuthenticated, navigate]);
+
+  if (!isLoadingAuth && !isAuthenticated) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

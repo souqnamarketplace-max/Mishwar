@@ -75,28 +75,44 @@ export default function Notifications() {
   }, [user?.email, qc]);
 
   const createPref = useMutation({
-    mutationFn: (data) => api.entities.TripPreference.create({
-      ...data,
-      user_email: user?.email,
-      user_name: user?.full_name,
-      max_price: data.max_price ? Number(data.max_price) : null,
-    }),
+    mutationFn: (data) => {
+      // Clamp max_price to sane range. Without this, a user could
+      // type -50 or 99999999 and the server would have to reject it.
+      // Bounds match RequestTrip.suggested_price for consistency.
+      const rawPrice = data.max_price ? Number(data.max_price) : null;
+      const maxPrice = rawPrice == null
+        ? null
+        : Math.min(Math.max(rawPrice, 0), 1000);
+      return api.entities.TripPreference.create({
+        ...data,
+        user_email: user?.email,
+        user_name: user?.full_name,
+        max_price: maxPrice,
+      });
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["preferences"] });
       setForm(emptyForm);
       setShowForm(false);
       toast.success("تم إضافة التفضيل بنجاح ✅");
     },
+    // Previously: no onError. RLS denials and network errors silently
+    // kept the form open with no feedback — user clicked save, nothing
+    // happened, they tried again, still nothing. Now they at least
+    // see what went wrong.
+    onError: (err) => toast.error(friendlyError(err, "تعذر إضافة التفضيل")),
   });
 
   const togglePref = useMutation({
     mutationFn: ({ id, is_active }) => api.entities.TripPreference.update(id, { is_active }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["preferences"] }),
+    onError: (err) => toast.error(friendlyError(err, "تعذر تحديث التفضيل")),
   });
 
   const deletePref = useMutation({
     mutationFn: (id) => api.entities.TripPreference.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["preferences"] }); toast.success("تم حذف التفضيل"); },
+    onError: (err) => toast.error(friendlyError(err, "تعذر حذف التفضيل")),
   });
 
   // Unified actions hook — same source of truth as the bell popup. The
@@ -190,6 +206,8 @@ export default function Notifications() {
                 <DollarSign className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   type="number"
+                  min="0"
+                  max="1000"
                   placeholder="مثال: 80"
                   value={form.max_price}
                   onChange={(e) => setForm({ ...form, max_price: e.target.value })}

@@ -42,9 +42,9 @@ For each page:
 | 11 | UserProfile.jsx | 536 | ✅ done | 1 real (fake 92% acceptance rate default) |
 | 12 | Dashboard.jsx | 535 | ✅ done | 4 real (today-vs-all-time label lies, fake weekly grouping, fake daily timeseries, 'both' users double-counted in pie) |
 | 13 | RequestTrip.jsx | 477 | ✅ done | 1 real (rules-of-hooks violation on auth gate) |
-| 14 | PassengerVerification.jsx | 411 | pending | |
-| 15 | Notifications.jsx | 391 | pending | |
-| 16 | PassengerRequests.jsx | 382 | pending | |
+| 14 | PassengerVerification.jsx | 425 | ✅ done | 1 real (rules-of-hooks violation on auth gate) |
+| 15 | Notifications.jsx | 393 | ✅ done | 3 real (missing onError handlers on 3 mutations, unbounded max_price input) |
+| 16 | PassengerRequests.jsx | 396 | ✅ done | 2 real (queryKey not scoped to user — cache leak across sessions, navigate-during-render) |
 | 17 | MyRequests.jsx | ? | pending | |
 | 18 | DriverDashboard.jsx | ? | pending | |
 | 19 | Favorites.jsx | ? | pending | |
@@ -244,6 +244,35 @@ This was the reference implementation that AccountSettings's uploadFile should h
 Lines 121-124 (old): `if (!isAuthenticated) { navigate(...); return null; }`. This early-return ran AFTER two `useQuery`s and BEFORE `useMutation` + `useMemo`. Hook count was 3 on un-authed renders, 5 on authed renders. React's rules-of-hooks require invariant hook order across renders. Worse, the file comment further down (lines 126-128 in the original) explicitly warned about this for the verification gate but did the same anti-pattern for the auth gate immediately above.
 **Why no production crash?** On the very first render `isLoadingAuth=true` so the early-return didn't fire — all hooks ran. The bug only triggered when auth state resolved to `unauthenticated` on a later render, reducing the hook count. React's prod build is more lenient but dev mode throws.
 **Fix:** moved auth check into a `useEffect` that runs as a side-effect after all hooks have been called. Page returns a loading splash for the brief window between effect-fire and route change. Hook count is now invariant across renders. ✅
+
+### Page 14 — PassengerVerification.jsx
+
+**🟠 HIGH — Rules-of-hooks violation on auth gate**
+Same pattern as RequestTrip — inline `if (!authed) { navigate; return null }` placed BEFORE the page's useQuery, useState, useMutation calls. On the first render `isLoadingAuth=true` so the gate didn't fire and all hooks ran. On a later render where auth resolved to false, the gate triggered and ~10 subsequent hooks were skipped. Hook count varied between renders.
+**Fix:** moved redirect into a `useEffect` AFTER all hooks. Loading splash bridges the navigation. Hook count invariant. ✅
+
+**False alarm investigated:**
+- `upload()` helper at line 88-99 had no MIME/size validation. Looked like the same upload defect from Onboarding/AccountSettings. Verified: validation lives in the `PhotoField` component at line 344-355 — checks `^image/` MIME prefix and 10MB cap before passing the file up. So the upload helper sees only validated files. Not a bug.
+
+### Page 15 — Notifications.jsx
+
+**🟡 MEDIUM — Three mutations missing `onError` handlers**
+`createPref`, `togglePref`, `deletePref` all had `onSuccess` but no `onError`. RLS denials and network errors silently kept the UI in its previous state — user clicked save, modal stayed open, nothing toasted, they tried again, still nothing.
+**Fix:** added `onError: (err) => toast.error(friendlyError(err, "..."))` to all three. Errors are now visible. ✅
+
+**🟡 MEDIUM — Unbounded max_price input**
+The number input had no `min`/`max` attributes, and the mutation did `data.max_price ? Number(data.max_price) : null` with no clamping. A user could type `-50` or `99999999` and it would land in the DB.
+**Fix:** added `min="0" max="1000"` to the input (matches RequestTrip.suggested_price bounds); mutation clamps to that range as belt-and-braces (handles edge case of paste / direct DOM manipulation bypassing the input attrs). ✅
+
+### Page 16 — PassengerRequests.jsx
+
+**🟡 MEDIUM — `queryKey: ["passenger-requests-feed"]` not scoped to user**
+The feed is global, but the queryKey wasn't scoped to `user?.email`. When User A (subscribed) loaded the page, fetched the feed, then signed out, and User B signed in, react-query happily served User B the cached feed from User A's session. The data is global so it's not a security issue, but it's a stale-cache-across-sessions footgun — User B might see slightly outdated data, and if the feed schema ever changes, weird interactions could happen.
+**Fix:** scoped queryKey to `["passenger-requests-feed", user?.email]` so different sessions get isolated cache entries. ✅
+
+**🟡 LOW — navigate-during-render anti-pattern**
+Inline `if (!authed) { navigate; return null }` was after all hooks here (so hook count was stable, unlike RequestTrip/PassengerVerification), but calling `navigate()` during render is still a React anti-pattern that strict mode warns about ("Cannot update a component while rendering a different component"). Effects are where side effects belong.
+**Fix:** moved to useEffect, returns a loading splash during the brief redirect window. ✅
 
 
 
