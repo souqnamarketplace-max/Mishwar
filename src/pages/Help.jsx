@@ -1,8 +1,9 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
-import { Headphones, Search, ChevronDown, ChevronUp, MessageCircle, Phone, Mail } from "lucide-react";
+import { Headphones, Search, ChevronDown, ChevronUp, Ticket, Phone, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -172,22 +173,34 @@ export default function Help() {
         ))}
       </div>
 
-      {/* Contact */}
+      {/* Contact — Three async support channels:
+            (1) Ticket form → routes to /feedback which uses the
+                existing support_tickets table that admin monitors via
+                DashboardFeedback. Used to be a 'محادثة مباشرة' (live
+                chat) button which we don't have the team to staff.
+            (2) Phone (tel:) — opens the phone dialer on mobile.
+            (3) Email (mailto:) — opens the email client. */}
       <div className="bg-primary/5 rounded-2xl p-8 text-center">
         <h2 className="text-xl font-bold text-foreground mb-2">لم تجد إجابتك؟</h2>
-        <p className="text-muted-foreground text-sm mb-6">فريق الدعم لدينا جاهز لمساعدتك</p>
+        <p className="text-muted-foreground text-sm mb-6">أرسل لنا رسالة وسنرد عليك في أقرب وقت ممكن</p>
         <div className="flex flex-wrap justify-center gap-3">
-          <Button className="rounded-xl bg-primary text-primary-foreground gap-2">
-            <MessageCircle className="w-4 h-4" />
-            محادثة مباشرة
+          <Button asChild className="rounded-xl bg-primary text-primary-foreground gap-2">
+            <Link to="/feedback">
+              <Ticket className="w-4 h-4" />
+              أرسل تذكرة دعم
+            </Link>
           </Button>
-          <Button variant="outline" className="rounded-xl gap-2">
-            <Phone className="w-4 h-4" />
-            {supportPhone}
+          <Button asChild variant="outline" className="rounded-xl gap-2">
+            <a href={`tel:${supportPhone}`} dir="ltr">
+              <Phone className="w-4 h-4" />
+              {supportPhone}
+            </a>
           </Button>
-          <Button variant="outline" className="rounded-xl gap-2">
-            <Mail className="w-4 h-4" />
-            {supportEmail}
+          <Button asChild variant="outline" className="rounded-xl gap-2">
+            <a href={`mailto:${supportEmail}`} dir="ltr">
+              <Mail className="w-4 h-4" />
+              {supportEmail}
+            </a>
           </Button>
         </div>
       </div>
