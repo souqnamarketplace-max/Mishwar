@@ -9,6 +9,7 @@ import NotificationBell from "@/components/notifications/NotificationBell";
 import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
 import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
 
 const MOBILE_TABS = [
   { id: "home",     label: "الرئيسية", icon: Home,          path: "/" },
@@ -85,21 +86,9 @@ export default function MobileLayout({ children, user, showHeader = true, header
   const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
   // ─── Unread messages count (drives red badge on الرسائل tab) ───
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ["unread-messages-count", user?.email],
-    queryFn: async () => {
-      if (!user?.email) return 0;
-      const { count, error } = await supabase
-        .from("messages")
-        .select("*", { count: "exact", head: true })
-        .eq("receiver_email", user.email)
-        .eq("is_read", false);
-      if (error) { console.warn("unread count error:", error); return 0; }
-      return count || 0;
-    },
-    enabled: !!user?.email,
-    staleTime: 15000,
-  });
+  // Hook handles the COUNT query + Supabase realtime subscription.
+  // Same hook is used by Navbar.jsx so desktop + mobile stay in sync.
+  const unreadCount = useUnreadMessageCount(user?.email);
 
   // ─── Support phone for the emergency CTA (pulled from settings so
   // admin can edit without a deploy; same pattern as Help.jsx and
@@ -112,20 +101,6 @@ export default function MobileLayout({ children, user, showHeader = true, header
     staleTime: 5 * 60 * 1000,
   });
   const supportPhoneM = settingsArrM[0]?.support_phone || "";
-
-  // Realtime: bump unread count when a new message arrives, drop it when read
-  useEffect(() => {
-    if (!user?.email) return;
-    const channel = supabase
-      .channel(`unread-msgs-${user.email}`)
-      .on("postgres_changes",
-        { event: "*", schema: "public", table: "messages",
-          filter: `receiver_email=eq.${user.email}` },
-        () => qc.invalidateQueries({ queryKey: ["unread-messages-count", user.email] })
-      )
-      .subscribe();
-    return () => { try { supabase.removeChannel(channel); } catch {} };
-  }, [user?.email, qc]);
 
   const currentTab = MOBILE_TABS.find(tab => location.pathname.startsWith(tab.path.split("?")[0]));
 

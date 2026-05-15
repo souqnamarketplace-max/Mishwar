@@ -5,6 +5,7 @@ import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCh
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/apiClient";
+import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
 import NotificationBell from "../notifications/NotificationBell";
 
 const LOGO_URL = "/logo.png";
@@ -34,6 +35,11 @@ export default function Navbar() {
     queryKey: ["me"],
     queryFn: () => api.auth.me(),
   });
+
+  // Drives the red badge on the message icon. Live-updated via the
+  // hook's internal Supabase realtime subscription — no manual
+  // refresh needed when a new message arrives.
+  const unreadMessages = useUnreadMessageCount(user?.email);
 
   return (
     <nav className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b border-border">
@@ -115,9 +121,22 @@ export default function Navbar() {
                 </Link>
               </>
             )}
-            <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+            <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors" aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}>
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-accent rounded-full"></span>
+              {/* Real badge tied to the unread-messages hook. Was
+                  previously a static dot that always appeared, even
+                  with zero unread messages — defeating the whole
+                  point. Style matches the mobile bottom-tabs badge
+                  (red bg, white text, ring + pulse) for consistency
+                  across the two surfaces. */}
+              {unreadMessages > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
+                  aria-hidden="true"
+                >
+                  {unreadMessages > 9 ? "9+" : unreadMessages}
+                </span>
+              )}
             </Link>
             <NotificationBell userEmail={user?.email} />
             
