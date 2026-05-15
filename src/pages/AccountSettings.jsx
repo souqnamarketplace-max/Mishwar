@@ -38,6 +38,8 @@ export default function AccountSettings() {
   const [phoneLoading, setPhoneLoading] = useState(false);
   const [gender, setGender] = useState("");
   const [city, setCity] = useState("");
+  const [pendingGender, setPendingGender] = useState("");  // local UI state for the gender dropdown when set-once is available
+  const [genderLoading, setGenderLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
 
   // Avatar
@@ -115,6 +117,33 @@ export default function AccountSettings() {
       toast.error(friendlyError(err, "فشل التحديث"));
     } finally {
       setProfileLoading(false);
+    }
+  };
+
+  // Gender: set-once (migration 040). The DB guard
+  // guard_profile_protected_columns allows NULL → male|female ONCE; any
+  // subsequent change requires admin via the set_user_gender_admin RPC
+  // (the support path). This handler only fires from the UI when the
+  // current value is NULL, so the happy path is a regular profile
+  // UPDATE. If the server rejects (e.g. race: another tab set it first),
+  // friendlyError already maps the 'gender is set-once' message to an
+  // actionable Arabic string.
+  const handleGenderSet = async () => {
+    if (pendingGender !== "male" && pendingGender !== "female") {
+      toast.error("اختر الجنس أولاً");
+      return;
+    }
+    setGenderLoading(true);
+    try {
+      await api.auth.updateMe({ gender: pendingGender });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      toast.success("تم حفظ الجنس ✅", {
+        description: "لا يمكن تغيير الجنس مرة أخرى. للتعديل تواصل مع الدعم.",
+      });
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر حفظ الجنس"));
+    } finally {
+      setGenderLoading(false);
     }
   };
 
@@ -599,25 +628,31 @@ export default function AccountSettings() {
 
           {/* User ID badge — matches the identifier admins see in
               /dashboard/users so users can give it to support for quick
-              lookup. Shows the first 8 chars of the UUID (enough to
-              uniquely identify them in practice) with copy-full-UUID
-              button. */}
+              lookup. The full UUID stays the database key (admin search
+              uses the full value via the copy button); the display
+              shows the first 8 hex chars formatted as 'MSH-XXXX-XXXX'
+              so it's easy to read out loud over phone, easy to type if
+              needed, and clearly labeled as a Mishwaro account ID. */}
           <div>
             <Label>معرّف الحساب</Label>
-            <div className="mt-1 px-4 py-2.5 rounded-xl border border-border bg-muted/30 text-xs text-muted-foreground flex items-center justify-between gap-2 font-mono" dir="ltr">
-              <span>{user?.id ? `${String(user.id).slice(0, 8)}…` : "—"}</span>
+            <div className="mt-1 px-4 py-2.5 rounded-xl border border-border bg-muted/30 text-sm text-foreground flex items-center justify-between gap-2 font-mono tracking-wider" dir="ltr">
+              <span>
+                {user?.id
+                  ? `MSH-${String(user.id).slice(0, 4).toUpperCase()}-${String(user.id).slice(4, 8).toUpperCase()}`
+                  : "—"}
+              </span>
               {user?.id && (
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard?.writeText(String(user.id))
-                      .then(() => toast.success("تم نسخ المعرّف"))
+                      .then(() => toast.success("تم نسخ المعرّف الكامل"))
                       .catch(() => toast.error("تعذر النسخ"));
                   }}
                   className="text-primary hover:text-primary/80 transition-colors p-1"
                   aria-label="نسخ المعرّف الكامل"
                 >
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -628,19 +663,54 @@ export default function AccountSettings() {
           <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
             <h3 className="font-bold text-foreground text-sm">الجنس والمدينة</h3>
             <div>
-              <label className="text-xs text-muted-foreground mb-1 block">الجنس (يُحدَّد أثناء التسجيل فقط)</label>
-              <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-input bg-muted/40 text-sm">
-                {user?.gender === "female"
-                  ? <><span>👩</span><span className="font-medium">أنثى</span></>
-                  : user?.gender === "male"
-                  ? <><span>👨</span><span className="font-medium">ذكر</span></>
-                  : user?.onboarding_completed
-                  // Onboarding done but no gender set = passenger account (we
-                  // only ask drivers for gender during onboarding). Don't
-                  // imply something is missing — it's intentionally optional.
-                  ? <span className="text-muted-foreground text-xs">غير محدد</span>
-                  : <span className="text-muted-foreground text-xs">لم يُحدَّد — يرجى إكمال الإعداد الأولي</span>}
-              </div>
+              <label className="text-xs text-muted-foreground mb-1 block">الجنس</label>
+              {user?.gender === "female" || user?.gender === "male" ? (
+                // Locked display — gender is set. To change, user must
+                // contact support (set_user_gender_admin RPC, migration 040).
+                <>
+                  <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-input bg-muted/40 text-sm">
+                    <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                    {user.gender === "female"
+                      ? <><span>👩</span><span className="font-medium">أنثى</span></>
+                      : <><span>👨</span><span className="font-medium">ذكر</span></>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">للتغيير تواصل مع الدعم وأرسل معرّف حسابك</p>
+                </>
+              ) : user?.onboarding_completed ? (
+                // Onboarding complete but gender not set yet — passenger
+                // accounts (or Google OAuth flow) reach this state. Allow
+                // the user to set it ONCE. DB enforces the set-once rule.
+                <>
+                  <div className="flex gap-2">
+                    <select
+                      value={pendingGender}
+                      onChange={(e) => setPendingGender(e.target.value)}
+                      className="flex-1 h-10 px-3 rounded-xl border border-input bg-background text-sm"
+                    >
+                      <option value="">— اختر الجنس —</option>
+                      <option value="male">👨 ذكر</option>
+                      <option value="female">👩 أنثى</option>
+                    </select>
+                    <Button
+                      onClick={handleGenderSet}
+                      disabled={genderLoading || !pendingGender}
+                      className="rounded-xl h-10 shrink-0"
+                      size="sm"
+                    >
+                      {genderLoading ? "..." : "حفظ"}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ يمكنك تحديد الجنس مرة واحدة فقط — اختر بعناية
+                  </p>
+                </>
+              ) : (
+                // True onboarding-incomplete state — direct them back to
+                // /onboarding rather than letting them piecemeal-edit.
+                <div className="flex items-center gap-2 h-10 px-3 rounded-xl border border-input bg-muted/40 text-sm">
+                  <span className="text-muted-foreground text-xs">لم يُحدَّد — يرجى إكمال الإعداد الأولي</span>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs text-muted-foreground mb-1 block">المدينة</label>
