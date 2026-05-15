@@ -31,8 +31,8 @@ For each page:
 |---|------|-----|--------|--------------|
 | 1 | Home.jsx | 27 | ✅ done | 3 real (HeroSection JSON.parse crash, HeroSection .img.replace crash, StatsBar NaN/5) |
 | 2 | SearchTrips.jsx | 371 | ✅ done | 2 real (sort NaN when time is null, error state hidden as empty state) |
-| 3 | TripDetails.jsx | 1126 | pending | |
-| 4 | MyTrips.jsx | 643 | pending | |
+| 3 | TripDetails.jsx | 1126 | ✅ done | 3 real (favorites state stale on slug URLs, fake amenity bullets, false marketing trust badges) |
+| 4 | MyTrips.jsx | 644 | ✅ done | 3 real (duplicate statusConfig key, allTrips fetching wrong rows hiding old bookings, knock-on driver-not-notified) |
 | 5 | Messages.jsx | 1126 | pending | |
 | 6 | CreateTrip.jsx | 1188 | pending | |
 | 7 | Onboarding.jsx | 712 | pending | |
@@ -86,6 +86,36 @@ When the trips query fails (RLS denial, network down), the page falls through to
 **🟡 LOW noted, not fixed (filter inconsistency):**
 - Line 131 `t.price > parseFloat(maxPrice)` — null/string prices silently pass the filter. Acceptable since results are still queryable, and the inconsistency is hidden.
 - `isTripExpired(t)` called inside `.filter` on every re-render — perf footgun on 500 trips, not a bug.
+
+### Page 3 — TripDetails.jsx
+
+**🟠 HIGH — line 166: `useState(() => getFavs().has(id))` stale on slug URLs**
+The useState initializer only runs once. For slug URLs, `id` is `null` at first render (the trip hasn't resolved yet), so `getFavs().has(null)` returns false. When the trip resolves and id becomes a real UUID, this state never updates — the heart icon stays un-favorited even on trips the user previously favorited.
+**Fix:** moved to useEffect that re-syncs when `id` (or `favKey`, i.e. user email) changes. Initial state false; effect populates correct value when id is known. ✅
+
+**🟠 HIGH — lines 431-443: hardcoded fake amenities**
+The sidebar showed "تكييف، موسيقى، مسموح بالتدخين، حقيبة" on EVERY trip regardless of the driver's actual `trip.amenities` / `pref_smoking` / `pref_pets`. A driver who explicitly DISABLED smoking would still see their trip page advertising "مسموح بالتدخين" to passengers. The real amenity-chip logic exists further down in the page (line 705+) — the sidebar block was redundant fake duplication.
+**Fix:** removed the hardcoded list; kept just the seat-count bullet. Real amenity chips already render in the main details panel. ✅
+
+**🟠 HIGH — lines 1107-1123: false marketing claims in trust badges**
+Four badges claimed: (1) 24/7 support team (doesn't exist), (2) "complete protection for your payments" (payments are external via Jawwal/Reflect/bank, not in-app), (3) free cancellation (true but vague), (4) "thousands of users trust us" (same fake claim being scrubbed elsewhere). App Store reviewers flag this as misleading marketing.
+**Fix:** replaced with 4 truthful claims about features we actually ship: in-app messaging, mutual rating system, cancel-before-trip, user reporting to admins. ✅
+
+### Page 4 — MyTrips.jsx
+
+**🟡 MEDIUM — lines 33,37: `statusConfig.cancelled` defined twice**
+JavaScript silently uses the second definition (destructive theme) and the first (red-100) is dead. Not a runtime bug since the second is the intended one, but the duplicate made it look like an inconsistency and was the kind of thing that bites someone later.
+**Fix:** deduped, kept the destructive-themed version, reordered keys to match status flow. ✅
+
+**🔴 CRITICAL — lines 191-194: `allTrips` fetched the platform's 200 newest trips, not the user's booked trips**
+`api.entities.Trip.list("-created_date", 200)` returns the latest 200 trips on the entire platform, then the page filtered to `bookedTripIds.has(t.id)`. The instant the platform has more than 200 trips newer than the user's booked one, **the booking disappears from /my-trips** — the trip isn't in `allTrips` to be filtered in. The user thinks their booking was cancelled. Heavy bandwidth waste too (200 unrelated trips on every load).
+**Fix:** new query `["my-booked-trips", email, idsKey]` that queries trips with `.in("id", myBookedTripIds)`. Fetches only the trips the user has bookings on. Scales with the user's booking count (1-50) instead of platform size. Updated 2 invalidation sites to use the new queryKey. ✅
+
+**🟠 HIGH (knock-on of CRITICAL above) — line 137-138: cancel-booking driver notification silently skipped**
+When passenger cancels a booking, the cancel handler does `allTrips?.find(t => t.id === booking?.trip_id)` to look up the driver email for the notification. With the old `allTrips` query, if the booked trip wasn't in the latest 200 platform trips, `trip` was undefined, the `if (trip?.driver_email...)` guard silently skipped, and **the driver never got bell-pinged about the cancellation**. Seat went back into the pool with no driver awareness.
+**Fix:** automatic — by fixing the `allTrips` query above, the lookup now always finds the trip the booking is on. ✅
+
+
 
 
 

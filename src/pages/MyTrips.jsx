@@ -29,12 +29,16 @@ const tabs = [
 ];
 
 const statusConfig = {
-  pending:   { label: "بانتظار موافقة السائق", color: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
-  cancelled: { label: "ملغية",                  color: "bg-red-100 text-red-700 hover:bg-red-100" },
-  confirmed: { label: "مؤكدة", color: "bg-accent/10 text-accent border-accent/20" },
-  in_progress: { label: "مباشر", color: "bg-primary/10 text-primary border-primary/20" },
-  completed: { label: "مكتملة", color: "bg-muted text-muted-foreground border-border" },
-  cancelled: { label: "ملغاة", color: "bg-destructive/10 text-destructive border-destructive/20" },
+  pending:     { label: "بانتظار موافقة السائق", color: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
+  confirmed:   { label: "مؤكدة",                 color: "bg-accent/10 text-accent border-accent/20" },
+  in_progress: { label: "مباشر",                 color: "bg-primary/10 text-primary border-primary/20" },
+  completed:   { label: "مكتملة",                color: "bg-muted text-muted-foreground border-border" },
+  // The 'cancelled' key was previously defined twice (bg-red-100 then
+  // bg-destructive/10). JS uses the second; the first was dead code
+  // and the duplication made it look like an inconsistency. Single
+  // definition using destructive theme tokens so the badge matches
+  // every other 'something failed/was cancelled' surface.
+  cancelled:   { label: "ملغاة",                 color: "bg-destructive/10 text-destructive border-destructive/20" },
 };
 
 export default function MyTrips() {
@@ -113,7 +117,7 @@ export default function MyTrips() {
       //     exactly the bug souqnamarketplace@gmail.com hit when
       //     trying to re-book Ramallah → Nablus right after
       //     cancelling.
-      //   ["trip", *] and ["trips"] / ["all-trips-lookup"] — the
+      //   ["trip", *] and ["trips"] / ["my-booked-trips"] — the
       //     server-side cancel_booking RPC refunds the seat
       //     atomically, so available_seats changed; the trip detail
       //     and any trip-list view (search, my-trips driver tab)
@@ -123,7 +127,7 @@ export default function MyTrips() {
       qc.invalidateQueries({ queryKey: ["my-booking"] });
       qc.invalidateQueries({ queryKey: ["trip"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
-      qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
+      qc.invalidateQueries({ queryKey: ["my-booked-trips"] });
       logAudit("booking_cancelled_by_passenger", "booking", bookingId, { passenger_email: user?.email });
       toast.success("تم إلغاء الحجز بنجاح");
       // Notify driver that the booking was cancelled. Routes through
@@ -187,10 +191,31 @@ export default function MyTrips() {
     enabled: !!user?.email,
   });
 
-  // All trips (to look up booked trips)
+  // Trips the user has booked. Previously this fetched the PLATFORM's
+  // 200 newest trips (`api.entities.Trip.list("-created_date", 200)`)
+  // and tried to look up the user's bookings within that pool — which
+  // meant any trip older than the latest 200 platform trips was
+  // silently missing. Once Mishwaro has a few hundred users posting
+  // daily, a user's confirmed booking from a week ago would just
+  // disappear from /my-trips. They'd think their booking was cancelled.
+  //
+  // Fix: query only the trip ids the user has bookings on, using
+  // Booking.trip_id as an .in() filter. This makes every booking
+  // visible regardless of trip age AND drastically reduces bandwidth
+  // (1 trip per booking instead of 200 unrelated ones).
+  const myBookedTripIds = (passengerBookings || []).map(b => b.trip_id).filter(Boolean);
   const { data: allTrips = [] } = useQuery({
-    queryKey: ["all-trips-lookup"],
-    queryFn: () => api.entities.Trip.list("-created_date", 200),
+    queryKey: ["my-booked-trips", user?.email, myBookedTripIds.join(",")],
+    queryFn: async () => {
+      if (myBookedTripIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("trips")
+        .select("*")
+        .in("id", myBookedTripIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.email && myBookedTripIds.length > 0,
   });
 
   // Group passenger bookings by trip_id, picking the most relevant booking
@@ -239,7 +264,7 @@ export default function MyTrips() {
     // KEY FIX: when driver confirms/cancels a booking, passenger sees it instantly
     const unsubBookings = api.entities.Booking.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
-      qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
+      qc.invalidateQueries({ queryKey: ["my-booked-trips"] });
       qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
     });
     return () => { unsubTrips(); unsubReviews(); unsubBookings(); };

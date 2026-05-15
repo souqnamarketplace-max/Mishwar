@@ -163,7 +163,18 @@ export default function TripDetails() {
   // Favorites — persisted in localStorage per user (MUST be after user query to avoid TDZ)
   const favKey = `mishwar-favs-${user?.email || "anon"}`;
   const getFavs = () => { try { return new Set(JSON.parse(localStorage.getItem(favKey) || "[]")); } catch { return new Set(); } };
-  const [favorited, setFavorited] = useState(() => getFavs().has(id));
+  // useState init runs ONCE. For slug URLs, `id` is null at first render
+  // (the trip hasn't resolved yet) — getFavs().has(null) is always false,
+  // so the heart icon would stay un-favorited even on a trip the user
+  // had previously favorited. The useEffect below re-syncs once the
+  // real id is known. Same applies if the user/login changes mid-page.
+  const [favorited, setFavorited] = useState(false);
+  useEffect(() => {
+    if (!id) return;
+    setFavorited(getFavs().has(id));
+    // favKey changes when user logs in/out — re-read the right list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, favKey]);
 
   const toggleFavorite = () => {
     const favs = getFavs();
@@ -427,20 +438,21 @@ export default function TripDetails() {
             </div>
 
             <div className="p-4 space-y-3">
-              {/* Seat & amenity highlights */}
+              {/* Seat count. The hardcoded amenity bullets that used to
+                  live here (تكييف، موسيقى، مسموح بالتدخين، حقيبة) were
+                  fake — they showed the SAME four items on every trip
+                  regardless of what the driver actually offers. A
+                  driver who explicitly disabled smoking would still
+                  see their trip page advertising "مسموح بالتدخين" to
+                  passengers. The real amenity chips, driven by
+                  trip.amenities + pref_smoking / pref_pets /
+                  pref_chattiness, render further down inside the main
+                  trip-details panel. */}
               <div className="space-y-2 text-sm">
-                {[
-                  { icon: Users, text: `${trip.available_seats || 3} مقاعد متاحة` },
-                  { icon: Briefcase, text: "متاح حقيبة متوسطة" },
-                  { icon: Snowflake, text: "تكييف" },
-                  { icon: Music, text: "موسيقى" },
-                  { icon: Cigarette, text: "مسموح بالتدخين" },
-                ].map((item) => (
-                  <div key={item.text} className="flex items-center gap-2 text-foreground">
-                    <item.icon className="w-4 h-4 text-primary shrink-0" />
-                    <span>{item.text}</span>
-                  </div>
-                ))}
+                <div className="flex items-center gap-2 text-foreground">
+                  <Users className="w-4 h-4 text-primary shrink-0" />
+                  <span>{trip.available_seats || 0} {trip.available_seats === 1 ? "مقعد متاح" : "مقاعد متاحة"}</span>
+                </div>
               </div>
 
               {/* Book button */}
@@ -1103,13 +1115,20 @@ export default function TripDetails() {
         </div>
       , document.body)}
 
-      {/* Bottom trust badges */}
+      {/* Bottom trust badges — every claim here must be TRUTHFUL.
+          The previous set claimed (a) 24/7 support — there's no
+          support team, (b) 'complete protection for your payments' —
+          payments are settled externally via Jawwal/Reflect/bank, not
+          in-app, (c) 'thousands of users trust us' — same fake claim
+          being scrubbed elsewhere. App Store reviewers flag this
+          kind of misleading marketing. Replaced with features we
+          actually ship. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8 pt-6 border-t border-border">
         {[
-          { icon: Headphones, title: "دعم على مدار الساعة", desc: "فريق الدعم جاهز لمساعدتك في أي وقت" },
-          { icon: Shield, title: "طرق دفع آمنة", desc: "حماية كاملة لبياناتك ومعاملاتك المالية" },
-          { icon: X, title: "إلغاء مجاني", desc: "إلغاء مجاني حتى موعد الرحلة بساعتين" },
-          { icon: Users, title: "مجتمع موثوق", desc: "آلاف المستخدمين يثقون في سيرتنا كل يوم" },
+          { icon: MessageCircle, title: "رسائل داخل التطبيق", desc: "تواصل مع السائق قبل الرحلة عبر الدردشة الآمنة" },
+          { icon: Star, title: "نظام تقييم متبادل", desc: "اطّلع على تقييمات السائقين السابقة قبل الحجز" },
+          { icon: X, title: "إلغاء قبل الرحلة", desc: "ألغِ حجزك قبل موعد الانطلاق دون رسوم" },
+          { icon: Shield, title: "بلاغات على المستخدمين", desc: "أبلغ عن أي سلوك غير لائق وستراجعه الإدارة" },
         ].map((b) => (
           <div key={b.title} className="flex items-start gap-3 p-4 bg-card rounded-xl border border-border">
             <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
