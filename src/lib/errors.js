@@ -120,6 +120,32 @@ const KNOWN_PATTERNS = [
   [/bucket not found/i,                                    "تعذر الوصول لمجلد التخزين"],
 
   // Common Postgres/PostgREST messages without a clean .code
+  //
+  // IMPORTANT: more-specific RAISE EXCEPTION patterns from our own RPCs
+  // come FIRST — they need to match before the generic
+  // 'violates check constraint' fallback below catches every 23514.
+
+  // book_seat (migrations 003, 017, 018, 034, 037)
+  [/profile incomplete|finish onboarding|onboarding/i,
+                                                           "يرجى إكمال إعداد حسابك أولاً قبل الحجز"],
+  [/cannot book your own trip/i,                           "لا يمكنك حجز رحلتك أنت"],
+  [/not enough seats/i,                                    "لا توجد مقاعد كافية متاحة في هذه الرحلة"],
+  [/trip is in the past/i,                                 "هذه الرحلة قد انتهت بالفعل"],
+  [/trip not bookable.*status/i,                           "هذه الرحلة غير متاحة للحجز حالياً"],
+  [/trip not found/i,                                      "الرحلة المطلوبة غير موجودة"],
+  [/booking blocked due to strikes/i,                      "حسابك معلق مؤقتاً بسبب تجاوزات سابقة — تواصل مع الدعم"],
+  [/block exists between passenger and driver/i,           "لا يمكن إتمام الحجز — يوجد حظر بينك وبين السائق"],
+  [/invalid seat count/i,                                  "عدد المقاعد غير صحيح"],
+  [/passenger has.*conflict|booking conflict|overlap.*booking|conflict.*booking/i,
+                                                           "لديك حجز آخر في نفس الوقت — ألغِ الحجز السابق أولاً"],
+
+  // Trip creation / update (migration 002 + business triggers)
+  [/cannot change (passenger_email|driver_email|sender_email|receiver_email)/i,
+                                                           "تعذر التحديث — لا يمكن تغيير بيانات تعريف الحساب"],
+  [/passengers cannot change|drivers cannot change/i,      "ليس لديك صلاحية تغيير هذا الحقل"],
+  [/passengers can only cancel/i,                          "يمكنك فقط إلغاء الحجز"],
+
+  // Generic Postgres errors (must come AFTER the specific patterns above)
   [/violates check constraint/i,                           "البيانات لا تطابق الشروط المطلوبة"],
   [/violates foreign key constraint/i,                     "البيانات المرتبطة غير موجودة أو محذوفة"],
   [/violates unique constraint|duplicate key/i,            "هذه القيمة موجودة بالفعل"],

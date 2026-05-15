@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield, X, LogOut } from "lucide-react";
+import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield, X, LogOut, Copy } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -597,6 +597,33 @@ export default function AccountSettings() {
             <p className="text-xs text-muted-foreground mt-1">لا يمكن تغيير الاسم بعد التسجيل</p>
           </div>
 
+          {/* User ID badge — matches the identifier admins see in
+              /dashboard/users so users can give it to support for quick
+              lookup. Shows the first 8 chars of the UUID (enough to
+              uniquely identify them in practice) with copy-full-UUID
+              button. */}
+          <div>
+            <Label>معرّف الحساب</Label>
+            <div className="mt-1 px-4 py-2.5 rounded-xl border border-border bg-muted/30 text-xs text-muted-foreground flex items-center justify-between gap-2 font-mono" dir="ltr">
+              <span>{user?.id ? `${String(user.id).slice(0, 8)}…` : "—"}</span>
+              {user?.id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(String(user.id))
+                      .then(() => toast.success("تم نسخ المعرّف"))
+                      .catch(() => toast.error("تعذر النسخ"));
+                  }}
+                  className="text-primary hover:text-primary/80 transition-colors p-1"
+                  aria-label="نسخ المعرّف الكامل"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">يُستخدم لتعريف حسابك عند التواصل مع الدعم</p>
+          </div>
+
           {/* الجنس والمدينة */}
           <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
             <h3 className="font-bold text-foreground text-sm">الجنس والمدينة</h3>
@@ -607,6 +634,11 @@ export default function AccountSettings() {
                   ? <><span>👩</span><span className="font-medium">أنثى</span></>
                   : user?.gender === "male"
                   ? <><span>👨</span><span className="font-medium">ذكر</span></>
+                  : user?.onboarding_completed
+                  // Onboarding done but no gender set = passenger account (we
+                  // only ask drivers for gender during onboarding). Don't
+                  // imply something is missing — it's intentionally optional.
+                  ? <span className="text-muted-foreground text-xs">غير محدد</span>
                   : <span className="text-muted-foreground text-xs">لم يُحدَّد — يرجى إكمال الإعداد الأولي</span>}
               </div>
             </div>
