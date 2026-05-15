@@ -75,6 +75,15 @@ function Overview() {
   const totalTrips = trips.length;
   const totalBookings = bookings.length;
   const totalUsers = users.length;
+
+  // Today vs all-time: previously the stat cards LABELED 'Active users
+  // today' / 'Bookings today' but the values were totalUsers and
+  // confirmedBookings (all-time). Admin saw inflated 'today' numbers.
+  // Compute real today counts now.
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const usersToday    = users.filter((u)    => u.created_at && new Date(u.created_at) >= todayStart).length;
+  const bookingsToday = bookings.filter((b) => b.created_at && new Date(b.created_at) >= todayStart).length;
+
   // Revenue counts only bookings that actually represent realised value:
   // confirmed (driver accepted, money owed) or completed (trip done). The
   // pre-fix code summed ALL bookings — cancelled ones inflated the total
@@ -111,35 +120,83 @@ function Overview() {
   const safeDate = (d) => d ? new Date(d) : new Date();
 
   const statCards = [
-    { title: "المستخدمين النشطين اليوم", value: totalUsers.toString(), change: "—", up: true, icon: Users, bg: "bg-primary/10", iconColor: "text-primary" },
-    { title: "الحجوزات اليوم", value: confirmedBookings.toString(), change: "—", up: true, icon: CalendarCheck, bg: "bg-accent/10", iconColor: "text-accent" },
-    { title: "إجمالي المستخدمين", value: totalUsers.toString(), change: "—", up: true, icon: Users, bg: "bg-primary/10", iconColor: "text-primary" },
-    { title: "إجمالي الرحلات", value: totalTrips.toString(), change: "—", up: true, icon: Car, bg: "bg-accent/10", iconColor: "text-accent" },
-    { title: "إجمالي الإيرادات", value: `₪${totalRevenue.toLocaleString()}`, change: "—", up: true, icon: DollarSign, bg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
+    // Labels now match values: 'today' cards use today counts, 'total'
+    // cards use all-time counts. Previously both said 'today' but
+    // showed all-time, inflating the dashboard for the admin.
+    { title: "المستخدمون الجدد اليوم", value: usersToday.toString(),    change: "—", up: true, icon: Users,         bg: "bg-primary/10",     iconColor: "text-primary" },
+    { title: "الحجوزات اليوم",         value: bookingsToday.toString(), change: "—", up: true, icon: CalendarCheck, bg: "bg-accent/10",      iconColor: "text-accent" },
+    { title: "إجمالي المستخدمين",      value: totalUsers.toString(),    change: "—", up: true, icon: Users,         bg: "bg-primary/10",     iconColor: "text-primary" },
+    { title: "إجمالي الرحلات",         value: totalTrips.toString(),    change: "—", up: true, icon: Car,           bg: "bg-accent/10",      iconColor: "text-accent" },
+    { title: "إجمالي الإيرادات",       value: `₪${totalRevenue.toLocaleString()}`, change: "—", up: true, icon: DollarSign, bg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
   ];
 
-  // Chart data from recent trips
-  const chartData = trips.slice(0, 7).map((trip, i) => ({
-    name: safeDate(trip.created_at).toLocaleDateString("ar-EG"),
-    value: trip?.price || 0,
-  }));
+  // ── Daily trips chart (last 7 days) ───────────────────────────────
+  // Previously this was `trips.slice(0, 7)` with each row's created_at as
+  // the label — labels promised a daily timeseries but the data was just
+  // 'the 7 most recent trips', which could all be from today or all from
+  // last month. Now buckets trips into the last 7 calendar days so each
+  // bar reflects ACTUAL trip volume for that day, including zero days.
+  const chartData = (() => {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0,0,0,0);
+      d.setDate(d.getDate() - i);
+      const next = new Date(d); next.setDate(next.getDate() + 1);
+      const count = trips.filter((t) => {
+        const tc = t.created_at ? new Date(t.created_at) : null;
+        return tc && tc >= d && tc < next;
+      }).length;
+      days.push({
+        name:  d.toLocaleDateString("ar-EG", { month: "short", day: "numeric" }),
+        value: count,
+      });
+    }
+    return days;
+  })();
 
-  // Pie data from user types
-  const driverCount = users.filter((u) => u.account_type === "driver" || u.account_type === "both").length;
-  const passengerCount = users.filter((u) => u.account_type === "passenger" || u.account_type === "both").length;
-  
+  // ── Pie: account-type breakdown ───────────────────────────────────
+  // Previously `passengerCount` AND `driverCount` both counted users
+  // with account_type='both' — a 'both' user appeared twice in the
+  // pie, inflating each segment. Split into THREE categories so each
+  // user is counted exactly once.
+  const passengerOnlyCount = users.filter((u) => u.account_type === "passenger").length;
+  const driverOnlyCount    = users.filter((u) => u.account_type === "driver").length;
+  const bothCount          = users.filter((u) => u.account_type === "both").length;
   const pieData = [
-    { name: "ركاب", value: passengerCount, color: "hsl(135, 20%, 30%)" },
-    { name: "سائقون", value: driverCount, color: "hsl(90, 35%, 42%)" },
-  ];
+    { name: "ركاب فقط",   value: passengerOnlyCount, color: "hsl(135, 20%, 30%)" },
+    { name: "سائقون فقط", value: driverOnlyCount,    color: "hsl(90, 35%, 42%)" },
+    { name: "كلاهما",     value: bothCount,          color: "hsl(45, 60%, 50%)" },
+  ].filter((slice) => slice.value > 0);
 
-  // Revenue data grouped by week
-  const revenueData = [
-    { name: "الأسبوع 1", value: bookings.slice(0, 25).reduce((sum, b) => sum + (b.total_price || 0), 0) },
-    { name: "الأسبوع 2", value: bookings.slice(25, 50).reduce((sum, b) => sum + (b.total_price || 0), 0) },
-    { name: "الأسبوع 3", value: bookings.slice(50, 75).reduce((sum, b) => sum + (b.total_price || 0), 0) },
-    { name: "الأسبوع 4", value: bookings.slice(75, 100).reduce((sum, b) => sum + (b.total_price || 0), 0) },
-  ];
+  // ── Revenue chart (last 4 calendar weeks, rolling) ────────────────
+  // Previously `bookings.slice(0,25)` / `.slice(25,50)` etc., labeled
+  // "Week 1" through "Week 4" — those were NOT weeks, they were
+  // arbitrary 25-row chunks from a newest-first list. So "Week 1"
+  // really meant "the 25 most recent bookings". Numbers were
+  // unrelated to calendar time. Bucket properly now.
+  const revenueData = (() => {
+    const weeks = [];
+    const now = new Date();
+    now.setHours(0,0,0,0);
+    for (let i = 3; i >= 0; i--) {
+      const end   = new Date(now); end.setDate(now.getDate() - i * 7);
+      const start = new Date(end); start.setDate(end.getDate() - 7);
+      const value = bookings
+        .filter((b) => {
+          if (!b.created_at) return false;
+          if (b.status !== "confirmed" && b.status !== "completed") return false;
+          const bc = new Date(b.created_at);
+          return bc >= start && bc < end;
+        })
+        .reduce((sum, b) => sum + (b.total_price || 0), 0);
+      weeks.push({
+        name:  `أسبوع ${4 - i}`,
+        value,
+      });
+    }
+    return weeks;
+  })();
 
   // Recent trips
   const recentTrips = trips.slice(0, 4).map((trip) => ({

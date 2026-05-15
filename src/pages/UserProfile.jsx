@@ -136,9 +136,16 @@ export default function UserProfile() {
 
   const completedTrips = trips.filter((t) => t.status === "completed").length;
   const upcomingTrips = trips.filter((t) => ["confirmed", "in_progress"].includes(t.status)).length;
+  // Acceptance rate — null when there's no data to compute from. The
+  // previous default of 92 was a fabricated marketing number that
+  // showed up on every brand-new profile with zero bookings, implying
+  // activity that didn't exist. Same anti-pattern as the hardcoded
+  // 'thousands of users trust us' claims we scrubbed elsewhere — App
+  // Store / privacy review flags these. Display sites should hide the
+  // badge when the rate is null.
   const acceptanceRate = bookings.length
     ? Math.round((bookings.filter((b) => b.status !== "cancelled").length / bookings.length) * 100)
-    : 92;
+    : null;
 
   // confirmedWithUser gates the phone-call button below the avatar.
   //
@@ -358,14 +365,20 @@ export default function UserProfile() {
               value={`${fiveStarPct}%`}
               sublabel={`${fiveStarCount} مراجعة`}
             />
-            <StatCard
-              icon={Award}
-              iconColor="text-accent"
-              iconBg="bg-accent/10"
-              label="معدل القبول"
-              value={`${acceptanceRate}%`}
-              sublabel="موثوقية"
-            />
+            {/* Acceptance-rate card only renders when there's real data
+                to compute from. Previously this defaulted to 92% for
+                brand-new profiles with zero bookings, a fabricated
+                marketing number. Hiding the card is honest. */}
+            {acceptanceRate !== null && (
+              <StatCard
+                icon={Award}
+                iconColor="text-accent"
+                iconBg="bg-accent/10"
+                label="معدل القبول"
+                value={`${acceptanceRate}%`}
+                sublabel="موثوقية"
+              />
+            )}
           </div>
 
           {/* Car info (drivers only) — now shows the vehicle photo

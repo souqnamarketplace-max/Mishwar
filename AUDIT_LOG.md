@@ -39,9 +39,9 @@ For each page:
 | 8 | Login.jsx | 866 | ✅ done | 3 real (rate-limit dead code, email format unchecked, rate-limit never reset on success) |
 | 9 | AccountSettings.jsx | 1341 | ✅ done | 6 real incl. 1 CRITICAL (license docs to public bucket, password no current-check, password no compliance, email no format check, avatar no MIME/size, Promise.all not allSettled, prod console.logs) |
 | 10 | BecomeDriver.jsx | 718 | ✅ done | 0 real (clean — uses uploads-private correctly; was the reference impl AccountSettings should have followed) |
-| 11 | UserProfile.jsx | 528 | pending | |
-| 12 | Dashboard.jsx | 512 | pending | |
-| 13 | RequestTrip.jsx | 462 | pending | |
+| 11 | UserProfile.jsx | 536 | ✅ done | 1 real (fake 92% acceptance rate default) |
+| 12 | Dashboard.jsx | 535 | ✅ done | 4 real (today-vs-all-time label lies, fake weekly grouping, fake daily timeseries, 'both' users double-counted in pie) |
+| 13 | RequestTrip.jsx | 477 | ✅ done | 1 real (rules-of-hooks violation on auth gate) |
 | 14 | PassengerVerification.jsx | 411 | pending | |
 | 15 | Notifications.jsx | 391 | pending | |
 | 16 | PassengerRequests.jsx | 382 | pending | |
@@ -210,6 +210,40 @@ One explicitly comment-marked "Once stable, remove this log." Page is now stable
 **No real bugs.** The wizard correctly uses `uploads-private` for all identity docs (the comment at line 169-177 explains exactly why), validates dates server-of-truth (re-checks on submit even if input min was bypassed), uses per-field uploading state for concurrent uploads, and properly hydrates from existing license rows for resume-after-rejection.
 
 This was the reference implementation that AccountSettings's uploadFile should have followed. ✅
+
+### Page 11 — UserProfile.jsx
+
+**🟡 MEDIUM — Fake 92% acceptance rate for users with no data**
+`bookings.length ? real_rate : 92`. Brand-new users with zero bookings displayed "معدل القبول 92%" — fabricated marketing number on every empty profile. App Store review and basic data honesty both rule this out. Same pattern as the false "thousands of users trust us" claims being scrubbed elsewhere.
+**Fix:** default to `null`. Render-site conditional hides the stat card when `null` instead of showing fake data. ✅
+
+**🟡 LOW noted, not fixed (semantic):**
+- `acceptanceRate` is computed from the target's own passenger-bookings cancellation rate, but the label is generic "معدل القبول" — conflates driver acceptance with passenger no-shows. The metric is ambiguous on a profile that could be either role. Worth a product-level decision before reworking. 🟡
+
+### Page 12 — Dashboard.jsx
+
+**🟠 HIGH — Stat cards labeled "today" displayed all-time numbers**
+"المستخدمين النشطين اليوم" (Active users today) showed `totalUsers.toString()` — all users ever. "الحجوزات اليوم" (Bookings today) showed `confirmedBookings.toString()` — all confirmed bookings ever. The labels promised today data; the values were all-time. Admin decisions were being made on inflated numbers.
+**Fix:** computed real `usersToday` / `bookingsToday` from `created_at >= today` filter. Cards labeled "today" now use today counts; cards labeled "إجمالي" use all-time. ✅
+
+**🟠 HIGH — Revenue chart "Week 1/2/3/4" was NOT weeks**
+`bookings.slice(0, 25)` / `.slice(25, 50)` / etc., labeled "الأسبوع 1" through "الأسبوع 4". These were arbitrary 25-row index chunks from a list ordered by `-created_date`. So "Week 1" = "the 25 newest bookings". Numbers had no relation to actual weeks. Admin analytics built on this would draw false conclusions.
+**Fix:** group by actual calendar week using `created_at` date arithmetic. Each bucket sums revenue from bookings created in a rolling 7-day window. Confirmed/completed status filter applied so cancelled bookings don't inflate revenue. ✅
+
+**🟠 HIGH — Daily trips chart labels lied about being a daily timeseries**
+`trips.slice(0, 7).map(t => ({ name: t.created_at, value: t.price }))`. Labels were the creation dates of the 7 most recent trips — could all be from today, or all spread across the past month. Bars represented prices of individual trips, not daily totals. Confusing chart.
+**Fix:** bucket by calendar day for the last 7 days; bar value = count of trips created on that day (zero days included). Labels are now real dates, values are real daily volumes. ✅
+
+**🟡 MEDIUM — Users of type "both" double-counted in pie chart**
+`passengerCount = users.filter(u => u.account_type === "passenger" || u.account_type === "both")` AND `driverCount = users.filter(u => u.account_type === "driver" || u.account_type === "both")`. A user of type "both" was counted in BOTH segments. If you had 100 users all "both", the pie showed 200 slices. Visual misrepresentation of platform composition.
+**Fix:** split into three exclusive categories — passenger-only, driver-only, both. Each user counted exactly once. Pie filter drops zero-count slices so the chart isn't cluttered when one category is empty. ✅
+
+### Page 13 — RequestTrip.jsx
+
+**🟠 HIGH — Rules-of-hooks violation on auth gate**
+Lines 121-124 (old): `if (!isAuthenticated) { navigate(...); return null; }`. This early-return ran AFTER two `useQuery`s and BEFORE `useMutation` + `useMemo`. Hook count was 3 on un-authed renders, 5 on authed renders. React's rules-of-hooks require invariant hook order across renders. Worse, the file comment further down (lines 126-128 in the original) explicitly warned about this for the verification gate but did the same anti-pattern for the auth gate immediately above.
+**Why no production crash?** On the very first render `isLoadingAuth=true` so the early-return didn't fire — all hooks ran. The bug only triggered when auth state resolved to `unauthenticated` on a later render, reducing the hook count. React's prod build is more lenient but dev mode throws.
+**Fix:** moved auth check into a `useEffect` that runs as a side-effect after all hooks have been called. Page returns a loading splash for the brief window between effect-fire and route change. Hook count is now invariant across renders. ✅
 
 
 

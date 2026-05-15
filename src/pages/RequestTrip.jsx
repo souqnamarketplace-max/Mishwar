@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -117,16 +117,13 @@ export default function RequestTrip() {
     staleTime: 30_000,
   });
 
-  // Auth gate
-  if (!isLoadingAuth && !isAuthenticated) {
-    navigate("/login?returnTo=/request-trip", { replace: true });
-    return null;
-  }
-
-  // ID verification gate is enforced AFTER all hooks (below) — placing
-  // it here would change hook count between renders and crash React
-  // (rules-of-hooks). The gate JSX is rendered just before the form's
-  // own return statement.
+  // NOTE: Auth gate is enforced AFTER all hooks below via the
+  // useEffect at the end of this hook list. Doing it inline here as
+  // `if (!isAuthenticated) { navigate(...); return null; }` (where it
+  // used to live) violates rules-of-hooks because useMutation and
+  // useMemo below would be skipped on un-authed renders, changing the
+  // hook count between renders. Same reasoning the comment further
+  // down explains for the verification gate.
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -197,6 +194,25 @@ export default function RequestTrip() {
 
   const canSubmit = issues.length === 0 && !submit.isPending && activeCount < 3;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Auth gate — redirect runs as a side-effect (effect, not render)
+  // so the navigate call doesn't fight with the render tree. The
+  // un-authed render returns a loading splash for the brief window
+  // between the effect firing and the route change. Hook count stays
+  // invariant across renders this way.
+  useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated) {
+      navigate("/login?returnTo=/request-trip", { replace: true });
+    }
+  }, [isLoadingAuth, isAuthenticated, navigate]);
+
+  if (!isLoadingAuth && !isAuthenticated) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   // ─── ID verification gate (rendered AFTER all hooks to keep hook
   // order stable across renders — earlier placement violated rules-
