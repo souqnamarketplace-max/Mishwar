@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard } from "lucide-react";
@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/apiClient";
 import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
+import { toast } from "sonner";
 import NotificationBell from "../notifications/NotificationBell";
 
 const LOGO_URL = "/logo.png";
@@ -29,6 +30,7 @@ const getNavLinks = (user) => {
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
   const location = useLocation();
 
   const { data: user } = useQuery({
@@ -40,6 +42,42 @@ export default function Navbar() {
   // hook's internal Supabase realtime subscription — no manual
   // refresh needed when a new message arrives.
   const unreadMessages = useUnreadMessageCount(user?.email);
+
+  // Close the profile dropdown on outside click. Previously the
+  // dropdown only closed via tapping a menu item or the trigger
+  // button — tapping anywhere else on the page left it open,
+  // sometimes blocking other UI surfaces (especially on mobile
+  // where the dropdown overlaps page content). Same pattern as
+  // AdminNotificationBell uses.
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handler = (e) => {
+      if (profileRef.current && profileRef.current.contains(e.target)) return;
+      setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [profileOpen]);
+
+  // Shared logout handler — awaits the promise so failures surface
+  // as toasts. Previously both logout buttons (lines ~238 + ~320)
+  // did `api.auth.logout(); setX(false)` fire-and-forget. If the
+  // request failed (network blip, expired refresh token, etc.),
+  // the menu closed but the user stayed signed in with no feedback.
+  // Now: explicit error toast on failure. Success path doesn't
+  // toast — AuthContext picks up SIGNED_OUT and routes the user
+  // appropriately.
+  const handleLogout = async () => {
+    try {
+      await api.auth.logout();
+    } catch {
+      toast.error("فشل تسجيل الخروج. حاول مجدداً.");
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-card/95 backdrop-blur-md border-b border-border">
@@ -141,7 +179,7 @@ export default function Navbar() {
             <NotificationBell userEmail={user?.email} />
             
             {/* Profile Menu */}
-            <div className="relative hidden lg:block">
+            <div ref={profileRef} className="relative hidden lg:block">
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
                 className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
@@ -235,7 +273,7 @@ export default function Navbar() {
                     </Link>
                   )}
                   <button
-                    onClick={() => { api.auth.logout(); setProfileOpen(false); }}
+                    onClick={() => { setProfileOpen(false); handleLogout(); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
@@ -317,7 +355,7 @@ export default function Navbar() {
                 </Link>
               )}
               <button
-                onClick={() => { api.auth.logout(); setMobileOpen(false); }}
+                onClick={() => { setMobileOpen(false); handleLogout(); }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" />

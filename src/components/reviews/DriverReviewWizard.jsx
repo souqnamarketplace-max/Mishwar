@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
+import { notifyUser } from "@/lib/notifyUser";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";

@@ -158,6 +158,24 @@ export default function AdminNotificationBell({ userEmail }) {
         .in("id", unread.map(n => n.id));
       if (error) throw error;
     },
+    // Optimistic flip — without this the user clicked "mark all read"
+    // and waited for the network round-trip + invalidate before the
+    // badge cleared. Stamps every visible row as is_read=true now;
+    // rollback restores the snapshot on error.
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["admin-bell-notifications", userEmail] });
+      const prev = qc.getQueryData(["admin-bell-notifications", userEmail]);
+      qc.setQueryData(["admin-bell-notifications", userEmail], (old) =>
+        Array.isArray(old) ? old.map(n => ({ ...n, is_read: true })) : old
+      );
+      return { prev };
+    },
+    onError: (_e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["admin-bell-notifications", userEmail], ctx.prev);
+      // No toast — admin notification bell is a passive surface and a
+      // failure to mark-all-read isn't actionable; rolling back the
+      // visual is feedback enough.
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-bell-notifications", userEmail] }),
   });
 

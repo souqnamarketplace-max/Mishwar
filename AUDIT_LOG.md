@@ -353,10 +353,10 @@ After the 20-page audit completed, extending the same methodology to
 | 6 | HeroSection.jsx | 362 | ✅ done | 0 real (defensive code handles edge cases correctly) |
 | 7 | DriverPassengers.jsx | 359 | ✅ done | 2 real (optimistic on wrong queryKey x2, no optimistic on markPaid) |
 | 8 | UserActionsMenu.jsx | 357 | ✅ done | 1 CRITICAL (rules-of-hooks violation — hook count varied 8 vs 10 between renders) |
-| 9 | RouteMap.jsx | 353 | pending | |
-| 10 | DriverReviewWizard.jsx | 336 | pending | |
-| 11 | Navbar.jsx | 331 | pending | |
-| 12 | AdminNotificationBell.jsx | 317 | pending | |
+| 9 | RouteMap.jsx | 353 | ✅ done | 1 real (duplicate maxZoom key — same defect as MapCityPicker) |
+| 10 | DriverReviewWizard.jsx | 336 | ✅ done | 1 real (notifyUser imported nowhere — runtime crash when driver wrote any public_review/private_message) |
+| 11 | Navbar.jsx | 331 | ✅ done | 2 real (no click-outside on profile dropdown, fire-and-forget logout x2) |
+| 12 | AdminNotificationBell.jsx | 317 | ✅ done | 1 real (markAllRead no optimistic + no onError) |
 | 13 | NotificationBell.jsx | 310 | pending | |
 | 14 | UserHistorySection.jsx | 297 | pending | |
 | 15 | FeaturedTrips.jsx | 280 | pending | |
@@ -477,4 +477,50 @@ Hook count: 8 if guards pass, 10 if guards fail. The guards' conditions depend o
 
 The fact that this hasn't been crashing production constantly suggests most usages don't hit the transition. But on every logout, every "view profile" → "back to my profile" navigation, this risks `Rendered fewer hooks than expected`. Audit phase 1 already fixed this pattern in 4 page-level pieces; here it's in a component used everywhere.
 **Fix:** moved all early-return guards AFTER both useMutation calls. Render-time guards live immediately before the JSX `return`. Hook count is now invariant — always 10. ✅
+
+
+## Component Batch 3 — Findings
+
+### Component 9 — RouteMap.jsx (353 LOC)
+
+**🟡 LOW — Duplicate `maxZoom` key in tile-layer options**
+Third occurrence of this exact pattern (MapCityPicker had it too). `{ subdomains, maxZoom: 20, attribution, maxZoom: 19 }` — JS uses the second value (19); the first is dead. Cosmetic / source-clarity issue.
+**Fix:** removed the dead first key. ✅
+
+**False alarm investigated:**
+- The `useEffect` dependency array uses `JSON.stringify(stops)` to detect changes. Since `stops` defaults to `[]` (a fresh array each render), this stringifies every render — but `JSON.stringify([]) === JSON.stringify([])` so the effect doesn't re-fire spuriously. Mild performance overhead, not a bug.
+- `onRouteCalculated` is referenced inside the effect but not in the deps array. Standard stale-closure risk if a caller passes a closure capturing fresh state, but most callers pass static handlers. Note, didn't fix.
+
+### Component 10 — DriverReviewWizard.jsx (336 LOC)
+
+**🟠 HIGH — `notifyUser` referenced but never imported — runtime crash on any review with text**
+Two call sites:
+- Line 77 — notify passenger of new public review
+- Line 94 — deliver driver's private message as a notification
+
+Neither was inside the import block. Both bombed with `ReferenceError: notifyUser is not defined` at runtime — but because each was guarded by `if (p.public_review)` / `if (p.private_message)`, **drivers who left both fields empty got success, drivers who wrote anything got a hard crash**.
+
+The whole submit ran inside `Promise.all(data.map(async (p) => { ... }))` — one rejection failed the entire batch. So a driver rating 3 passengers, leaving text for only the first, would see the review for ALL three fail.
+
+Cross-checked: PassengerReviewWizard (the sibling) imports notifyUser correctly. This component was the only one with the missing import. Also ran an audit-wide check (`grep -L "import.*notifyUser" $(grep -l notifyUser src/...)`) — no other components have this defect.
+**Fix:** added the missing `import { notifyUser } from "@/lib/notifyUser";` at the top. ✅
+
+### Component 11 — Navbar.jsx (331 LOC)
+
+**🟡 MEDIUM — No click-outside handler on profile dropdown**
+`setProfileOpen(true)` opened the dropdown but the only ways to close it were: tap the trigger again, tap a menu item, or navigate away. Tapping anywhere else on the page left it open, blocking other interactive surfaces below (especially on mobile where the dropdown often overlaps page content).
+**Fix:** added `profileRef = useRef(null)` on the dropdown wrapper + a useEffect that listens for outside `mousedown` / `touchstart` and closes the dropdown. Same pattern AdminNotificationBell already uses. ✅
+
+**🟡 MEDIUM — Fire-and-forget logout, twice**
+Lines 238 (desktop) and 320 (mobile) both did `api.auth.logout(); setX(false)` — promise discarded. If logout failed (network, expired refresh token), the menu closed but the user stayed signed in with no toast. Same defect we fixed in MobileLayout in component batch 1.
+**Fix:** extracted a shared `handleLogout` that awaits the promise and toasts on error. Both buttons call it. Success path doesn't toast — AuthContext picks up SIGNED_OUT and routes. ✅
+
+### Component 12 — AdminNotificationBell.jsx (317 LOC)
+
+**🟡 MEDIUM — `markAllRead` had no optimistic update and no `onError`**
+The single-notification `markRead` mutation does both (optimistic flip + rollback on error). The bulk `markAllRead` did neither — admin clicked, waited ~200ms for network + invalidate, badge cleared. If the bulk update failed (RLS, network), no toast, no rollback (nothing to roll back), badge silently stayed.
+**Fix:** added optimistic flip stamping every visible notification to `is_read: true` immediately; rollback restores the snapshot on error. No toast on error (admin bell is a passive surface; visual rollback is feedback enough). ✅
+
+**False alarm investigated:**
+- `getAdminNotifTarget(notif)` routes by emoji prefix in the title, ignoring `notif.link`. Consumer NotificationBell follows `notif.link` when present. Slight inconsistency, but since admin notifications are always generated by `notifyAdmin` (which sets specific titles), this works in practice. Note, didn't fix.
 

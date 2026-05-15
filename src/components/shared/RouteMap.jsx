@@ -134,9 +134,16 @@ export default function RouteMap({
 
         mapInstanceRef.current = map;
 
-        // OpenStreetMap tile layer
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {subdomains: "abcd", maxZoom: 20, maxZoom: 19,
-          attribution: '© OpenStreetMap contributors',}).addTo(map);
+        // OpenStreetMap tile layer.
+        // Was previously declared with duplicate maxZoom keys (20 then
+        // 19); JS uses the second, the first was dead. Same defect
+        // fixed in MapCityPicker. Keep the value that was actually
+        // being applied.
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          subdomains: "abcd",
+          maxZoom: 19,
+          attribution: '© OpenStreetMap contributors',
+        }).addTo(map);
         // ── Arabic city label overlay ─────────────────────────────────
         const labelsLayer = L.layerGroup();
         const renderArabicLabels = () => {
