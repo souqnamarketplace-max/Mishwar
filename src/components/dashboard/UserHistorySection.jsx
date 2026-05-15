@@ -125,7 +125,14 @@ export default function UserHistorySection({ user }) {
           sub={bookingsCount > 0
             ? `معدل الإلغاء: ${cancelRate.toFixed(0)}%`
             : "لم يحجز بعد"}
-          subTone={cancelRate >= 30 ? "warn" : cancelRate >= 50 ? "danger" : "neutral"}
+          // Severity tone: check the HIGHER threshold first so the
+          // danger branch is reachable. The previous ordering put
+          // >= 30 first and >= 50 second — left-to-right ternary
+          // evaluation meant cancelRates of 50-100% all matched
+          // the >= 30 branch and showed as 'warn' (yellow) instead
+          // of 'danger' (red). The admin's at-a-glance triage
+          // signal for chronic cancellers was effectively broken.
+          subTone={cancelRate >= 50 ? "danger" : cancelRate >= 30 ? "warn" : "neutral"}
         />
         <Stat
           icon={AlertTriangle}

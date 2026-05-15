@@ -38,6 +38,8 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    // ── Phase 1: AUTHORITATIVE — the review row. If this fails, the
+    //    user's action failed; show error and let them retry.
     try {
       await api.entities.Review.create({
         trip_id: trip.id,
@@ -53,52 +55,65 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
         private_message: privateMsg,
         is_anonymous: false,
       });
+    } catch (err) {
+      toast.error(friendlyError(err, "تعذر إرسال التقييم"));
+      setSubmitting(false);
+      return;
+    }
 
-      // Notify driver
-      if (publicReview) {
-        await notifyUser({
+    // ── Phase 2: BEST-EFFORT side-effects. Review is saved; do not
+    //    let any of these failures surface 'تعذر إرسال التقييم' to
+    //    the user, or they'll retry and create a duplicate review.
+    //    Each call has its own .catch so one failure doesn't cascade.
+    //    Previously these were awaited inside the same try block as
+    //    Review.create — a flaky notifyUser would falsely report the
+    //    whole submission failed, leading to duplicate reviews + double
+    //    driver notifications when the user retried.
+    const sideEffects = [];
+    if (publicReview) {
+      sideEffects.push(
+        notifyUser({
           user_email: driverEmail,
           title: `تقييم جديد من ${passengerUser?.full_name || "راكب"} ⭐`,
           message: `حصلت على ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${publicReview ? `: "${publicReview}"` : ""}`,
           type: "system",
           trip_id: trip.id,
           // Driver's ratings tab — note the id is 'my-ratings', not
-          // 'ratings' as the legacy routing fallback had it. The
-          // routing-lib fix landed in the same audit commit; this
-          // explicit link guarantees the right destination even if
-          // routing.js gets edited.
+          // 'ratings' as the legacy routing fallback had it.
           link: "/driver?tab=my-ratings",
-        });
-      }
-      if (privateMsg) {
-        await notifyUser({
+        }).catch(() => { /* non-fatal */ })
+      );
+    }
+    if (privateMsg) {
+      sideEffects.push(
+        notifyUser({
           user_email: driverEmail,
           title: "رسالة خاصة من راكب 📩",
           message: privateMsg,
           type: "system",
           trip_id: trip.id,
-          // Same rationale as the driver→passenger private message:
-          // the body carries the full text; /notifications is where
-          // the user can scroll back and re-read it.
           link: "/notifications",
-        });
-      }
-      // Low-rating signal to admin — gives admin a quality signal to
-      // investigate problem drivers without having to mine the reviews
-      // table manually. Threshold 1-2 stars only; 3+ stars is normal
-      // variance not worth interrupting.
-      if (rating <= 2) {
-        await notifyAdmin({
+        }).catch(() => { /* non-fatal */ })
+      );
+    }
+    // Low-rating signal to admin — gives admin a quality signal to
+    // investigate problem drivers without having to mine the reviews
+    // table manually. Threshold 1-2 stars only; 3+ stars is normal
+    // variance not worth interrupting.
+    if (rating <= 2) {
+      sideEffects.push(
+        notifyAdmin({
           title: `⚠️ تقييم منخفض (${rating}/5) للسائق`,
           message: `${passengerUser?.full_name || "راكب"} قيّم السائق بـ ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${publicReview ? ` — "${publicReview.slice(0, 100)}"` : ""}`,
           trip_id: trip.id,
           link: "/dashboard?tab=reviews",
-        });
-      }
-      // Audit log — passenger reviews were unaudited. Captures
-      // rating, driver_email, trip_id so admin can answer 'how
-      // many 1-star reviews did driver X get this month' from the
-      // activity feed alone.
+        }).catch(() => { /* non-fatal */ })
+      );
+    }
+    // Audit log — wrap defensively. logAudit is documented as
+    // non-throwing but a network blip mid-flight could still
+    // bubble up if anyone ever changes its contract.
+    try {
       logAudit("passenger_review_submitted", "review", trip.id, {
         passenger_email: passengerUser?.email,
         driver_email:    driverEmail,
@@ -108,12 +123,16 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
         has_private_msg: !!privateMsg,
         low_rating:      rating <= 2,
       });
-      setStep(5);
-    } catch (err) {
-      toast.error(friendlyError(err, "تعذر إرسال التقييم"));
-    } finally {
-      setSubmitting(false);
-    }
+    } catch { /* non-fatal */ }
+
+    // Don't block the success transition on the side-effects — the
+    // user's review is already saved. Fire-and-forget the batch
+    // (Promise.allSettled already swallows individual rejections
+    // because every promise has its own .catch above).
+    Promise.allSettled(sideEffects);
+
+    setStep(5);
+    setSubmitting(false);
   };
 
   return createPortal(

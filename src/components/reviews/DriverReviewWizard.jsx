@@ -48,15 +48,31 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
 
   const handleSubmit = async () => {
     setSubmitting(true);
-    try {
-      await Promise.all(data.map(async (p) => {
-        // 1. Mark no_show on booking
-        await supabase.from("bookings")
+    // ── Phase 1: AUTHORITATIVE — booking.no_show flag + review row
+    //    per passenger. allSettled so a single passenger failing
+    //    doesn't block the others. Collect per-passenger results
+    //    so we can give the driver an accurate toast if some
+    //    rows failed.
+    //
+    //    Previously this whole block was a single Promise.all
+    //    wrapping booking-update + review-create + 2 awaited
+    //    notifyUser calls. ANY notifyUser rejection (RLS edge
+    //    case, network blip on the notifications path) failed the
+    //    whole batch — driver saw 'تعذر إرسال التقييم' and
+    //    retried, creating DUPLICATE reviews for every passenger
+    //    whose rows were already saved before the failing one.
+    const writeResults = await Promise.allSettled(
+      data.map(async (p) => {
+        // 1a. Mark no_show on booking (authoritative for both
+        //     showed-up and didn't-show paths)
+        const { error: bErr } = await supabase
+          .from("bookings")
           .update({ no_show: !p.showed_up })
           .eq("trip_id", trip.id)
           .eq("passenger_email", p.email);
+        if (bErr) throw bErr;
 
-        // 2. Create review record
+        // 1b. Create review record (only if they showed up)
         if (p.showed_up) {
           await api.entities.Review.create({
             trip_id: trip.id,
@@ -72,48 +88,59 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
             private_message: p.private_message,
             is_anonymous: true,
           });
+        }
+        return p;
+      })
+    );
 
-          // 3. Notify passenger of public review
-          if (p.public_review) {
-            await notifyUser({
+    const succeeded = writeResults
+      .map((r, i) => (r.status === "fulfilled" ? data[i] : null))
+      .filter(Boolean);
+    const failedCount = writeResults.length - succeeded.length;
+
+    if (succeeded.length === 0) {
+      // Nothing got saved — first failure surfaces as the toast.
+      const firstReason = writeResults.find(r => r.status === "rejected")?.reason;
+      toast.error(friendlyError(firstReason, "تعذر إرسال التقييم"));
+      setSubmitting(false);
+      return;
+    }
+
+    // ── Phase 2: BEST-EFFORT side-effects. Notifications + audit
+    //    for every passenger whose DB write succeeded. Each call
+    //    has its own .catch — one failure doesn't block any other.
+    //    The success transition does NOT depend on these — driver
+    //    sees step=5 even if every notification fails.
+    const sideEffects = [];
+    for (const p of succeeded) {
+      if (p.showed_up) {
+        if (p.public_review) {
+          sideEffects.push(
+            notifyUser({
               user_email: p.email,
               title: "تقييم جديد على ملفك ⭐",
               message: `كتب السائق تقييماً عن رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
               type: "system",
               trip_id: trip.id,
-              // Lands the passenger on their completed trips where
-              // the new review attaches to the trip card. Routing-lib
-              // would have caught this via the 'تقييم' title fallback
-              // → /driver?tab=my-ratings, but that's the DRIVER's
-              // ratings tab, wrong recipient. Explicit link removes
-              // the ambiguity.
               link: "/my-trips?tab=completed",
-            });
-          }
-          // 4. Private message as notification
-          if (p.private_message) {
-            await notifyUser({
+            }).catch(() => { /* non-fatal */ })
+          );
+        }
+        if (p.private_message) {
+          sideEffects.push(
+            notifyUser({
               user_email: p.email,
               title: "رسالة خاصة من السائق 📩",
               message: p.private_message,
               type: "system",
               trip_id: trip.id,
-              // Private message has the full text in the body — taking
-              // the user to /notifications lets them scroll back and
-              // re-read it, mark it read manually, etc. (Trip details
-              // page doesn't surface the private message anywhere.)
               link: "/notifications",
-            });
-          }
+            }).catch(() => { /* non-fatal */ })
+          );
         }
-
-        // Audit log — one row per passenger rated (whether they
-        // showed up or not). Captures rating + no_show flag for two
-        // reasons: (1) admins reviewing complaints ('driver claimed
-        // I didn't show up but I did') have a server-stamped record
-        // to compare against the passenger's claim; (2) aggregate
-        // rating stats per driver can be derived from the audit log
-        // alone, no need to scan the reviews table.
+      }
+      // Audit log — one row per passenger rated, showed-up or not.
+      try {
         logAudit("driver_review_submitted", "review", trip.id, {
           driver_email:    driverUser?.email,
           passenger_email: p.email,
@@ -123,13 +150,16 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
           has_public_text: !!p.public_review,
           has_private_msg: !!p.private_message,
         });
-      }));
-      setStep(5);
-    } catch (e) {
-      toast.error(friendlyError(e, "تعذر إرسال التقييم"));
-    } finally {
-      setSubmitting(false);
+      } catch { /* non-fatal */ }
     }
+    // Don't block the success transition on the side-effects.
+    Promise.allSettled(sideEffects);
+
+    if (failedCount > 0) {
+      toast.warning(`تم حفظ ${succeeded.length} من ${data.length} تقييمات. حاول مجدداً لاحقاً للباقي.`);
+    }
+    setStep(5);
+    setSubmitting(false);
   };
 
   const TOTAL = 4;
