@@ -3,7 +3,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { getNotifTarget } from "@/lib/notificationRouting";
 import { useNotificationActions } from "@/lib/useNotificationActions";
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft, ToggleRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,13 +43,13 @@ export default function Notifications() {
   // Fetch user
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   // Preferences
   const { data: preferences = [] } = useQuery({
     queryKey: ["preferences"],
-    queryFn: () => base44.entities.TripPreference.list("-created_date", 50),
+    queryFn: () => api.entities.TripPreference.list("-created_date", 50),
   });
 
   // Notifications
@@ -57,7 +57,7 @@ export default function Notifications() {
     queryKey: ["notifications", user?.email],
     queryFn: () =>
       user?.email
-        ? base44.entities.Notification.filter({ user_email: user.email }, "-created_date", 30)
+        ? api.entities.Notification.filter({ user_email: user.email }, "-created_date", 30)
         : [],
     enabled: !!user?.email,
   });
@@ -65,17 +65,17 @@ export default function Notifications() {
   // Real-time subscription for notifications & preferences
   useEffect(() => {
     if (!user?.email) return;
-    const unsubNotif = base44.entities.Notification.subscribe((event) => {
+    const unsubNotif = api.entities.Notification.subscribe((event) => {
       qc.invalidateQueries({ queryKey: ["notifications", user.email] });
     });
-    const unsubPref = base44.entities.TripPreference.subscribe((event) => {
+    const unsubPref = api.entities.TripPreference.subscribe((event) => {
       qc.invalidateQueries({ queryKey: ["preferences"] });
     });
     return () => { unsubNotif(); unsubPref(); };
   }, [user?.email, qc]);
 
   const createPref = useMutation({
-    mutationFn: (data) => base44.entities.TripPreference.create({
+    mutationFn: (data) => api.entities.TripPreference.create({
       ...data,
       user_email: user?.email,
       user_name: user?.full_name,
@@ -90,12 +90,12 @@ export default function Notifications() {
   });
 
   const togglePref = useMutation({
-    mutationFn: ({ id, is_active }) => base44.entities.TripPreference.update(id, { is_active }),
+    mutationFn: ({ id, is_active }) => api.entities.TripPreference.update(id, { is_active }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["preferences"] }),
   });
 
   const deletePref = useMutation({
-    mutationFn: (id) => base44.entities.TripPreference.delete(id),
+    mutationFn: (id) => api.entities.TripPreference.delete(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["preferences"] }); toast.success("تم حذف التفضيل"); },
   });
 

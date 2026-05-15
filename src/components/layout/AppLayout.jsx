@@ -1,7 +1,7 @@
 import React from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { AnimatePresence } from "framer-motion";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
@@ -24,7 +24,7 @@ export default function AppLayout() {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   if (isMobile) {

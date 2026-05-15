@@ -1,8 +1,8 @@
 /**
  * Append a row to the admin_audit_log table.
  *
- * Why this lives outside base44Client:
- *   - The base44 entity client auto-injects `created_by`, which doesn't exist
+ * Why this lives outside apiClient:
+ *   - The api entity client auto-injects `created_by`, which doesn't exist
  *     on admin_audit_log and would cause every insert to fail.
  *   - We need finely-tuned auth handling — must use the USER's JWT so that
  *     RLS policies (`audit_insert_admin` for admins, `audit_insert_self`

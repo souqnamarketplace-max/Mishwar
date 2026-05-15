@@ -15,7 +15,7 @@
  */
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Flag, Clock, CheckCircle2, ShieldCheck, XCircle } from "lucide-react";
 import { REPORT_CATEGORIES } from "@/lib/blockUtils";
 
@@ -32,7 +32,7 @@ export default function MyReportsSection({ user }) {
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["my-reports", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.UserReport.filter({ reporter_email: user.email }, "-created_at", 100)
+      ? api.entities.UserReport.filter({ reporter_email: user.email }, "-created_at", 100)
       : [],
     enabled: !!user?.email,
   });

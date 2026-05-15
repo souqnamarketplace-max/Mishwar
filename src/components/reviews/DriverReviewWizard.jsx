@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X, UserCheck, UserX } from "lucide-react";
@@ -56,7 +56,7 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
 
         // 2. Create review record
         if (p.showed_up) {
-          await base44.entities.Review.create({
+          await api.entities.Review.create({
             trip_id: trip.id,
             reviewer_name: driverUser?.full_name || "سائق",
             reviewer_email: driverUser?.email,

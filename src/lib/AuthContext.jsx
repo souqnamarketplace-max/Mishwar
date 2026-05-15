@@ -4,7 +4,7 @@ import { captureException, setSentryUser, clearSentryUser } from "@/lib/sentry";
 import { supabase } from '@/lib/supabase';
 import { queryClientInstance } from '@/lib/query-client';
 import { invalidateBlockCache } from "@/lib/blockUtils";
-import { base44 } from '@/api/base44Client';
+import { api } from '@/api/apiClient';
 import { readLocalSession, readSessionToken } from "@/lib/session";
 
 // Historical alias — the context referenced the function under this name.
@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }) => {
         // loadUserProfile — without this, components consuming the
         // ["me"] query directly via useQuery (AppLayout → MobileLayout,
         // Navbar) retain the stale user object after SIGNED_OUT events
-        // that don't go through base44.auth.logout()'s hard reload:
+        // that don't go through api.auth.logout()'s hard reload:
         //   - server-side session expiry / refresh token revoked
         //   - another tab signing out
         //   - any programmatic supabase.auth.signOut() that skips the

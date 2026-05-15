@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { useSEO } from "@/hooks/useSEO";
 import { supabase } from "@/lib/supabase";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { CITY_COORDS } from "@/lib/mapUtils";
 import { useBlockedEmails } from "@/lib/blockUtils";
 import { ArrowLeft, Filter, Search, Sparkles, Wallet, MapPin } from "lucide-react";
@@ -98,7 +98,7 @@ export default function PassengerRequests() {
   // ─── Fetch requests ───────────────────────────────────────────
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["passenger-requests-feed"],
-    queryFn: () => base44.entities.TripRequest.filter(
+    queryFn: () => api.entities.TripRequest.filter(
       { status: "open" }, "-created_at", 200
     ),
     enabled: !!user?.email && subActive === true,

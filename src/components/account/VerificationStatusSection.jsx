@@ -1,7 +1,7 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useAuth } from "@/lib/AuthContext";
 import { checkDriverEligibility, daysUntil } from "@/lib/driverEligibility";
 import { ShieldCheck, Clock, AlertTriangle, XCircle, Upload } from "lucide-react";
@@ -14,7 +14,7 @@ export default function VerificationStatusSection() {
     queryKey: ["driver-licenses-all", user?.email],
     queryFn: () =>
       user?.email
-        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
+        ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
         : [],
     enabled: !!user?.email,
   });

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { CreditCard, MapPin, Calendar } from "lucide-react";
 
@@ -13,7 +13,7 @@ export default function PassengerPaymentsSection({ user }) {
   const { data: bookings = [], isLoading } = useQuery({
     queryKey: ["passenger-payments", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 100)
+      ? api.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 100)
       : [],
     enabled: !!user?.email,
   });

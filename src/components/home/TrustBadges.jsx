@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Shield, Users, RotateCcw, Headphones, Star, ChevronLeft, ChevronRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 const badges = [
   { emoji: "🛡️", title: "سائقون موثوقون", desc: "نتحقق من الهوية والرخصة والتأمين قبل انضمام أي سائق", color: "bg-primary/8 border-primary/20" },
@@ -23,7 +23,7 @@ export default function TrustBadges() {
 
   const { data: rawTestimonials = [] } = useQuery({
     queryKey: ["testimonials-published"],
-    queryFn: () => base44.entities.Testimonial.filter({ is_published: true }, "sort_order", 20),
+    queryFn: () => api.entities.Testimonial.filter({ is_published: true }, "sort_order", 20),
     staleTime: 5 * 60 * 1000,
   });
 

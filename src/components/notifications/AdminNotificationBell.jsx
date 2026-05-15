@@ -4,7 +4,7 @@
  * Why a separate component from NotificationBell:
  *
  * NotificationBell (used in Navbar/MobileLayout for consumer users) calls
- * `base44.entities.Notification.subscribe(...)` which sets up a Supabase
+ * `api.entities.Notification.subscribe(...)` which sets up a Supabase
  * realtime channel with a NON-user-scoped name (`notifications-realtime`).
  * When the consumer NotificationBell and the dashboard's admin bell both
  * mount at the same time (both AppLayout chrome AND the dashboard top bar
@@ -92,7 +92,7 @@ export default function AdminNotificationBell({ userEmail }) {
 
   // Realtime channel — DEDICATED name, separate from anything the consumer
   // bell uses, so the two don't collide on shared channel state. We also
-  // do NOT call base44.entities.Notification.subscribe (which uses the
+  // do NOT call api.entities.Notification.subscribe (which uses the
   // global non-scoped `notifications-realtime` channel that races with
   // the consumer bell when both are mounted).
   useEffect(() => {

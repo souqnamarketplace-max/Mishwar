@@ -2,7 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import React from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { CheckCircle, MapPin, Calendar, Clock, Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export default function BookingConfirmation() {
   const [searchParams] = useSearchParams();
   const tripId = searchParams.get("trip");
 
-  const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => base44.auth.me() });
+  const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => api.auth.me() });
 
   const { data: bookings = [] } = useQuery({
     queryKey: ["booking-confirm", tripId, user?.email],
@@ -32,7 +32,7 @@ export default function BookingConfirmation() {
       // an old notification link) would see Trip A's booking ref
       // number and seat count rendered against Trip B's route.
       // Filter to {trip_id, passenger_email} for an exact match.
-      ? base44.entities.Booking.filter({ trip_id: tripId, passenger_email: user.email }, "-created_date", 1)
+      ? api.entities.Booking.filter({ trip_id: tripId, passenger_email: user.email }, "-created_date", 1)
       : [],
     enabled: !!user?.email && !!tripId,
   });
@@ -56,7 +56,7 @@ export default function BookingConfirmation() {
     // the existing \"جاري تحميل تفاصيل الحجز...\" empty state, which
     // is the correct behaviour: better to show \"loading\" than the
     // wrong trip.
-    queryFn: () => tripId ? base44.entities.Trip.get(tripId) : null,
+    queryFn: () => tripId ? api.entities.Trip.get(tripId) : null,
     enabled: !!tripId,
   });
 

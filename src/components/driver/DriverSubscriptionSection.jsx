@@ -26,7 +26,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,7 +58,7 @@ export default function DriverSubscriptionSection({ user }) {
   // ── 1) Read app_settings (price + platform rails) ────────────────────────
   const { data: settingsArr = [] } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => api.entities.AppSettings.list(),
     staleTime: 60_000,
   });
   const settings = settingsArr[0] || {};

@@ -258,7 +258,7 @@ BEGIN
 END $$;
 
 -- ─── (3) RLS policy on public.trips (driver-side write gate) ──────────
--- Trip creation (CreateTrip.jsx) goes through base44.entities.Trip.create
+-- Trip creation (CreateTrip.jsx) goes through api.entities.Trip.create
 -- which is a direct PostgREST insert, NOT an RPC. RLS is the only place
 -- to enforce the onboarding check for this path. The existing INSERT
 -- policy (from supabase-production.sql + later migrations) checks

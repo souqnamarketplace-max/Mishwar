@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useCallback } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { Heart, Search, Bell, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -14,12 +14,12 @@ export default function Favorites() {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   const { data: trips = [], isLoading } = useQuery({
     queryKey: ["trips-all"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 200),
+    queryFn: () => api.entities.Trip.list("-created_date", 200),
   });
 
   // Read/write favorites from localStorage

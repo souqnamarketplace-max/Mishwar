@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Wallet, Building2, Smartphone, CreditCard, AlertCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 
@@ -22,7 +22,7 @@ export default function PassengerPaymentSetup({ user }) {
   const qc = useQueryClient();
 
   const save = useMutation({
-    mutationFn: () => base44.auth.updateMe({ preferred_payment: preferred }),
+    mutationFn: () => api.auth.updateMe({ preferred_payment: preferred }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم حفظ طريقة الدفع المفضلة ✅");

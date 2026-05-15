@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { logAdminAction } from "@/lib/adminAudit";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck, Search } from "lucide-react";
@@ -27,7 +27,7 @@ export default function DashboardBookings() {
   const qc = useQueryClient();
 
   React.useEffect(() => {
-    const u = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["bookings"] }));
+    const u = api.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["bookings"] }));
     return () => u();
   }, []);
 

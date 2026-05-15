@@ -3,7 +3,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { Users, Target, Heart, Shield, ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 const values = [
   { icon: Heart, title: "المجتمع أولاً", desc: "نؤمن بقوة المجتمع وأهمية التعاون بين أبناء فلسطين" },
@@ -23,7 +23,7 @@ export default function AboutUs() {
 
   const { data: team = [] } = useQuery({
     queryKey: ["team-members-published"],
-    queryFn: () => base44.entities.TeamMember.filter({ is_published: true }, "sort_order", 50),
+    queryFn: () => api.entities.TeamMember.filter({ is_published: true }, "sort_order", 50),
     staleTime: 5 * 60 * 1000,
   });
 

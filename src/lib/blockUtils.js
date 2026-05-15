@@ -1,7 +1,7 @@
 // Helper for managing user blocks across the app.
 // Caches the list of blocked emails per session for fast filtering.
 
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 let _cache = null;
 let _cacheEmail = null;
@@ -18,8 +18,8 @@ export async function getBlockedEmails(myEmail) {
 
   try {
     const [iBlocked, blockedMe] = await Promise.all([
-      base44.entities.UserBlock.filter({ blocker_email: myEmail }, "-created_at", 500),
-      base44.entities.UserBlock.filter({ blocked_email: myEmail }, "-created_at", 500),
+      api.entities.UserBlock.filter({ blocker_email: myEmail }, "-created_at", 500),
+      api.entities.UserBlock.filter({ blocked_email: myEmail }, "-created_at", 500),
     ]);
     const set = new Set();
     (iBlocked || []).forEach(b => set.add(b.blocked_email));

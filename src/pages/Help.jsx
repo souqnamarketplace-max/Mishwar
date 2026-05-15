@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { Headphones, Search, ChevronDown, ChevronUp, MessageCircle, Phone, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -121,7 +121,7 @@ export default function Help() {
 
   const { data: settingsArr = [] } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => api.entities.AppSettings.list(),
   });
 
   const settings = settingsArr[0] || {};

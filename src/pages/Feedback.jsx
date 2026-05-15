@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useSEO } from "@/hooks/useSEO";
 import { useAuth } from "@/lib/AuthContext";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -40,13 +40,13 @@ export default function Feedback() {
 
   const { data: myTickets = [] } = useQuery({
     queryKey: ["my-tickets", user?.email],
-    queryFn: () => base44.entities.SupportTicket.filter({ user_email: user.email }, "-created_date", 20),
+    queryFn: () => api.entities.SupportTicket.filter({ user_email: user.email }, "-created_date", 20),
     enabled: !!user?.email,
   });
 
   const submit = useMutation({
     mutationFn: async () => {
-      const ticket = await base44.entities.SupportTicket.create({
+      const ticket = await api.entities.SupportTicket.create({
         user_email: user?.email || "anonymous",
         user_name:  user?.full_name || "مستخدم",
         user_role:  user?.account_type || "passenger",

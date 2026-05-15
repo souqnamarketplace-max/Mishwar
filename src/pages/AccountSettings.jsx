@@ -8,7 +8,7 @@ import { captureException } from "@/lib/sentry";
 import { logAdminAction } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -50,7 +50,7 @@ export default function AccountSettings() {
     queryKey: ["driver-license", user?.email],
     queryFn: () =>
       user?.email
-        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+        ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
         : [],
     enabled: !!user?.email,
   });
@@ -108,7 +108,7 @@ export default function AccountSettings() {
   const handleProfileUpdate = async () => {
     setProfileLoading(true);
     try {
-      await base44.auth.updateMe({ city: city || undefined });
+      await api.auth.updateMe({ city: city || undefined });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث المدينة ✅");
     } catch (err) {
@@ -125,7 +125,7 @@ export default function AccountSettings() {
     }
     setEmailLoading(true);
     try {
-      await base44.auth.updateMe({ email });
+      await api.auth.updateMe({ email });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث البريد الإلكتروني بنجاح!");
     } catch (err) {
@@ -150,7 +150,7 @@ export default function AccountSettings() {
     setPasswordLoading(true);
     try {
       // Note: You'll need to implement this in your backend auth service
-      await base44.auth.updateMe({ password: passwordForm.new });
+      await api.auth.updateMe({ password: passwordForm.new });
       setPasswordForm({ current: "", new: "", confirm: "" });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تغيير كلمة المرور بنجاح!");
@@ -168,7 +168,7 @@ export default function AccountSettings() {
     if (phoneCheck.reason) { toast.error(phoneCheck.reason); return; }
     setPhoneLoading(true);
     try {
-      await base44.auth.updateMe({ phone });
+      await api.auth.updateMe({ phone });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث رقم الهاتف!");
     } catch (err) {
@@ -183,15 +183,15 @@ export default function AccountSettings() {
     
     setAvatarLoading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      await base44.auth.updateMe({ avatar_url: file_url });
+      const { file_url } = await api.integrations.Core.UploadFile({ file });
+      await api.auth.updateMe({ avatar_url: file_url });
       setAvatar(file_url);
       
       // Update all user's trips with new avatar
       if (user?.email) {
-        const userTrips = await base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 100);
+        const userTrips = await api.entities.Trip.filter({ created_by: user.email }, "-created_date", 100);
         await Promise.all(
-          userTrips.map(trip => base44.entities.Trip.update(trip.id, { driver_avatar: file_url }))
+          userTrips.map(trip => api.entities.Trip.update(trip.id, { driver_avatar: file_url }))
         );
       }
       
@@ -219,7 +219,7 @@ export default function AccountSettings() {
     setLicenseLoading(true);
     try {
       if (driverLicense) {
-        await base44.entities.DriverLicense.update(driverLicense.id, {
+        await api.entities.DriverLicense.update(driverLicense.id, {
           license_number: licenseNumber,
           expiry_date: licenseExpiry,
           car_registration_expiry_date: carRegistrationExpiry,
@@ -237,7 +237,7 @@ export default function AccountSettings() {
         });
         toast.success("تم تحديث المستندات وإرسالها للمراجعة");
       } else {
-        await base44.entities.DriverLicense.create({
+        await api.entities.DriverLicense.create({
           driver_email: user?.email,
           driver_name: user?.full_name,
           license_number: licenseNumber,
@@ -282,7 +282,7 @@ export default function AccountSettings() {
       // shot drops from 6-8 MB to ~500 KB. PDFs pass through.
       const compressed = await compressImage(file).catch(() => file);
 
-      // Use Supabase storage directly (bypasses base44 upload).
+      // Use Supabase storage directly (bypasses api upload).
       // Path is UUID-namespaced so storage RLS policies in
       // migrations/004_storage_hardening.sql can enforce ownership.
       const ext = (compressed.name || file.name).split(".").pop();
@@ -311,12 +311,12 @@ export default function AccountSettings() {
 
       // Pre-flight: block deletion if user has active trips/bookings
       const [activeDriverTrips, activeBookings] = await Promise.all([
-        base44.entities.Trip.filter(
+        api.entities.Trip.filter(
           { driver_email: user.email, status: "confirmed" },
           "-date",
           50
         ).then((trips) => (trips || []).filter((t) => t.date >= today)),
-        base44.entities.Booking.filter(
+        api.entities.Booking.filter(
           { passenger_email: user.email, status: "confirmed" },
           "-created_date",
           50
@@ -398,8 +398,8 @@ export default function AccountSettings() {
       let updatedRows = null;
       if (!rpcSucceeded) {
         // Legacy path — only when RPC is unavailable.
-        // Use supabase-js directly (not base44) for two reasons:
-        //   1. base44.entities.Profile.update goes through restFetch which
+        // Use supabase-js directly (not api) for two reasons:
+        //   1. api.entities.Profile.update goes through restFetch which
         //      falls back to the anon key when JWT is expired. With anon,
         //      the profiles_update RLS policy (id = auth.uid()) matches 0
         //      rows; PostgREST returns 200 with [] and the old code treated
@@ -476,7 +476,7 @@ export default function AccountSettings() {
       );
 
       try {
-        await base44.auth.deleteMe?.();
+        await api.auth.deleteMe?.();
       } catch (_) {
         /* ignore — soft delete is the source of truth */
       }
@@ -518,7 +518,7 @@ export default function AccountSettings() {
       // deletion didn't go through.
       setShowDeleteModal(false);
       setTimeout(() => {
-        if (base44.auth.logout) base44.auth.logout("/");
+        if (api.auth.logout) api.auth.logout("/");
         else window.location.href = "/";
       }, 1500);
     } catch (err) {
@@ -1013,7 +1013,7 @@ export default function AccountSettings() {
         <div className="bg-card rounded-2xl border border-border p-4">
           <Button
             onClick={async () => {
-              try { await base44.auth.logout?.("/"); } catch {}
+              try { await api.auth.logout?.("/"); } catch {}
               window.location.href = "/";
             }}
             variant="outline"

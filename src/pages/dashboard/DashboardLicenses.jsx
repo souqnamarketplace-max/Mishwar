@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import ModalPortal from "@/components/shared/ModalPortal";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { resolveDocumentUrls } from "@/lib/licenseUrls";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,7 +20,7 @@ export default function DashboardLicenses() {
   const qc = useQueryClient();
 
   React.useEffect(() => {
-    const u = base44.entities.DriverLicense.subscribe(() => qc.invalidateQueries({ queryKey: ["licenses"] }));
+    const u = api.entities.DriverLicense.subscribe(() => qc.invalidateQueries({ queryKey: ["licenses"] }));
     return () => u();
   }, []);
 
@@ -50,8 +50,8 @@ export default function DashboardLicenses() {
     }).then(urls => { if (!cancelled) setResolvedUrls(urls); });
     return () => { cancelled = true; };
   }, [selectedLicense?.id]);
-  // CRITICAL: must use supabase client directly here, NOT base44.entities.DriverLicense.paginate.
-  // The base44 SDK auto-injects a `created_by = auth.email()` filter on every
+  // CRITICAL: must use supabase client directly here, NOT api.entities.DriverLicense.paginate.
+  // The api SDK auto-injects a `created_by = auth.email()` filter on every
   // entity read, which means the admin only sees licenses they themselves
   // created (zero — admin isn't a driver). The result was an empty list
   // even though the table held real data, blocking the entire driver
@@ -81,7 +81,7 @@ export default function DashboardLicenses() {
   const approveMutation = useMutation({
     mutationFn: async (licenseId) => {
       const license = licenses.find((l) => l.id === licenseId);
-      // Use supabase directly: base44.entities.X.update can fail when admin
+      // Use supabase directly: api.entities.X.update can fail when admin
       // didn't create the row originally (created_by mismatch).
       const { error: updErr } = await supabase
         .from("driver_licenses")

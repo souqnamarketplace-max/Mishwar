@@ -3,7 +3,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Calendar, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import EmptyState from "@/components/shared/EmptyState";
 
 // Posts are fetched from public.blog_posts. The previous hardcoded
@@ -28,7 +28,7 @@ export default function Blog() {
 
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ["blog-posts-published"],
-    queryFn: () => base44.entities.BlogPost.filter(
+    queryFn: () => api.entities.BlogPost.filter(
       { is_published: true },
       "-published_at",
       50

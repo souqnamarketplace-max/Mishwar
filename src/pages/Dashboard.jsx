@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { useQuery } from "@tanstack/react-query";
@@ -53,22 +53,22 @@ const statusColors = {
 function Overview() {
   const { data: trips = [] } = useQuery({
     queryKey: ["all-trips-stats"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 100),
+    queryFn: () => api.entities.Trip.list("-created_date", 100),
   });
 
   const { data: bookings = [] } = useQuery({
     queryKey: ["all-bookings-stats"],
-    queryFn: () => base44.entities.Booking.list("-created_date", 100),
+    queryFn: () => api.entities.Booking.list("-created_date", 100),
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ["all-users-stats"],
-    queryFn: () => base44.entities.User.list("-created_date", 100),
+    queryFn: () => api.entities.User.list("-created_date", 100),
   });
 
   const { data: notifications = [] } = useQuery({
     queryKey: ["all-notifications"],
-    queryFn: () => base44.entities.Notification.list("-created_date", 10),
+    queryFn: () => api.entities.Notification.list("-created_date", 10),
   });
 
   // Calculate stats

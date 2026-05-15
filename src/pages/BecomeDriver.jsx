@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DateInput from "@/components/shared/DateInput";
 import { useSEO } from "@/hooks/useSEO";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { useAuth } from "@/lib/AuthContext";
@@ -88,7 +88,7 @@ export default function BecomeDriver() {
   const { data: licenses = [] } = useQuery({
     queryKey: ["driver-license", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+      ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
       : [],
     enabled: !!user?.email,
   });
@@ -237,9 +237,9 @@ export default function BecomeDriver() {
 
       // 1) Write/update the driver_license row
       if (existingLicense) {
-        await base44.entities.DriverLicense.update(existingLicense.id, licensePayload);
+        await api.entities.DriverLicense.update(existingLicense.id, licensePayload);
       } else {
-        await base44.entities.DriverLicense.create({
+        await api.entities.DriverLicense.create({
           driver_email: user.email,
           driver_name: user.full_name,
           ...licensePayload,
@@ -249,7 +249,7 @@ export default function BecomeDriver() {
       // 2) Promote account_type → "both" (or leave as "driver" if already)
       const targetType = user.account_type === "driver" ? "driver" : "both";
       if (user.account_type !== targetType) {
-        await base44.auth.updateMe({ account_type: targetType });
+        await api.auth.updateMe({ account_type: targetType });
       }
 
       // 3) Invalidate queries so home page / navbar / hub all reflect the

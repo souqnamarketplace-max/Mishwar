@@ -4,7 +4,7 @@ import { checkDriverConflict } from "@/lib/tripScheduling";
 import { useSEO } from "@/hooks/useSEO";
 import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -68,7 +68,7 @@ export default function CreateTrip() {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   // Role gate evaluated here, ENFORCED below (after all hooks).
@@ -89,7 +89,7 @@ export default function CreateTrip() {
     queryKey: ["driver-licenses-all", user?.email],
     queryFn: () =>
       user?.email
-        ? base44.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
+        ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
         : [],
     enabled: !!user?.email,
   });
@@ -325,7 +325,7 @@ export default function CreateTrip() {
 
     // ── Pre-submit conflict check (frontend layer; SQL trigger is the source of truth) ──
     try {
-      const myTrips = await base44.entities.Trip.filter({ driver_id: user.id }, "-created_date", 200);
+      const myTrips = await api.entities.Trip.filter({ driver_id: user.id }, "-created_date", 200);
       const tripsToCheck = form.is_recurring && form.recurring_days.length > 0
         ? form.recurring_days.map((dayIndex) => {
             const baseDate = new Date(form.date);
@@ -428,7 +428,7 @@ export default function CreateTrip() {
         const diff = (dayIndex - baseDate.getDay() + 7) % 7;
         const tripDate = new Date(baseDate);
         tripDate.setDate(baseDate.getDate() + (diff === 0 ? 7 : diff));
-        return base44.entities.Trip.create({
+        return api.entities.Trip.create({
           ...baseData,
           date: tripDate.toISOString().split("T")[0],
           driver_note: (baseData.driver_note || "") + " (رحلة يومية - " + dayNames[dayIndex] + ")",
@@ -470,7 +470,7 @@ export default function CreateTrip() {
       // cascade automatically; we don't need to do anything from the client.
     } else {
       try {
-        const newTrip = await base44.entities.Trip.create(baseData);
+        const newTrip = await api.entities.Trip.create(baseData);
         toast.success("تم نشر الرحلة بنجاح! 🎉");
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["driver-trips"] });

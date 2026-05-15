@@ -4,7 +4,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect, useRef } from "react";
 import ModalPortal from "@/components/shared/ModalPortal";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -78,7 +78,7 @@ export default function MyTrips() {
       // their trip's available_seats stuck at the lower count, and
       // the strike system never ran for late cancellations from
       // here either. Now matches the pattern used in
-      // base44Client.cancelBooking and DriverPassengers.
+      // apiClient.cancelBooking and DriverPassengers.
       const { error: rpcErr } = await supabase.rpc("cancel_booking", {
         booking_id_param: bookingId,
         reason_param: reason || "passenger_self_cancel",
@@ -151,7 +151,7 @@ export default function MyTrips() {
   const { data: driverTrips = [], isLoading: driverTripsLoading } = useQuery({
     queryKey: ["my-driver-trips", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.Trip.filter({ driver_email: user.email }, "-created_date", 50)
+      ? api.entities.Trip.filter({ driver_email: user.email }, "-created_date", 50)
       : [],
     enabled: !!user?.email && isDriver,  // Don't run for passengers — saves a hung query
   });
@@ -163,7 +163,7 @@ export default function MyTrips() {
   const { data: passengerBookings = [] } = useQuery({
     queryKey: ["my-passenger-bookings", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 50)
+      ? api.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 50)
       : [],
     enabled: !!user?.email,
   });
@@ -171,7 +171,7 @@ export default function MyTrips() {
   // All trips (to look up booked trips)
   const { data: allTrips = [] } = useQuery({
     queryKey: ["all-trips-lookup"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 200),
+    queryFn: () => api.entities.Trip.list("-created_date", 200),
   });
 
   // Group passenger bookings by trip_id, picking the most relevant booking
@@ -211,14 +211,14 @@ export default function MyTrips() {
 
   // Real-time subscription for trip & review updates
   useEffect(() => {
-    const unsubTrips = base44.entities.Trip.subscribe((event) => {
+    const unsubTrips = api.entities.Trip.subscribe((event) => {
       qc.invalidateQueries({ queryKey: ["trips"] });
     });
-    const unsubReviews = base44.entities.Review.subscribe((event) => {
+    const unsubReviews = api.entities.Review.subscribe((event) => {
       qc.invalidateQueries({ queryKey: ["my-reviews"] });
     });
     // KEY FIX: when driver confirms/cancels a booking, passenger sees it instantly
-    const unsubBookings = base44.entities.Booking.subscribe(() => {
+    const unsubBookings = api.entities.Booking.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
       qc.invalidateQueries({ queryKey: ["all-trips-lookup"] });
       qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
@@ -239,7 +239,7 @@ export default function MyTrips() {
   const filtered = activeTab === "all" ? trips : trips.filter((t) => effectiveStatus(t) === activeTab);
   const { data: myReviews = [] } = useQuery({
     queryKey: ["my-reviews", user?.email],
-    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email, review_type: "passenger_rates_driver" }),
+    queryFn: () => api.entities.Review.filter({ reviewer_email: user?.email, review_type: "passenger_rates_driver" }),
     enabled: !!user?.email,
   });
   const reviewedTripIds = new Set(myReviews.map((r) => r.trip_id));

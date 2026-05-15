@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { X, Megaphone } from "lucide-react";
 import { useState } from "react";
 
@@ -9,7 +9,7 @@ export default function AnnouncementBanner() {
 
   const { data: announcements = [] } = useQuery({
     queryKey: ["announcements-active"],
-    queryFn: () => base44.entities.Announcement.filter({ is_active: true }, "-created_date", 3),
+    queryFn: () => api.entities.Announcement.filter({ is_active: true }, "-created_date", 3),
   });
 
   const visible = announcements.filter(a => !dismissed.includes(a.id));

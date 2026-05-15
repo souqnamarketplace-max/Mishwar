@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bell, X, CheckCheck, Settings } from "lucide-react";
@@ -41,7 +41,7 @@ export default function NotificationBell({ userEmail }) {
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", userEmail],
     queryFn: () => userEmail
-      ? base44.entities.Notification.filter({ user_email: userEmail }, "-created_date", 20)
+      ? api.entities.Notification.filter({ user_email: userEmail }, "-created_date", 20)
       : [],
     enabled: !!userEmail,
   });
@@ -98,7 +98,7 @@ export default function NotificationBell({ userEmail }) {
   // (e.g. another tab marking-as-read causes UPDATEs we still want to reflect).
   useEffect(() => {
     if (!userEmail) return;
-    const unsub = base44.entities.Notification.subscribe(() => {
+    const unsub = api.entities.Notification.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["notifications", userEmail] });
     });
     return () => unsub();

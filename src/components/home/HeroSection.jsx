@@ -52,7 +52,7 @@ export default function HeroSection() {
   const navigate = useNavigate();
   const [slideIdx, setSlideIdx] = useState(0);
 
-  // Load slides directly from Supabase (bypasses base44 created_by filter).
+  // Load slides directly from Supabase (bypasses api created_by filter).
   //
   // app_settings has historically accumulated multiple rows (no UNIQUE constraint
   // on the table — it's effectively a singleton-by-convention, not by schema).

@@ -3,7 +3,7 @@ import DateInput from "@/components/shared/DateInput";
 import React, { useState, useEffect, useMemo} from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ export default function SearchTrips() {
   const { data: trips_unfiltered = [], isLoading, error } = useQuery({
     queryKey: ["trips"],
     queryFn: async () => {
-      // Fetch ALL confirmed trips via Supabase directly (base44 adds created_by filter)
+      // Fetch ALL confirmed trips via Supabase directly (api adds created_by filter)
       const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("trips")
@@ -79,7 +79,7 @@ export default function SearchTrips() {
 
 
   useEffect(() => {
-    const unsubscribe = base44.entities.Trip.subscribe(() => {
+    const unsubscribe = api.entities.Trip.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["trips"] });
     });
     return () => unsubscribe();

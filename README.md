@@ -27,7 +27,7 @@ npm run build # → production build in dist/
 
 ```
 src/
-├── api/              # Supabase API wrappers (base44Client.js)
+├── api/              # Supabase API wrappers (apiClient.js)
 ├── components/
 │   ├── home/         # Landing page sections
 │   ├── layout/       # Navbar, Footer, MobileLayout

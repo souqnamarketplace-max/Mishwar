@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -33,7 +33,7 @@ export default function UserHistorySection({ user }) {
   const isDriver = user?.account_type === "driver" || user?.account_type === "both";
   const { data: trips = [] } = useQuery({
     queryKey: ["admin-user-trips", email],
-    queryFn: () => base44.entities.Trip.filter({ driver_email: email }, "-created_at", 500),
+    queryFn: () => api.entities.Trip.filter({ driver_email: email }, "-created_at", 500),
     enabled: !!email && isDriver,
     staleTime: 30_000,
   });
@@ -41,7 +41,7 @@ export default function UserHistorySection({ user }) {
   // Bookings made by this user
   const { data: bookings = [] } = useQuery({
     queryKey: ["admin-user-bookings", email],
-    queryFn: () => base44.entities.Booking.filter({ passenger_email: email }, "-created_at", 500),
+    queryFn: () => api.entities.Booking.filter({ passenger_email: email }, "-created_at", 500),
     enabled: !!email,
     staleTime: 30_000,
   });
@@ -49,7 +49,7 @@ export default function UserHistorySection({ user }) {
   // Reports filed AGAINST this user
   const { data: reports = [] } = useQuery({
     queryKey: ["admin-user-reports", email],
-    queryFn: () => base44.entities.Report.filter({ reported_email: email }, "-created_at", 500),
+    queryFn: () => api.entities.Report.filter({ reported_email: email }, "-created_at", 500),
     enabled: !!email,
     staleTime: 30_000,
   });
@@ -57,7 +57,7 @@ export default function UserHistorySection({ user }) {
   // Reviews of this user (only meaningful if driver)
   const { data: reviews = [] } = useQuery({
     queryKey: ["admin-user-reviews", email],
-    queryFn: () => base44.entities.Review.filter({ driver_email: email }, "-created_at", 500),
+    queryFn: () => api.entities.Review.filter({ driver_email: email }, "-created_at", 500),
     enabled: !!email && isDriver,
     staleTime: 30_000,
   });

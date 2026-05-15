@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { Users, Car, MapPin, Star } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 // Animated number counter
 function AnimatedNumber({ value, suffix = "", duration = 1.5 }) {
@@ -44,7 +44,7 @@ export default function StatsBar() {
   // the correct launch-day behaviour (no fake "10,000+ users" claim).
   const { data: settingsArr = [] } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => api.entities.AppSettings.list(),
     staleTime: 5 * 60 * 1000,
   });
   const settings = settingsArr[0] || {};
@@ -53,24 +53,24 @@ export default function StatsBar() {
 
   const { data: trips = [] } = useQuery({
     queryKey: ["stats-trips"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 1000),
+    queryFn: () => api.entities.Trip.list("-created_date", 1000),
     enabled: statsEnabled,
   });
   const { data: users = [] } = useQuery({
     queryKey: ["stats-users"],
-    queryFn: () => base44.entities.User.list(),
+    queryFn: () => api.entities.User.list(),
     enabled: statsEnabled,
   });
   const { data: reviews = [] } = useQuery({
     queryKey: ["stats-reviews"],
-    queryFn: () => base44.entities.Review.filter({ review_type: "passenger_rates_driver" }),
+    queryFn: () => api.entities.Review.filter({ review_type: "passenger_rates_driver" }),
     enabled: statsEnabled,
   });
 
   useEffect(() => {
     if (!statsEnabled) return;
-    const u1 = base44.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-trips"] }));
-    const u2 = base44.entities.Review.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-reviews"] }));
+    const u1 = api.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-trips"] }));
+    const u2 = api.entities.Review.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-reviews"] }));
     return () => { u1(); u2(); };
   }, [qc, statsEnabled]);
 

@@ -7,7 +7,7 @@
  */
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { captureException } from "@/lib/sentry";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
@@ -32,7 +32,7 @@ export default function ExpiredTripNotifier({ user }) {
 
   const { data: myTrips = [] } = useQuery({
     queryKey: ["notifier-trips", user?.email],
-    queryFn: () => base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 100),
+    queryFn: () => api.entities.Trip.filter({ created_by: user.email }, "-created_date", 100),
     enabled: isDriver && !!user?.email,
     refetchInterval: 60_000, // check every minute
     staleTime: 55_000,
@@ -50,8 +50,8 @@ export default function ExpiredTripNotifier({ user }) {
       if (notified.has(trip.id)) continue;
 
       // Send notification once. Direct supabase.from() insert (not
-      // base44.entities.Notification.create) so we use the live JWT —
-      // base44's restFetch can fall back to the anon key when the
+      // api.entities.Notification.create) so we use the live JWT —
+      // api's restFetch can fall back to the anon key when the
       // session is stale, which makes auth_user_email() resolve to
       // NULL inside RLS, which rejects this self-insert. supabase-js
       // always carries the live token so the self-target RLS check

@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useRef, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Car, Users, DollarSign, Star, ChevronDown, Plus, X,
@@ -190,12 +190,12 @@ export default function DriverDashboard() {
   const [selectedTripId, setSelectedTripId] = useState(null);
   const qc = useQueryClient();
 
-  const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => base44.auth.me() });
+  const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => api.auth.me() });
 
   const { data: trips = [], isLoading: tripsLoading } = useQuery({
     queryKey: ["driver-trips", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.Trip.filter({ driver_email: user.email }, "-created_date", 50)
+      ? api.entities.Trip.filter({ driver_email: user.email }, "-created_date", 50)
       : [],
     enabled: !!user?.email,
   });
@@ -203,7 +203,7 @@ export default function DriverDashboard() {
   const tripIds = trips.map(t => t.id);
   const { data: allBookings = [] } = useQuery({
     queryKey: ["driver-bookings", user?.email],
-    queryFn: () => base44.entities.Booking.list("-created_date", 500),
+    queryFn: () => api.entities.Booking.list("-created_date", 500),
     enabled: !!user?.email,
   });
   const bookings = allBookings.filter(b => tripIds.includes(b.trip_id));
@@ -216,7 +216,7 @@ export default function DriverDashboard() {
   // Realtime
   React.useEffect(() => {
     if (!user?.email) return;
-    const u = base44.entities.Booking.subscribe(() => {
+    const u = api.entities.Booking.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["driver-bookings", user.email] });
       qc.invalidateQueries({ queryKey: ["driver-trips", user.email] });
     });

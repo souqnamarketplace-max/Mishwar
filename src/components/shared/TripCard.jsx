@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer } from "lucide-react";
 import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 
 // ── Palestinian date formatter ────────────────────────────────────────────────
 const PS_MONTHS = [
@@ -258,7 +258,7 @@ export default function TripCard({ trip }) {
 
   useEffect(() => {
     if (!trip?.id) return;
-    const unsub = base44.entities.Trip.subscribe((payload) => {
+    const unsub = api.entities.Trip.subscribe((payload) => {
       if (payload?.new?.id === trip.id) setLiveTrip(payload.new);
     });
     return unsub;

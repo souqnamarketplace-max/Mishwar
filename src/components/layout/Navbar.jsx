@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import NotificationBell from "../notifications/NotificationBell";
 
 const LOGO_URL = "/logo.png";
@@ -32,7 +32,7 @@ export default function Navbar() {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   return (
@@ -216,7 +216,7 @@ export default function Navbar() {
                     </Link>
                   )}
                   <button
-                    onClick={() => { base44.auth.logout(); setProfileOpen(false); }}
+                    onClick={() => { api.auth.logout(); setProfileOpen(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
@@ -298,7 +298,7 @@ export default function Navbar() {
                 </Link>
               )}
               <button
-                onClick={() => { base44.auth.logout(); setMobileOpen(false); }}
+                onClick={() => { api.auth.logout(); setMobileOpen(false); }}
                 className="w-full flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="w-4 h-4" />

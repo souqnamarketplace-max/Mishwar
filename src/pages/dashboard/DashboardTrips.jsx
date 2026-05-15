@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { logAdminAction } from "@/lib/adminAudit";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Car, Search, MapPin, ArrowLeft, Clock, Users, Trash2 } from "lucide-react";
@@ -28,8 +28,8 @@ export default function DashboardTrips() {
 
   // Realtime — admin sees trip changes instantly
   React.useEffect(() => {
-    const u1 = base44.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["trips"] }));
-    const u2 = base44.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["trips"] }));
+    const u1 = api.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["trips"] }));
+    const u2 = api.entities.Booking.subscribe(() => qc.invalidateQueries({ queryKey: ["trips"] }));
     return () => { u1(); u2(); };
   }, []);
 
@@ -49,7 +49,7 @@ export default function DashboardTrips() {
   const { data: tripsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["trips", page, search, statusFilter, dateRangePreset, customFrom, customTo],
     queryFn: async () => {
-      // Direct supabase — base44.entities.Trip.paginate auto-injects
+      // Direct supabase — api.entities.Trip.paginate auto-injects
       // created_by = admin_email and hides every trip the admin didn't
       // create themselves (i.e. all of them in production).
       const from = (page - 1) * PAGE_SIZE;

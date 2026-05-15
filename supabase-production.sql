@@ -1238,7 +1238,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.broadcast_notification(TEXT, TEXT) TO authenticated;
 
 -- ============================================================
--- CANCEL BOOKING RPC — replaces the broken base44.functions.invoke
+-- CANCEL BOOKING RPC — atomic seat-refund + state transition
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.cancel_booking(booking_id_param UUID)
 RETURNS void AS $$

@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { AlertTriangle, CheckCircle2, Info, Clock } from "lucide-react";
 
 /**
@@ -27,7 +27,7 @@ export default function StrikeStatusSection({ user }) {
   // can be stale by minutes — strikes need to be current).
   const { data: profile, isLoading } = useQuery({
     queryKey: ["my-strike-profile", email],
-    queryFn: () => base44.entities.Profile.filter({ email }, "-created_at", 1)
+    queryFn: () => api.entities.Profile.filter({ email }, "-created_at", 1)
       .then(rows => rows?.[0] || null),
     enabled: !!email,
     staleTime: 30_000,

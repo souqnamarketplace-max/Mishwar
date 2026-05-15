@@ -5,7 +5,7 @@
  */
 import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
 import { logAudit } from "@/lib/adminAudit";
@@ -27,7 +27,7 @@ export default function BookingRequestPopup({ user }) {
   // Fetch driver's trips
   const { data: myTrips = [] } = useQuery({
     queryKey: ["popup-trips", user?.email],
-    queryFn: () => base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 50),
+    queryFn: () => api.entities.Trip.filter({ created_by: user.email }, "-created_date", 50),
     enabled: isDriver && !!user?.email,
     refetchInterval: false,
   });
@@ -37,7 +37,7 @@ export default function BookingRequestPopup({ user }) {
   // Fetch pending bookings on driver's trips
   const { data: allBookings = [] } = useQuery({
     queryKey: ["popup-bookings", user?.email],
-    queryFn: () => base44.entities.Booking.filter({ status: "pending" }, "-created_date", 50),
+    queryFn: () => api.entities.Booking.filter({ status: "pending" }, "-created_date", 50),
     enabled: isDriver && tripIds.length > 0,
     refetchInterval: 15000, // poll every 15s as backup
   });
@@ -50,7 +50,7 @@ export default function BookingRequestPopup({ user }) {
   // Subscribe to real-time booking updates
   useEffect(() => {
     if (!isDriver || !user?.email) return;
-    const unsub = base44.entities.Booking.subscribe(() => {
+    const unsub = api.entities.Booking.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["popup-bookings", user.email] });
     });
     return () => unsub();
@@ -75,7 +75,7 @@ export default function BookingRequestPopup({ user }) {
       // previous implementation did Booking.update + manual seat
       // restore from react-query cache, with the same lost-update
       // race as the other three cancel sites we cleaned up this
-      // session (DriverPassengers, base44Client.cancelBooking,
+      // session (DriverPassengers, apiClient.cancelBooking,
       // MyTrips passenger cancel — see commits a0c5587 and 2b2028b).
       // Driver rejecting from a popup is a pending-booking case in
       // practice (popups don't fire for already-confirmed bookings)
@@ -92,7 +92,7 @@ export default function BookingRequestPopup({ user }) {
         if (error) throw error;
         return;
       }
-      await base44.entities.Booking.update(id, { status });
+      await api.entities.Booking.update(id, { status });
     },
     onSuccess: async (_, { id, status }) => {
       qc.invalidateQueries({ queryKey: ["popup-bookings", user.email] });

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import { useGPSTripCompletion } from "@/lib/gpsTracking";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyUser } from "@/lib/notifyUser";
 import { useQueryClient } from "@tanstack/react-query";
 import { Navigation, MapPin, Clock, AlertTriangle } from "lucide-react";
@@ -28,7 +28,7 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
     if (completing) return;
     setCompleting(true);
     try {
-      await base44.entities.Trip.update(trip.id, { status: "completed" });
+      await api.entities.Trip.update(trip.id, { status: "completed" });
       // Notify all passengers
       await Promise.all(passengers.map(b =>
         notifyUser({

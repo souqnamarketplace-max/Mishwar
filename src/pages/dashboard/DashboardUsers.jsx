@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { logAdminAction } from "@/lib/adminAudit";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Users, Search, Shield, UserCheck, Mail, Trash2, Edit2, Car, Lock, Unlock, Copy, Eye, EyeOff } from "lucide-react";
@@ -26,7 +26,7 @@ export default function DashboardUsers() {
   const qc = useQueryClient();
 
   React.useEffect(() => {
-    const u = base44.entities.Profile.subscribe(() => qc.invalidateQueries({ queryKey: ["users"] }));
+    const u = api.entities.Profile.subscribe(() => qc.invalidateQueries({ queryKey: ["users"] }));
     return () => u();
   }, []);
 
@@ -36,10 +36,10 @@ export default function DashboardUsers() {
   const { data: usersData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["users", page],
     queryFn: async () => {
-      // Direct supabase to bypass base44 created_by auto-filter that hid
+      // Direct supabase to bypass api created_by auto-filter that hid
       // every user the admin didn't create themselves. Note: profiles
       // table uses created_at (not created_date) and does NOT have a
-      // created_by column at all, but base44 still filters via current
+      // created_by column at all, but api still filters via current
       // session user, returning at most one row.
       const from = (page - 1) * PAGE_SIZE;
       const to   = from + PAGE_SIZE - 1;
@@ -154,7 +154,7 @@ export default function DashboardUsers() {
   };
 
   const updateUserMutation = useMutation({
-    mutationFn: (data) => base44.functions.invoke('updateUserAdmin', {
+    mutationFn: (data) => api.functions.invoke('updateUserAdmin', {
       userId: data.id,
       data: {
         full_name: data.full_name,
@@ -175,7 +175,7 @@ export default function DashboardUsers() {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: (user) => base44.functions.invoke('updateUserAdmin', {
+    mutationFn: (user) => api.functions.invoke('updateUserAdmin', {
       userId: user.id,
       data: { is_active: !user.is_active }
     }),

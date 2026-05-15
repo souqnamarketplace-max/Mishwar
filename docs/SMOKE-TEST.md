@@ -122,7 +122,7 @@ As `smoke-driver` going through onboarding:
       per audit C-03 fix). NOT `public/timestamp.jpg`.
 
 If files are landing at `public/...`: the storage upload code regressed.
-Check `src/api/base44Client.js`, `src/pages/Onboarding.jsx`,
+Check `src/api/apiClient.js`, `src/pages/Onboarding.jsx`,
 `src/pages/AccountSettings.jsx` — all three should use UUID prefix.
 
 ---

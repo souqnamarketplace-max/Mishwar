@@ -1,5 +1,5 @@
 import React from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { Star } from "lucide-react";
 import StarRating from "./StarRating";
@@ -8,7 +8,7 @@ export default function RatingSummary({ driverEmail }) {
   const { data: reviews = [] } = useQuery({
     queryKey: ["reviews", driverEmail],
     queryFn: () =>
-      base44.entities.Review.filter({ driver_email: driverEmail, review_type: "passenger_rates_driver" }, "-created_date", 100),
+      api.entities.Review.filter({ driver_email: driverEmail, review_type: "passenger_rates_driver" }, "-created_date", 100),
     enabled: !!driverEmail,
   });
 

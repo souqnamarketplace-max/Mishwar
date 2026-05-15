@@ -1,8 +1,20 @@
 /**
- * base44Client.js — Supabase compatibility shim
+ * apiClient.js — Supabase client wrapper
  *
- * Replaces @base44/sdk with a Supabase-backed implementation that
- * exposes the EXACT same API. Zero changes needed in other files.
+ * Thin abstraction over @supabase/supabase-js that exposes a stable
+ * entity API surface (api.entities.Trip.filter, api.auth.me, etc.)
+ * used throughout the app. Wraps every Supabase call with:
+ *   - timeout enforcement (the supabase-js client occasionally hangs
+ *     after HMR or token refresh — withTimeout aborts after 7s)
+ *   - direct REST fallback via fetch() when the supabase-js client
+ *     misbehaves, bypassing its internal state machine
+ *   - sentry capture on errors
+ *
+ * Historical note: this file used to be base44Client.js and exported
+ * a const `base44` because the app was previously built on the Base44
+ * SaaS platform. The Base44 dependency was removed; only the API
+ * shape was preserved so other source files didn't all have to
+ * change at once. The file is now named for what it actually is.
  */
 
 import { supabase } from '@/lib/supabase';
@@ -663,7 +675,7 @@ const functions = {
 
 // ─── Export ───────────────────────────────────────────────────
 
-export const base44 = {
+export const api = {
   entities: {
     Trip:           createEntityClient('trips'),
     Booking:        createEntityClient('bookings'),
@@ -693,4 +705,4 @@ export const base44 = {
   functions,
 };
 
-export default base44;
+export default api;

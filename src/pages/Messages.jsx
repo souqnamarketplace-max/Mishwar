@@ -2,7 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -132,8 +132,8 @@ export default function Messages() {
     queryFn: async () => {
       if (!user?.email) return { asPassenger: [], driverTrips: [] };
       const [asPassenger, driverTrips] = await Promise.all([
-        base44.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 100),
-        base44.entities.Trip.filter({ created_by: user.email }, "-created_date", 100),
+        api.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 100),
+        api.entities.Trip.filter({ created_by: user.email }, "-created_date", 100),
       ]);
       return { asPassenger: asPassenger || [], driverTrips: driverTrips || [] };
     },
@@ -242,7 +242,7 @@ export default function Messages() {
   // ─── Realtime subscription ───
   useEffect(() => {
     if (!user?.email) return;
-    const unsub = base44.entities.Message.subscribe(() => {
+    const unsub = api.entities.Message.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["messages", user.email] });
     });
     return () => unsub();

@@ -1,5 +1,5 @@
 {
-  "name": "base44-app",
+  "name": "mishwaro",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -16,8 +16,6 @@
     "build:sitemap": "node scripts/build-sitemap.js"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.27",
-    "@base44/vite-plugin": "^1.0.13",
     "@capacitor/android": "^8.3.3",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",

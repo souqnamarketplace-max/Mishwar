@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2 } from "lucide-react";
 import { motion } from "framer-motion";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // ── City colour palette ────────────────────────────────────────────────────────
@@ -194,7 +194,7 @@ export default function FeaturedTrips() {
   // even before the cron has run.
   const { data: trips_unfiltered = [] } = useQuery({
     queryKey: ["featured-trips"],
-    queryFn: () => base44.entities.Trip.filter({ status: "confirmed" }, "-created_date", 20),
+    queryFn: () => api.entities.Trip.filter({ status: "confirmed" }, "-created_date", 20),
   });
 
   const blockedSet = useBlockedEmails();
@@ -241,7 +241,7 @@ export default function FeaturedTrips() {
 
 
   useEffect(() => {
-    const unsub = base44.entities.Trip.subscribe((ev) => {
+    const unsub = api.entities.Trip.subscribe((ev) => {
       if (ev.type === "create" || ev.type === "update")
         qc.invalidateQueries({ queryKey: ["featured-trips"] });
     });

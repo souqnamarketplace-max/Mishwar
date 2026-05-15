@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Car, Save, Camera, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ export default function DriverVehicleEditor() {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   const [form, setForm] = useState(null);
@@ -37,7 +37,7 @@ export default function DriverVehicleEditor() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await base44.auth.updateMe(currentForm);
+      await api.auth.updateMe(currentForm);
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم حفظ بيانات المركبة بنجاح ✅");
     } finally {
@@ -50,7 +50,7 @@ export default function DriverVehicleEditor() {
     if (!file) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await api.integrations.Core.UploadFile({ file });
       set("car_image", file_url);
       toast.success("تم رفع الصورة بنجاح ✅");
     } catch (err) {

@@ -3,7 +3,7 @@ import { useLocation, Link, useNavigate } from "react-router-dom";
 import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet, Inbox, LayoutDashboard } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
@@ -108,7 +108,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
   // than showing nothing for a safety feature. */}
   const { data: settingsArrM = [] } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => api.entities.AppSettings.list(),
     staleTime: 5 * 60 * 1000,
   });
   const supportPhoneM = settingsArrM[0]?.support_phone || "";
@@ -512,7 +512,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             {/* Sign Out + Version */}
             <div className="border-t border-border" dir="rtl">
               <button
-                onClick={() => { setShowMobileMenu(false); base44.auth.logout(); }}
+                onClick={() => { setShowMobileMenu(false); api.auth.logout(); }}
                 className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive"
               >
                 <LogOut className="w-5 h-5 shrink-0" />

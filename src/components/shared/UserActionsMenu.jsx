@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MoreVertical, Shield, Flag, X, CheckCircle2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
 import { useAuth } from "@/lib/AuthContext";
 import { invalidateBlockCache, REPORT_CATEGORIES } from "@/lib/blockUtils";
@@ -57,7 +57,7 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
   // doesn't see "فشل" on what is, from their perspective, a no-op.
   const tryBlock = async () => {
     try {
-      await base44.entities.UserBlock.create({
+      await api.entities.UserBlock.create({
         blocker_email: user.email,
         blocked_email: targetEmail,
       });
@@ -95,7 +95,7 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
   const reportMutation = useMutation({
     mutationFn: async (data) => {
       // 1) Persist the report itself
-      const report = await base44.entities.UserReport.create({
+      const report = await api.entities.UserReport.create({
         reporter_email: user.email,
         reported_email: targetEmail,
         category: data.category,

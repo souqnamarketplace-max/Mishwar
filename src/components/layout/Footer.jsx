@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Mail, Phone, MapPin } from "lucide-react";
 
 const quickLinks = [
@@ -29,7 +29,7 @@ export default function Footer() {
   // broken on a fresh DB.
   const { data: settingsArr = [] } = useQuery({
     queryKey: ["app_settings"],
-    queryFn: () => base44.entities.AppSettings.list(),
+    queryFn: () => api.entities.AppSettings.list(),
     staleTime: 5 * 60 * 1000, // 5 min — settings change rarely
   });
   const settings = settingsArr[0] || {};

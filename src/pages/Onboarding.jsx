@@ -6,7 +6,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import { readSessionUserId } from "@/lib/session";
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
 import { supabase } from "@/lib/supabase";
 import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
@@ -95,7 +95,7 @@ export default function Onboarding() {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   const save = useMutation({
@@ -116,7 +116,7 @@ export default function Onboarding() {
         }
       }
 
-      await base44.auth.updateMe({
+      await api.auth.updateMe({
         account_type: accountType,
         phone: form.phone,
         city: form.city,
@@ -134,7 +134,7 @@ export default function Onboarding() {
 
       // Create driver license for drivers (validation moved above)
       if (accountType === "driver" || accountType === "both") {
-        await base44.entities.DriverLicense.create({
+        await api.entities.DriverLicense.create({
           driver_email:                 user?.email,
           driver_name:                  user?.full_name,
           license_number:               form.license_number,

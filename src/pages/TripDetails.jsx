@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import RouteMap from "@/components/shared/RouteMap";
 import { isBookingClosed, isLastChance, minutesUntilTrip, isTripExpired } from "@/lib/tripScheduling";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -82,17 +82,17 @@ export default function TripDetails() {
   useEffect(() => { window.scrollTo({ top: 0, behavior: "instant" }); }, [lookupValue]);
 
   // ── 2. User query (must come before anything that uses user) ──
-  // For anonymous share-link visitors, base44.auth.me() throws
+  // For anonymous share-link visitors, api.auth.me() throws
   // "Not authenticated" — set retry: false so we fail fast instead
   // of triggering 3 retries before settling.
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
     retry: false,
   });
 
   // ── 3. Trip fetch — by UUID or short_code depending on what's in the URL.
-  // Direct supabase (not base44) to avoid the SDK's auto-injected
+  // Direct supabase (not api) to avoid the SDK's auto-injected
   // created_by filter that would hide the trip from non-driver viewers
   // (passengers, anonymous share-link visitors).
   // RLS already permits public read for status='confirmed' trips.
@@ -148,7 +148,7 @@ export default function TripDetails() {
   const { data: existingBookings = [] } = useQuery({
     queryKey: ["my-booking", id, user?.email],
     queryFn: () => user?.email
-      ? base44.entities.Booking.filter({ trip_id: id, passenger_email: user.email }, "-created_date", 5)
+      ? api.entities.Booking.filter({ trip_id: id, passenger_email: user.email }, "-created_date", 5)
       : [],
     enabled: !!user?.email && !!id,
   });
@@ -174,7 +174,7 @@ export default function TripDetails() {
 
   const { data: driverProfile } = useQuery({
     queryKey: ["driver-profile", tripData?.driver_id],
-    queryFn: () => base44.entities.Profile.filter({ created_by: tripData.driver_id }, "-created_at", 1),
+    queryFn: () => api.entities.Profile.filter({ created_by: tripData.driver_id }, "-created_at", 1),
     enabled: !!tripData?.driver_id,
     select: (data) => data?.[0] || null,
   });

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Star, CheckCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -35,19 +35,19 @@ export default function DriverRatePassengers({ trips, bookings }) {
 
   const { data: user } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   const { data: myReviews = [] } = useQuery({
     queryKey: ["driver-given-reviews", user?.email],
-    queryFn: () => base44.entities.Review.filter({ reviewer_email: user?.email, review_type: "driver_rates_passenger" }),
+    queryFn: () => api.entities.Review.filter({ reviewer_email: user?.email, review_type: "driver_rates_passenger" }),
     enabled: !!user?.email,
   });
 
   const reviewedIds = new Set(myReviews.map((r) => r.trip_id + "_" + r.rated_user_email));
 
   const submitReview = useMutation({
-    mutationFn: (data) => base44.entities.Review.create(data),
+    mutationFn: (data) => api.entities.Review.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["driver-given-reviews", user?.email] });
       toast.success("تم إرسال التقييم بنجاح ✅");

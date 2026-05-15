@@ -4,7 +4,7 @@
  *
  * Use this for ANY cross-user notification (driver→passenger booking
  * accept/reject, passenger→driver review submitted, etc.). DO NOT use
- * base44.entities.Notification.create directly for cross-user inserts —
+ * api.entities.Notification.create directly for cross-user inserts —
  * the migration 002 RLS policy on notifications_insert silently rejects
  * them, and the failure was historically swallowed in try/catch blocks
  * across the codebase, leaving notifications undelivered without surfacing

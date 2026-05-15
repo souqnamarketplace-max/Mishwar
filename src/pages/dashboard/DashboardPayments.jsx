@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
 import { supabase } from "@/lib/supabase";
@@ -125,7 +125,7 @@ export default function DashboardPayments() {
   const filtered = bookings;
 
   // Read commission rate from app_settings — direct supabase query (the
-  // base44 entity wrapper would inject created_by filter and return zero
+  // api entity wrapper would inject created_by filter and return zero
   // rows). app_settings has only one row (config singleton).
   const { data: appSettingsArr = [] } = useQuery({
     queryKey: ["app_settings"],

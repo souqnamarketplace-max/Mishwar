@@ -7,7 +7,7 @@
 -- from X to Y") have been silently failing in production since the
 -- feature shipped. The client code in src/pages/CreateTrip.jsx after a
 -- successful Trip.create() iterates over public.trip_preferences and
--- calls base44.entities.Notification.create for each match — which is
+-- calls api.entities.Notification.create for each match — which is
 -- a direct INSERT into public.notifications from the driver's session,
 -- targeting the matched passenger's email. The notifications_insert
 -- RLS policy (migration 002) only allows:

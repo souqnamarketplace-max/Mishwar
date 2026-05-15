@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
     if (!file.type.startsWith("image/")) { toast.error("يرجى رفع صورة فقط"); return; }
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await api.integrations.Core.UploadFile({ file });
       onUpdate("img", file_url);
       toast.success("✅ تم رفع الصورة بنجاح");
     } catch (err) { toast.error(friendlyError(err, "تعذر رفع الصورة")); }
@@ -147,7 +147,7 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
 export default function DashboardHeroSlides() {
   const qc = useQueryClient();
 
-  // Use Supabase directly — bypasses base44 created_by filter.
+  // Use Supabase directly — bypasses api created_by filter.
   //
   // Order by updated_at DESC to match HeroSection.jsx's read pattern: both
   // sides agree on which row is "the active settings row", so saves here

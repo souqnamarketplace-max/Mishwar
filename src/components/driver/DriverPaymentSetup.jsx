@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, CreditCard, CheckCircle, AlertCircle, Wallet, Smartphone } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 
@@ -46,7 +46,7 @@ export default function DriverPaymentSetup({ user }) {
   });
 
   const save = useMutation({
-    mutationFn: (data) => base44.auth.updateMe(data),
+    mutationFn: (data) => api.auth.updateMe(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم حفظ بيانات الدفع ✅");

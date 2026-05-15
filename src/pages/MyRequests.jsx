@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { useSEO } from "@/hooks/useSEO";
 import { supabase } from "@/lib/supabase";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { friendlyError } from "@/lib/errors";
 import { toast } from "sonner";
 import { Plus, Inbox, ArrowLeft } from "lucide-react";
@@ -56,7 +56,7 @@ export default function MyRequests() {
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["my-trip-requests", user?.email],
-    queryFn: () => base44.entities.TripRequest.filter(
+    queryFn: () => api.entities.TripRequest.filter(
       { passenger_email: user.email }, "-created_at", 100
     ),
     enabled: !!user?.email,

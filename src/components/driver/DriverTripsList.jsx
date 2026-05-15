@@ -3,7 +3,7 @@ import DriverReviewWizard from "@/components/reviews/DriverReviewWizard";
 import GPSTripTracker from "@/components/driver/GPSTripTracker";
 import { createPortal } from "react-dom";
 import { logAudit } from "@/lib/adminAudit";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
@@ -34,7 +34,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
 
   const cancelMutation = useMutation({
     mutationFn: async (tripId) => {
-      await base44.entities.Trip.update(tripId, { status: "cancelled" });
+      await api.entities.Trip.update(tripId, { status: "cancelled" });
       // Pull BOTH pending and confirmed bookings on this trip so they
       // all get flipped to cancelled_by_driver. Previously this only
       // pulled confirmed bookings, leaving pending ones stuck — a
@@ -44,8 +44,8 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       // get out of that state.
       // Also captures the trip data here (name + cities) so we can
       // include them in the passenger notifications below.
-      const tripData = await base44.entities.Trip.get(tripId).catch(() => null);
-      const bookings = await base44.entities.Booking.filter(
+      const tripData = await api.entities.Trip.get(tripId).catch(() => null);
+      const bookings = await api.entities.Booking.filter(
         { trip_id: tripId },
         "-created_date",
         200
@@ -63,7 +63,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
           const refundFields = b.payment_status === "paid"
             ? { refund_required: true, refund_status: "pending" }
             : {};
-          return base44.entities.Booking.update(b.id, {
+          return api.entities.Booking.update(b.id, {
             status: "cancelled_by_driver",
             ...refundFields,
           });
@@ -146,7 +146,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.Trip.update(id, data),
     onMutate: async ({ id, data }) => {
       await qc.cancelQueries({ queryKey: ["trips"] });
       const prev = qc.getQueryData(["trips"]);
@@ -221,7 +221,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
 
   // Real-time subscription — status updates instantly without reload
   useEffect(() => {
-    const unsub = base44.entities.Trip.subscribe(() => {
+    const unsub = api.entities.Trip.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
     });
@@ -229,7 +229,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   }, [qc]);
 
   const editMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Trip.update(id, data),
+    mutationFn: ({ id, data }) => api.entities.Trip.update(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
       setEditingTrip(null);
@@ -239,7 +239,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Trip.delete(id),
+    mutationFn: (id) => api.entities.Trip.delete(id),
     onMutate: async (id) => {
       await qc.cancelQueries({ queryKey: ["trips"] });
       const prev = qc.getQueryData(["trips"]);

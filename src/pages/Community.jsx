@@ -1,7 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Users, Heart, Shield, Star, MapPin, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import EmptyState from "@/components/shared/EmptyState";
@@ -13,13 +13,13 @@ export default function Community() {
   const { data: drivers = [] } = useQuery({
     queryKey: ["community-top-drivers"],
     queryFn: async () => {
-      const list = await base44.entities.User.filter(
+      const list = await api.entities.User.filter(
         { account_type: "both" },
         "-total_rating",
         20
       );
       // Also include drivers
-      const drivers2 = await base44.entities.User.filter(
+      const drivers2 = await api.entities.User.filter(
         { account_type: "driver" },
         "-total_rating",
         20
@@ -33,12 +33,12 @@ export default function Community() {
 
   const { data: trips = [] } = useQuery({
     queryKey: ["community-trips"],
-    queryFn: () => base44.entities.Trip.list("-created_date", 200),
+    queryFn: () => api.entities.Trip.list("-created_date", 200),
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ["community-users-count"],
-    queryFn: () => base44.entities.User.list("-created_date", 1000),
+    queryFn: () => api.entities.User.list("-created_date", 1000),
   });
 
   // Compute popular routes from real trips

@@ -1,6 +1,6 @@
 import React from "react";
 import { logAudit } from "@/lib/adminAudit";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -59,7 +59,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
         if (error) throw error;
         return;
       }
-      await base44.entities.Booking.update(id, { status });
+      await api.entities.Booking.update(id, { status });
     },
     onMutate: async ({ id, status }) => {
       await qc.cancelQueries({ queryKey: ["bookings"] });
@@ -166,7 +166,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
   // the matching admin-side write lives in DashboardPayments.
   const markPaid = useMutation({
     mutationFn: async ({ id, paid }) => {
-      await base44.entities.Booking.update(id, {
+      await api.entities.Booking.update(id, {
         payment_status: paid ? "paid" : "pending",
         paid_at: paid ? new Date().toISOString() : null,
       });
@@ -182,7 +182,7 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
 
   // Realtime: booking list updates when any booking changes
   React.useEffect(() => {
-    const u = base44.entities.Booking.subscribe(() => {
+    const u = api.entities.Booking.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["driver-bookings"] });
       qc.invalidateQueries({ queryKey: ["bookings"] });
     });

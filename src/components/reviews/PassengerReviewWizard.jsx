@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { createPortal } from "react-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
 import { notifyUser } from "@/lib/notifyUser";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,7 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await base44.entities.Review.create({
+      await api.entities.Review.create({
         trip_id: trip.id,
         reviewer_name: passengerUser?.full_name || "راكب",
         reviewer_email: passengerUser?.email,

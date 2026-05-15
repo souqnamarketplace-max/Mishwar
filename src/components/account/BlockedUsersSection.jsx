@@ -12,7 +12,7 @@
  */
 import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { invalidateBlockCache } from "@/lib/blockUtils";
 import { Button } from "@/components/ui/button";
 import { Shield, X } from "lucide-react";
@@ -25,13 +25,13 @@ export default function BlockedUsersSection({ user }) {
   const { data: blocks = [], isLoading } = useQuery({
     queryKey: ["my-blocks-list", user?.email],
     queryFn: () => user?.email
-      ? base44.entities.UserBlock.filter({ blocker_email: user.email }, "-created_at", 200)
+      ? api.entities.UserBlock.filter({ blocker_email: user.email }, "-created_at", 200)
       : [],
     enabled: !!user?.email,
   });
 
   const unblockMutation = useMutation({
-    mutationFn: (id) => base44.entities.UserBlock.delete(id),
+    mutationFn: (id) => api.entities.UserBlock.delete(id),
     onSuccess: () => {
       // Invalidate every cache that filters by blocks: search results,
       // trip lists, the cached set in blockUtils, and our own list view.

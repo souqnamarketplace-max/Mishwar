@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import { useSEO } from "@/hooks/useSEO";
 import { supabase } from "@/lib/supabase";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { friendlyError } from "@/lib/errors";
 import { CITY_COORDS } from "@/lib/mapUtils";
 import { toast } from "sonner";
@@ -91,7 +91,7 @@ export default function RequestTrip() {
   const { data: activeCount = 0 } = useQuery({
     queryKey: ["my-active-request-count", user?.email],
     queryFn: async () => {
-      const list = await base44.entities.TripRequest.filter(
+      const list = await api.entities.TripRequest.filter(
         { passenger_email: user.email, status: "open" }, "-created_at", 10
       );
       return list?.length || 0;

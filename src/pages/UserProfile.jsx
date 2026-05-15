@@ -1,7 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import {
   Star, Car, MapPin, Calendar, Shield, Award,
@@ -43,7 +43,7 @@ export default function UserProfile() {
 
   const { data: currentUser } = useQuery({
     queryKey: ["me"],
-    queryFn: () => base44.auth.me(),
+    queryFn: () => api.auth.me(),
   });
 
   const isOwnProfile = !email || currentUser?.email === email;
@@ -54,7 +54,7 @@ export default function UserProfile() {
     queryKey: ["profile", targetEmail],
     queryFn: async () => {
       if (!targetEmail) return null;
-      const list = await base44.entities.User.filter({ email: targetEmail });
+      const list = await api.entities.User.filter({ email: targetEmail });
       return list?.[0] || null;
     },
     enabled: !!targetEmail,
@@ -64,7 +64,7 @@ export default function UserProfile() {
     queryKey: ["driver-trips", targetEmail],
     queryFn: () =>
       targetEmail
-        ? base44.entities.Trip.filter({ driver_email: targetEmail }, "-created_date", 50)
+        ? api.entities.Trip.filter({ driver_email: targetEmail }, "-created_date", 50)
         : [],
     // Only fetch driver-trips when this profile is a driver (saves a query for passenger profiles)
     enabled: !!targetEmail && (profile?.account_type === "driver" || profile?.account_type === "both"),
@@ -81,12 +81,12 @@ export default function UserProfile() {
       if (!targetEmail) return [];
       // Drivers: passengers rated them. Passengers: drivers rated them.
       return isDriverProfile
-        ? base44.entities.Review.filter(
+        ? api.entities.Review.filter(
             { driver_email: targetEmail, review_type: "passenger_rates_driver" },
             "-created_date",
             100
           )
-        : base44.entities.Review.filter(
+        : api.entities.Review.filter(
             { rated_user_email: targetEmail, review_type: "driver_rates_passenger" },
             "-created_date",
             100
@@ -99,7 +99,7 @@ export default function UserProfile() {
     queryKey: ["bookings", targetEmail],
     queryFn: () =>
       targetEmail
-        ? base44.entities.Booking.filter({ passenger_email: targetEmail }, "-created_date", 50)
+        ? api.entities.Booking.filter({ passenger_email: targetEmail }, "-created_date", 50)
         : [],
     enabled: !!targetEmail,
   });
@@ -224,7 +224,7 @@ export default function UserProfile() {
                   variant="outline" size="sm"
                   className="rounded-xl gap-1.5 h-9 text-destructive border-destructive/30 hover:bg-destructive/10"
                   onClick={async () => {
-                    try { await base44.auth.logout("/"); } catch {}
+                    try { await api.auth.logout("/"); } catch {}
                     window.location.href = "/";
                   }}
                 >

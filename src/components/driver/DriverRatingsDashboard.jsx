@@ -1,6 +1,6 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { Star, MessageCircle, TrendingUp } from "lucide-react";
 
 /**
@@ -20,7 +20,7 @@ export default function DriverRatingsDashboard({ user }) {
   // (trust/rating system), so this works without admin escalation.
   const { data: reviews = [], isLoading } = useQuery({
     queryKey: ["my-driver-reviews", user?.email],
-    queryFn: () => base44.entities.Review.filter(
+    queryFn: () => api.entities.Review.filter(
       { driver_email: user.email },
       "-created_at",
       500

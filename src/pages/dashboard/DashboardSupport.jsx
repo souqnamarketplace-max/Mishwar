@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";

@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { logAdminAction } from "@/lib/adminAudit";
 import { notifyUser } from "@/lib/notifyUser";
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/apiClient";
 import { formatArabicDate } from "@/lib/validation";
 import {
   Wallet, CheckCircle, XCircle, Clock, ImageIcon, FileText, ExternalLink,

@@ -4,8 +4,8 @@
  *
  * Why this exists
  * ───────────────
- * Every dashboard tab originally called base44.entities.X.paginate(...).
- * The base44 SDK auto-injects a `created_by = auth.email()` filter on
+ * Every dashboard tab originally called api.entities.X.paginate(...).
+ * The api SDK auto-injects a `created_by = auth.email()` filter on
  * every entity read, which means an admin sees only the rows they
  * themselves created — usually zero. Live counts vs what admin saw
  * on production:
