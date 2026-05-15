@@ -122,8 +122,12 @@ export default function Onboarding() {
         city: form.city,
         bio: form.bio,
         avatar_url: avatarUrl,
+        // Gender is collected from every user at step 1 now (not just
+        // drivers), so persist it regardless of account_type. The
+        // migration 040 set-once trigger allows this first NULL→value
+        // transition; any further change is admin-only.
+        gender: form.gender,
         ...(accountType !== "passenger" ? {
-          gender: form.gender,
           car_model: form.car_model,
           car_year: form.car_year,
           car_color: form.car_color,
@@ -219,10 +223,12 @@ export default function Onboarding() {
     if (step === 1) {
       const phoneCheck = validatePhone(form.phone);
       if (phoneCheck.reason) { toast.error(phoneCheck.reason); return false; }
-      if (!form.city) { toast.error("يرجى اختيار مدينتك ⚠️"); return false; }
+      if (!form.city)   { toast.error("يرجى اختيار مدينتك ⚠️"); return false; }
+      // Gender — required for ALL users (moved from driver-only step 2
+      // so Google-OAuth passengers also land with their gender set).
+      if (!form.gender) { toast.error("يرجى اختيار الجنس ⚠️"); return false; }
     }
     if (step === 2 && isDriver) {
-      if (!form.gender)    { toast.error("يرجى اختيار الجنس ⚠️"); return false; }
       if (!form.car_model) { toast.error("يرجى إدخال موديل السيارة ⚠️"); return false; }
       if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
     }
@@ -403,6 +409,31 @@ export default function Onboarding() {
                       onChange={(city) => setForm({ ...form, city })}
                     />
                   </div>
+                  {/* Gender — required for ALL users at onboarding (not just
+                      drivers as the previous design had it). This solves
+                      the Google-OAuth flow: Google no longer exposes gender
+                      in OIDC scopes, so passengers signing up via Google
+                      end up with gender=NULL forever. By asking once at
+                      onboarding, every account is fully populated from day
+                      one. The migration 040 set-once trigger still applies
+                      — if a user makes a mistake here they have to contact
+                      support to change it, which is why the amber warning
+                      below tells them so up front. */}
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">الجنس <span className="text-destructive">*</span></label>
+                    <select
+                      value={form.gender || ""}
+                      onChange={(e) => setForm({ ...form, gender: e.target.value })}
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"
+                    >
+                      <option value="">— اختر الجنس —</option>
+                      <option value="male">👨 ذكر</option>
+                      <option value="female">👩 أنثى</option>
+                    </select>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5">
+                      ⚠️ يُحدَّد مرة واحدة فقط — للتغيير لاحقاً تواصل مع الدعم
+                    </p>
+                  </div>
                   <div>
                     <label className="text-sm font-medium mb-1 block">نبذة عنك (اختياري)</label>
                     <textarea
@@ -425,18 +456,9 @@ export default function Onboarding() {
                 <h2 className="text-lg font-bold text-foreground mb-2">بيانات سيارتك</h2>
                 <p className="text-sm text-muted-foreground mb-6">هذه المعلومات تظهر للركاب في رحلاتك</p>
                 <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">الجنس <span className="text-destructive">*</span></label>
-                    <select
-                      value={form.gender || ""}
-                      onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                      className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"
-                    >
-                      <option value="">اختر الجنس</option>
-                      <option value="male">👨 رجل</option>
-                      <option value="female">👩 امرأة</option>
-                    </select>
-                  </div>
+                  {/* Gender used to live here but moved to step 1 — every
+                      user (passenger or driver) now answers it once during
+                      the personal-info step rather than only drivers. */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-sm font-medium mb-1 block">موديل السيارة <span className="text-destructive">*</span></label>
