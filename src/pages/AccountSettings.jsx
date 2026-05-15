@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
-import { todayISO, isFutureOrToday, validatePhone } from "@/lib/validation";
+import { todayISO, isFutureOrToday, validatePhone, validatePasswordCompliance, passwordComplianceMessage, isValidEmail } from "@/lib/validation";
 import { compressImage } from "@/lib/compressImage";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
@@ -117,10 +117,6 @@ export default function AccountSettings() {
         captureException(error, { msg: "direct profile fetch failed in AccountSettings" });
         return null;
       }
-      // Intentional console output so users hitting this issue can paste
-      // the result to support. Once stable, remove this log.
-      // eslint-disable-next-line no-console
-      console.log("[AccountSettings] account_number from DB:", data?.account_number);
       return data;
     },
   });
@@ -150,8 +146,6 @@ export default function AccountSettings() {
           console.warn("[AccountSettings] self-heal RPC failed:", error);
           return;
         }
-        // eslint-disable-next-line no-console
-        console.log("[AccountSettings] self-heal RPC returned:", data);
         refetchProfileRow();
         qc.invalidateQueries({ queryKey: ["me"] });
       } catch (e) {
@@ -220,11 +214,19 @@ export default function AccountSettings() {
       toast.error("أدخل بريد إلكتروني جديد");
       return;
     }
+    if (!isValidEmail(email)) {
+      toast.error("صيغة البريد الإلكتروني غير صحيحة");
+      return;
+    }
     setEmailLoading(true);
     try {
       await api.auth.updateMe({ email });
       qc.invalidateQueries({ queryKey: ["me"] });
-      toast.success("تم تحديث البريد الإلكتروني بنجاح!");
+      // Supabase sends a confirmation email to the NEW address. Until
+      // the user clicks it, the email change isn't applied. Communicate
+      // this clearly instead of saying "تم تحديث" which suggests it's
+      // already done.
+      toast.success("تم إرسال رسالة تأكيد إلى البريد الجديد. اضغط الرابط لإكمال التغيير", { duration: 8000 });
     } catch (err) {
       toast.error(friendlyError(err, "تعذر تحديث البريد الإلكتروني"));
     }
@@ -240,13 +242,38 @@ export default function AccountSettings() {
       toast.error("كلمات المرور غير متطابقة");
       return;
     }
-    if (passwordForm.new.length < 8) {
-      toast.error("كلمة المرور يجب أن تكون 8 أحرف على الأقل");
+    if (passwordForm.new === passwordForm.current) {
+      toast.error("كلمة المرور الجديدة يجب أن تختلف عن الحالية");
+      return;
+    }
+    // Supabase password policy: 8 chars + lowercase + uppercase + digit.
+    // Without this client check, the server rejects with a generic 422
+    // and the user is left guessing what's wrong. Mirrors Login.jsx so
+    // the rules are consistent across signup, recovery, and change-password.
+    const compliance = validatePasswordCompliance(passwordForm.new);
+    if (compliance.missing.length > 0) {
+      toast.error(passwordComplianceMessage(compliance), { duration: 7000 });
       return;
     }
     setPasswordLoading(true);
     try {
-      // Note: You'll need to implement this in your backend auth service
+      // CRITICAL: verify the CURRENT password before allowing the change.
+      // Previously the UI asked for the current password but never checked
+      // it — anyone with an open session on a public computer could change
+      // the password without knowing the existing one. We re-authenticate
+      // by calling signInWithPassword on the user's own email. The session
+      // is unaffected by a successful sign-in to the same account, but a
+      // wrong password gets rejected cleanly here before the
+      // updateUser call.
+      const { error: verifyErr } = await supabase.auth.signInWithPassword({
+        email: user?.email,
+        password: passwordForm.current,
+      });
+      if (verifyErr) {
+        toast.error("كلمة المرور الحالية غير صحيحة");
+        setPasswordLoading(false);
+        return;
+      }
       await api.auth.updateMe({ password: passwordForm.new });
       setPasswordForm({ current: "", new: "", confirm: "" });
       qc.invalidateQueries({ queryKey: ["me"] });
@@ -277,21 +304,39 @@ export default function AccountSettings() {
   const uploadAvatar = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+    // MIME + size validation — was missing entirely. Users could
+    // upload a PDF, an .exe, or a 50MB raw camera photo. accept attr
+    // alone doesn't stop Android Capacitor pickers from passing any
+    // file through.
+    if (!file.type.startsWith("image/")) {
+      toast.error("يرجى رفع صورة بصيغة JPG / PNG / WebP");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("حجم الصورة يجب أن يكون أقل من 5 MB");
+      return;
+    }
+
     setAvatarLoading(true);
     try {
       const { file_url } = await api.integrations.Core.UploadFile({ file });
       await api.auth.updateMe({ avatar_url: file_url });
       setAvatar(file_url);
-      
-      // Update all user's trips with new avatar
+
+      // Update all user's trips with new avatar.
+      // Promise.allSettled (not all) so a single trip-update failure
+      // doesn't tank the whole operation. Without this, the avatar
+      // IS already saved on the profile by line above, but if any
+      // trip update fails the catch shows "تعذر رفع الصورة" — making
+      // the user think the upload failed entirely. With allSettled,
+      // we silently continue and let the next page-load reconcile.
       if (user?.email) {
         const userTrips = await api.entities.Trip.filter({ created_by: user.email }, "-created_date", 100);
-        await Promise.all(
+        await Promise.allSettled(
           userTrips.map(trip => api.entities.Trip.update(trip.id, { driver_avatar: file_url }))
         );
       }
-      
+
       qc.invalidateQueries({ queryKey: ["me"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["driver-trips"] });
@@ -379,15 +424,28 @@ export default function AccountSettings() {
       // shot drops from 6-8 MB to ~500 KB. PDFs pass through.
       const compressed = await compressImage(file).catch(() => file);
 
-      // Use Supabase storage directly (bypasses api upload).
-      // Path is UUID-namespaced so storage RLS policies in
-      // migrations/004_storage_hardening.sql can enforce ownership.
+      // PRIVATE bucket. License / car-reg / insurance / selfie are
+      // identity-grade PII — license numbers, ID photos, selfies. The
+      // legacy code here uploaded to 'uploads' (public-read) and stored
+      // the full publicUrl in the DB column, which meant anyone with
+      // the URL had permanent unauthenticated read access — including
+      // admins viewing audit logs that leaked URLs, support staff with
+      // screenshots, anyone who got hold of an admin export. The private
+      // bucket gates reads via createSignedUrl (60s TTL) plus the owner-
+      // or-admin RLS policy from migration 004. BecomeDriver.jsx has
+      // been doing this correctly since the wizard launched; this path
+      // was the inconsistent outlier. Display sites already handle both
+      // legacy public URLs and new private paths via resolveDocumentUrl.
       const ext = (compressed.name || file.name).split(".").pop();
       const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("uploads").upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage
+        .from("uploads-private")
+        .upload(path, compressed, { upsert: true });
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);
-      setUrl(publicUrl);
+      // Store the PATH, not a publicUrl. resolveDocumentUrl signs it
+      // at render time. Legacy rows with full URLs still display via
+      // the isPublicHttpUrl pass-through inside that helper.
+      setUrl(path);
       toast.success(`✅ تم رفع ${fileType} بنجاح`);
     } catch (err) {
       console.error("Upload error:", err);

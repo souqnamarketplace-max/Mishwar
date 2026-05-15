@@ -37,8 +37,8 @@ For each page:
 | 6 | CreateTrip.jsx | 1189 | ✅ done | 1 cross-page (payment method ID inconsistency across booking/display/creation surfaces — fixed in TripDetails) |
 | 7 | Onboarding.jsx | 738 | ✅ done | 2 real (no MIME validation on 4 uploads, no bio maxLength) |
 | 8 | Login.jsx | 866 | ✅ done | 3 real (rate-limit dead code, email format unchecked, rate-limit never reset on success) |
-| 9 | AccountSettings.jsx | 1340 | pending | |
-| 10 | BecomeDriver.jsx | 717 | pending | |
+| 9 | AccountSettings.jsx | 1341 | ✅ done | 6 real incl. 1 CRITICAL (license docs to public bucket, password no current-check, password no compliance, email no format check, avatar no MIME/size, Promise.all not allSettled, prod console.logs) |
+| 10 | BecomeDriver.jsx | 718 | ✅ done | 0 real (clean — uses uploads-private correctly; was the reference impl AccountSettings should have followed) |
 | 11 | UserProfile.jsx | 528 | pending | |
 | 12 | Dashboard.jsx | 512 | pending | |
 | 13 | RequestTrip.jsx | 462 | pending | |
@@ -174,6 +174,42 @@ A user at 4 attempts who finally gets the password right keeps the counter pinne
 
 **False alarms:**
 - Client-side rate limit being bypassable via incognito / devtools — true, but server-side Supabase rate limit handles it. Worth noting in comments (already done).
+
+### Page 9 — AccountSettings.jsx
+
+**🔴 CRITICAL — `uploadFile` writes identity-grade PII to the PUBLIC bucket**
+License photos, car registration documents, insurance documents, and identity selfies were being uploaded to the `'uploads'` bucket (public-read). The full publicUrl was stored in the DB column, meaning anyone with the URL had **permanent unauthenticated read access** to a driver's government ID, license photo, or selfie. URLs leak via screenshots, admin audit logs, support chats, anywhere they're referenced. BecomeDriver.jsx already does this correctly (uses `'uploads-private'` with signed-URL resolution via licenseUrls.js); AccountSettings was the inconsistent re-upload path. **Real privacy bug — App Store / GDPR concern.**
+**Fix:** route to `'uploads-private'`, store the path (not URL), let resolveDocumentUrl sign at render time. Legacy rows with full URLs continue working via the isPublicHttpUrl pass-through in that helper. ✅
+
+**🟠 HIGH — Password update never verified the current password**
+The form asked for the current password but never checked it. `supabase.auth.updateUser({ password })` only requires a valid session — anyone with an open session on a public computer could change the password without knowing the existing one. UI was lying to the user about what protection was in place.
+**Fix:** call `signInWithPassword` on the user's own email with the current password before allowing the change. Wrong → toast + early return. Right → continue to updateUser. (Re-authenticating to the same account doesn't disturb the active session.) ✅
+
+**🟠 HIGH — Password update missing Supabase policy compliance check**
+Same problem Login.jsx had: server requires lowercase + uppercase + digit + 8 chars but the client only checked length. Users typing 'alllowercase' got a generic 422 error.
+**Fix:** added `validatePasswordCompliance` check matching the rules used in signup and password recovery. Also added "new must differ from current" check — was missing. ✅
+
+**🟡 MEDIUM — Email update no format validation**
+Same as Login — any string went to Supabase, returned a generic error. Also: success toast claimed "تم تحديث" but Supabase actually emails a confirmation link to the NEW address; the change isn't applied until they click. Toast was misleading.
+**Fix:** added isValidEmail check; updated success toast to say "تم إرسال رسالة تأكيد إلى البريد الجديد" with longer duration. ✅
+
+**🟠 HIGH — Avatar upload no MIME or size validation**
+Same defect as Onboarding had (pre-batch-4 fix). Avatar bucket is public, so any uploaded file is permanently web-accessible.
+**Fix:** check `file.type.startsWith("image/")` + 5MB cap up front. ✅
+
+**🟡 MEDIUM — Avatar trip-update used Promise.all instead of allSettled**
+When the avatar updates, the page fetches the user's last 100 trips and updates each with a fresh `driver_avatar` URL. If ANY single trip-update failed (RLS race, deleted trip, etc.), `Promise.all` rejected the whole chain. The avatar IS already saved on the profile by that point, but the user sees "تعذر رفع الصورة" and thinks the entire upload failed.
+**Fix:** `Promise.allSettled` — partial failures tolerated, the profile-level avatar is the source of truth, trips reconcile on next read. ✅
+
+**🟡 LOW — Two production console.logs leaking account internals**
+One explicitly comment-marked "Once stable, remove this log." Page is now stable. The second logged the self-heal RPC result on every mount.
+**Fix:** removed both. ✅
+
+### Page 10 — BecomeDriver.jsx
+
+**No real bugs.** The wizard correctly uses `uploads-private` for all identity docs (the comment at line 169-177 explains exactly why), validates dates server-of-truth (re-checks on submit even if input min was bypassed), uses per-field uploading state for concurrent uploads, and properly hydrates from existing license rows for resume-after-rejection.
+
+This was the reference implementation that AccountSettings's uploadFile should have followed. ✅
 
 
 
