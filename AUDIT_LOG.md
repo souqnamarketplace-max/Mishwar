@@ -378,10 +378,10 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 26 | DriverVehicleEditor.jsx | 170 | ✅ done | 2 real (HIGH: same async-user data-loss as DriverPaymentSetup; MEDIUM: handleSave try/finally with no catch) |
 | 27 | StrikeStatusSection.jsx | 170 | ✅ done | 0 real (clean) |
 | 28 | PassengerPaymentsSection.jsx | 169 | ✅ done | 1 LOW (payment method ID shown raw instead of Arabic label) |
-| 29 | RequestCard.jsx | 143 | pending | |
-| 30 | StatsBar.jsx | 149 | pending | |
-| 31 | DashboardFilterBar.jsx | 149 | pending | |
-| 32 | LegalSheet.jsx | 133 | pending | |
+| 29 | RequestCard.jsx | 143 | ✅ done | 0 real (purely presentational, no state/effects/mutations) |
+| 30 | StatsBar.jsx | 149 | ✅ done | 0 real bugs; deferred follow-ups: User.list() + Trip.list(1000) inefficient at scale (count-via-list anti-pattern) |
+| 31 | DashboardFilterBar.jsx | 149 | ✅ done | 0 real (callers documented to debounce; date-range timezone handling correct) |
+| 32 | LegalSheet.jsx | 133 | ✅ done | 0 real (carefully implemented — ModalPortal, body scroll lock cleanup, Esc-to-close all correct) |
 | 33 | GPSTripTracker.jsx | 132 | pending | |
 | 34 | MyReportsSection.jsx | 104 | pending | |
 | 35 | PreferencesSection.jsx | 101 | pending | |
@@ -758,4 +758,35 @@ Minor: `Profile.filter({email}, "-created_at", 1)` could be simplified to a `.eq
 - The platform-newest-N anti-pattern (migrated to `.in('id', tripIds)` per-user lookup)
 - The cancelled-vs-pending payment_status confusion (explicit `badgeFor` hierarchy where status='cancelled' wins over payment_status='pending', precisely because `cancel_booking` RPC doesn't touch payment_status)
 - A `tripById` lookup that gracefully degrades to "رحلة" with date fallback
+
+
+## Component Batch 8 — Findings
+
+This batch ran unusually clean — **0 real bugs across 574 LOC**. All four components are well-implemented. Notes below for completeness.
+
+### Component 29 — RequestCard.jsx (143 LOC)
+
+Purely presentational. Receives `request` + `mode` + `onClick` + `action` as props; renders a card. No state, no effects, no mutations. The `fmtDate` and `fmtTime` helpers handle edge cases (null, NaN, past dates) gracefully. Minor polish: "بعد 2 أيام" is grammatically incorrect Arabic (should be "بعد يومين" — dual form), but this is a localisation polish item, not a bug.
+
+### Component 30 — StatsBar.jsx (149 LOC)
+
+The data-correctness defenses are good: `validRatings.filter(r => typeof r.rating === "number" && !isNaN(r.rating))` prevents a single bad row producing "NaN/5" on the public homepage. The `public_stats_enabled` + `min_users` gates prevent inflated launch-day stats.
+
+**Deferred follow-ups (NOT fixed — beyond batch scope):**
+- `api.entities.User.list()` (line 61) fetches all profile rows just to compute `users.length`. At scale this becomes wasteful (5MB+ for 10k users). Should be a server-side COUNT.
+- `Trip.list("-created_date", 1000)` (line 56) fetches up to 1000 trips for `completedTrips` count and `cities` Set derivation. Beyond row 1000, both counts are inaccurate — older completed trips drop off, older route pairs disappear from the unique-city Set. The platform isn't there yet, but this is a marketing surface where inflated/deflated numbers risk app-store scrutiny.
+
+Both are "count-via-list" anti-patterns. The proper fix is a server-side aggregate RPC. Not in this batch; flag for the deferred follow-up list.
+
+### Component 31 — DashboardFilterBar.jsx (149 LOC)
+
+Reusable. Documents its no-debounce contract explicitly ("Page should debounce or use staleTime if needed."). All callers verified to use `setSearchAndReset` style handlers that update react-query keys — react-query handles request cancellation correctly, so no broken behaviour, just inefficiency.
+
+The `resolveDateRange` helper at the bottom correctly interprets local-time dates and converts to UTC ISO bounds — which is the right behaviour for admin filters (admin thinks in local time, data stored in UTC).
+
+### Component 32 — LegalSheet.jsx (133 LOC)
+
+Exemplary. Comments explain every design choice: why a modal not a route navigation (preserves form state), why ModalPortal (escapes parent transform stacking context), why dvh on parent + overflow-y-auto on content (scrollable text while close button stays visible), why both Esc-to-close and backdrop tap (desktop + mobile parity).
+
+Body-scroll-lock cleanup correctly captures `prev = body.style.overflow` and restores it on unmount AND when `kind` changes to null.
 
