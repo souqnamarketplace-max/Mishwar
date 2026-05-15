@@ -93,34 +93,73 @@ export default function AccountSettings() {
     }
   }, [user]);
 
-  // Self-heal: if the user is loaded but has no account_number (e.g.
-  // they signed up before migration 041 ran, or one of the triggers
-  // didn't fire for them), silently call the ensure_my_account_number
-  // RPC (migration 043) which assigns one. Then invalidate the ["me"]
-  // cache so the page re-fetches and displays the new value. Runs at
-  // most once per page-load — if the RPC fails (e.g. migration not
-  // yet applied), Sentry captures it and the user simply sees the
-  // UUID fallback as before.
+  // ── Account number — fetched DIRECTLY from the profiles table ──────
+  // Bypasses api.auth.me's picker logic entirely. The previous approach
+  // tried to surface account_number through auth.me's explicit field-
+  // list mapping, which has caching layers, deploy-timing risks, and
+  // requires every change to propagate through the api shim. Direct
+  // fetch via supabase-js means: if the DB has the column populated,
+  // the page sees it within ~200ms of mount, end of story.
+  const { data: profileRow, refetch: refetchProfileRow } = useQuery({
+    queryKey: ["account-number-direct", user?.id],
+    enabled: !!user?.id,
+    staleTime: 0,        // always treat as stale — we want fresh on every mount
+    refetchOnMount: true,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("account_number")
+        .eq("id", user.id)
+        .single();
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.warn("[AccountSettings] direct profile fetch failed:", error);
+        captureException(error, { msg: "direct profile fetch failed in AccountSettings" });
+        return null;
+      }
+      // Intentional console output so users hitting this issue can paste
+      // the result to support. Once stable, remove this log.
+      // eslint-disable-next-line no-console
+      console.log("[AccountSettings] account_number from DB:", data?.account_number);
+      return data;
+    },
+  });
+
+  // The value the UI actually displays. Tries:
+  //   1. Direct fetch from profiles (most reliable, no picker in the way)
+  //   2. Whatever auth.me returned (works if commit 047e771 deployed)
+  //   3. null (falls back to the UUID display)
+  const accountNumber = profileRow?.account_number ?? user?.account_number ?? null;
+
+  // Self-heal: if the direct fetch came back NULL (column hasn't been
+  // populated for this user yet), call ensure_my_account_number RPC
+  // and refetch our local query. This works even if React Query's
+  // ["me"] cache is stale — we only need our own queryKey to refresh.
   useEffect(() => {
     if (!user?.id) return;
-    if (user.account_number != null) return;
+    if (profileRow === undefined) return;            // still loading
+    if (profileRow?.account_number != null) return;  // already set
     let cancelled = false;
     (async () => {
       try {
-        const { error } = await supabase.rpc("ensure_my_account_number");
+        const { data, error } = await supabase.rpc("ensure_my_account_number");
         if (cancelled) return;
         if (error) {
           captureException(error, { msg: "ensure_my_account_number RPC failed" });
+          // eslint-disable-next-line no-console
+          console.warn("[AccountSettings] self-heal RPC failed:", error);
           return;
         }
-        // Refetch the user object so the UI picks up the new value.
+        // eslint-disable-next-line no-console
+        console.log("[AccountSettings] self-heal RPC returned:", data);
+        refetchProfileRow();
         qc.invalidateQueries({ queryKey: ["me"] });
       } catch (e) {
         if (!cancelled) captureException(e, { msg: "ensure_my_account_number threw" });
       }
     })();
     return () => { cancelled = true; };
-  }, [user?.id, user?.account_number, qc]);
+  }, [user?.id, profileRow, refetchProfileRow, qc]);
 
   useEffect(() => {
     if (driverLicense) {
@@ -670,25 +709,25 @@ export default function AccountSettings() {
             <div
               className={
                 "mt-1 px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 font-mono tracking-wider " +
-                (user?.account_number != null
+                (accountNumber != null
                   ? "border-primary/30 bg-primary/5 text-primary text-base font-bold"
                   : "border-border bg-muted/30 text-foreground text-sm")
               }
               dir="ltr"
             >
               <span>
-                {user?.account_number != null
-                  ? `M-${user.account_number}`
+                {accountNumber != null
+                  ? `M-${accountNumber}`
                   : user?.id
                   ? `MSH-${String(user.id).slice(0, 4).toUpperCase()}-${String(user.id).slice(4, 8).toUpperCase()}`
                   : "—"}
               </span>
-              {(user?.account_number != null || user?.id) && (
+              {(accountNumber != null || user?.id) && (
                 <button
                   type="button"
                   onClick={() => {
-                    const idForCopy = user?.account_number != null
-                      ? `M-${user.account_number}`
+                    const idForCopy = accountNumber != null
+                      ? `M-${accountNumber}`
                       : String(user.id);
                     navigator.clipboard?.writeText(idForCopy)
                       .then(() => toast.success("تم نسخ المعرّف"))
