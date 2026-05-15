@@ -7,6 +7,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/api/apiClient";
 import { friendlyError } from "@/lib/errors";
+import { logAudit } from "@/lib/adminAudit";
 import { CITY_COORDS } from "@/lib/mapUtils";
 import { toast } from "sonner";
 import { ArrowLeft, MapPin, Calendar, Clock, Users, DollarSign, Info, AlertCircle, ShieldCheck } from "lucide-react";
@@ -155,11 +156,24 @@ export default function RequestTrip() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("تم نشر طلبك! سيظهر للسائقين فوراً 🎉");
       qc.invalidateQueries({ queryKey: ["my-trip-requests"] });
       qc.invalidateQueries({ queryKey: ["my-active-request-count"] });
       qc.invalidateQueries({ queryKey: ["public-open-requests-count"] });
+      // Audit log — trip requests (passenger posts 'I want a ride
+      // from X to Y, who's going?') were unaudited. This is the
+      // passenger-side equivalent of trip_created (driver-side).
+      // Captures route, date, suggested price for activity-feed
+      // visibility.
+      logAudit("trip_request_created", "trip_request", data?.id || null, {
+        passenger_email:  user?.email,
+        route:            `${form.from_city} → ${form.to_city}`,
+        date:             form.requested_date,
+        time_flexibility: form.time_flexibility,
+        seats_needed:     form.seats_needed,
+        suggested_price:  form.suggested_price,
+      });
       navigate("/my-requests");
     },
     onError: (err) => {

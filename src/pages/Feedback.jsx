@@ -3,6 +3,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { logAudit } from "@/lib/adminAudit";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { MessageSquarePlus, Lightbulb, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronUp, Send } from "lucide-react";
@@ -68,10 +69,20 @@ export default function Feedback() {
       });
       return ticket;
     },
-    onSuccess: () => {
+    onSuccess: (ticket) => {
       toast.success("تم إرسال ملاحظتك بنجاح! سنرد عليك قريباً 🙏");
       setSubject(""); setMessage(""); setType("suggestion"); setCategory("أخرى");
       qc.invalidateQueries({ queryKey: ["my-tickets", user?.email] });
+      // Audit log — feedback / complaint / praise submissions are
+      // a key signal admins need to track for support workload
+      // planning. Captures the type (complaint vs suggestion vs
+      // praise) so admins can answer 'how many complaints did we
+      // get this month' without scanning ticket subject lines.
+      logAudit("feedback_submitted", "feedback", ticket?.id || null, {
+        user_email: user?.email,
+        ticket_type: type,
+        category,
+      });
     },
     onError: (err) => toast.error(friendlyError(err, "تعذر إرسال الملاحظة — حاول مجدداً")),
   });

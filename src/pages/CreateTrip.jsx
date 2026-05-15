@@ -3,6 +3,7 @@ import DateInput from "@/components/shared/DateInput";
 import { checkDriverConflict } from "@/lib/tripScheduling";
 import { useSEO } from "@/hooks/useSEO";
 import { useOnboardingGate } from "@/hooks/useOnboardingGate";
+import { logAudit } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { useNavigate } from "react-router-dom";
@@ -447,6 +448,26 @@ export default function CreateTrip() {
       qc.invalidateQueries({ queryKey: ["my-driver-trips"] });
       qc.invalidateQueries({ queryKey: ["featured-trips"] });
 
+      // Audit log — one entry per successfully-created trip so each
+      // shows in the activity feed individually (rather than a single
+      // batched "5 trips created" row that loses per-trip detail).
+      // Failures are intentionally skipped — the trip doesn't exist
+      // to reference.
+      succeeded.forEach((r) => {
+        const trip = r.value;
+        if (trip?.id) {
+          logAudit("trip_created", "trip", trip.id, {
+            route: `${baseData.from_city} → ${baseData.to_city}`,
+            date: trip.date,
+            time: baseData.time,
+            price: baseData.price,
+            seats: baseData.available_seats,
+            recurring: true,
+            driver_email: user?.email,
+          });
+        }
+      });
+
       if (failed.length === 0) {
         toast.success(`تم نشر ${succeeded.length} رحلات متكررة بنجاح! 🎉`);
       } else if (succeeded.length === 0) {
@@ -480,6 +501,20 @@ export default function CreateTrip() {
         // trg_notify_matching_route_preferences trigger (migration 038)
         // synchronously inside Trip.create's transaction — no client
         // action needed.
+
+        // Audit log — trip creation was previously unaudited despite
+        // being the canonical 'a driver took action' event. With this
+        // entry, the activity log finally shows trip postings, and
+        // admin can answer "how many trips did driver X post this
+        // week" without scraping the trips table directly.
+        logAudit("trip_created", "trip", newTrip?.id || null, {
+          route: `${baseData.from_city} → ${baseData.to_city}`,
+          date: baseData.date,
+          time: baseData.time,
+          price: baseData.price,
+          seats: baseData.available_seats,
+          driver_email: user?.email,
+        });
       } catch (err) {
         const msg = err?.message || "";
         // SQL trigger errors come back with the Arabic text already

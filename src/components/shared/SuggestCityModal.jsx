@@ -4,6 +4,7 @@ import { MapPin, X, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { logAudit } from "@/lib/adminAudit";
 import { toast } from "sonner";
 
 /**
@@ -60,6 +61,16 @@ export default function SuggestCityModal({ initialName, onClose }) {
           title: "🗺️ اقتراح مدينة جديدة",
           message: `اقترح مستخدم إضافة "${cleanName}"${notes.trim() ? ` — ${notes.trim().slice(0, 120)}` : ""}`,
           link: "/dashboard?tab=cities",
+        });
+        // Audit log — city suggestions were unaudited. The
+        // city_suggestion_approved / _rejected events were logged
+        // when admin acted on them (DashboardCities.jsx), but the
+        // initial submission wasn't, leaving a gap from 'user
+        // suggested X' to 'admin approved X'. Now the trail is
+        // continuous.
+        logAudit("city_suggested", "city_suggestion", data?.id || null, {
+          city_name: cleanName,
+          has_notes: !!notes.trim(),
         });
         setStage("success");
       }

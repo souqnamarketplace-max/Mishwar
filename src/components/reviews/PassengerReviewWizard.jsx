@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { logAudit } from "@/lib/adminAudit";
 
 function StarPicker({ value, onChange }) {
   return (
@@ -94,6 +95,19 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
           link: "/dashboard?tab=reviews",
         });
       }
+      // Audit log — passenger reviews were unaudited. Captures
+      // rating, driver_email, trip_id so admin can answer 'how
+      // many 1-star reviews did driver X get this month' from the
+      // activity feed alone.
+      logAudit("passenger_review_submitted", "review", trip.id, {
+        passenger_email: passengerUser?.email,
+        driver_email:    driverEmail,
+        trip_id:         trip.id,
+        rating,
+        has_public_text: !!publicReview,
+        has_private_msg: !!privateMsg,
+        low_rating:      rating <= 2,
+      });
       setStep(5);
     } catch (err) {
       toast.error(friendlyError(err, "تعذر إرسال التقييم"));

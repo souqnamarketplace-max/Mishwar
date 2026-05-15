@@ -28,6 +28,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { logAudit } from "@/lib/adminAudit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -347,8 +348,20 @@ function SubscribeForm({ user, price, periodDays, settings, variant = "new", onS
       });
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("✓ تم إرسال طلبك. ستصلك رسالة فور المراجعة");
+      // Audit log — subscription requests were previously unaudited.
+      // Captures payment_method, variant (new vs renewal), reference,
+      // and amount so admins can answer 'how many subscription
+      // requests came via Reflect last week' from the activity feed
+      // alone, without scanning the driver_subscriptions table.
+      logAudit("subscription_requested", "driver_subscription", data?.id || null, {
+        driver_email: user.email,
+        variant,
+        payment_method: data?.payment_method,
+        payment_reference: data?.payment_reference,
+        amount: data?.amount,
+      });
       onSubmitted?.();
     },
     onError: (err) => toast.error(friendlyError(err, "فشل الإرسال")),

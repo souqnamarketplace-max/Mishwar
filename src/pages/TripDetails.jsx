@@ -22,6 +22,7 @@ import { buildTripSlug, parseTripIdFromSlug } from "@/lib/slug";
 import { friendlyError } from "@/lib/errors";
 import { useBlockedEmails } from "@/lib/blockUtils";
 import { useOnboardingGate } from "@/hooks/useOnboardingGate";
+import { logAudit } from "@/lib/adminAudit";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -215,7 +216,7 @@ export default function TripDetails() {
       return data;
     },
     onMutate: () => null,
-    onSuccess: () => {
+    onSuccess: (data) => {
       setShowConfirm(false);
       setJustBooked(true);
       toast.success("تم إرسال طلب الحجز! بانتظار موافقة السائق 🎉");
@@ -223,6 +224,22 @@ export default function TripDetails() {
       qc.invalidateQueries({ queryKey: ["my-passenger-bookings"] });
       qc.invalidateQueries({ queryKey: ["trips"] });
       qc.invalidateQueries({ queryKey: ["trip", id] });
+
+      // Audit log — booking creation was unaudited. This entry is
+      // what makes "this passenger booked Trip X" appear in the
+      // activity feed. Server-side, the book_seat RPC has the
+      // canonical record (bookings.id, created_at), but for the
+      // audit trail we need an explicit row that admins can query
+      // by passenger_email or trip_id without joining bookings.
+      logAudit("booking_created", "booking", data?.id || null, {
+        trip_id: tripData?.id,
+        route: tripData ? `${tripData.from_city} → ${tripData.to_city}` : null,
+        date: tripData?.date,
+        passenger_email: user?.email,
+        driver_email: tripData?.driver_email,
+        payment_method: selectedPayment,
+        seats: 1,
+      });
     },
     onError: (err) => {
       setShowConfirm(false);

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Star, ChevronLeft, ChevronRight, Check, X, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { logAudit } from "@/lib/adminAudit";
 
 // ── Star picker ───────────────────────────────────────────────────────────────
 function StarPicker({ value, onChange }) {
@@ -104,6 +105,23 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
             });
           }
         }
+
+        // Audit log — one row per passenger rated (whether they
+        // showed up or not). Captures rating + no_show flag for two
+        // reasons: (1) admins reviewing complaints ('driver claimed
+        // I didn't show up but I did') have a server-stamped record
+        // to compare against the passenger's claim; (2) aggregate
+        // rating stats per driver can be derived from the audit log
+        // alone, no need to scan the reviews table.
+        logAudit("driver_review_submitted", "review", trip.id, {
+          driver_email:    driverUser?.email,
+          passenger_email: p.email,
+          trip_id:         trip.id,
+          rating:          p.showed_up ? p.rating : null,
+          no_show:         !p.showed_up,
+          has_public_text: !!p.public_review,
+          has_private_msg: !!p.private_message,
+        });
       }));
       setStep(5);
     } catch (e) {

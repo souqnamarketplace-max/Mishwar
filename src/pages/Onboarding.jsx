@@ -8,6 +8,7 @@ import { readSessionUserId } from "@/lib/session";
 import React, { useState } from "react";
 import { api } from "@/api/apiClient";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { logAudit } from "@/lib/adminAudit";
 import { supabase } from "@/lib/supabase";
 import DriverPaymentSetupInline from "@/components/driver/DriverPaymentSetup";
 import { useAuth } from "@/lib/AuthContext";
@@ -165,6 +166,18 @@ export default function Onboarding() {
       // CRITICAL: refresh AuthContext BEFORE navigating, otherwise the redirect guard
       // in App.jsx still sees onboarding_completed=false and bounces back here (loop bug)
       await refreshUser();
+
+      // Audit log — onboarding completion is the canonical
+      // "user joined the platform with a chosen role" event. Captures
+      // account_type (passenger / driver / both) so admins can answer
+      // "how many drivers signed up this week" without joining
+      // multiple tables. Done before navigate so the audit row is
+      // committed even if navigation fails for any reason.
+      logAudit("onboarding_completed", "user", user?.id || null, {
+        user_email: user?.email,
+        account_type: accountType,
+        has_license: accountType === "driver" || accountType === "both",
+      });
 
       // Honor ?returnTo so users routed here by the onboarding gate
       // (useOnboardingGate, e.g. from Book / Send Message / Post Trip)

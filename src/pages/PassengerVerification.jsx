@@ -6,6 +6,7 @@ import { useSEO } from "@/hooks/useSEO";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { logAudit } from "@/lib/adminAudit";
 import { toast } from "sonner";
 import {
   ArrowLeft, ShieldCheck, AlertCircle, Clock, CheckCircle2,
@@ -125,6 +126,12 @@ export default function PassengerVerification() {
         message: `${user?.full_name || user?.email} أرسل طلب توثيق هوية. اضغط لمراجعة الطلب.`,
         link:    "/dashboard?tab=passenger-verifications",
       }).catch(() => { /* non-fatal */ });
+      // Audit log — verification submissions are a major user
+      // action. Previously the admin only saw them in the dashboard
+      // queue, not in the activity feed. Now both surfaces have it.
+      logAudit("passenger_verification_submitted", "passenger_verification", null, {
+        user_email: user?.email,
+      });
     },
     onError: (err) => toast.error(friendlyError(err, "تعذر إرسال طلب التوثيق")),
   });
