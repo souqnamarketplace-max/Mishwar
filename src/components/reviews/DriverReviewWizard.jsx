@@ -79,6 +79,13 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
               message: `كتب السائق تقييماً عن رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
               type: "system",
               trip_id: trip.id,
+              // Lands the passenger on their completed trips where
+              // the new review attaches to the trip card. Routing-lib
+              // would have caught this via the 'تقييم' title fallback
+              // → /driver?tab=my-ratings, but that's the DRIVER's
+              // ratings tab, wrong recipient. Explicit link removes
+              // the ambiguity.
+              link: "/my-trips?tab=completed",
             });
           }
           // 4. Private message as notification
@@ -89,6 +96,11 @@ export default function DriverReviewWizard({ trip, passengers, driverUser, onClo
               message: p.private_message,
               type: "system",
               trip_id: trip.id,
+              // Private message has the full text in the body — taking
+              // the user to /notifications lets them scroll back and
+              // re-read it, mark it read manually, etc. (Trip details
+              // page doesn't surface the private message anywhere.)
+              link: "/notifications",
             });
           }
         }

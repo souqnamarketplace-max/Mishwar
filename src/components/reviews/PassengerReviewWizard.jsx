@@ -61,6 +61,12 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
           message: `حصلت على ${rating} نجوم للرحلة من ${trip.from_city} إلى ${trip.to_city}${publicReview ? `: "${publicReview}"` : ""}`,
           type: "system",
           trip_id: trip.id,
+          // Driver's ratings tab — note the id is 'my-ratings', not
+          // 'ratings' as the legacy routing fallback had it. The
+          // routing-lib fix landed in the same audit commit; this
+          // explicit link guarantees the right destination even if
+          // routing.js gets edited.
+          link: "/driver?tab=my-ratings",
         });
       }
       if (privateMsg) {
@@ -70,6 +76,10 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
           message: privateMsg,
           type: "system",
           trip_id: trip.id,
+          // Same rationale as the driver→passenger private message:
+          // the body carries the full text; /notifications is where
+          // the user can scroll back and re-read it.
+          link: "/notifications",
         });
       }
       // Low-rating signal to admin — gives admin a quality signal to

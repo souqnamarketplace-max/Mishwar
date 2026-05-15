@@ -143,7 +143,17 @@ export default function MyTrips() {
             message: `${user.full_name || user.email} ألغى حجزه في رحلتك من ${trip.from_city} إلى ${trip.to_city}`,
             type: "system",
             trip_id: trip.id,
-            link: "/my-trips?tab=driver",
+            // Driver lands on the passenger-management tab of their
+            // dashboard — where they can see who's left, message the
+            // remaining riders, mark the trip cancelled if it's now
+            // empty, etc. The previous link '/my-trips?tab=driver'
+            // pointed to a tab that doesn't exist in MyTrips (only
+            // 'all/confirmed/in_progress/completed/cancelled' are
+            // valid) so the deep-link silently fell back to 'all'
+            // and the driver had to manually navigate to find the
+            // cancellation. Bug since ~mig 027; fixed in the full
+            // notification audit (this commit).
+            link: "/driver?tab=passengers",
           });
         }
       } catch (e) { console.warn("[Notif] booking_cancelled:", e?.message); }

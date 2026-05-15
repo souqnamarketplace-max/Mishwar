@@ -42,12 +42,20 @@ export function getNotifTarget(notif) {
   if (notif.trip_id) {
     // Booking requests → driver dashboard's passengers tab
     if (t.includes("حجز جديد") || t.includes("طلب حجز")) return "/driver?tab=passengers";
+    // A passenger cancelled / their pending booking auto-expired —
+    // driver is the recipient. Send them to passenger-management for
+    // remaining riders. Catches:
+    //   - migration 036 cascade title 'تم إلغاء حجز معلق'
+    //   - any legacy variant
+    if (t.includes("إلغاء حجز") && t.includes("معلق")) return "/driver?tab=passengers";
     // Trip started/completed for passenger → my trips
     if (t.includes("انطلقت") || t.includes("اكتملت") || t.includes("قيّم السائق")) return "/my-trips";
     // New trip match → trip details
     if (type === "new_trip") return `/trip/${notif.trip_id}`;
-    // Rating received → driver ratings
-    if (t.includes("تقييم جديد")) return "/driver?tab=ratings";
+    // Rating received → driver's ratings tab. The tab id is 'my-ratings'
+    // (per DriverDashboard.jsx TABS list); 'ratings' was the historical
+    // name and is the bug we keep hitting — fixed once and for all here.
+    if (t.includes("تقييم جديد")) return "/driver?tab=my-ratings";
     // Default with trip_id → trip details
     return `/trip/${notif.trip_id}`;
   }
@@ -66,7 +74,10 @@ export function getNotifTarget(notif) {
 
   // 4. Title-based fallback for legacy rows with no link, no trip_id,
   //    and a generic type='system'
-  if (t.includes("تقييم")) return "/driver?tab=ratings";
+  if (t.includes("تقييم")) return "/driver?tab=my-ratings";
+  // Subscription warning — title pattern from migration 010 (pre-047
+  // these rows had no link). Driver lands on subscription renewal tab.
+  if (t.includes("ينتهي اشتراكك")) return "/driver?tab=subscription";
   if (t.includes("حجز"))   return "/my-trips";
 
   // 5. No actionable destination — let caller decide whether to navigate

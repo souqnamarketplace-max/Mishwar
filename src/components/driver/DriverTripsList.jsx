@@ -94,7 +94,10 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                 : "ابحث عن رحلة بديلة على نفس المسار."),
             type: "system",
             trip_id: tripId,
-            link: "/my-trips",
+            // Cancelled by driver — passenger lands on الملغاة tab where
+            // the booking's reason field renders 'ألغاه السائق' so they
+            // can immediately see who triggered it.
+            link: "/my-trips?tab=cancelled",
           })
         )
       );
@@ -173,6 +176,9 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             message: `السائق ${trip?.driver_name || ""} انطلق من ${trip?.from_city} إلى ${trip?.to_city}. استعد للوصول خلال ${trip?.duration || "المدة المحددة"}.`,
             type: "system",
             trip_id: id,
+            // Live trip → land in the in-progress tab where the user
+            // sees the trip's live status, can message the driver, etc.
+            link: "/my-trips?tab=in_progress",
           })
         ));
         // Audit log — trip lifecycle transitions were previously
@@ -200,6 +206,10 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             message: `وصلت رحلتك من ${trip?.from_city} إلى ${trip?.to_city} مع السائق ${trip?.driver_name || ""}. شكراً لاستخدامك مشوارو! اذهب إلى رحلاتي وقيّم السائق لمساعدة المجتمع.`,
             type: "system",
             trip_id: id,
+            // Lands on completed tab — taps the trip → opens the
+            // PassengerReviewWizard so they can rate the driver
+            // straight from the notification.
+            link: "/my-trips?tab=completed",
           })
         ));
         // Same rationale as the in_progress branch above. Distinct

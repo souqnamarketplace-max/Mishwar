@@ -37,6 +37,9 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
           message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مشواروو!`,
           type: "system",
           trip_id: trip.id,
+          // Lands passenger on their completed-trips tab so they can
+          // tap the trip and trigger the PassengerReviewWizard.
+          link: "/my-trips?tab=completed",
         })
       ));
       qc.invalidateQueries({ queryKey: ["trips"] });

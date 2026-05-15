@@ -67,6 +67,11 @@ export default function ExpiredTripNotifier({ user }) {
               : `رحلتك من ${trip.from_city} إلى ${trip.to_city} الساعة ${trip.time} بدأت للتو. تحقق من الركاب وأكّد إتمام الرحلة.`,
             type: "system",
             trip_id: trip.id,
+            // Driver lands on their trips tab where they can mark the
+            // trip complete, see remaining passengers, etc. The
+            // notification is the prompt to act, the link is the
+            // shortcut to the actioning surface.
+            link: "/driver?tab=trips",
             is_read: false,
           });
           if (error) throw error;
