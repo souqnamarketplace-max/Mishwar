@@ -326,6 +326,7 @@ export default function Notifications() {
                 <div
                   key={notif.id}
                   className={`bg-card rounded-2xl border p-4 transition-all cursor-pointer hover:shadow-sm ${!notif.is_read ? "border-primary/30 bg-primary/5" : "border-border"}`}
+                  style={{ touchAction: "manipulation" }}
                   onClick={async () => {
                     // Mark-as-read uses the unified hook — handles
                     // optimistic flip, RLS no-op detection, and rollback.

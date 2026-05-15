@@ -35,6 +35,14 @@ export default function NotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 60, left: 8, width: 340 });
   const btnRef = useRef(null);
+  // popupRef points at the portaled motion.div. The outside-click
+  // handler must check this in addition to btnRef — without it, every
+  // click inside the popup is treated as "outside the bell" because
+  // the popup is portaled to document.body (not nested inside the
+  // bell button). That race closes the popup on mousedown/touchstart
+  // BEFORE the row's onClick fires on click/touchend, which is why
+  // most taps on the bell rows did nothing on mobile.
+  const popupRef = useRef(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -110,11 +118,20 @@ export default function NotificationBell({ userEmail }) {
   // page can't disagree about which rows are read.
   const { markRead, markAllRead, removeNotif } = useNotificationActions(userEmail);
 
-  // Close on outside click
+  // Close on outside click. Critical: both refs must be checked.
+  // btnRef = the trigger button (not portaled). popupRef = the popup
+  // motion.div (portaled to document.body via createPortal). A click
+  // inside EITHER counts as "inside the bell" and should not close.
+  // If we only checked btnRef, every tap on a notification row would
+  // fire setOpen(false) on touchstart (the popup is outside btnRef
+  // because it's in a portal), the popup would unmount before click
+  // fires, and the row's onClick would never run.
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (popupRef.current && popupRef.current.contains(e.target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     document.addEventListener("touchstart", handler);
@@ -173,6 +190,7 @@ export default function NotificationBell({ userEmail }) {
         <AnimatePresence>
           {open && (
             <motion.div
+              ref={popupRef}
               initial={{ opacity: 0, y: -6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
@@ -231,6 +249,7 @@ export default function NotificationBell({ userEmail }) {
                 ) : notifications.map(notif => (
                   <div key={notif.id}
                     className={`flex items-center gap-3 px-3 py-3 hover:bg-muted/40 transition-colors cursor-pointer group ${!notif.is_read ? "bg-primary/5" : ""}`}
+                    style={{ touchAction: "manipulation" }}
                     onClick={() => handleNotifClick(notif)}>
 
                     {/* Icon */}
@@ -248,14 +267,23 @@ export default function NotificationBell({ userEmail }) {
                       </p>
                     </div>
 
-                    {/* Unread dot + delete */}
+                    {/* Unread dot + delete.
+                        The delete button used to be `opacity-0
+                        group-hover:opacity-100` — invisible without
+                        hover. On mobile (no hover state) the button
+                        was permanently invisible BUT still occupied
+                        space and stopped propagation, so taps on the
+                        right edge of the row silently did nothing
+                        because they were hitting an invisible
+                        button. Now always at 50% opacity (visible
+                        but unobtrusive), full opacity on hover. */}
                     <div className="flex flex-col items-center gap-1.5 shrink-0">
                       {!notif.is_read && (
                         <div className="w-2 h-2 rounded-full bg-primary" />
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); removeNotif(notif.id); }}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-muted transition-opacity"
+                        className="opacity-50 hover:opacity-100 p-1 rounded-lg hover:bg-muted transition-opacity"
                         aria-label="حذف">
                         <X className="w-3 h-3 text-muted-foreground" />
                       </button>

@@ -64,6 +64,11 @@ export default function AdminNotificationBell({ userEmail }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 60, left: 8, width: 360 });
   const btnRef = useRef(null);
+  // popupRef points at the portaled motion.div. Same fix as
+  // NotificationBell — without checking it in the outside-click
+  // handler, every tap inside the popup race-closes before its
+  // own onClick can fire on mobile.
+  const popupRef = useRef(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -156,11 +161,15 @@ export default function AdminNotificationBell({ userEmail }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-bell-notifications", userEmail] }),
   });
 
-  // Close on outside click
+  // Close on outside click. See NotificationBell.jsx for why both
+  // refs must be checked — the popup is portaled to document.body
+  // and would otherwise be classified as "outside" on every tap.
   useEffect(() => {
     if (!open) return;
     const handler = (e) => {
-      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false);
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (popupRef.current && popupRef.current.contains(e.target)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     document.addEventListener("touchstart", handler);
@@ -211,6 +220,7 @@ export default function AdminNotificationBell({ userEmail }) {
         <AnimatePresence>
           {open && (
             <motion.div
+              ref={popupRef}
               initial={{ opacity: 0, y: -6, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -6, scale: 0.98 }}
@@ -269,6 +279,7 @@ export default function AdminNotificationBell({ userEmail }) {
                     <button
                       key={notif.id}
                       onClick={() => handleNotifClick(notif)}
+                      style={{ touchAction: "manipulation" }}
                       className={`w-full text-right px-3 py-2.5 hover:bg-muted/50 transition-colors border-b border-border/30 flex items-start gap-2.5 ${
                         !notif.is_read ? "bg-primary/5" : ""
                       }`}
