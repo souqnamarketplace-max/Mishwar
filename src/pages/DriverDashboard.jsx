@@ -1,6 +1,7 @@
 import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useRef, useEffect } from "react";
 import { api } from "@/api/apiClient";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Car, Users, DollarSign, Star, ChevronDown, Plus, X,
@@ -128,7 +129,17 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
     acc[m] = (acc[m] || 0) + (b.total_price || 0);
     return acc;
   }, {});
-  const methodLabel = { cash: "نقداً 💵", bank_transfer: "تحويل 🏦", reflect: "Reflect 💜", jawwal_pay: "Jawwal 📱", card: "بطاقة 💳" };
+  const methodLabel = {
+    cash:          "نقداً 💵",
+    bank_transfer: "تحويل 🏦",
+    reflect:       "Reflect 💜",
+    jawwal_pay:    "Jawwal 📱",
+    // Was 'card'; CreateTrip emits 'credit_card'. Drivers taking
+    // credit-card payments were seeing the raw 'credit_card' string
+    // here as fallback (via `methodLabel[method] || method`) instead
+    // of a friendly Arabic label.
+    credit_card:   "بطاقة 💳",
+  };
 
   return (
     <div className="space-y-4" dir="rtl">
@@ -201,12 +212,31 @@ export default function DriverDashboard() {
   });
 
   const tripIds = trips.map(t => t.id);
-  const { data: allBookings = [] } = useQuery({
-    queryKey: ["driver-bookings", user?.email],
-    queryFn: () => api.entities.Booking.list("-created_date", 500),
-    enabled: !!user?.email,
+  // Query bookings for THIS driver's trips, not the platform's newest 500.
+  // The previous `Booking.list('-created_date', 500)` returned the
+  // platform's most-recently-created bookings and filtered client-side
+  // to tripIds — meaning a driver with bookings on trips older than
+  // the 500 newest platform bookings would silently lose them from
+  // this view. Critically, `totalEarnings` is derived from this set —
+  // so the driver's REPORTED EARNINGS would be UNDERSTATED, and their
+  // earnings tab would show ₪0 for older trips that still had paid
+  // bookings on them. Same anti-pattern as the MyTrips critical fix.
+  //
+  // Empty tripIds (driver hasn't published anything yet) → skip the
+  // query entirely; bookings stays as the default [] from useQuery.
+  const { data: bookings = [] } = useQuery({
+    queryKey: ["driver-bookings", user?.email, tripIds.join(",")],
+    queryFn: async () => {
+      if (tripIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .in("trip_id", tripIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user?.email && tripIds.length > 0,
   });
-  const bookings = allBookings.filter(b => tripIds.includes(b.trip_id));
 
   const totalEarnings    = bookings.filter(b => b.status === "confirmed" || b.status === "completed").reduce((s, b) => s + (b.total_price || 0), 0);
   const totalPassengers  = bookings.filter(b => b.status !== "cancelled").length;

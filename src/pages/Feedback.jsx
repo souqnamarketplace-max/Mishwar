@@ -58,21 +58,27 @@ export default function Feedback() {
         status: "open",
         priority: type === "complaint" ? "high" : "normal",
       });
-      // Notify admin so it shows up in the dashboard bell. Fire-and-forget;
-      // a failure here shouldn't block the user's success toast.
-      const typeLabel = TYPES.find(t => t.id === type)?.label || type;
-      const titleEmoji = type === "complaint" ? "⚠️" : type === "praise" ? "💚" : "💡";
-      await notifyAdmin({
-        title: `${titleEmoji} ${typeLabel} جديد${type === "complaint" ? "ة" : ""} من ${user?.full_name || "مستخدم"}`,
-        message: (subject || message).slice(0, 200),
-        link: "/dashboard?tab=feedback",
-      });
       return ticket;
     },
     onSuccess: (ticket) => {
       toast.success("تم إرسال ملاحظتك بنجاح! سنرد عليك قريباً 🙏");
       setSubject(""); setMessage(""); setType("suggestion"); setCategory("أخرى");
       qc.invalidateQueries({ queryKey: ["my-tickets", user?.email] });
+      // Notify admin so it shows up in the dashboard bell. Truly
+      // fire-and-forget now — moved out of the mutationFn await
+      // chain. Previously it was awaited there, so if the admin
+      // notification insert failed (RLS edge case, network blip),
+      // the WHOLE mutation rejected — the user saw 'تعذر إرسال
+      // الملاحظة' even though their ticket was already created.
+      // Now: ticket creation is authoritative success; admin ping
+      // is best-effort decoration.
+      const typeLabel = TYPES.find(t => t.id === type)?.label || type;
+      const titleEmoji = type === "complaint" ? "⚠️" : type === "praise" ? "💚" : "💡";
+      notifyAdmin({
+        title: `${titleEmoji} ${typeLabel} جديد${type === "complaint" ? "ة" : ""} من ${user?.full_name || "مستخدم"}`,
+        message: (subject || message).slice(0, 200),
+        link: "/dashboard?tab=feedback",
+      }).catch(() => { /* non-fatal — ticket is already saved */ });
       // Audit log — feedback / complaint / praise submissions are
       // a key signal admins need to track for support workload
       // planning. Captures the type (complaint vs suggestion vs
@@ -134,6 +140,7 @@ export default function Feedback() {
         <p className="text-sm font-bold mb-2">الموضوع</p>
         <input value={subject} onChange={e => setSubject(e.target.value)}
           placeholder="عنوان مختصر لملاحظتك..."
+          maxLength={200}
           className="w-full h-11 px-4 rounded-xl bg-muted/50 border border-border text-sm focus:outline-none focus:border-primary mb-4" />
 
         {/* Message */}
@@ -141,7 +148,17 @@ export default function Feedback() {
         <textarea value={message} onChange={e => setMessage(e.target.value)}
           placeholder="اكتب ملاحظتك بالتفصيل..."
           rows={4}
-          className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border text-sm focus:outline-none focus:border-primary resize-none mb-4" />
+          maxLength={2000}
+          className="w-full px-4 py-3 rounded-xl bg-muted/50 border border-border text-sm focus:outline-none focus:border-primary resize-none mb-1" />
+        {/* Live counter — appears once over 80% of cap, red at 95%+.
+            Without a length limit, users could paste essays into the
+            DB. 2000 chars is plenty for a support ticket description. */}
+        {message.length > 1600 && (
+          <p className={`text-[10px] mb-3 text-left ${message.length > 1900 ? "text-destructive" : "text-muted-foreground"}`}>
+            {message.length} / 2000
+          </p>
+        )}
+        {message.length <= 1600 && <div className="mb-3" />}
 
         <Button onClick={() => submit.mutate()} disabled={!message.trim() || submit.isPending}
           className="w-full h-11 rounded-xl font-bold gap-2 bg-primary text-primary-foreground">

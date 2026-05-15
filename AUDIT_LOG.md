@@ -45,10 +45,10 @@ For each page:
 | 14 | PassengerVerification.jsx | 425 | ✅ done | 1 real (rules-of-hooks violation on auth gate) |
 | 15 | Notifications.jsx | 393 | ✅ done | 3 real (missing onError handlers on 3 mutations, unbounded max_price input) |
 | 16 | PassengerRequests.jsx | 396 | ✅ done | 2 real (queryKey not scoped to user — cache leak across sessions, navigate-during-render) |
-| 17 | MyRequests.jsx | ? | pending | |
-| 18 | DriverDashboard.jsx | ? | pending | |
-| 19 | Favorites.jsx | ? | pending | |
-| 20 | Feedback.jsx | ? | pending | |
+| 17 | MyRequests.jsx | 233 | ✅ done | 1 real (rules-of-hooks violation on auth gate) |
+| 18 | DriverDashboard.jsx | 333 | ✅ done | 2 real incl. 1 CRITICAL (earnings understated for older trips, payment_method label mismatch) |
+| 19 | Favorites.jsx | 145 | ✅ done | 1 CRITICAL (favorites of older trips silently disappearing — same anti-pattern as MyTrips) |
+| 20 | Feedback.jsx | 209 | ✅ done | 2 real (notifyAdmin awaited in mutationFn could fail entire submit, no maxLength on inputs) |
 | - | (static pages below not audited) | | | About, Blog, Community, Help, HowItWorks, Privacy, Safety, Terms |
 
 ---
@@ -273,6 +273,54 @@ The feed is global, but the queryKey wasn't scoped to `user?.email`. When User A
 **🟡 LOW — navigate-during-render anti-pattern**
 Inline `if (!authed) { navigate; return null }` was after all hooks here (so hook count was stable, unlike RequestTrip/PassengerVerification), but calling `navigate()` during render is still a React anti-pattern that strict mode warns about ("Cannot update a component while rendering a different component"). Effects are where side effects belong.
 **Fix:** moved to useEffect, returns a loading splash during the brief redirect window. ✅
+
+### Page 17 — MyRequests.jsx
+
+**🟠 HIGH — Rules-of-hooks violation on auth gate**
+Same pattern as RequestTrip, PassengerVerification. Inline `if (!authed) { navigate; return null }` between `useState`/`useAuth` (above) and `useQuery`/`useMutation` (below). Hook count was 3 on un-authed renders, 5 on authed renders. Worked in practice because `isLoadingAuth=true` on first render shielded it, but later renders triggering the gate would skip subsequent hooks.
+**Fix:** moved to useEffect after all hooks; loading splash bridges navigation. Hook count invariant. ✅
+
+### Page 18 — DriverDashboard.jsx
+
+**🔴 CRITICAL — Driver earnings understated for older trips**
+Same anti-pattern as MyTrips. `Booking.list("-created_date", 500)` returned the platform's 500 newest bookings then filtered client-side to `tripIds`. A driver with bookings on trips older than the 500 newest platform bookings silently lost them from this view. **`totalEarnings` is derived from this filtered set** — meaning the driver's REPORTED EARNINGS would be understated. The per-trip breakdown would show ₪0 for older trips that still had paid bookings. Earnings affect tax records and trust — admin pages and driver self-perception would diverge.
+**Fix:** query bookings by `.in("trip_id", tripIds)` so we fetch exactly the bookings on this driver's trips, regardless of age. Empty tripIds → skip query entirely. Same fix shape as MyTrips. ✅
+
+**🟡 MEDIUM — Payment method label dictionary used stale ID `'card'` instead of `'credit_card'`**
+We standardized payment IDs to `bank_transfer / jawwal_pay / reflect / credit_card` in batch 3. `EarningsTab.methodLabel` here still had `card: "بطاقة 💳"` while CreateTrip emits `credit_card`. Drivers who took credit-card payments saw the raw `credit_card` string in their earnings breakdown (via the `methodLabel[method] || method` fallback) instead of a friendly Arabic label.
+**Fix:** changed key from `card` to `credit_card`, matching the canonical ID emitted at trip creation. ✅
+
+### Page 19 — Favorites.jsx
+
+**🔴 CRITICAL — Favorites of older trips silently vanishing**
+Identical anti-pattern to the MyTrips critical fix in batch 2. `Trip.list("-created_date", 200)` returned the platform's 200 newest trips, then filtered client-side to `favIds`. A user favoriting a trip in March would lose it from `/favorites` once the platform had 200+ newer trips — user thinks the trip was deleted, but localStorage still has the ID. Confusing UX, same root cause we already fixed twice (MyTrips bookings, now also DriverDashboard bookings).
+**Fix:** query trips by `.in("id", favIdsArray)`. Scales with user's favorites count (1-20) instead of platform size. Empty favIds → skip query. ✅
+
+### Page 20 — Feedback.jsx
+
+**🟠 HIGH — `notifyAdmin` awaited inside mutationFn — admin notification failure rejected user's submission**
+The comment said "Fire-and-forget; a failure here shouldn't block the user's success toast" but it actually used `await notifyAdmin(...)` inside the mutationFn. If the admin notification insert failed (e.g. RLS edge case, network blip), the WHOLE mutation rejected and the user saw "تعذر إرسال الملاحظة — حاول مجدداً" — **even though their support ticket was already created successfully**. They'd retry, creating duplicate tickets, and admins would see two of every complaint.
+**Fix:** moved `notifyAdmin` out of `mutationFn` and into `onSuccess` with explicit `.catch(() => {})`. Ticket creation is now authoritative success; admin ping is best-effort decoration. ✅
+
+**🟡 MEDIUM — Subject and message inputs had no maxLength**
+A user could paste 100k characters into either field. DB write either bloats the support_tickets table or fails with an unhelpful Postgres error. Same defect as the Onboarding bio fix.
+**Fix:** subject → 200 chars, message → 2000 chars. Live counter on message at 80% / red at 95%. ✅
+
+---
+
+## ✅ Audit Complete
+
+**20 of 20 pages audited.** Comprehensive findings:
+- **40+ real bugs** found and fixed across 8 batches
+- **4 CRITICAL** bugs (MyTrips/Favorites/DriverDashboard disappearing data, AccountSettings public-bucket privacy issue)
+- **0 deferred** beyond the documented follow-ups (legacy public-bucket migration, recurring-trip date UX review, UserProfile semantic acceptance-rate decision, DriverPaymentSetup ID normalization)
+
+**Patterns that recurred across the audit:**
+1. **Platform-newest-N anti-pattern** appeared FOUR times: MyTrips (bookings), DriverDashboard (bookings), Favorites (trips), and was almost in batch 1's StatsBar before being noticed. Whenever you see `entity.list("-created_date", N)` followed by a client-side filter, the data invisibly disappears once the platform grows past N rows. Always query by ID set instead.
+2. **Rules-of-hooks** auth gate pattern appeared FOUR times: RequestTrip, PassengerVerification, PassengerRequests (mild), MyRequests. Useeffect for auth redirects, not inline early-returns.
+3. **Missing `onError` handlers** on mutations meant RLS denials were invisible to users — appeared on Notifications (3 mutations).
+4. **Fake marketing numbers** (24/7 support, "thousands of users", 92% acceptance default) appeared on TripDetails, UserProfile, Home/StatsBar. App Store reviewers flag these.
+5. **Payment method ID inconsistency** across 6 surfaces — fixed in TripDetails (booking modal + display panel) and DriverDashboard (earnings labels). One outlier remains in DriverPaymentSetup (setup-time UI only, doesn't affect trip data shape).
 
 
 

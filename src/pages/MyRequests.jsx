@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
@@ -49,10 +49,10 @@ export default function MyRequests() {
   // modal is showing.
   const [cancelTargetId, setCancelTargetId] = useState(null);
 
-  if (!isLoadingAuth && !isAuthenticated) {
-    navigate("/login?returnTo=/my-requests", { replace: true });
-    return null;
-  }
+  // NOTE: auth-gate redirect is handled by useEffect AFTER all hooks
+  // below. Doing it inline here (`if (!authed) { navigate; return null }`)
+  // changes hook count across renders because the useQuery and
+  // useMutation calls below would be skipped on un-authed renders.
 
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["my-trip-requests", user?.email],
@@ -75,6 +75,22 @@ export default function MyRequests() {
     },
     onError: (err) => toast.error(friendlyError(err, "تعذر الإلغاء")),
   });
+
+  // Auth gate — runs as a side-effect after all hooks, never
+  // changing hook count between renders.
+  useEffect(() => {
+    if (!isLoadingAuth && !isAuthenticated) {
+      navigate("/login?returnTo=/my-requests", { replace: true });
+    }
+  }, [isLoadingAuth, isAuthenticated, navigate]);
+
+  if (!isLoadingAuth && !isAuthenticated) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   const open    = requests.filter(r => r.status === "open");
   const closed  = requests.filter(r => r.status !== "open");

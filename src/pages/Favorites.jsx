@@ -2,6 +2,7 @@ import { useSEO } from "@/hooks/useSEO";
 import React, { useState, useCallback } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { Heart, Search, Bell, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -17,17 +18,38 @@ export default function Favorites() {
     queryFn: () => api.auth.me(),
   });
 
-  const { data: trips = [], isLoading } = useQuery({
-    queryKey: ["trips-all"],
-    queryFn: () => api.entities.Trip.list("-created_date", 200),
-  });
-
   // Read/write favorites from localStorage
   const favKey = `mishwar-favs-${user?.email || "anon"}`;
   const getFavIds = useCallback(() => {
     try { return new Set(JSON.parse(localStorage.getItem(favKey) || "[]")); }
     catch { return new Set(); }
   }, [favKey]);
+
+  const favIds = getFavIds();
+  const favIdsArray = Array.from(favIds);
+
+  // Query only the trips matching favorited IDs. Previously this was
+  // `Trip.list('-created_date', 200)` which returned the platform's
+  // 200 newest trips, then filtered client-side to favIds. The
+  // moment the platform had 200+ trips newer than a favorited trip,
+  // that favorite vanished from the page — user thinks the trip was
+  // deleted, but it's just outside the fetch window. Identical bug
+  // pattern to the MyTrips critical fix from batch 2. Now we fetch
+  // by id, so the result set scales with the user's favorites
+  // count (typically 1-20) instead of platform size.
+  const { data: trips = [], isLoading } = useQuery({
+    queryKey: ["fav-trips", favIdsArray.join(",")],
+    queryFn: async () => {
+      if (favIdsArray.length === 0) return [];
+      const { data, error } = await supabase
+        .from("trips")
+        .select("*")
+        .in("id", favIdsArray);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: favIdsArray.length > 0,
+  });
 
   const removeFav = (tripId) => {
     const favs = getFavIds();
@@ -36,12 +58,11 @@ export default function Favorites() {
     forceUpdate(n => n + 1); // re-render without reload
   };
 
-  const favIds = getFavIds();
   // Filter out expired trips — a passenger favorited a trip in March,
   // it's now May, the trip has already happened. Showing it as a
   // bookable favorite is misleading. Stale favorites are silently
   // hidden but stay in localStorage in case they want a record.
-  const favTrips = trips.filter(t => favIds.has(t.id) && !isTripExpired(t));
+  const favTrips = trips.filter(t => !isTripExpired(t));
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6" dir="rtl">
