@@ -28,10 +28,14 @@ export default function AccountHub() {
   const [searchParams] = useSearchParams();
   const [section, setSection] = useState(searchParams.get("section") || null);
 
-  // Sync section state with URL query param when it changes (deep links from menu)
+  // Sync section state with URL query param. Previously this only
+  // updated when fromUrl was truthy — so a user navigating from
+  // /account?section=vehicle to /account (no params) ended up
+  // viewing the vehicle section even though the URL no longer
+  // requested it. The deep-link case still works because
+  // setSection(<string>) updates the rendered view.
   React.useEffect(() => {
-    const fromUrl = searchParams.get("section");
-    if (fromUrl) setSection(fromUrl);
+    setSection(searchParams.get("section") || null);
   }, [searchParams]);
 
   if (!user) {

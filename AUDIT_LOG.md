@@ -368,10 +368,12 @@ Plus retroactive fix: **DriverReviewWizard.jsx had the same defect as PassengerR
 | 19 | CityAutocomplete.jsx | 245 | ✅ done | 1 real (outside-click handler missing touchstart) |
 | 20 | PullToRefresh.jsx | 221 | ✅ done | 0 real (very carefully implemented; ref-based gesture, stable listeners) |
 | ★ | **apiClient.js subscribe()** | (~30 LOC change) | ✅ done | 1 CRITICAL (shared-channel teardown race — see below) |
-| 21 | DriverPaymentSetup.jsx | 217 | pending | |
-| 22 | AccountHub.jsx | 211 | pending | |
-| 23 | SuggestCityModal.jsx | 208 | pending | |
-| 24 | DriverRatingsDashboard.jsx | 185 | pending | |
+| 21 | DriverPaymentSetup.jsx | 217 | ✅ done | 2 real (HIGH: data loss — IBAN wiped when user loaded async; payment ID alignment from phase 1 follow-up) |
+| 22 | AccountHub.jsx | 211 | ✅ done | 1 real (section state didn't clear when URL param removed) |
+| 23 | SuggestCityModal.jsx | 208 | ✅ done | 1 real (best-effort notifications inside authoritative try — same pattern as review wizards) |
+| 24 | DriverRatingsDashboard.jsx | 185 | ✅ done | 1 real (review filter missed review_type — driver saw their OWN outgoing reviews mixed with incoming, inflating count + skewing average) |
+
+Plus retroactive: **UserHistorySection.jsx had the same review_type filter defect** — fixed alongside DriverRatingsDashboard. Admin's "متوسط التقييم" card for a driver was averaging ratings the driver gave passengers WITH ratings passengers gave the driver. Same fix.
 | 25 | DriverRatePassengers.jsx | 171 | pending | |
 | 26 | DriverVehicleEditor.jsx | 170 | pending | |
 | 27 | StrikeStatusSection.jsx | 170 | pending | |
@@ -622,4 +624,61 @@ Listened only to `mousedown`. On mobile, tap-outside doesn't always synthesise a
 ### Component 20 — PullToRefresh.jsx (221 LOC)
 
 **0 real bugs.** This component is unusually well-implemented. Ref-based gesture state (avoiding React batching races on touchend), stable listener attachment (no re-mount churn during a pull), explicit walk-up-the-DOM to find the actual scroll container, `passive: false` only on touchmove so preventDefault works, fallback to documentElement for desktop, refresh-in-progress lockout. All design choices are documented inline.
+
+
+## Component Batch 6 — Findings
+
+### Component 21 — DriverPaymentSetup.jsx (217 LOC)
+
+**🟠 HIGH — Data loss: previously-saved bank/Reflect/Jawwal/card fields wiped when user loads async**
+The state initializers `useState({ bank_iban: user?.bank_iban || "" })` only run on the FIRST render. If the parent passes `user=undefined` on first mount (auth still loading) and `user` resolves later with real data, the local state stays empty. Driver sees blank form, fills in some fields, clicks save → mutation PATCHes profile with `{bank_iban: "", ...}` → **wipes the previously-saved IBAN with an empty string**.
+
+`api.auth.updateMe` is a direct PATCH (verified — no merge logic on the server), so an empty value overwrites whatever was there.
+
+The driver couldn't be expected to know the field was already populated — they saw blank, so they re-typed what they remembered (which usually means: filled in the things visible on screen, left "optional" fields blank).
+**Fix:** added `useEffect` that re-hydrates ALL four state objects from `user` when `user.email` first becomes available. Tracked with `hydratedRef` to avoid clobbering in-progress edits when `me` is re-fetched later by another action. ✅
+
+**🟡 MEDIUM — Tab IDs didn't match canonical payment-method schema**
+The deferred follow-up from phase 1 batch 3 explicitly noted: "DriverPaymentSetup still uses 'bank' (setup-time UI only)". Updated to `bank_transfer` / `credit_card` to match CreateTrip's emit values and DriverDashboard.methodLabel's decode keys. Setup-time UI only (these IDs never reach booking/trip data shape), but resolves the inconsistency. ✅
+
+### Component 22 — AccountHub.jsx (211 LOC)
+
+**🟡 MEDIUM — Section state didn't clear when URL param was removed**
+```js
+React.useEffect(() => {
+  const fromUrl = searchParams.get("section");
+  if (fromUrl) setSection(fromUrl);   // ← only sets when truthy
+}, [searchParams]);
+```
+User on `/account?section=vehicle` had section state `"vehicle"`. If they then navigated (via Link, browser back, etc.) to `/account` with no params, `searchParams.get("section")` returned null, the `if (fromUrl)` guard was false, and section state stayed `"vehicle"` — the URL said "show the master list" but the UI kept showing the vehicle section.
+**Fix:** removed the truthiness guard. `setSection(searchParams.get("section") || null)` always tracks the URL. ✅
+
+### Component 23 — SuggestCityModal.jsx (208 LOC)
+
+**🟠 HIGH — Best-effort `notifyAdmin` + `logAudit` inside the authoritative submit try-catch**
+Same pattern as PassengerReviewWizard / DriverReviewWizard / Feedback. The `suggest_city` RPC creates the row; then notifyAdmin is awaited; then logAudit is called. All inside a single try-catch. If notifyAdmin failed (RLS edge case for the user's role, network blip), the catch fired with a "failed" toast — but the suggestion was already saved.
+
+Mitigation: the `suggest_city` RPC has built-in idempotency (dedupes by name, bumps duplicate_count). So even if the user retries on the misleading failure toast, no duplicate row is created. But the UX is still wrong — user thinks they failed and might give up.
+**Fix:** split into Phase 1 (RPC, authoritative) and Phase 2 (notifyAdmin + logAudit, fire-and-forget with their own .catch). Stage transition happens after Phase 1; Phase 2 runs in the background. ✅
+
+### Component 24 — DriverRatingsDashboard.jsx (185 LOC)
+
+**🟠 HIGH — Review filter missed `review_type` — driver saw their own OUTGOING reviews mixed with incoming**
+`Review.filter({ driver_email: user.email })` pulled BOTH directions of reviews:
+- Passenger-rates-driver (`review_type='passenger_rates_driver'`) — what the driver SHOULD see here ("how am I doing")
+- Driver-rates-passenger (`review_type='driver_rates_passenger'`) — the driver's OWN ratings of passengers (which ALSO carry `driver_email=me` because the driver IS the driver in both directions)
+
+Impact on the "تقييماتي" (My Ratings) tab:
+- **Inflated count.** Total review count was inflated by the driver's own outgoing reviews.
+- **Skewed average.** A driver rated 4.5 by passengers who gave passengers 3.0 ratings would see ~3.75. Completely misleading reputation signal.
+- **Histogram corrupted.** Star distribution included both directions.
+- **Confusing display.** `ReviewRow` shows `reviewer_name` — for the driver's own outgoing reviews, that's the driver's own name. So the driver saw their own name appear as a reviewer of themselves.
+
+**Fix:** added `review_type: "passenger_rates_driver"` to the filter. Incoming feedback only. ✅
+
+### Retroactive — UserHistorySection.jsx (same defect, same batch)
+
+Found the same defect by grep — UserHistorySection's admin "متوسط التقييم" card had the same unfiltered Review.filter. Admin investigating a user saw their reputation score corrupted by the user's own outgoing ratings. Same one-line fix (add `review_type: "passenger_rates_driver"`).
+
+**Audit-wide cross-check:** I greped for all `Review.filter` and `Review.list` calls. Other call sites already filter by review_type correctly (UserProfile.jsx, RatingSummary.jsx, ReviewsList.jsx, StatsBar.jsx, MyTrips.jsx, DriverRatePassengers.jsx). Only DriverRatingsDashboard + UserHistorySection were missing the filter.
 

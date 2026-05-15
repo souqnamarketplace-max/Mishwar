@@ -45,35 +45,19 @@ export default function SuggestCityModal({ initialName, onClose }) {
       return;
     }
     setSubmitting(true);
+
+    // ── Phase 1: AUTHORITATIVE — the suggest_city RPC.
+    // RPC has built-in idempotency (dedupes by name, returns existing
+    // id and bumps duplicate_count) so retries on transient failures
+    // are safe. Errors here surface to the user.
+    let data;
     try {
-      const { data, error } = await supabase.rpc("suggest_city", {
+      const result = await supabase.rpc("suggest_city", {
         p_name: cleanName,
         p_notes: notes.trim() || null,
       });
-      if (error) throw error;
-      // RPC returns NULL if the city already exists in admin_cities.
-      if (data === null) {
-        setStage("already_exists");
-      } else {
-        // Fire admin notification — admin will see this in the dashboard
-        // bell so they can review pending suggestions promptly.
-        await notifyAdmin({
-          title: "🗺️ اقتراح مدينة جديدة",
-          message: `اقترح مستخدم إضافة "${cleanName}"${notes.trim() ? ` — ${notes.trim().slice(0, 120)}` : ""}`,
-          link: "/dashboard?tab=cities",
-        });
-        // Audit log — city suggestions were unaudited. The
-        // city_suggestion_approved / _rejected events were logged
-        // when admin acted on them (DashboardCities.jsx), but the
-        // initial submission wasn't, leaving a gap from 'user
-        // suggested X' to 'admin approved X'. Now the trail is
-        // continuous.
-        logAudit("city_suggested", "city_suggestion", data?.id || null, {
-          city_name: cleanName,
-          has_notes: !!notes.trim(),
-        });
-        setStage("success");
-      }
+      if (result.error) throw result.error;
+      data = result.data;
     } catch (err) {
       const msg = err?.message || "فشل إرسال الطلب";
       // Most likely cause: user is not authenticated. Be specific.
@@ -82,9 +66,45 @@ export default function SuggestCityModal({ initialName, onClose }) {
       } else {
         toast.error(msg);
       }
-    } finally {
       setSubmitting(false);
+      return;
     }
+
+    // RPC returns NULL if the city already exists in admin_cities.
+    if (data === null) {
+      setStage("already_exists");
+      setSubmitting(false);
+      return;
+    }
+
+    // ── Phase 2: BEST-EFFORT side-effects. Suggestion is saved; do
+    //    not let admin-notification / audit failures surface a
+    //    misleading "failed" toast (this is the same defect we fixed
+    //    in PassengerReviewWizard, DriverReviewWizard, and Feedback —
+    //    when best-effort calls are awaited inside the same try as
+    //    the authoritative write, their failure looks like total
+    //    failure to the user).
+    notifyAdmin({
+      title: "🗺️ اقتراح مدينة جديدة",
+      message: `اقترح مستخدم إضافة "${cleanName}"${notes.trim() ? ` — ${notes.trim().slice(0, 120)}` : ""}`,
+      link: "/dashboard?tab=cities",
+    }).catch(() => { /* non-fatal — suggestion is already saved */ });
+
+    try {
+      // Audit log — city suggestions were unaudited. The
+      // city_suggestion_approved / _rejected events were logged
+      // when admin acted on them (DashboardCities.jsx), but the
+      // initial submission wasn't, leaving a gap from 'user
+      // suggested X' to 'admin approved X'. Now the trail is
+      // continuous.
+      logAudit("city_suggested", "city_suggestion", data?.id || null, {
+        city_name: cleanName,
+        has_notes: !!notes.trim(),
+      });
+    } catch { /* non-fatal */ }
+
+    setStage("success");
+    setSubmitting(false);
   };
 
   return createPortal(

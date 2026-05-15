@@ -2,7 +2,7 @@
  * DriverPaymentSetup — complete payout method configuration for drivers.
  * Supports: Bank Transfer, Reflect, Jawwal Pay, Card (info only)
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +12,17 @@ import { api } from "@/api/apiClient";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 
+// Tab IDs aligned with the canonical payment-method IDs that CreateTrip
+// emits and DriverDashboard.methodLabel decodes. This is setup-time UI
+// only — the tab ID never reaches a booking/trip row — but using the
+// canonical IDs avoids future surprises (e.g. if someone later wires
+// /driver?tab=payments&method=bank_transfer URL routing). Resolves the
+// documented follow-up from phase 1 batch 3.
 const TABS = [
-  { id: "bank",       label: "تحويل بنكي",  icon: Building2,  color: "text-blue-600"   },
-  { id: "reflect",    label: "Reflect",      icon: Wallet,     color: "text-purple-600" },
-  { id: "jawwal_pay", label: "Jawwal Pay",   icon: Smartphone, color: "text-green-600"  },
-  { id: "card",       label: "بطاقة",        icon: CreditCard, color: "text-rose-600"   },
+  { id: "bank_transfer", label: "تحويل بنكي",  icon: Building2,  color: "text-blue-600"   },
+  { id: "reflect",       label: "Reflect",      icon: Wallet,     color: "text-purple-600" },
+  { id: "jawwal_pay",    label: "Jawwal Pay",   icon: Smartphone, color: "text-green-600"  },
+  { id: "credit_card",   label: "بطاقة",        icon: CreditCard, color: "text-rose-600"   },
 ];
 
 function SavedBadge({ text }) {
@@ -29,21 +35,53 @@ function SavedBadge({ text }) {
 }
 
 export default function DriverPaymentSetup({ user }) {
-  const [tab, setTab] = useState("bank");
+  const [tab, setTab] = useState("bank_transfer");
   const qc = useQueryClient();
 
   const [bank, setBank] = useState({
     bank_name:           user?.bank_name           || "",
     bank_account_name:   user?.bank_account_name   || "",
     bank_account_number: user?.bank_account_number || "",
-    bank_iban:           user?.bank_iban            || "",
+    bank_iban:           user?.bank_iban           || "",
   });
   const [reflect,   setReflect]   = useState({ reflect_number:    user?.reflect_number    || "" });
-  const [jawwal,    setJawwal]    = useState({ jawwal_pay_number:  user?.jawwal_pay_number || "" });
+  const [jawwal,    setJawwal]    = useState({ jawwal_pay_number: user?.jawwal_pay_number || "" });
   const [card,      setCard]      = useState({
     card_holder_name: user?.card_holder_name || "",
     card_last_four:   user?.card_last_four   || "",
   });
+
+  // Sync state from user when it FIRST arrives. useState initializers
+  // only run on the very first render — if the parent passes user=undefined
+  // (auth still loading) and user resolves later, all four state objects
+  // stay at their initial empty values. The driver would then see empty
+  // fields, fill in some, click save, and the PATCH would send
+  // `{ bank_iban: "", ... }` OVERWRITING the previously-saved IBAN with
+  // empty string. Real data-loss bug.
+  //
+  // The hydratedRef ensures we only do this once per user.email — so a
+  // background re-fetch of `me` (triggered by some other action) doesn't
+  // clobber the driver's in-progress edits.
+  const hydratedRef = useRef(null);
+  useEffect(() => {
+    if (!user?.email) return;
+    if (hydratedRef.current === user.email) return;
+    hydratedRef.current = user.email;
+    setBank({
+      bank_name:           user.bank_name           || "",
+      bank_account_name:   user.bank_account_name   || "",
+      bank_account_number: user.bank_account_number || "",
+      bank_iban:           user.bank_iban           || "",
+    });
+    setReflect({ reflect_number:    user.reflect_number    || "" });
+    setJawwal({  jawwal_pay_number: user.jawwal_pay_number || "" });
+    setCard({
+      card_holder_name: user.card_holder_name || "",
+      card_last_four:   user.card_last_four   || "",
+    });
+  }, [user?.email, user?.bank_name, user?.bank_account_name, user?.bank_account_number,
+      user?.bank_iban, user?.reflect_number, user?.jawwal_pay_number,
+      user?.card_holder_name, user?.card_last_four]);
 
   const save = useMutation({
     mutationFn: (data) => api.auth.updateMe(data),
@@ -55,7 +93,7 @@ export default function DriverPaymentSetup({ user }) {
   });
 
   const handleSave = () => {
-    if (tab === "bank") {
+    if (tab === "bank_transfer") {
       if (!bank.bank_name || !bank.bank_account_name || !bank.bank_account_number) {
         toast.error("يرجى ملء اسم البنك واسم الحساب ورقمه");
         return;
@@ -67,7 +105,7 @@ export default function DriverPaymentSetup({ user }) {
     } else if (tab === "jawwal_pay") {
       if (!jawwal.jawwal_pay_number) { toast.error("أدخل رقم هاتف Jawwal Pay"); return; }
       save.mutate(jawwal);
-    } else if (tab === "card") {
+    } else if (tab === "credit_card") {
       if (!card.card_holder_name || !card.card_last_four) {
         toast.error("يرجى ملء اسم صاحب البطاقة وآخر 4 أرقام");
         return;
@@ -104,7 +142,7 @@ export default function DriverPaymentSetup({ user }) {
       </div>
 
       {/* Bank Transfer */}
-      {tab === "bank" && (
+      {tab === "bank_transfer" && (
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -179,7 +217,7 @@ export default function DriverPaymentSetup({ user }) {
       )}
 
       {/* Card (info only) */}
-      {tab === "card" && (
+      {tab === "credit_card" && (
         <div className="space-y-3">
           <div className="flex items-start gap-3 p-4 bg-amber-500/8 rounded-xl border border-amber-500/20">
             <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />

@@ -16,12 +16,26 @@ import { Star, MessageCircle, TrendingUp } from "lucide-react";
  *   - List of recent reviews with reviewer name, comment, date
  */
 export default function DriverRatingsDashboard({ user }) {
-  // Pull all reviews for this driver. Reviews table is publicly readable
-  // (trust/rating system), so this works without admin escalation.
+  // Pull all PASSENGER→DRIVER reviews for this driver. Reviews table is
+  // publicly readable (trust/rating system), so this works without
+  // admin escalation.
+  //
+  // Filter must include review_type='passenger_rates_driver'. The
+  // Review table has driver_email set on BOTH directions:
+  //   - DriverReviewWizard writes driver_email=me when the DRIVER rates
+  //     a passenger (review_type='driver_rates_passenger')
+  //   - PassengerReviewWizard writes driver_email=me when the PASSENGER
+  //     rates the driver (review_type='passenger_rates_driver')
+  // Without the type filter, this query returned BOTH directions —
+  // inflating the count, skewing the average toward whatever ratings
+  // the driver gave their passengers, and showing the driver's own
+  // name as "reviewer_name" on their own ratings tab. The "My Ratings"
+  // tab is for INCOMING feedback only; outgoing reviews live on
+  // "تقييم الركاب" (DriverRatePassengers).
   const { data: reviews = [], isLoading } = useQuery({
     queryKey: ["my-driver-reviews", user?.email],
     queryFn: () => api.entities.Review.filter(
-      { driver_email: user.email },
+      { driver_email: user.email, review_type: "passenger_rates_driver" },
       "-created_at",
       500
     ),

@@ -54,10 +54,20 @@ export default function UserHistorySection({ user }) {
     staleTime: 30_000,
   });
 
-  // Reviews of this user (only meaningful if driver)
+  // Reviews of this user as a driver. Filter to passenger_rates_driver
+  // only — the Review table has driver_email set on BOTH review
+  // directions, so without the type filter we'd be averaging the
+  // ratings PASSENGERS gave this driver together with the ratings
+  // this driver gave OTHER passengers (review_type='driver_rates_passenger').
+  // Same defect we fixed in DriverRatingsDashboard. This card surfaces
+  // 'how do passengers rate this driver', so passenger→driver only.
   const { data: reviews = [] } = useQuery({
     queryKey: ["admin-user-reviews", email],
-    queryFn: () => api.entities.Review.filter({ driver_email: email }, "-created_at", 500),
+    queryFn: () => api.entities.Review.filter(
+      { driver_email: email, review_type: "passenger_rates_driver" },
+      "-created_at",
+      500
+    ),
     enabled: !!email && isDriver,
     staleTime: 30_000,
   });
