@@ -41,10 +41,19 @@ export default function MyTrips() {
   useSEO({ title: "رحلاتي", description: "شاهد رحلاتك السابقة والقادمة" });
 
   const [confirmCancel, setConfirmCancel] = useState({ open: false, bookingId: null, reason: "" });
-  const [activeTab, setActiveTab] = useState("all");
+  const [searchParams] = useSearchParams();
+  // Read the tab from the URL on initial render so deep-links from
+  // notifications work: '/my-trips?tab=confirmed' lands on the upcoming
+  // tab, '/my-trips?tab=cancelled' on the cancelled tab. Validate
+  // against the known tab list so a malformed param falls back to
+  // 'all' rather than rendering an empty page.
+  const _validTabIds = tabs.map(t => t.id);
+  const _paramTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    _validTabIds.includes(_paramTab) ? _paramTab : "all"
+  );
   const [wizardTrip, setWizardTrip] = useState(null); // trip object for PassengerReviewWizard
   const qc = useQueryClient();
-  const [searchParams] = useSearchParams();
   const highlightTripId = searchParams.get("trip");
   const highlightRef = useRef(null);
 
@@ -422,6 +431,13 @@ export default function MyTrips() {
                                   label = "ألغاه السائق";
                                 } else if (reason === "driver_reject_popup") {
                                   label = "رفض السائق طلبك";
+                                } else if (reason === "auto_expired_no_driver_response") {
+                                  // Auto-cancelled because the trip departure
+                                  // passed with the booking still pending —
+                                  // migration 045 lazy-expires these. From
+                                  // the passenger's POV, the driver never
+                                  // responded and the trip is gone.
+                                  label = "انتهت مهلة الرد من السائق";
                                 } else {
                                   // Unknown / legacy reason — show neutral text
                                   label = "ملغاة";

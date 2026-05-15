@@ -108,6 +108,12 @@ export default function BookingRequestPopup({ user }) {
             message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}.`,
             type: "system",
             trip_id: booking.trip_id,
+            // Deep-link to the user's confirmed trips tab so the
+            // notification tap takes them straight to "my booked trips"
+            // — the user's words. MyTrips reads ?tab=X on mount
+            // (migration to that behaviour shipped in the same commit
+            // as this one).
+            link: "/my-trips?tab=confirmed",
           });
           logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
           toast.success("✅ تم قبول الحجز");
@@ -118,6 +124,9 @@ export default function BookingRequestPopup({ user }) {
             message: "نأسف، تم رفض طلب حجزك من قبل السائق.",
             type: "system",
             trip_id: booking.trip_id,
+            // Take the passenger to the cancelled tab where they can
+            // see WHO rejected it and find an alternative trip.
+            link: "/my-trips?tab=cancelled",
           });
           logAudit("driver_reject_booking", "booking", id, {
             passenger_email: booking.passenger_email,

@@ -102,6 +102,9 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
               message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}. تحقق من تفاصيل الدفع في صفحة تأكيد الحجز.`,
               type: "system",
               trip_id: booking.trip_id,
+              // Tap on the bell badge → user lands on their upcoming
+              // confirmed trips (the 'my booked trips' tab).
+              link: "/my-trips?tab=confirmed",
             });
             logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
             toast.success("تم قبول الحجز وإخطار الراكب ✅");
@@ -127,6 +130,9 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
                 message: "نأسف، قام السائق بإلغاء حجزك المؤكد. ابحث عن رحلة بديلة على نفس المسار.",
                 type: "system",
                 trip_id: booking.trip_id,
+                // Cancelled-by-driver lands them in the cancelled tab
+                // where the reason 'driver_cancel' renders 'ألغاه السائق'.
+                link: "/my-trips?tab=cancelled",
               });
               logAudit("driver_cancel_confirmed_booking", "booking", id, {
                 passenger_email: booking.passenger_email,
@@ -140,6 +146,9 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
                 message: "عذراً، قام السائق برفض حجزك. يمكنك البحث عن رحلة أخرى.",
                 type: "system",
                 trip_id: booking.trip_id,
+                // Rejection — passenger goes to cancelled tab, sees the
+                // 'رفض السائق طلبك' reason rendered by MyTrips.
+                link: "/my-trips?tab=cancelled",
               });
               logAudit("driver_reject_booking", "booking", id, {
                 passenger_email: booking.passenger_email,
