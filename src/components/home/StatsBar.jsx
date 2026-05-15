@@ -83,8 +83,15 @@ export default function StatsBar() {
 
   const completedTrips = trips.filter(t => t.status === "completed").length;
   const cities = new Set([...trips.map(t => t.from_city), ...trips.map(t => t.to_city)].filter(Boolean)).size;
-  const avgRating = reviews.length
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+  // Filter out null / non-numeric ratings before averaging. A single
+  // null in the dataset (e.g. a soft-deleted review whose rating was
+  // nulled, or a partial INSERT that landed in the table without a
+  // rating) would otherwise propagate through the reduce as NaN and
+  // the home page would display 'NaN/5' as the average — visibly
+  // broken on a marketing surface.
+  const validRatings = reviews.filter(r => typeof r.rating === "number" && !isNaN(r.rating));
+  const avgRating = validRatings.length
+    ? (validRatings.reduce((s, r) => s + r.rating, 0) / validRatings.length).toFixed(1)
     : null;
 
   // Each tile only appears if its underlying data is real and meaningful.

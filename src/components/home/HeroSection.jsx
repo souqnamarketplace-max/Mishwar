@@ -74,8 +74,38 @@ export default function HeroSection() {
       let slides = null;
       if (row.hero_city_slides) {
         const raw = row.hero_city_slides;
-        const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-        slides = Array.isArray(parsed) ? parsed.filter(s => s.active !== false) : null;
+        // Defensive parse — admin can edit app_settings rows via the
+        // raw SQL editor, which means hero_city_slides could be set to
+        // malformed JSON (or to a JSON that's structurally valid but
+        // doesn't match our slide shape). A throw here would propagate
+        // out of the queryFn and react-query would mark the query as
+        // errored, leaving the hero blank on every refresh. Better:
+        // log and fall through to the bundled fallback gradient.
+        let parsed = null;
+        try {
+          parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+        } catch (e) {
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn("[HeroSection] hero_city_slides is not valid JSON:", e);
+          }
+        }
+        // Strict shape check: each slide must be an object with an
+        // .img string. Without this, an array containing strings,
+        // numbers, or nulls (any of which is structurally valid JSON
+        // but not a slide) would survive the filter and crash later
+        // at s.img.replace(...) — a runtime TypeError that the React
+        // error boundary would catch and replace the whole hero with
+        // a fallback UI.
+        slides = Array.isArray(parsed)
+          ? parsed.filter(
+              (s) =>
+                s &&
+                typeof s === "object" &&
+                typeof s.img === "string" &&
+                s.active !== false
+            )
+          : null;
       }
       return { slides, badgeText: row.hero_badge_text || null };
     },
@@ -183,8 +213,8 @@ export default function HeroSection() {
             // the browser load it after critical work is done.
             return (
               <img key={(s.img || s.city) + i}
-                src={s.img.replace('w=1400&h=800', 'w=800&h=500')}
-                alt={s.city}
+                src={typeof s.img === "string" ? s.img.replace('w=1400&h=800', 'w=800&h=500') : ""}
+                alt={s.city || ""}
                 fetchpriority={isCurrent ? "high" : "low"}
                 loading={isCurrent ? "eager" : "lazy"}
                 decoding="async"
@@ -254,8 +284,8 @@ export default function HeroSection() {
             // Same LCP treatment as the mobile hero above
             return (
               <img key={(s.img || s.city) + i}
-                src={s.img.replace('w=1400&h=800', 'w=1200&h=700')}
-                alt={s.city}
+                src={typeof s.img === "string" ? s.img.replace('w=1400&h=800', 'w=1200&h=700') : ""}
+                alt={s.city || ""}
                 fetchpriority={isCurrent ? "high" : "low"}
                 loading={isCurrent ? "eager" : "lazy"}
                 decoding="async"

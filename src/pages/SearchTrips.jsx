@@ -140,9 +140,17 @@ export default function SearchTrips() {
       return true;
     })
     .sort((a, b) => {
-      if (sortBy === "price_asc")  return a.price - b.price;
-      if (sortBy === "price_desc") return b.price - a.price;
-      return new Date(a.date + " " + a.time) - new Date(b.date + " " + b.time);
+      if (sortBy === "price_asc")  return (a.price || 0) - (b.price || 0);
+      if (sortBy === "price_desc") return (b.price || 0) - (a.price || 0);
+      // Default: date ascending. Time can be null on legacy rows.
+      // Without the '00:00' fallback, new Date('2025-12-15 null')
+      // returns Invalid Date, Invalid - Invalid is NaN, and Array.sort
+      // with a NaN comparator gives implementation-defined (read:
+      // chaotic) ordering. Passengers see a jumbled trip list with
+      // no apparent rhyme.
+      const aTime = a.time || "00:00";
+      const bTime = b.time || "00:00";
+      return new Date(a.date + " " + aTime) - new Date(b.date + " " + bTime);
     });
 
   const cityOptions = CITIES.map(c => ({ value: c, label: c }));
@@ -326,6 +334,22 @@ export default function SearchTrips() {
               <div className="h-10 bg-muted rounded w-full" />
             </div>
           ))}
+        </div>
+      ) : error ? (
+        // Surface query failures explicitly. Without this branch the
+        // page silently rendered the empty state when the network was
+        // down or RLS denied — users thought they'd entered bad search
+        // criteria and would loop on changing filters instead of
+        // retrying. The retry button refetches via react-query.
+        <div className="text-center py-20">
+          <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+            <X className="w-8 h-8 text-destructive/60" />
+          </div>
+          <h3 className="text-lg font-bold text-foreground mb-2">تعذّر تحميل الرحلات</h3>
+          <p className="text-muted-foreground text-sm mb-4">يبدو أن هناك مشكلة في الاتصال. جرّب مرة أخرى.</p>
+          <Button onClick={() => qc.invalidateQueries({ queryKey: ["trips"] })} className="rounded-xl">
+            إعادة المحاولة
+          </Button>
         </div>
       ) : filtered.length > 0 ? (
         <div className="space-y-4">
