@@ -93,6 +93,35 @@ export default function AccountSettings() {
     }
   }, [user]);
 
+  // Self-heal: if the user is loaded but has no account_number (e.g.
+  // they signed up before migration 041 ran, or one of the triggers
+  // didn't fire for them), silently call the ensure_my_account_number
+  // RPC (migration 043) which assigns one. Then invalidate the ["me"]
+  // cache so the page re-fetches and displays the new value. Runs at
+  // most once per page-load — if the RPC fails (e.g. migration not
+  // yet applied), Sentry captures it and the user simply sees the
+  // UUID fallback as before.
+  useEffect(() => {
+    if (!user?.id) return;
+    if (user.account_number != null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { error } = await supabase.rpc("ensure_my_account_number");
+        if (cancelled) return;
+        if (error) {
+          captureException(error, { msg: "ensure_my_account_number RPC failed" });
+          return;
+        }
+        // Refetch the user object so the UI picks up the new value.
+        qc.invalidateQueries({ queryKey: ["me"] });
+      } catch (e) {
+        if (!cancelled) captureException(e, { msg: "ensure_my_account_number threw" });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, user?.account_number, qc]);
+
   useEffect(() => {
     if (driverLicense) {
       setLicenseNumber(driverLicense.license_number || "");
