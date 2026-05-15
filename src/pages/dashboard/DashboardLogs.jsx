@@ -100,13 +100,18 @@ export default function DashboardLogs() {
   const resetPage = () => setPage(1);
 
   // ── Activity feed (user-facing) ────────────────────────────────────────
+  // search_email added (migration 050) — admins can now filter the
+  // activity feed to a specific user. Accepts an email substring OR
+  // a numeric/M-prefixed account number (e.g. 'M-1234' or '1234').
+  // Server resolves M-#### to email via profiles.account_number.
   const activityQ = useQuery({
     enabled: view === "activity",
-    queryKey: ["activity-log", filterType, page],
+    queryKey: ["activity-log", filterType, searchEmail, page],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("activity_log", {
-        filter_type: filterType,
-        page_param: page,
+        filter_type:     filterType,
+        search_email:    searchEmail.trim() || null,
+        page_param:      page,
         page_size_param: PAGE_SIZE,
       });
       if (error) throw error;
@@ -249,6 +254,24 @@ export default function DashboardLogs() {
             </button>
           ))}
         </div>
+
+        {/* Activity view — simple user search (single field).
+            Same searchEmail state as the audit view, so switching
+            between views preserves the filter. Server-side, the new
+            activity_log RPC (migration 050) accepts either an email
+            substring or 'M-####' / numeric account ID. */}
+        {view === "activity" && (
+          <div className="relative max-w-md">
+            <Mail className="absolute right-3 top-2.5 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchEmail}
+              onChange={(e) => { setSearchEmail(e.target.value); resetPage(); }}
+              placeholder="ابحث بالبريد أو رقم الحساب (M-1234)..."
+              className="w-full h-10 pr-10 pl-3 rounded-lg bg-background border border-border text-sm"
+            />
+          </div>
+        )}
 
         {/* Audit-only rich filters */}
         {view === "audit" && (
