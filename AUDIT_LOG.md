@@ -33,8 +33,8 @@ For each page:
 | 2 | SearchTrips.jsx | 371 | ✅ done | 2 real (sort NaN when time is null, error state hidden as empty state) |
 | 3 | TripDetails.jsx | 1126 | ✅ done | 3 real (favorites state stale on slug URLs, fake amenity bullets, false marketing trust badges) |
 | 4 | MyTrips.jsx | 644 | ✅ done | 3 real (duplicate statusConfig key, allTrips fetching wrong rows hiding old bookings, knock-on driver-not-notified) |
-| 5 | Messages.jsx | 1126 | pending | |
-| 6 | CreateTrip.jsx | 1188 | pending | |
+| 5 | Messages.jsx | 1127 | ✅ done | 2 real (chatEmails array mutation, N parallel mark-as-read UPDATEs) |
+| 6 | CreateTrip.jsx | 1189 | ✅ done | 1 cross-page (payment method ID inconsistency across booking/display/creation surfaces — fixed in TripDetails) |
 | 7 | Onboarding.jsx | 712 | pending | |
 | 8 | Login.jsx | 859 | pending | |
 | 9 | AccountSettings.jsx | 1340 | pending | |
@@ -114,6 +114,39 @@ JavaScript silently uses the second definition (destructive theme) and the first
 **🟠 HIGH (knock-on of CRITICAL above) — line 137-138: cancel-booking driver notification silently skipped**
 When passenger cancels a booking, the cancel handler does `allTrips?.find(t => t.id === booking?.trip_id)` to look up the driver email for the notification. With the old `allTrips` query, if the booked trip wasn't in the latest 200 platform trips, `trip` was undefined, the `if (trip?.driver_email...)` guard silently skipped, and **the driver never got bell-pinged about the cancellation**. Seat went back into the pool with no driver awareness.
 **Fix:** automatic — by fixing the `allTrips` query above, the lookup now always finds the trip the booking is on. ✅
+
+### Page 5 — Messages.jsx
+
+**🟡 MEDIUM — line 177: `chatEmails.sort()` mutates the useMemo'd array**
+`chatEmails` is returned from `useMemo` — same reference across renders. `.sort()` mutates in place, silently corrupting the cached value. Subsequent renders would see the already-sorted array. Not a runtime crash but a foot-gun.
+**Fix:** spread before sort: `[...chatEmails].sort()`. ✅
+
+**🟠 HIGH — lines 390-401: N parallel UPDATE queries on mark-as-read**
+Opening a conversation with 50 unread messages fired 50 individual `UPDATE messages SET is_read=true WHERE id=X` queries in parallel. Slow on mobile, wasteful on Supabase quota. Also the silent `.catch(() => {})` hid RLS failures during testing.
+**Fix:** single batch UPDATE using `.in("id", unreadIds)` — one round trip regardless of unread count. Errors now surface in dev console via `import.meta.env.DEV` guard. ✅
+
+**False alarms checked:**
+- Line 118 `.or(\`sender_email.eq.${email}...\`)` — PostgREST injection concern. Verified: emails are validated server-side before insertion, and RLS would deny crafted queries even if they parsed. Not a real issue.
+
+### Page 6 — CreateTrip.jsx
+
+**🟠 HIGH (cross-page) — payment method ID inconsistency across 5+ surfaces**
+We have 3 different ID conventions in use simultaneously:
+| File | Bank | Jawwal | Reflect | Card |
+|---|---|---|---|---|
+| CreateTrip (form) | bank_transfer | jawwal_pay | reflect | (none) |
+| CreateTrip (autosave) | bank_transfer | jawwal_pay | reflect | credit_card |
+| TripDetails (display panel) | bank_transfer | (missing) | (missing) | card |
+| TripDetails (booking modal) | **bank** | **jawwal** | reflect | (none) |
+| PassengerPaymentSetup | bank_transfer | jawwal_pay | reflect | card |
+| DriverPaymentSetup | **bank** | (missing) | reflect | (none) |
+
+Consequence: a driver enables bank_transfer at trip creation → trip row stores `["bank_transfer"]` → booking modal looks for `"bank"` → no match → bank option silently absent from passenger's payment choices. Same for jawwal_pay vs jawwal. Same for credit_card vs card on the display panel. Drivers confused: "I enabled these methods, why aren't passengers using them?"
+**Fix (this batch):** aligned the TripDetails booking modal + display panel with the canonical `bank_transfer` / `jawwal_pay` / `reflect` / `credit_card` IDs used everywhere else. Drivers' enabled methods now show up to passengers as intended.
+**Deferred:** DriverPaymentSetup.jsx still uses `"bank"` (not `"bank_transfer"`). This is a setup-time UI inconsistency but doesn't affect trip data shape. Worth a follow-up but not in this batch's scope. Flagged in the page when we get to it. 🟡
+
+**False alarms / deferred:**
+- Recurring trip date logic at line 425-437: when picked date IS one of the recurring days, the trip publishes for +7 days from picked date rather than ALSO for the picked date. May be intentional UX; flagging for product review. 🟡
 
 
 

@@ -174,7 +174,12 @@ export default function Messages() {
   }, [user?.email, rawMessages]);
 
   const { data: profilesByEmail = {} } = useQuery({
-    queryKey: ["chat-profiles", chatEmails.sort().join(",")],
+    // Spread before sort — `chatEmails` comes from useMemo so its
+    // reference is reused across renders. .sort() mutates in place,
+    // which would silently corrupt the memoized value (subsequent
+    // comparisons see the already-sorted array). Spread guarantees
+    // the sort doesn't reach back into useMemo's cached object.
+    queryKey: ["chat-profiles", [...chatEmails].sort().join(",")],
     queryFn: async () => {
       if (chatEmails.length === 0) return {};
       try {
@@ -387,17 +392,31 @@ export default function Messages() {
   }, [activeId, activeConv?.messages?.length]);
 
   // ─── Mark as read ───
+  // Previously this fired one UPDATE per unread message (Promise.all
+  // of N individual queries). For a chat with 50 unread messages
+  // that's 50 parallel network requests. Replaced with a single
+  // UPDATE using .in() — one round trip regardless of unread count.
   useEffect(() => {
     if (!activeConv || !user?.email) return;
     const unread = activeConv.messages.filter(m => m.receiver_email === user.email && !m.is_read);
     if (unread.length === 0) return;
-    Promise.all(unread.map(m => supabase.from("messages").update({ is_read: true }).eq("id", m.id)))
-      .then(() => {
+    const unreadIds = unread.map(m => m.id);
+    supabase
+      .from("messages")
+      .update({ is_read: true })
+      .in("id", unreadIds)
+      .then(({ error }) => {
+        if (error) {
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.warn("[Messages] mark-as-read failed:", error);
+          }
+          return;
+        }
         qc.invalidateQueries({ queryKey: ["messages", user.email] });
         qc.invalidateQueries({ queryKey: ["unread-messages-count", user.email] });
         qc.invalidateQueries({ queryKey: ["mobile-msg-badge", user.email] });
-      })
-      .catch(() => {});
+      });
   }, [activeId, activeConv, user?.email, qc]);
 
   // ─── Mobile chat overlay mode ───

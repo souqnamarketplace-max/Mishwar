@@ -756,14 +756,23 @@ export default function TripDetails() {
               );
             })()}
 
-            {/* Payment Methods */}
+            {/* Payment Methods. Must show ALL methods the driver
+                enabled. Previously the display only listed cash,
+                bank_transfer, and 'card' — missing jawwal_pay and
+                reflect entirely (drivers enabling them wouldn't see
+                them advertised here), and using 'card' as the id
+                while CreateTrip emits 'credit_card' (so even cards
+                wouldn't appear). Aligned with the canonical set
+                used in PassengerPaymentSetup. */}
             <div className="mt-3">
               <p className="text-xs text-muted-foreground mb-2">طرق الدفع المقبولة</p>
               <div className="flex flex-wrap gap-2">
                 {[
-                  { id: "cash", label: "نقداً", icon: "💵" },
-                  { id: "bank_transfer", label: "تحويل بنكي", icon: "🏦" },
-                  { id: "card", label: "بطاقة ائتمان", icon: "💳" },
+                  { id: "cash",          label: "نقداً",       icon: "💵" },
+                  { id: "bank_transfer", label: "تحويل بنكي",  icon: "🏦" },
+                  { id: "jawwal_pay",    label: "جوال باي",     icon: "📱" },
+                  { id: "reflect",       label: "Reflect",      icon: "💳" },
+                  { id: "credit_card",   label: "بطاقة ائتمان", icon: "💳" },
                 ].map((m) => (
                   (trip.payment_methods?.includes(m.id) || (trip.payment_methods?.length === 0 && m.id === "cash")) && (
                     <span key={m.id} className="flex items-center gap-1 text-xs bg-accent/10 text-accent px-2 py-1 rounded-lg">
@@ -1071,14 +1080,21 @@ export default function TripDetails() {
               </div>
             </div>
 
-            {/* Payment method */}
+            {/* Payment method. IDs MUST match the canonical set used
+                by CreateTrip and PassengerPaymentSetup. The previous
+                IDs ('bank' / 'jawwal') didn't match any other surface
+                in the app — drivers enabled bank_transfer at trip
+                creation, the trip row stored 'bank_transfer', and
+                this filter looked for 'bank' (no match), so the
+                bank option silently disappeared from the booking
+                modal. Same for jawwal_pay. */}
             <p className="text-sm font-bold mb-2">طريقة الدفع</p>
             <div className="grid grid-cols-3 gap-2 mb-4">
               {[
-                { id: "cash",    label: "نقداً",       icon: "💵" },
-                { id: "jawwal",  label: "جوال باي",     icon: "📱" },
-                { id: "reflect", label: "ريفلكت",       icon: "💳" },
-                { id: "bank",    label: "تحويل بنكي",   icon: "🏦" },
+                { id: "cash",          label: "نقداً",       icon: "💵" },
+                { id: "jawwal_pay",    label: "جوال باي",     icon: "📱" },
+                { id: "reflect",       label: "ريفلكت",       icon: "💳" },
+                { id: "bank_transfer", label: "تحويل بنكي",   icon: "🏦" },
               ].filter(m => !trip.payment_methods?.length || trip.payment_methods.includes(m.id) || m.id === "cash")
                .map(m => (
                 <button key={m.id}
