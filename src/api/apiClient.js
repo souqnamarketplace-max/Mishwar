@@ -379,6 +379,11 @@ const auth = {
     return {
       id: user.id,
       email: user.email,
+      // Sequential account number (migration 041). select=* above
+      // already pulls this from the DB; we just need to surface it
+      // through the explicit field-list mapping so AccountSettings
+      // and any other consumer can read user.account_number.
+      account_number: profile?.account_number ?? null,
       full_name: profile?.full_name ?? user.user_metadata?.full_name ?? '',
       avatar_url: profile?.avatar_url ?? null,
       role: profile?.role ?? 'user',
