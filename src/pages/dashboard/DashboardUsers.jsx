@@ -348,13 +348,24 @@ export default function DashboardUsers() {
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                           {/* Sequential account number (migration 041) —
                               same format users see on their /account-settings
-                              page. Helps admins cross-reference when a user
-                              tells them 'my ID is M-1042'. */}
-                          <p className="text-[10px] text-muted-foreground/80 font-mono mt-0.5" dir="ltr">
-                            {user.account_number != null
-                              ? `M-${user.account_number}`
-                              : `MSH-${String(user.id || "").slice(0, 4).toUpperCase()}-${String(user.id || "").slice(4, 8).toUpperCase()}`}
-                          </p>
+                              page. Displayed as a small primary-coloured
+                              pill so admins can spot 'M-1014' at a glance
+                              when a user says "my ID is M-1014". */}
+                          {user.account_number != null ? (
+                            <span
+                              className="inline-block mt-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs font-mono font-bold tracking-wider"
+                              dir="ltr"
+                            >
+                              M-{user.account_number}
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-block mt-1 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-mono"
+                              dir="ltr"
+                            >
+                              MSH-{String(user.id || "").slice(0, 4).toUpperCase()}-{String(user.id || "").slice(4, 8).toUpperCase()}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </td>

@@ -638,7 +638,15 @@ export default function AccountSettings() {
               users still see SOMETHING they can give support. */}
           <div>
             <Label>معرّف الحساب</Label>
-            <div className="mt-1 px-4 py-2.5 rounded-xl border border-border bg-muted/30 text-sm text-foreground flex items-center justify-between gap-2 font-mono tracking-wider" dir="ltr">
+            <div
+              className={
+                "mt-1 px-4 py-2.5 rounded-xl border flex items-center justify-between gap-2 font-mono tracking-wider " +
+                (user?.account_number != null
+                  ? "border-primary/30 bg-primary/5 text-primary text-base font-bold"
+                  : "border-border bg-muted/30 text-foreground text-sm")
+              }
+              dir="ltr"
+            >
               <span>
                 {user?.account_number != null
                   ? `M-${user.account_number}`
