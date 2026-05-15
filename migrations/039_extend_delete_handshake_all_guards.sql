@@ -5,12 +5,11 @@
 --
 -- USER REPORT (2026-05-14)
 -- Attempting to delete an account → 403 from delete_user_account_v2 with
--- the error 'cannot change passenger_email'. Toast: "فشل حذف الحساب.
--- يرجى الاتصال بالدعم: cannot change passenger_email".
+-- the error 'cannot change passenger_email'.
 --
 -- ROOT CAUSE
--- Migration 002 (security hardening) created FIVE BEFORE-UPDATE triggers,
--- each blocking identity-column changes for non-admin callers:
+-- Migration 002 created FIVE BEFORE-UPDATE triggers, each blocking
+-- identity-column changes for non-admin callers:
 --   guard_profile_protected_columns       on public.profiles
 --   guard_booking_updates                  on public.bookings
 --   guard_trip_updates                     on public.trips
@@ -18,64 +17,49 @@
 --   guard_review_must_have_booking         on public.reviews   (INSERT only)
 --
 -- Migration 035 fixed the FIRST one by adding a session-variable
--- handshake (mishwar.deleting_account = NEW.id::text), so the deletion
--- RPC could anonymize the profile's email column. But the OTHER three
--- UPDATE triggers were left untouched — and the delete RPC's cascade
--- (migration 036) does UPDATEs on each of them to anonymize the
--- denormalized email/name columns:
---
---   UPDATE bookings SET passenger_email = v_new_email, passenger_name = ...
---     → blocked by guard_booking_updates
---   UPDATE trips SET driver_email = v_new_email, driver_name = ...
---     → blocked by guard_trip_updates
---   UPDATE messages SET sender_email = v_new_email, ...
---   UPDATE messages SET receiver_email = v_new_email, ...
---     → blocked by guard_message_receiver_columns
---
--- The first one to fire was bookings (alphabetical anonymization order
--- in the RPC), which threw 'cannot change passenger_email' and the
--- entire delete-account transaction rolled back. The user saw the
--- error, the deletion never persisted, the modal reset (as fixed in
--- the previous commit).
+-- handshake. The other three UPDATE triggers were left untouched —
+-- and the delete RPC's cascade (migration 036) does UPDATEs on each
+-- to anonymize denormalized email/name columns. The first to fire was
+-- bookings, hence the user's error.
 --
 -- THE FIX
 -- Apply the same session-variable handshake to all three remaining
--- UPDATE triggers. Slight simplification from migration 035's pattern:
--- instead of comparing the session variable to NEW.id (which works
--- for profiles but doesn't generalize — bookings.id is the booking
--- UUID, not the user UUID), we compare it to auth.uid()::text.
+-- UPDATE triggers. Each guard now checks at the top, right after the
+-- admin bypass:
 --
--- This is semantically "the current operation is being performed
--- inside an authorized account-deletion flow for the calling user".
--- delete_user_account_v2 is the only function that sets the session
--- variable, and it sets it to auth.uid()::text. So this check is
--- effectively "are we inside delete_user_account_v2 right now?"
+--   IF NULLIF(current_setting('mishwar.deleting_account', true), '')
+--      IS NOT NULL
+--      AND current_setting('mishwar.deleting_account', true)
+--          = auth.uid()::text
+--   THEN
+--     RETURN NEW;
+--   END IF;
+--
+-- This bypass only triggers when the deletion RPC has set the session
+-- variable AND the calling user matches auth.uid().
 --
 -- SAFETY ANALYSIS
 --   • set_config in delete_user_account_v2 uses is_local := true →
---     scoped to that transaction, auto-clears on commit/rollback,
---     can't leak across requests.
+--     scoped to that transaction, auto-clears on commit/rollback.
 --   • PostgREST does not allow clients to set arbitrary session
 --     variables over the wire. Custom namespaces like `mishwar.*`
---     are not in the configurable prefix list — only `request.*`
---     and a few PG defaults. So an attacker can't spoof the
---     handshake via REST.
---   • The session variable only allows BYPASSING the immutable-
---     column protections. It doesn't grant any new write capability;
---     row-level RLS on the underlying tables still applies (and the
---     RPC bypasses RLS only because it's SECURITY DEFINER, not
---     because of this variable).
---   • The handshake compares against auth.uid() of the CALLER. If
---     user A's session calls delete_user_account_v2, the variable
---     is set to A's UUID, and only updates affecting A's own data
---     can pass the guard. The RPC's WHERE clauses already constrain
---     this — the trigger check is redundant defense in depth.
+--     are not in the configurable prefix list.
+--   • The handshake compares against auth.uid() of the CALLER. Only
+--     the calling user themselves can bypass for their own data.
+--
+-- HISTORICAL NOTE
+-- The first draft used a regexp_replace splice via pg_get_functiondef
+-- to inject the handshake without re-stating each function's full
+-- body. That FAILED at apply time because pg_get_functiondef reformats
+-- whitespace, quotes, and indentation when reconstructing source —
+-- so the regex pattern (matching migration-002 source) never matched
+-- the reformatted output. The verification block then raised
+-- 'guard_message_receiver_columns missing handshake'. This version
+-- uses full CREATE OR REPLACE — verbose but reliable.
 --
 -- ════════════════════════════════════════════════════════════════════════
 
 -- ─── (1) guard_booking_updates ────────────────────────────────────────
--- Re-CREATE with the handshake check inserted right after the admin
--- bypass. Everything else preserved verbatim from migration 002.
 
 CREATE OR REPLACE FUNCTION public.guard_booking_updates()
 RETURNS TRIGGER
@@ -96,10 +80,8 @@ BEGIN
   -- Admin can do anything
   IF caller_role = 'admin' THEN RETURN NEW; END IF;
 
-  -- Deletion-handshake bypass (migration 039). Set inside
-  -- delete_user_account_v2 to auth.uid()::text right before the
-  -- cascade of anonymization UPDATEs. is_local on set_config makes
-  -- this txn-scoped — it can't leak across requests.
+  -- Deletion-handshake bypass (migration 039). delete_user_account_v2
+  -- sets this to auth.uid()::text right before its cascade UPDATEs.
   IF v_handshake IS NOT NULL AND v_handshake = auth.uid()::text THEN
     RETURN NEW;
   END IF;
@@ -117,7 +99,6 @@ BEGIN
   END IF;
 
   IF is_passenger AND NOT is_driver THEN
-    -- Passenger can only cancel + edit their own pickup/dropoff/notes
     IF NEW.payment_status IS DISTINCT FROM OLD.payment_status THEN
       RAISE EXCEPTION 'passengers cannot change payment_status' USING ERRCODE = '42501';
     END IF;
@@ -167,79 +148,123 @@ BEGIN
 END $$;
 
 -- ─── (2) guard_trip_updates ───────────────────────────────────────────
--- Original blocks driver_email changes. Same handshake pattern.
 
-DO $$
+CREATE OR REPLACE FUNCTION public.guard_trip_updates()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_catalog, auth
+AS $$
 DECLARE
-  v_orig_def TEXT;
-BEGIN
-  -- Capture the existing function definition. We need to preserve all
-  -- its existing logic (status transition rules, etc.) and just inject
-  -- the handshake at the top.
-  SELECT pg_get_functiondef(p.oid)
-  INTO v_orig_def
-  FROM pg_proc p
-  JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname = 'public' AND p.proname = 'guard_trip_updates';
-
-  IF v_orig_def IS NULL THEN
-    RAISE NOTICE 'guard_trip_updates not present, skipping';
-    RETURN;
-  END IF;
-
-  -- If the handshake is already in the body, skip — the migration is
-  -- idempotent.
-  IF v_orig_def LIKE '%mishwar.deleting_account%' THEN
-    RAISE NOTICE 'guard_trip_updates already has handshake';
-    RETURN;
-  END IF;
-
-  -- Inject the handshake check right after the admin-bypass.
-  -- The migration-002 source has:
-  --     IF caller_role = 'admin' THEN RETURN NEW; END IF;
-  -- followed by the immutable-column checks. We splice a new block
-  -- in between via regexp_replace, NOT a full function rewrite —
-  -- that way any subsequent migration that added new business logic
-  -- to guard_trip_updates is preserved.
-  EXECUTE regexp_replace(
-    v_orig_def,
-    '(IF\s+caller_role\s*=\s*''admin''\s+THEN\s+RETURN\s+NEW\s*;\s*END\s+IF\s*;)',
-    E'\\1\n  -- Deletion-handshake bypass (migration 039)\n  IF NULLIF(current_setting(''mishwar.deleting_account'', true), '''') IS NOT NULL\n     AND current_setting(''mishwar.deleting_account'', true) = auth.uid()::text\n  THEN\n    RETURN NEW;\n  END IF;',
-    'i'
+  caller_email TEXT := public.auth_user_email();
+  caller_role  TEXT := public.auth_user_role();
+  has_bookings BOOLEAN := EXISTS (
+    SELECT 1 FROM public.bookings
+    WHERE trip_id = OLD.id::text
+      AND status IN ('confirmed','completed')
   );
+  v_handshake  TEXT := NULLIF(current_setting('mishwar.deleting_account', true), '');
+BEGIN
+  IF caller_role = 'admin' THEN RETURN NEW; END IF;
+
+  -- Deletion-handshake bypass (migration 039)
+  IF v_handshake IS NOT NULL AND v_handshake = auth.uid()::text THEN
+    RETURN NEW;
+  END IF;
+
+  -- driver_email immutable
+  IF NEW.driver_email IS DISTINCT FROM OLD.driver_email THEN
+    RAISE EXCEPTION 'cannot change driver_email'           USING ERRCODE = '42501';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id THEN
+    RAISE EXCEPTION 'cannot change trip id'                USING ERRCODE = '42501';
+  END IF;
+  IF NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'cannot change created_at'             USING ERRCODE = '42501';
+  END IF;
+
+  -- Route + price + date + time freeze after first booking.
+  IF has_bookings THEN
+    IF NEW.from_city IS DISTINCT FROM OLD.from_city THEN
+      RAISE EXCEPTION 'cannot change from_city after first booking'  USING ERRCODE = '42501';
+    END IF;
+    IF NEW.to_city   IS DISTINCT FROM OLD.to_city   THEN
+      RAISE EXCEPTION 'cannot change to_city after first booking'    USING ERRCODE = '42501';
+    END IF;
+    IF NEW.price     IS DISTINCT FROM OLD.price     THEN
+      RAISE EXCEPTION 'cannot change price after first booking'      USING ERRCODE = '42501';
+    END IF;
+    IF NEW.date      IS DISTINCT FROM OLD.date      THEN
+      RAISE EXCEPTION 'cannot change date after first booking'       USING ERRCODE = '42501';
+    END IF;
+    IF NEW.time      IS DISTINCT FROM OLD.time      THEN
+      RAISE EXCEPTION 'cannot change time after first booking'       USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  -- total_seats is set at creation, never changes
+  IF NEW.total_seats IS DISTINCT FROM OLD.total_seats THEN
+    RAISE EXCEPTION 'cannot change total_seats'            USING ERRCODE = '42501';
+  END IF;
+
+  RETURN NEW;
 END $$;
 
 -- ─── (3) guard_message_receiver_columns ───────────────────────────────
--- Original blocks sender_email and receiver_email changes. Same pattern
--- as guard_trip_updates — splice in the handshake right after admin
--- bypass without touching anything else.
 
-DO $$
+CREATE OR REPLACE FUNCTION public.guard_message_receiver_columns()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_catalog, auth
+AS $$
 DECLARE
-  v_orig_def TEXT;
+  caller       TEXT := public.auth_user_email();
+  v_handshake  TEXT := NULLIF(current_setting('mishwar.deleting_account', true), '');
 BEGIN
-  SELECT pg_get_functiondef(p.oid)
-  INTO v_orig_def
-  FROM pg_proc p
-  JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname = 'public' AND p.proname = 'guard_message_receiver_columns';
+  -- Admin override
+  IF public.auth_user_role() = 'admin' THEN RETURN NEW; END IF;
 
-  IF v_orig_def IS NULL THEN
-    RAISE NOTICE 'guard_message_receiver_columns not present, skipping';
-    RETURN;
+  -- Deletion-handshake bypass (migration 039)
+  IF v_handshake IS NOT NULL AND v_handshake = auth.uid()::text THEN
+    RETURN NEW;
   END IF;
 
-  IF v_orig_def LIKE '%mishwar.deleting_account%' THEN
-    RAISE NOTICE 'guard_message_receiver_columns already has handshake';
-    RETURN;
+  -- Receiver can only change is_read (and updated_at). All identity
+  -- columns are immutable.
+  IF OLD.receiver_email = caller AND OLD.sender_email <> caller THEN
+    IF NEW.content        IS DISTINCT FROM OLD.content        THEN
+      RAISE EXCEPTION 'receivers cannot edit message content' USING ERRCODE = '42501';
+    END IF;
+    IF NEW.sender_email   IS DISTINCT FROM OLD.sender_email   THEN
+      RAISE EXCEPTION 'cannot change sender_email'           USING ERRCODE = '42501';
+    END IF;
+    IF NEW.sender_name    IS DISTINCT FROM OLD.sender_name    THEN
+      RAISE EXCEPTION 'cannot change sender_name'            USING ERRCODE = '42501';
+    END IF;
+    IF NEW.receiver_email IS DISTINCT FROM OLD.receiver_email THEN
+      RAISE EXCEPTION 'cannot change receiver_email'         USING ERRCODE = '42501';
+    END IF;
+    IF NEW.created_at     IS DISTINCT FROM OLD.created_at     THEN
+      RAISE EXCEPTION 'cannot change created_at'             USING ERRCODE = '42501';
+    END IF;
+    IF NEW.trip_id        IS DISTINCT FROM OLD.trip_id        THEN
+      RAISE EXCEPTION 'cannot change trip_id'                USING ERRCODE = '42501';
+    END IF;
+    IF NEW.conversation_id IS DISTINCT FROM OLD.conversation_id THEN
+      RAISE EXCEPTION 'cannot change conversation_id'        USING ERRCODE = '42501';
+    END IF;
   END IF;
 
-  EXECUTE regexp_replace(
-    v_orig_def,
-    '(IF\s+caller_role\s*=\s*''admin''\s+THEN\s+RETURN\s+NEW\s*;\s*END\s+IF\s*;)',
-    E'\\1\n  -- Deletion-handshake bypass (migration 039)\n  IF NULLIF(current_setting(''mishwar.deleting_account'', true), '''') IS NOT NULL\n     AND current_setting(''mishwar.deleting_account'', true) = auth.uid()::text\n  THEN\n    RETURN NEW;\n  END IF;',
-    'i'
-  );
+  -- Senders can edit their own content but not impersonate
+  IF OLD.sender_email = caller THEN
+    IF NEW.sender_email IS DISTINCT FROM OLD.sender_email THEN
+      RAISE EXCEPTION 'cannot change sender_email'           USING ERRCODE = '42501';
+    END IF;
+    IF NEW.receiver_email IS DISTINCT FROM OLD.receiver_email THEN
+      RAISE EXCEPTION 'cannot change receiver_email'         USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  RETURN NEW;
 END $$;
 
 -- ─── Verification ─────────────────────────────────────────────────────
@@ -250,12 +275,6 @@ DECLARE
   v_message_ok  BOOLEAN;
   v_profile_ok  BOOLEAN;
 BEGIN
-  -- Each of the four guards should now contain the handshake reference.
-  -- guard_profile_protected_columns picked it up in migration 035 (with
-  -- a slightly different check shape using NEW.id), so we accept either
-  -- pattern there. The other three should match the new auth.uid()
-  -- pattern from this migration.
-
   SELECT pg_get_functiondef(p.oid) LIKE '%mishwar.deleting_account%'
   INTO v_booking_ok
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace

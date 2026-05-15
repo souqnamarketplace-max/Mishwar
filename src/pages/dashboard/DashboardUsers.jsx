@@ -218,15 +218,26 @@ export default function DashboardUsers() {
   });
 
   const filtered = users.filter((u) => {
-    const matchSearch = !search || 
-      u.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-      u.email?.toLowerCase().includes(search.toLowerCase());
-    
-    const matchFilter = filter === "all" || 
+    // Match by full_name / email substring OR by exact account_number.
+    // The account_number search accepts both raw '1000' and the
+    // user-facing 'M-1000' format (the prefix is stripped before
+    // comparison). Admins can paste exactly what the user reads to
+    // them from the AccountSettings 'معرّف الحساب' field.
+    let matchSearch = !search;
+    if (!matchSearch) {
+      const q = search.toLowerCase().trim();
+      const acctMatch = q.replace(/^m[-\s]?/i, "");  // 'M-1000' / 'm-1000' / 'M 1000' → '1000'
+      matchSearch =
+        u.full_name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q) ||
+        (u.account_number != null && String(u.account_number) === acctMatch);
+    }
+
+    const matchFilter = filter === "all" ||
       (filter === "admin" && u.role === "admin") ||
       (filter === "driver" && (u.account_type === "driver" || u.account_type === "both")) ||
       (filter === "passenger" && (u.account_type === "passenger" || u.account_type === "both"));
-    
+
     return matchSearch && matchFilter;
   });
 
@@ -260,7 +271,7 @@ export default function DashboardUsers() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="ابحث بالاسم أو الإيميل..."
+              placeholder="ابحث بالاسم أو الإيميل أو رقم الحساب (M-1000)..."
               className="pr-10 rounded-xl"
             />
           </div>
@@ -335,6 +346,15 @@ export default function DashboardUsers() {
                             )}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                          {/* Sequential account number (migration 041) —
+                              same format users see on their /account-settings
+                              page. Helps admins cross-reference when a user
+                              tells them 'my ID is M-1042'. */}
+                          <p className="text-[10px] text-muted-foreground/80 font-mono mt-0.5" dir="ltr">
+                            {user.account_number != null
+                              ? `M-${user.account_number}`
+                              : `MSH-${String(user.id || "").slice(0, 4).toUpperCase()}-${String(user.id || "").slice(4, 8).toUpperCase()}`}
+                          </p>
                         </div>
                       </div>
                     </td>

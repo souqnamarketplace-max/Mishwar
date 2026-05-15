@@ -626,31 +626,39 @@ export default function AccountSettings() {
             <p className="text-xs text-muted-foreground mt-1">لا يمكن تغيير الاسم بعد التسجيل</p>
           </div>
 
-          {/* User ID badge — matches the identifier admins see in
-              /dashboard/users so users can give it to support for quick
-              lookup. The full UUID stays the database key (admin search
-              uses the full value via the copy button); the display
-              shows the first 8 hex chars formatted as 'MSH-XXXX-XXXX'
-              so it's easy to read out loud over phone, easy to type if
-              needed, and clearly labeled as a Mishwaro account ID. */}
+          {/* User ID badge — sequential account number (migration 041)
+              formatted as 'M-1000', 'M-1001', etc. Easy to read aloud,
+              easy to type, easy to remember. The UUID still exists in
+              the DB for FK / JOIN purposes, but users and support see
+              only the short number. Admin dashboard /dashboard/users
+              has a search field for this same number.
+
+              If account_number is NULL (pre-migration-041 state, or a
+              data anomaly), fall back to a formatted UUID prefix so
+              users still see SOMETHING they can give support. */}
           <div>
             <Label>معرّف الحساب</Label>
             <div className="mt-1 px-4 py-2.5 rounded-xl border border-border bg-muted/30 text-sm text-foreground flex items-center justify-between gap-2 font-mono tracking-wider" dir="ltr">
               <span>
-                {user?.id
+                {user?.account_number != null
+                  ? `M-${user.account_number}`
+                  : user?.id
                   ? `MSH-${String(user.id).slice(0, 4).toUpperCase()}-${String(user.id).slice(4, 8).toUpperCase()}`
                   : "—"}
               </span>
-              {user?.id && (
+              {(user?.account_number != null || user?.id) && (
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard?.writeText(String(user.id))
-                      .then(() => toast.success("تم نسخ المعرّف الكامل"))
+                    const idForCopy = user?.account_number != null
+                      ? `M-${user.account_number}`
+                      : String(user.id);
+                    navigator.clipboard?.writeText(idForCopy)
+                      .then(() => toast.success("تم نسخ المعرّف"))
                       .catch(() => toast.error("تعذر النسخ"));
                   }}
                   className="text-primary hover:text-primary/80 transition-colors p-1"
-                  aria-label="نسخ المعرّف الكامل"
+                  aria-label="نسخ المعرّف"
                 >
                   <Copy className="w-4 h-4" />
                 </button>
