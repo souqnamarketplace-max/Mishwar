@@ -363,10 +363,11 @@ After the 20-page audit completed, extending the same methodology to
 | 16 | PassengerReviewWizard.jsx | 277 | ✅ done | 1 HIGH (best-effort notifications inside authoritative try → duplicate reviews on retry) |
 
 Plus retroactive fix: **DriverReviewWizard.jsx had the same defect as PassengerReviewWizard** — fixed in the same commit. See component 10 row above; this is a 2nd defect found on a 2nd pass.
-| 17 | TripCard.jsx | 275 | pending | |
-| 18 | BookingRequestPopup.jsx | 251 | pending | |
-| 19 | CityAutocomplete.jsx | 245 | pending | |
-| 20 | PullToRefresh.jsx | 221 | pending | |
+| 17 | TripCard.jsx | 275 | ✅ done | Symptom of apiClient.subscribe defect — fixed upstream in this batch |
+| 18 | BookingRequestPopup.jsx | 251 | ✅ done | Symptom of apiClient.subscribe defect — fixed upstream in this batch |
+| 19 | CityAutocomplete.jsx | 245 | ✅ done | 1 real (outside-click handler missing touchstart) |
+| 20 | PullToRefresh.jsx | 221 | ✅ done | 0 real (very carefully implemented; ref-based gesture, stable listeners) |
+| ★ | **apiClient.js subscribe()** | (~30 LOC change) | ✅ done | 1 CRITICAL (shared-channel teardown race — see below) |
 | 21 | DriverPaymentSetup.jsx | 217 | pending | |
 | 22 | AccountHub.jsx | 211 | pending | |
 | 23 | SuggestCityModal.jsx | 208 | pending | |
@@ -562,3 +563,63 @@ In batch 3 I fixed the missing `notifyUser` import. Auditing PassengerReviewWiza
 - Phase 1: `Promise.allSettled` over per-passenger booking-update + review-create. Each per-passenger result is tracked; failure of one passenger does not block the others.
 - Phase 2: for each successfully-saved passenger, fire notifyUser + logAudit, each with its own .catch.
 - Toast accuracy: if some passengers failed but others succeeded, the driver sees `"تم حفظ X من Y تقييمات. حاول مجدداً لاحقاً للباقي."` rather than a misleading all-or-nothing failure. ✅
+
+## Component Batch 5 — Findings
+
+### 🔴🔴🔴 The big one — apiClient.js `entities.X.subscribe()` shared-channel teardown race
+
+Auditing TripCard's realtime subscription led me back to `api.entities.Trip.subscribe()`, which I assumed was a thin wrapper. It wasn't — it had a critical bug:
+
+```js
+subscribe: (callback) => {
+  const channelName = `${tableName}-realtime`;
+  // Remove any existing channel with same name (cleanup from previous mount)
+  try { supabase.removeChannel(supabase.channel(channelName)); } catch {}
+  // ... create new channel, register callback ...
+}
+```
+
+The channel name is `${tableName}-realtime` — **shared across every caller**, not user-scoped, not component-scoped. The comment "cleanup from previous mount" reflects an incorrect mental model: there is no "previous mount" when multiple components mount concurrently. Every new `subscribe()` call **tore down the channel that all existing subscribers depended on** and replaced it with a fresh one registering only the new caller's callback. So:
+
+- 20 TripCards mounting in a search results page → only the **last one** received realtime updates. Other 19 silently dead.
+- When any of those cards unmounted → its cleanup removed the channel, killing realtime for everyone.
+- DriverTripsList's realtime + DriverPassengers' realtime + NotificationBell's entity fallback + Notifications page's preferences subscription + Messages page + 7 dashboard pages → all racing for the same channel slot.
+
+This was the underlying defect that AdminNotificationBell had already worked around with its own dedicated channel name (see the workaround comment we cleaned up in this batch).
+
+**Impact on real users:**
+- Cards on a search results page never updating their seat counts in real time as bookings come in
+- Drivers using DriverTripsList not seeing status updates from other devices
+- Admins viewing /dashboard/notifications with the consumer bell mounted in chrome → only one of them updating
+- Multiple-tab inconsistencies where one tab gets updates and another doesn't
+
+**Fix:** rewrote the subscribe implementation to use a per-channel-name registry. First subscriber creates the Supabase channel; subsequent subscribers add their callback to a shared Set. The channel only gets torn down when the LAST subscriber unsubscribes. Each inbound row fans out to every registered callback. Per-callback try/catch so one bad handler doesn't break delivery to others.
+
+Affects every caller of `api.entities.X.subscribe()` automatically, no per-call changes needed:
+- TripCard, FeaturedTrips, SearchTrips, DriverTripsList, DriverDashboard
+- BookingRequestPopup, DriverPassengers, DashboardBookings, DashboardTrips
+- NotificationBell (consumer), Notifications page
+- Messages page
+- DashboardLicenses, DashboardUsers, StatsBar
+
+### Component 17 — TripCard.jsx (275 LOC)
+
+No standalone bugs — but TripCard's `useEffect` (line 259) at scale exposed the apiClient defect above. With the apiClient fix, the per-card subscribe call is now efficient (one shared channel, fan-out to all cards). The per-card filtering `if (payload?.new?.id === trip.id) setLiveTrip(payload.new)` already does the right thing for receiving only the relevant updates.
+
+### Component 18 — BookingRequestPopup.jsx (251 LOC)
+
+No new bugs beyond the apiClient defect. The popup polls every 15s as backup AND subscribes to Booking realtime — with the apiClient fix the realtime now works alongside DriverPassengers' subscription instead of fighting it. The `onSuccess` notifyUser is awaited but is wrapped in the mutation's own error handling, so a notification failure shows a soft fail (no success toast) but doesn't trigger a misleading "failed" state. Worth noting but not a duplicate-on-retry risk like the review wizards.
+
+### Component 19 — CityAutocomplete.jsx (245 LOC)
+
+**🟡 LOW — Outside-click handler missing `touchstart`**
+Listened only to `mousedown`. On mobile, tap-outside doesn't always synthesise a mousedown (especially across scrollable regions). Other dropdowns in this codebase (NotificationBell, AdminNotificationBell, the Navbar profile menu we fixed in batch 3) listen to both `mousedown` and `touchstart`.
+**Fix:** added the touchstart listener. ✅
+
+**False alarm investigated:**
+- The filter at line 53 has an unusual second clause: `normQuery.includes(<city first word>)`. Looked like a bug because a 1-2 char query can never contain a 3+ char city's first word. But the second clause's intent is the inverse case — matching multi-word USER input against single-word city names ("السفر إلى رام الله" should match "رام الله"). The asymmetry is by design.
+
+### Component 20 — PullToRefresh.jsx (221 LOC)
+
+**0 real bugs.** This component is unusually well-implemented. Ref-based gesture state (avoiding React batching races on touchend), stable listener attachment (no re-mount churn during a pull), explicit walk-up-the-DOM to find the actual scroll container, `passive: false` only on touchmove so preventDefault works, fallback to documentElement for desktop, refresh-in-progress lockout. All design choices are documented inline.
+

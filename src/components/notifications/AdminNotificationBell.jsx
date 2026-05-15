@@ -95,11 +95,16 @@ export default function AdminNotificationBell({ userEmail }) {
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Realtime channel — DEDICATED name, separate from anything the consumer
-  // bell uses, so the two don't collide on shared channel state. We also
-  // do NOT call api.entities.Notification.subscribe (which uses the
-  // global non-scoped `notifications-realtime` channel that races with
-  // the consumer bell when both are mounted).
+  // Realtime channel — DEDICATED name. Originally introduced because
+  // the shared apiClient.entities.Notification.subscribe() channel
+  // had a race where each new subscribe() torn down all existing
+  // subscriptions on the same channel (every caller shared
+  // `${tableName}-realtime`). That race is now fixed at the source
+  // — see the subscribeRegistry comment in apiClient.js. We keep
+  // the dedicated channel here for two reasons: (1) channel-name
+  // isolation makes admin vs consumer bell debugging easier in the
+  // Supabase realtime panel, (2) it pairs naturally with the 30s
+  // polling fallback so admin sees new rows even if realtime drops.
   useEffect(() => {
     if (!userEmail) return;
     let channel;

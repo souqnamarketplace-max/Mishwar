@@ -127,6 +127,11 @@ function buildQs({ select = '*', orderBy, ascending = false, limit, filters = {}
 // should import from "@/lib/session" directly.
 const readLocalSession = readSession;
 
+// Shared registry for the subscribe() implementation below.
+// Maps channelName → { channel, callbacks }. See the comment on
+// createEntityClient(tableName).subscribe for the why.
+const subscribeRegistry = new Map();
+
 function createEntityClient(tableName) {
   return {
     list: async (sort, limit) => {
@@ -303,34 +308,77 @@ function createEntityClient(tableName) {
     },
 
     subscribe: (callback) => {
-      // Use stable channel name — prevents duplicate channels on remount
+      // Shared per-table channel with a callback registry.
+      //
+      // Previously: every caller of subscribe() called
+      // supabase.removeChannel(channelName) up front to "clean up
+      // previous mount", then created a fresh channel. The channel
+      // name (`${tableName}-realtime`) was SHARED across all callers,
+      // so caller B's mount destroyed caller A's still-active
+      // subscription. On a page with 20 TripCards, only the
+      // last-mounted card received realtime updates; the other 19
+      // were silently dead. When ANY card unmounted, the cleanup
+      // destroyed the channel for everyone. AdminNotificationBell
+      // had already worked around this by using its own dedicated
+      // channel name; this is the fix to the underlying defect for
+      // every other caller (TripCard, BookingRequestPopup,
+      // DriverTripsList, DriverPassengers, FeaturedTrips, StatsBar,
+      // Notifications page, Messages page, multiple dashboard
+      // pages, etc.).
+      //
+      // Now: first subscribe() for a tableName creates the Supabase
+      // channel and a callbacks Set. Subsequent subscribe() calls
+      // for the same tableName just add their callback to the Set —
+      // no channel teardown. Unsubscribe removes only this caller's
+      // callback; only the LAST unsubscribe (callbacks Set becomes
+      // empty) removes the Supabase channel.
       const channelName = `${tableName}-realtime`;
-      
-      // Remove any existing channel with same name (cleanup from previous mount)
-      try { supabase.removeChannel(supabase.channel(channelName)); } catch {}
-      
-      const channel = supabase
-        .channel(channelName, { config: { broadcast: { self: true } } })
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: tableName },
-          (payload) => callback(payload)
-        )
-        .subscribe((status) => {
-          if (status === 'CHANNEL_ERROR') {
-            console.warn(`[Realtime] Channel error on ${tableName} — will retry`);
-            // Auto-reconnect after 3 seconds
-            setTimeout(() => {
-              try { channel.subscribe(); } catch {}
-            }, 3000);
-          }
-          if (status === 'TIMED_OUT') {
-            console.warn(`[Realtime] Timed out on ${tableName}`);
-          }
-        });
-      
+      let entry = subscribeRegistry.get(channelName);
+      if (!entry) {
+        const callbacks = new Set();
+        const channel = supabase
+          .channel(channelName, { config: { broadcast: { self: true } } })
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: tableName },
+            (payload) => {
+              // Fan out to every registered subscriber. Each cb is
+              // wrapped in try/catch so one cb throwing doesn't
+              // break delivery to the others.
+              callbacks.forEach((cb) => {
+                try { cb(payload); } catch (e) {
+                  console.warn(`[Realtime ${tableName}] subscriber threw:`, e);
+                }
+              });
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'CHANNEL_ERROR') {
+              console.warn(`[Realtime] Channel error on ${tableName} — will retry`);
+              setTimeout(() => {
+                try { channel.subscribe(); } catch {}
+              }, 3000);
+            }
+            if (status === 'TIMED_OUT') {
+              console.warn(`[Realtime] Timed out on ${tableName}`);
+            }
+          });
+        entry = { channel, callbacks };
+        subscribeRegistry.set(channelName, entry);
+      }
+      entry.callbacks.add(callback);
+
       return () => {
-        supabase.removeChannel(channel);
+        const e = subscribeRegistry.get(channelName);
+        if (!e) return;
+        e.callbacks.delete(callback);
+        // Only tear down the Supabase channel when no one is
+        // listening anymore. Prevents the "last-card-unmount kills
+        // everyone" cascade from the previous implementation.
+        if (e.callbacks.size === 0) {
+          try { supabase.removeChannel(e.channel); } catch {}
+          subscribeRegistry.delete(channelName);
+        }
       };
     },
   };

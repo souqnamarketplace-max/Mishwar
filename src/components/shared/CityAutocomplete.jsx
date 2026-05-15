@@ -60,8 +60,17 @@ export default function CityAutocomplete({
   useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (!wrapperRef.current?.contains(e.target)) setOpen(false); };
+    // Both mousedown AND touchstart — on mobile, tap-outside doesn't
+    // always synthesise a mousedown reliably (especially when the tap
+    // lands on a different scrollable region). Other dropdowns in the
+    // codebase (NotificationBell, AdminNotificationBell, Navbar
+    // profile menu) use both events for this reason.
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
   }, [open]);
 
   const handleSelect = (city) => {
