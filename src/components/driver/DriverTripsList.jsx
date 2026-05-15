@@ -173,15 +173,27 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
       return api.entities.Trip.update(id, data);
     },
     onMutate: async ({ id, data }) => {
-      await qc.cancelQueries({ queryKey: ["trips"] });
-      const prev = qc.getQueryData(["trips"]);
-      qc.setQueryData(["trips"], old => 
-        old?.map(t => t.id === id ? { ...t, ...data } : t) || []
-      );
-      return prev;
+      // Optimistic on BOTH the global trips list (SearchTrips reads
+      // this) AND the per-driver list (DriverDashboard reads this).
+      // Previously only the global key was touched, so the driver
+      // viewing their own dashboard saw no optimistic feedback —
+      // UI froze for ~200ms while invalidate→refetch ran. Touching
+      // both keys gives instant local feedback while the server
+      // round-trip happens.
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["trips"] }),
+        qc.cancelQueries({ queryKey: ["driver-trips", driverUser?.email] }),
+      ]);
+      const prevTrips       = qc.getQueryData(["trips"]);
+      const prevDriverTrips = qc.getQueryData(["driver-trips", driverUser?.email]);
+      const apply = (old) => old?.map(t => t.id === id ? { ...t, ...data } : t) || [];
+      qc.setQueryData(["trips"], apply);
+      qc.setQueryData(["driver-trips", driverUser?.email], apply);
+      return { prevTrips, prevDriverTrips };
     },
     onError: (err, vars, ctx) => {
-      qc.setQueryData(["trips"], ctx);
+      qc.setQueryData(["trips"], ctx?.prevTrips);
+      qc.setQueryData(["driver-trips", driverUser?.email], ctx?.prevDriverTrips);
       toast.error(friendlyError(err, "فشل تحديث الرحلة"));
     },
     onSuccess: async (_, { id, data, trip, bookings: tripBookings }) => {
@@ -307,19 +319,82 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id) => api.entities.Trip.delete(id),
+    mutationFn: async (id) => {
+      // Before deleting the trip, cancel and notify any active
+      // bookings on it. Previously this just called Trip.delete()
+      // and the bookings stayed in the DB pointing at a now-
+      // nonexistent trip_id (Booking.trip_id is text, no FK
+      // CASCADE). Passengers saw ghost bookings forever with no
+      // notification. The confirm modal's text — "سيتم إلغاء
+      // حجوزاتهم" — was a lie; nothing actually cancelled them.
+      // Now: same flow as cancelMutation, then delete the trip.
+      const tripData = await api.entities.Trip.get(id).catch(() => null);
+      const tripBookings = await api.entities.Booking.filter(
+        { trip_id: id },
+        "-created_date",
+        200
+      );
+      const affected = tripBookings.filter(b => b.status === "pending" || b.status === "confirmed");
+
+      if (affected.length > 0) {
+        const route = tripData ? `من ${tripData.from_city} إلى ${tripData.to_city}` : "";
+        const date  = tripData?.date || "";
+        // Flip the bookings to cancelled_by_driver. allSettled so a
+        // single row that hits a transient error doesn't tank the
+        // whole sequence — we still want to delete the trip.
+        await Promise.allSettled(
+          affected.map(b => {
+            const refundFields = b.payment_status === "paid"
+              ? { refund_required: true, refund_status: "pending" }
+              : {};
+            return api.entities.Booking.update(b.id, {
+              status: "cancelled_by_driver",
+              ...refundFields,
+            });
+          })
+        );
+        // Notify each affected passenger. Same shape as cancelMutation.
+        await Promise.allSettled(
+          affected.map(b =>
+            notifyUser({
+              user_email: b.passenger_email,
+              title:   "تم إلغاء الرحلة من قبل السائق",
+              message: `نأسف، السائق ألغى الرحلة ${route} ${date ? `بتاريخ ${date}` : ""}. ` +
+                (b.payment_status === "paid"
+                  ? "سيتم استرداد المبلغ المدفوع — تابع الإشعارات."
+                  : "ابحث عن رحلة بديلة على نفس المسار."),
+              type: "system",
+              trip_id: id,
+              link: "/my-trips?tab=cancelled",
+            })
+          )
+        );
+      }
+      // Now delete the trip row itself.
+      return api.entities.Trip.delete(id);
+    },
     onMutate: async (id) => {
-      await qc.cancelQueries({ queryKey: ["trips"] });
-      const prev = qc.getQueryData(["trips"]);
-      qc.setQueryData(["trips"], old => old?.filter(t => t.id !== id) || []);
-      return prev;
+      // Optimistic on both queryKeys — same fix as updateMutation.
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["trips"] }),
+        qc.cancelQueries({ queryKey: ["driver-trips", driverUser?.email] }),
+      ]);
+      const prevTrips       = qc.getQueryData(["trips"]);
+      const prevDriverTrips = qc.getQueryData(["driver-trips", driverUser?.email]);
+      const apply = (old) => old?.filter(t => t.id !== id) || [];
+      qc.setQueryData(["trips"], apply);
+      qc.setQueryData(["driver-trips", driverUser?.email], apply);
+      return { prevTrips, prevDriverTrips };
     },
     onError: (err, vars, ctx) => {
-      qc.setQueryData(["trips"], ctx);
+      qc.setQueryData(["trips"], ctx?.prevTrips);
+      qc.setQueryData(["driver-trips", driverUser?.email], ctx?.prevDriverTrips);
       toast.error(friendlyError(err, "فشل حذف الرحلة"));
     },
     onSuccess: (_, tripId) => {
       qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips", driverUser?.email] });
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
       toast.success("تم حذف الرحلة");
       const trip = trips?.find(t => t.id === tripId);
       logAudit("driver_delete_trip", "trip", tripId, {

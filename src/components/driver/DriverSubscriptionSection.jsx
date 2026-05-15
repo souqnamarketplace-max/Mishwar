@@ -303,11 +303,27 @@ function SubscribeForm({ user, price, periodDays, settings, variant = "new", onS
     try {
       const compressed = await compressImage(file).catch(() => file);
       const ext = (compressed.name || file.name).split(".").pop();
+      // Subscription-proof screenshots are FINANCIAL PII — they
+      // commonly include bank/Reflect/Jawwal transaction images
+      // showing the driver's account number, amount, recipient,
+      // and sometimes phone numbers. Previously uploaded to
+      // 'uploads' (public-read) with the full publicUrl stored in
+      // the DB. Anyone with the URL — admins viewing the
+      // subscription queue, leaked screenshots, audit log
+      // details — had permanent unauthenticated read access. Now
+      // routes to uploads-private; the column stores the path and
+      // resolveDocumentUrl signs it at render time. Same fix shape
+      // as the AccountSettings license docs fix in batch 5.
       const path = `${user.id}/subscription-proof-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("uploads").upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage
+        .from("uploads-private")
+        .upload(path, compressed, { upsert: true });
       if (upErr) throw upErr;
-      const { data: { publicUrl } } = supabase.storage.from("uploads").getPublicUrl(path);
-      setProofUrl(publicUrl);
+      // Store the path, not a public URL. Display sites already
+      // resolve paths via licenseUrls.resolveDocumentUrl which
+      // signs them with a 60s TTL and falls back to legacy public
+      // URLs via the isPublicHttpUrl pass-through.
+      setProofUrl(path);
       toast.success("✓ تم رفع إثبات الدفع");
     } catch (err) {
       toast.error(`خطأ: ${friendlyError(err, "حاول مجدداً")}`);

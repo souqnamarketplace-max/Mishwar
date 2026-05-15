@@ -10,6 +10,7 @@ import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
 import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
+import { toast } from "sonner";
 
 const MOBILE_TABS = [
   { id: "home",     label: "الرئيسية", icon: Home,          path: "/" },
@@ -82,8 +83,25 @@ export default function MobileLayout({ children, user, showHeader = true, header
   const contentRef = useRef(null);
   const tabHistoryRef = useRef({});
   
-  // Detect if viewport is mobile
-  const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
+  // Detect if viewport is mobile. Reactive to resize/orientation so
+  // foldables, tablets, and desktop browsers crossing the 1024px
+  // breakpoint see the chrome update correctly. Previously this was
+  // computed once at render and stayed stuck at the initial value,
+  // so rotating a phone-sized window to landscape past 1024px wide
+  // (or vice versa) kept the wrong chrome visible until reload.
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && window.innerWidth < 1024
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => setIsMobile(window.innerWidth < 1024);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
 
   // ─── Unread messages count (drives red badge on الرسائل tab) ───
   // Hook handles the COUNT query + Supabase realtime subscription.
@@ -164,13 +182,24 @@ export default function MobileLayout({ children, user, showHeader = true, header
               {headerTitle || PAGE_TITLES[location.pathname] || resolveDynamicTitle(location.pathname) || currentTab?.label || "مشوارو"}
             </h1>
 
-            {/* LEFT side (RTL end): Logo or Back arrow */}
+            {/* LEFT side (RTL end): Logo or Back arrow.
+                Back arrow uses navigate(-1) so users return to wherever
+                they came from — Search results, MyTrips, etc. — not
+                hard-jumped to Home. Falls back to / only if there's no
+                history (e.g. they landed via a direct URL). */}
             {location.pathname !== "/" ? (
-              <Link to="/">
-                <Button variant="ghost" size="icon" className="h-10 w-10">
-                  <ArrowRight className="w-5 h-5" />
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => {
+                  if (window.history.length > 1) navigate(-1);
+                  else navigate("/");
+                }}
+                aria-label="رجوع"
+              >
+                <ArrowRight className="w-5 h-5" />
+              </Button>
             ) : (
               <Link to="/">
                 <img src="/logo.png" alt="مشوارو" className="h-8 w-8 rounded-lg object-cover" />
@@ -487,7 +516,21 @@ export default function MobileLayout({ children, user, showHeader = true, header
             {/* Sign Out + Version */}
             <div className="border-t border-border" dir="rtl">
               <button
-                onClick={() => { setShowMobileMenu(false); api.auth.logout(); }}
+                onClick={async () => {
+                  setShowMobileMenu(false);
+                  // Was: api.auth.logout() fire-and-forget. If the
+                  // logout request failed (network blip, expired
+                  // refresh token, etc.), the menu closed but the
+                  // user stayed logged in with no toast — confusing.
+                  // Now: await + toast on error. Success path
+                  // navigates away (AuthContext picks up SIGNED_OUT
+                  // and routes), so no toast needed there.
+                  try {
+                    await api.auth.logout();
+                  } catch (err) {
+                    toast.error("فشل تسجيل الخروج. حاول مجدداً.");
+                  }
+                }}
                 className="flex items-center gap-3 w-full px-4 py-3 hover:bg-destructive/10 transition-colors text-destructive"
               >
                 <LogOut className="w-5 h-5 shrink-0" />

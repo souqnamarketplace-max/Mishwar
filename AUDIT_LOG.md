@@ -326,3 +326,102 @@ A user could paste 100k characters into either field. DB write either bloats the
 
 
 
+
+---
+
+# Component-Level Audit (Phase 2)
+
+After the 20-page audit completed, extending the same methodology to
+`src/components/`. Total: 103 component files, 14,616 LOC.
+
+## Scope
+- **Audited**: high-traffic, business-logic, mutation-emitting,
+  auth-touching, payment-touching, file-upload-touching, modal components
+- **Skipped**: `src/components/ui/*` (shadcn-generated primitives —
+  vendor wrappers around Radix UI, bugs would be upstream)
+- **Spot-checked only**: tiny (<50 LOC) presentational components
+
+## Priority order (largest + highest-impact first)
+
+| # | Component | LOC | Status | Real bugs |
+|---|-----------|-----|--------|-----------|
+| 1 | DriverTripsList.jsx | 939 | ✅ done | 3 real incl. 1 CRITICAL (delete leaves orphan bookings, optimistic on wrong queryKey x2) |
+| 2 | MobileLayout.jsx | 646 | ✅ done | 3 real (stale isMobile, back arrow always to /, logout fire-and-forget) |
+| 3 | HowItWorks.jsx | 598 | ✅ done | 0 real (pure presentational mockup) |
+| 4 | DriverSubscriptionSection.jsx | 517 | ✅ done | 1 CRITICAL (payment proofs to public bucket) |
+| 5 | MapCityPicker.jsx | 472 | pending | |
+| 6 | HeroSection.jsx | 362 | pending | |
+| 7 | DriverPassengers.jsx | 359 | pending | |
+| 8 | UserActionsMenu.jsx | 357 | pending | |
+| 9 | RouteMap.jsx | 353 | pending | |
+| 10 | DriverReviewWizard.jsx | 336 | pending | |
+| 11 | Navbar.jsx | 331 | pending | |
+| 12 | AdminNotificationBell.jsx | 317 | pending | |
+| 13 | NotificationBell.jsx | 310 | pending | |
+| 14 | UserHistorySection.jsx | 297 | pending | |
+| 15 | FeaturedTrips.jsx | 280 | pending | |
+| 16 | PassengerReviewWizard.jsx | 277 | pending | |
+| 17 | TripCard.jsx | 275 | pending | |
+| 18 | BookingRequestPopup.jsx | 251 | pending | |
+| 19 | CityAutocomplete.jsx | 245 | pending | |
+| 20 | PullToRefresh.jsx | 221 | pending | |
+| 21 | DriverPaymentSetup.jsx | 217 | pending | |
+| 22 | AccountHub.jsx | 211 | pending | |
+| 23 | SuggestCityModal.jsx | 208 | pending | |
+| 24 | DriverRatingsDashboard.jsx | 185 | pending | |
+| 25 | DriverRatePassengers.jsx | 171 | pending | |
+| 26 | DriverVehicleEditor.jsx | 170 | pending | |
+| 27 | StrikeStatusSection.jsx | 170 | pending | |
+| 28 | PassengerPaymentsSection.jsx | 169 | pending | |
+| 29 | RequestCard.jsx | 143 | pending | |
+| 30 | StatsBar.jsx | 149 | pending | |
+| 31 | DashboardFilterBar.jsx | 149 | pending | |
+| 32 | LegalSheet.jsx | 133 | pending | |
+| 33 | GPSTripTracker.jsx | 132 | pending | |
+| 34 | MyReportsSection.jsx | 104 | pending | |
+| 35 | PreferencesSection.jsx | 101 | pending | |
+
+Plus assorted smaller (<100 LOC) components — spot-checked.
+
+
+## Component Batch 1 — Findings
+
+### Component 1 — DriverTripsList.jsx (939 LOC)
+
+**🔴 CRITICAL — `deleteMutation` left orphan bookings + no passenger notification**
+The trip-delete UI showed a warning: "يوجد X راكب محجوزون — سيتم إلغاء حجوزاتهم" ("X passengers booked — their bookings will be cancelled"). But the `deleteMutation.mutationFn` only called `Trip.delete(id)` — **no booking cancellation logic ran**. Booking.trip_id is `text` (not a UUID FK with CASCADE), so the booking rows stayed in the DB pointing at a now-nonexistent trip. Passengers saw a ghost booking forever with no notification of what happened.
+The `cancelMutation` did this correctly (flips bookings + notifies passengers); `deleteMutation` was the broken sibling that the warning text *claimed* behaved the same way but didn't.
+**Fix:** before deleting the trip row, fetch active bookings, flip them to `cancelled_by_driver` (with refund_required flag for paid bookings), and notify each passenger. Mirrors cancelMutation's flow. ✅
+
+**🟡 MEDIUM — Optimistic updates only wrote to `["trips"]` queryKey, not `["driver-trips", email]`**
+The component renders inside the driver dashboard which reads from `["driver-trips", email]`. The optimistic update only touched `["trips"]` (which is what SearchTrips reads). So when a driver tapped start/complete/delete, the UI didn't update optimistically — there was a ~200ms freeze while invalidate→refetch ran. SearchTrips (the irrelevant cache) got the optimistic benefit, the driver's own dashboard didn't.
+**Fix:** apply optimistic updates to both queryKeys. Context now stores both previous snapshots so a rollback on error restores both. ✅
+
+**🟡 MEDIUM — Same bug in deleteMutation's optimistic update**
+Identical to above. Fixed alongside.
+
+### Component 2 — MobileLayout.jsx (646 LOC)
+
+**🟡 MEDIUM — `isMobile` computed once at render, never updates**
+`const isMobile = window.innerWidth < 1024`. Hard-coded constant for the component lifetime. If user rotates a phone/tablet, opens DevTools, resizes a desktop browser across the 1024 breakpoint, or uses a foldable — the chrome doesn't update. Same issue another batch already fixed in Messages.jsx for the chat composer.
+**Fix:** moved to `useState` + resize/orientationchange listener. ✅
+
+**🟡 MEDIUM — Back arrow always navigates to `/`, breaking the back-button mental model**
+The mobile header's back arrow rendered a `<Link to="/">` — every back tap from any page jumped to home. User on Home → Search → TripDetails who tapped back went straight to Home, losing their Search context. Standard mobile UX is `navigate(-1)`.
+**Fix:** uses `navigate(-1)` when `window.history.length > 1`, falls back to `/` when there's no history (direct URL entry). ✅
+
+**🟡 MEDIUM — Logout was fire-and-forget**
+`api.auth.logout()` returns a Promise but the onClick handler didn't await it. If logout failed (network blip, expired refresh token, etc.), the menu closed but the user stayed logged in with no toast — confusing.
+**Fix:** awaited inside async handler with explicit error toast. Success path doesn't toast (AuthContext picks up SIGNED_OUT and routes). ✅
+
+### Component 3 — HowItWorks.jsx (598 LOC)
+
+**0 real bugs.** Pure presentational — phone mockup illustrations + a tab toggle + auto-advancing step. No mutations, no API calls, no user input. Skipped.
+
+### Component 4 — DriverSubscriptionSection.jsx (517 LOC)
+
+**🔴 CRITICAL — Subscription payment-proof screenshots uploaded to PUBLIC bucket**
+`supabase.storage.from("uploads").upload(...)` then stored the full publicUrl in `driver_subscriptions.proof_url`. Payment proofs are **financial PII** — they commonly include bank / Reflect / Jawwal transaction screenshots showing the driver's bank account number, transaction amount, recipient information, sometimes phone numbers. Anyone with the URL — admins, screenshot leaks, audit log entries — had permanent unauthenticated read access.
+Identical defect pattern to the AccountSettings license-docs fix in batch 5 (audit phase 1). Mishwaro's subscription-proof flow regressed back to public storage while the rest of the app converged on private.
+**Fix:** route to `uploads-private` bucket; store the path (not URL); display layer already handles both via `licenseUrls.resolveDocumentUrl` pass-through. ✅
+
