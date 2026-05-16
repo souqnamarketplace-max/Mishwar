@@ -5,7 +5,7 @@ import {
   ResponsiveContainer,
   PieChart, Pie, Cell,
 } from "recharts";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 /**
@@ -22,7 +22,16 @@ import { Badge } from "@/components/ui/badge";
  * The chart data computations stay in Dashboard.jsx — only the
  * rendering moves here, so this component stays presentational.
  */
-export default function DashboardCharts({ pieData, chartData, revenueData, totalRevenue }) {
+export default function DashboardCharts({ pieData, chartData, revenueData, totalRevenue, revenueChange }) {
+  // revenueChange shape: { text: "+12%" | "—" | "جديد", up: boolean }
+  // Defaults handle the case where the prop isn't passed yet (during
+  // Dashboard's loading state) without breaking the render.
+  const change = revenueChange || { text: "—", up: true };
+  const ChangeIcon = change.up ? TrendingUp : TrendingDown;
+  const changeColor = change.text === "—"
+    ? "text-muted-foreground"
+    : change.up ? "text-green-600" : "text-destructive";
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
       {/* User distribution donut */}
@@ -74,8 +83,10 @@ export default function DashboardCharts({ pieData, chartData, revenueData, total
           <span className="text-2xl font-bold text-primary">₪{totalRevenue.toLocaleString()}</span>
         </div>
         <div className="flex items-center gap-1 mb-4">
-          <TrendingUp className="w-3 h-3 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">— مقارنة بالشهر الماضي</span>
+          <ChangeIcon className={`w-3 h-3 ${changeColor}`} />
+          <span className={`text-xs ${changeColor}`}>
+            {change.text === "—" ? "—" : change.text} مقارنة بالشهر الماضي
+          </span>
         </div>
         <div className="h-36">
           <ResponsiveContainer width="100%" height="100%">

@@ -222,18 +222,47 @@ function formatDuration(minutes) {
 }
 
 /**
- * Route via Valhalla (openstreetmap.de) — CORS-enabled, no API key needed.
- * Supports West Bank roads. Falls back to straight-line estimate if API fails.
+ * Route via OSRM — CORS-enabled, no API key needed. Supports West Bank roads.
+ * Falls back to straight-line estimate if all servers fail.
+ *
+ * In-memory route cache: keyed by stringified coordinates list. Users
+ * tweaking search dates / passenger count on the same from→to typically
+ * fire this dozens of times per session, all returning identical routes.
+ * Caching eliminates the bulk of repeat requests and is the primary
+ * defense against hitting the 429 rate-limit threshold on shared OSM
+ * routing servers. Cleared on app reload — routes don't need to persist
+ * across sessions, road data can change.
  */
-// Multiple routing servers — try in order, skip on rate limit or CORS
-// Routing servers — try in order. OSRM (OSM Germany) is CORS-enabled, no key needed,
-// no rate limit issues. Valhalla openstreetmap.de servers got CORS-locked + heavily rate-limited.
+const ROUTE_CACHE = new Map();
+const ROUTE_CACHE_LIMIT = 100; // bound memory; oldest entry dropped on overflow
+
+function routeCacheKey(locations) {
+  // Round to 5 decimal places so trivially different floats from geocoding
+  // still hit the same cache entry. 5 decimals ≈ 1m precision, plenty for
+  // routing.
+  return locations.map(([la, ln]) => `${la.toFixed(5)},${ln.toFixed(5)}`).join('|');
+}
+
+// Routing servers — tried in order. Both are CORS-enabled, public, no key.
+// 429 (rate limit) or other transient failure falls through to next server.
+// Previously this array had a single entry — the `if (res.status === 429)
+// continue` had no fallback to fall through to. Now: OSM Germany primary,
+// OSRM demo server backup.
 const ROUTING_SERVERS = [
   // OSRM via OSM Germany — CORS-enabled, public, no key, ~100M requests/year
   { type: 'osrm', url: 'https://routing.openstreetmap.de/routed-car/route/v1/driving' },
+  // OSRM project demo server — official fallback, same API
+  { type: 'osrm', url: 'https://router.project-osrm.org/route/v1/driving' },
 ];
 
 async function osrmRoute(locations) {
+  // Check cache first. Same coords from a previous lookup in this session
+  // return immediately — no network call, no rate-limit risk.
+  const key = routeCacheKey(locations);
+  if (ROUTE_CACHE.has(key)) {
+    return ROUTE_CACHE.get(key);
+  }
+
   // OSRM expects coordinates as lng,lat;lng,lat;... in the URL path
   const coordsStr = locations.map(([lat, lng]) => `${lng},${lat}`).join(';');
 
@@ -254,11 +283,24 @@ async function osrmRoute(locations) {
       // Convert GeoJSON [lng,lat] → Leaflet [lat,lng]
       const coordinates = route.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
 
-      return {
+      const result = {
         distanceKm: route.distance / 1000,
         durationMin: Math.round(route.duration / 60),
         coordinates,
       };
+
+      // Cache the success. Bound the cache size to prevent unbounded
+      // growth in long sessions (admin panels, drivers leaving the
+      // app open all day). On overflow, drop the oldest entry —
+      // Map iteration order is insertion order, so the first key is
+      // the oldest.
+      if (ROUTE_CACHE.size >= ROUTE_CACHE_LIMIT) {
+        const firstKey = ROUTE_CACHE.keys().next().value;
+        if (firstKey !== undefined) ROUTE_CACHE.delete(firstKey);
+      }
+      ROUTE_CACHE.set(key, result);
+
+      return result;
     } catch (e) {
       console.warn(`Routing via ${server.url} failed:`, e.message);
       continue;

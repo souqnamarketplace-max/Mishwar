@@ -1142,3 +1142,123 @@ Worth noting because their authors clearly thought about edge cases. Useful as r
 2. **Pull and deploy main** — all 14 commits land cleanly, build clean throughout
 3. Smoke-test the apiClient.subscribe fix (batch 5) and the duplicate-notification fixes
 4. Plan the deferred items in priority order — app-store submission is probably next priority
+
+═══════════════════════════════════════════════════════════════════════
+# POST-AUDIT POLISH ROUND — Deferred items wired up
+═══════════════════════════════════════════════════════════════════════
+
+All 5 items from the deferred follow-up list addressed. Two of them
+turned out to be more serious than the "polish" label suggested:
+
+## 1. Routing 429 fallback (`src/lib/mapUtils.js`)
+
+**Investigation revealed:** the `ROUTING_SERVERS` array had only ONE
+entry. The `if (res.status === 429) continue` rate-limit handler
+had nothing to fall through to — it just exited the loop and threw.
+Then `calculateRoute`'s catch silently degraded to a straight-line.
+
+**Fix:**
+- Added `router.project-osrm.org` (official OSRM demo server) as a
+  second hop. CORS-enabled, free, no key. Same API as the primary.
+- Added an in-memory `ROUTE_CACHE` (Map, max 100 entries, LRU-ish
+  eviction). Keyed by rounded coords. Repeat lookups for the same
+  route (extremely common as users tweak dates/passenger count)
+  return from memory — primary defense against hitting 429.
+
+## 2. Notification permission UX (`src/components/account/NotificationPrefsSection.jsx`)
+
+**Investigation revealed:** the existing `pushNotifications.js`
+infrastructure had `getPermission()` and `ensurePermission()` already
+wired (called lazily from NotificationBell.jsx on first bell-open).
+But `NotificationPrefsSection` only surfaced the in-app `notif_push`
+toggle — a user could enable it in their profile while the BROWSER
+had notifications denied at the OS level, and see no indication why
+notifications weren't actually arriving.
+
+**Fix:** added a `PermissionStatusCard` at the top of the section that
+reflects the live `Notification.permission` state with 4 variants:
+- **granted** → green confirmation card
+- **default** → CTA card with "تفعيل الإشعارات" button that triggers
+  `ensurePermission()` and re-reads the resolved state
+- **denied** → warning card with platform-specific re-enable
+  instructions for Chrome desktop, Safari iOS, Chrome Android
+- **unsupported** → quiet info that browser doesn't expose Notification
+
+Re-reads permission on `focus` + `visibilitychange` events so the card
+updates immediately when a user returns from browser/iOS settings,
+without requiring a full reload.
+
+## 3. Count-via-list refactor (`src/api/apiClient.js`, StatsBar, Dashboard)
+
+**Investigation revealed this wasn't just inefficiency.** Dashboard's
+`totalUsers/totalTrips/totalBookings` were computed as `.length` of
+100-row lists, so the admin's top-line stats **silently capped at 100**.
+Once any of those tables grew past 100, the admin saw `إجمالي
+المستخدمين: 100` permanently while the real number climbed. Actively
+broken state, not just "future scale concern."
+
+**Fix:**
+- Added `Entity.count(conditions)` to `createEntityClient` using
+  supabase-js `head: true, count: 'exact'` — single HEAD-style
+  request returns just the count, no row body.
+- `StatsBar.jsx`: replaced `User.list().length` and
+  `trips.filter(...).length` with `User.count()` and
+  `Trip.count({status:'completed'})`.
+- `Dashboard.jsx`: replaced `users.length`/`trips.length`/`bookings.length`
+  with three new dedicated count queries. The 100-row list queries are
+  kept for the chart/recent-activity/rate computations that DO need
+  the row data.
+- The `cities` Set derivation in StatsBar still uses row data (Postgres
+  DISTINCT not exposed via supabase-js) — documented with note that
+  it's an undercount above 1000 trips, deferred for a DISTINCT RPC.
+
+## 4 + 5. MoM revenue delta + Dashboard placeholder data
+   (`src/pages/Dashboard.jsx`, `src/components/dashboard/DashboardCharts.jsx`)
+
+**Replaced 9 `change: "—"` placeholder strings with real deltas:**
+
+| Card | Previous | Now |
+|---|---|---|
+| المستخدمون الجدد اليوم | "—" | DoD (today vs yesterday) |
+| الحجوزات اليوم | "—" | DoD |
+| إجمالي المستخدمين | "—" | MoM |
+| إجمالي الرحلات | "—" | MoM |
+| إجمالي الإيرادات | "—" | MoM |
+| إجمالي المعاملات | "—" | MoM (mirrors bookings) |
+| متوسط تقييم الرحلات | value "—", change "—" | computed from reviews query; value "X.X/5" |
+| نسبة الرحلات المكتملة | "—" | "—" kept (rate delta needs historical aggregates) |
+| نسبة الإلغاء | "—" | "—" kept (same) |
+
+**Implementation details:**
+- New `useMonthCount(table, prevKey, nowKey)` helper that returns
+  `{ prev, cur }` counts from two parallel `useQuery`s using
+  `supabase.from().select('*', { count: 'exact', head: true })` with
+  `gte/lt` on `created_at`. Called 3x for users/trips/bookings.
+- Revenue MoM uses two separate `useQuery`s to fetch `total_price` rows
+  (not counts — we need the values to sum). Filtered to
+  `confirmed`/`completed` to match the main `totalRevenue` calc.
+- `formatDelta(cur, prev)` handles edge cases:
+  - both zero → "—"
+  - prev zero, cur nonzero → "جديد" (don't show infinity %)
+  - normal → "+12%" / "-5%" with up:bool for direction
+- **Revenue avg rating** computed from a new reviews query with the
+  same null-rating defensive filter as RatingSummary/StatsBar.
+- Render fixed to handle 3 states properly (numeric, "جديد", "—"):
+  - Previous render showed a green up-arrow for ALL states even when
+    change was "—", visually wrong
+  - Hardcoded suffix "مقارنة بالأسبوع الماضي" (last week) was a lie —
+    deltas are MoM or DoD. Now uses per-card `period` prop.
+- `DashboardCharts` revenue card now accepts `revenueChange` prop and
+  shows the delta with directional icon + colour.
+
+## Files touched
+
+- `src/lib/mapUtils.js`
+- `src/api/apiClient.js`
+- `src/components/home/StatsBar.jsx`
+- `src/components/account/NotificationPrefsSection.jsx`
+- `src/pages/Dashboard.jsx`
+- `src/components/dashboard/DashboardCharts.jsx`
+
+Build clean. Eslint clean for all touched files (pre-existing unused-
+import warnings unrelated to this work persist in Dashboard.jsx).

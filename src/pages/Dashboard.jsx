@@ -51,6 +51,10 @@ const statusColors = {
 };
 
 function Overview() {
+  // Row-level data — used for charts, recent activity, status histograms,
+  // rate calculations. Bounded at 100 for performance; the per-row
+  // derivations (last-7-days bucket, revenue from confirmed/completed)
+  // are still accurate at the 100-row scale.
   const { data: trips = [] } = useQuery({
     queryKey: ["all-trips-stats"],
     queryFn: () => api.entities.Trip.list("-created_date", 100),
@@ -71,10 +75,124 @@ function Overview() {
     queryFn: () => api.entities.Notification.list("-created_date", 10),
   });
 
-  // Calculate stats
-  const totalTrips = trips.length;
-  const totalBookings = bookings.length;
-  const totalUsers = users.length;
+  // Server-side TOTALS. Previously totalTrips/totalBookings/totalUsers
+  // were computed as `trips.length` etc — but `trips` was the 100-row
+  // list above, so the dashboard's "إجمالي الرحلات / الحجوزات /
+  // المستخدمين" stat cards SILENTLY CAPPED AT 100 once those tables
+  // grew. Admin saw "إجمالي الرحلات: 100" for weeks while the real
+  // total climbed past 500. Now uses Entity.count() — single HEAD
+  // request, no row data, accurate at any scale.
+  const { data: totalTrips = 0 }    = useQuery({ queryKey: ["dash-trips-count"],    queryFn: () => api.entities.Trip.count(),    staleTime: 30_000 });
+  const { data: totalBookings = 0 } = useQuery({ queryKey: ["dash-bookings-count"], queryFn: () => api.entities.Booking.count(), staleTime: 30_000 });
+  const { data: totalUsers = 0 }    = useQuery({ queryKey: ["dash-users-count"],    queryFn: () => api.entities.User.count(),    staleTime: 30_000 });
+
+  // Reviews — separate query just for the average-rating stat card.
+  // The previous Dashboard didn't pull reviews at all so 'متوسط تقييم
+  // الرحلات' was a permanent '—'. Filter to passenger→driver direction
+  // (matches every other rating average surface). The same null-rating
+  // defensive filter as RatingSummary/StatsBar.
+  const { data: reviews = [] } = useQuery({
+    queryKey: ["dash-reviews-stats"],
+    queryFn: () => api.entities.Review.filter({ review_type: "passenger_rates_driver" }, "-created_date", 500),
+    staleTime: 60_000,
+  });
+
+  // Month-over-month delta computation.
+  // 'Now' window: start of current month → now
+  // 'Prev' window: start of previous month → start of current month
+  // For each stat, fetch a count restricted to created_at in each window
+  // and compute the percentage delta. PostgREST doesn't accept range
+  // operators via the eq-only conditions object, so we use the supabase
+  // client directly inline rather than threading new params through
+  // Entity.count.
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const prevMonthIso = prevMonthStart.toISOString();
+  const monthIso     = monthStart.toISOString();
+
+  const useMonthCount = (table, prevKey, nowKey) => {
+    const prev = useQuery({
+      queryKey: [prevKey],
+      queryFn: async () => {
+        const { count } = await supabase
+          .from(table)
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', prevMonthIso)
+          .lt('created_at', monthIso);
+        return count ?? 0;
+      },
+      staleTime: 5 * 60_000, // previous-month count rarely changes
+    });
+    const cur = useQuery({
+      queryKey: [nowKey],
+      queryFn: async () => {
+        const { count } = await supabase
+          .from(table)
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', monthIso);
+        return count ?? 0;
+      },
+      staleTime: 60_000,
+    });
+    return { prev: prev.data ?? 0, cur: cur.data ?? 0 };
+  };
+
+  const usersDelta    = useMonthCount('profiles',     'dash-users-prev-month',    'dash-users-cur-month');
+  const tripsDelta    = useMonthCount('trips',        'dash-trips-prev-month',    'dash-trips-cur-month');
+  const bookingsDelta = useMonthCount('bookings',     'dash-bookings-prev-month', 'dash-bookings-cur-month');
+
+  // Revenue MoM — compute from bookings.total_price in each window.
+  // Filter on confirmed/completed to match the totalRevenue computation
+  // below. Two separate queries because we want the per-row prices,
+  // not just the count.
+  const { data: prevMonthRevenueBookings = [] } = useQuery({
+    queryKey: ["dash-revenue-prev-month"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('bookings')
+        .select('total_price, status')
+        .gte('created_at', prevMonthIso)
+        .lt('created_at', monthIso)
+        .in('status', ['confirmed', 'completed']);
+      return data ?? [];
+    },
+    staleTime: 5 * 60_000,
+  });
+  const { data: curMonthRevenueBookings = [] } = useQuery({
+    queryKey: ["dash-revenue-cur-month"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('bookings')
+        .select('total_price, status')
+        .gte('created_at', monthIso)
+        .in('status', ['confirmed', 'completed']);
+      return data ?? [];
+    },
+    staleTime: 60_000,
+  });
+  const prevMonthRevenue = prevMonthRevenueBookings.reduce((s, b) => s + (Number(b.total_price) || 0), 0);
+  const curMonthRevenue  = curMonthRevenueBookings.reduce((s, b) => s + (Number(b.total_price) || 0), 0);
+
+  // Format a delta as "+12%" / "−5%" / "—" with up/down boolean for
+  // colour coding. Handle the edge cases:
+  //   prev=0 → can't compute a percentage; if cur>0 show "جديد" (new),
+  //            else dash. Showing "+∞%" looks broken.
+  //   prev=0 cur=0 → dash, nothing happened.
+  //   both numbers > 0 → standard percentage with rounding.
+  const formatDelta = (cur, prev) => {
+    if (prev === 0 && cur === 0) return { text: "—", up: true };
+    if (prev === 0) return { text: "جديد", up: true };
+    const pct = ((cur - prev) / prev) * 100;
+    const rounded = Math.round(pct);
+    const sign = rounded > 0 ? "+" : "";
+    return { text: `${sign}${rounded}%`, up: rounded >= 0 };
+  };
+
+  const usersChange    = formatDelta(usersDelta.cur,    usersDelta.prev);
+  const tripsChange    = formatDelta(tripsDelta.cur,    tripsDelta.prev);
+  const bookingsChange = formatDelta(bookingsDelta.cur, bookingsDelta.prev);
+  const revenueChange  = formatDelta(curMonthRevenue,   prevMonthRevenue);
 
   // Today vs all-time: previously the stat cards LABELED 'Active users
   // today' / 'Bookings today' but the values were totalUsers and
@@ -109,9 +227,35 @@ function Overview() {
   const cancellationRate = totalBookings > 0
     ? Math.round((cancelledCount / totalBookings) * 1000) / 10
     : 0;
+
+  // Average trip rating. Previously this card displayed a permanent '—'
+  // because Dashboard.jsx didn't fetch reviews at all. Now: average the
+  // passenger→driver reviews, with the same null-rating defensive filter
+  // as RatingSummary/StatsBar (a single null rating row would propagate
+  // through reduce as NaN and display 'NaN/5' on the admin dashboard).
+  const validReviews = reviews.filter(r => typeof r.rating === "number" && !isNaN(r.rating));
+  const avgRating = validReviews.length > 0
+    ? (validReviews.reduce((s, r) => s + r.rating, 0) / validReviews.length).toFixed(1)
+    : null;
+
+  // Day-over-day delta for the 'today' cards. usersToday/bookingsToday
+  // are derived from in-memory rows above; we just need yesterday's
+  // counts to compare against, again from in-memory.
+  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+  const usersYesterday    = users.filter((u)    => u.created_at && new Date(u.created_at) >= yesterdayStart && new Date(u.created_at) < todayStart).length;
+  const bookingsYesterday = bookings.filter((b) => b.created_at && new Date(b.created_at) >= yesterdayStart && new Date(b.created_at) < todayStart).length;
+  const usersTodayChange    = formatDelta(usersToday,    usersYesterday);
+  const bookingsTodayChange = formatDelta(bookingsToday, bookingsYesterday);
+
   const bottomStats = [
-    { title: "إجمالي المعاملات", value: totalBookings.toLocaleString(), change: "—", icon: CreditCard },
-    { title: "متوسط تقييم الرحلات", value: "—", change: "—", icon: Star },
+    // 'إجمالي المعاملات' (total transactions) MoM = bookings MoM
+    { title: "إجمالي المعاملات", value: totalBookings.toLocaleString(), change: bookingsChange.text, up: bookingsChange.up, icon: CreditCard },
+    // Avg rating now computed; delta would require a historical
+    // aggregate we don't store — leave as the value-only card.
+    { title: "متوسط تقييم الرحلات", value: avgRating ? `${avgRating}/5` : "—", change: "—", icon: Star },
+    // Completion/cancellation rate deltas would need a historical
+    // ratio comparison — left as '—' (these two are the rate over
+    // the displayed window, not point-in-time).
     { title: "نسبة الرحلات المكتملة", value: `${completionRate}%`, change: "—", icon: CalendarCheck },
     { title: "نسبة الإلغاء", value: `${cancellationRate}%`, change: "—", icon: AlertCircle },
   ];
@@ -123,11 +267,17 @@ function Overview() {
     // Labels now match values: 'today' cards use today counts, 'total'
     // cards use all-time counts. Previously both said 'today' but
     // showed all-time, inflating the dashboard for the admin.
-    { title: "المستخدمون الجدد اليوم", value: usersToday.toString(),    change: "—", up: true, icon: Users,         bg: "bg-primary/10",     iconColor: "text-primary" },
-    { title: "الحجوزات اليوم",         value: bookingsToday.toString(), change: "—", up: true, icon: CalendarCheck, bg: "bg-accent/10",      iconColor: "text-accent" },
-    { title: "إجمالي المستخدمين",      value: totalUsers.toString(),    change: "—", up: true, icon: Users,         bg: "bg-primary/10",     iconColor: "text-primary" },
-    { title: "إجمالي الرحلات",         value: totalTrips.toString(),    change: "—", up: true, icon: Car,           bg: "bg-accent/10",      iconColor: "text-accent" },
-    { title: "إجمالي الإيرادات",       value: `₪${totalRevenue.toLocaleString()}`, change: "—", up: true, icon: DollarSign, bg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
+    //
+    // change strings now show actual deltas:
+    // - 'today' cards: today vs yesterday (day-over-day)
+    // - 'total' cards: this month vs last month (month-over-month)
+    // The placeholder '—' has been replaced everywhere a delta can
+    // actually be computed.
+    { title: "المستخدمون الجدد اليوم", value: usersToday.toString(),    change: usersTodayChange.text,    up: usersTodayChange.up,    icon: Users,         bg: "bg-primary/10",     iconColor: "text-primary", period: "مقارنة بالأمس" },
+    { title: "الحجوزات اليوم",         value: bookingsToday.toString(), change: bookingsTodayChange.text, up: bookingsTodayChange.up, icon: CalendarCheck, bg: "bg-accent/10",      iconColor: "text-accent",  period: "مقارنة بالأمس" },
+    { title: "إجمالي المستخدمين",      value: totalUsers.toString(),    change: usersChange.text,         up: usersChange.up,         icon: Users,         bg: "bg-primary/10",     iconColor: "text-primary" },
+    { title: "إجمالي الرحلات",         value: totalTrips.toString(),    change: tripsChange.text,         up: tripsChange.up,         icon: Car,           bg: "bg-accent/10",      iconColor: "text-accent" },
+    { title: "إجمالي الإيرادات",       value: `₪${totalRevenue.toLocaleString()}`, change: revenueChange.text, up: revenueChange.up, icon: DollarSign, bg: "bg-yellow-500/10", iconColor: "text-yellow-600" },
   ];
 
   // ── Daily trips chart (last 7 days) ───────────────────────────────
@@ -212,22 +362,48 @@ function Overview() {
     <>
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
-        {statCards.map((stat) => (
-          <div key={stat.title} className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground">{stat.title}</p>
-              <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
-                <stat.icon className={`w-4 h-4 ${stat.iconColor}`} />
+        {statCards.map((stat) => {
+          // Visual treatment of the delta depends on what kind of value it is:
+          //   '—'    → no comparison data, neutral grey, no arrow
+          //   'جديد' → previous period was empty, new activity is a positive
+          //            signal but a percentage is meaningless; neutral primary
+          //   '+X%' / '-X%' → green up / red down per up flag
+          // The previous render always showed a green up-arrow regardless,
+          // even when change was '—'. And the "مقارنة بالأسبوع الماضي" (last
+          // week) suffix was a lie — top cards now compare month-over-month,
+          // today-cards compare day-over-day. Use stat.period if provided,
+          // otherwise omit the suffix entirely so the user reads the delta
+          // value alone.
+          const isPlaceholder = stat.change === "—";
+          const isNew = stat.change === "جديد";
+          const showTrendIcon = !isPlaceholder && !isNew;
+          const valueColor = isPlaceholder
+            ? "text-muted-foreground"
+            : isNew
+              ? "text-primary"
+              : stat.up ? "text-green-500" : "text-destructive";
+          return (
+            <div key={stat.title} className="bg-card rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-muted-foreground">{stat.title}</p>
+                <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                  <stat.icon className={`w-4 h-4 ${stat.iconColor}`} />
+                </div>
+              </div>
+              <p className="text-xl font-bold text-foreground">{stat.value}</p>
+              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                {showTrendIcon && (stat.up
+                  ? <TrendingUp className="w-3 h-3 text-green-500" />
+                  : <TrendingDown className="w-3 h-3 text-destructive" />
+                )}
+                <span className={`text-xs ${valueColor}`}>{stat.change}</span>
+                {!isPlaceholder && (
+                  <span className="text-xs text-muted-foreground">{stat.period || "مقارنة بالشهر الماضي"}</span>
+                )}
               </div>
             </div>
-            <p className="text-xl font-bold text-foreground">{stat.value}</p>
-            <div className="flex items-center gap-1 mt-1 flex-wrap">
-              {stat.up ? <TrendingUp className="w-3 h-3 text-green-500" /> : <TrendingDown className="w-3 h-3 text-destructive" />}
-              <span className={`text-xs ${stat.up ? "text-green-500" : "text-destructive"}`}>{stat.change}</span>
-              <span className="text-xs text-muted-foreground">مقارنة بالأسبوع الماضي</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Charts Row — lazy-loaded so recharts doesn't block initial dashboard paint */}
@@ -243,6 +419,7 @@ function Overview() {
           chartData={chartData}
           revenueData={revenueData}
           totalRevenue={totalRevenue}
+          revenueChange={revenueChange}
         />
       </Suspense>
 

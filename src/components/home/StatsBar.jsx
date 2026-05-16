@@ -51,25 +51,63 @@ export default function StatsBar() {
   const statsEnabled = settings.public_stats_enabled === true;
   const minUsers = Number(settings.public_stats_min_users ?? 100);
 
+  // Server-side counts. Previously this section used the count-via-list
+  // anti-pattern: User.list() and Trip.list(1000) downloaded all the
+  // row data just to compute lengths. Wasteful and INCORRECT once tables
+  // exceeded the implicit limits — totalUsers was capped at whatever
+  // PostgREST's default returned (typically 1000), and completedTrips
+  // was capped at 1000 explicitly. The home page slowly under-reported
+  // as the platform grew.
+  //
+  // Trip.count({status:'completed'}) and User.count() send HEAD-style
+  // requests that return ONLY the count header, no body. Far cheaper
+  // and finally accurate at any scale.
+  const { data: totalUsers = 0 } = useQuery({
+    queryKey: ["stats-users-count"],
+    queryFn: () => api.entities.User.count(),
+    enabled: statsEnabled,
+    staleTime: 60_000,
+  });
+  const { data: completedTrips = 0 } = useQuery({
+    queryKey: ["stats-completed-trips-count"],
+    queryFn: () => api.entities.Trip.count({ status: "completed" }),
+    enabled: statsEnabled,
+    staleTime: 60_000,
+  });
+
+  // Cities Set genuinely needs row data because it's DISTINCT(from_city,
+  // to_city) — Postgres can do this with a single query but supabase-js
+  // doesn't expose .distinct() so we fetch rows and dedupe client-side.
+  // Bounded at 1000 trips — once the platform exceeds that, the cities
+  // count is an UNDERCOUNT of historical routes, but routes are
+  // sticky in practice (the same 50-100 routes show up repeatedly)
+  // so the displayed unique-cities count remains accurate-ish. A
+  // server-side DISTINCT RPC is the proper long-term fix; deferred
+  // because it requires a migration.
   const { data: trips = [] } = useQuery({
     queryKey: ["stats-trips"],
     queryFn: () => api.entities.Trip.list("-created_date", 1000),
     enabled: statsEnabled,
+    staleTime: 60_000,
   });
-  const { data: users = [] } = useQuery({
-    queryKey: ["stats-users"],
-    queryFn: () => api.entities.User.list(),
-    enabled: statsEnabled,
-  });
+
+  // Reviews fetched for the average rating tile. The review_type filter
+  // already caps the row set to passenger-rates-driver only (excluding
+  // the inverse direction). Pre-launch this is small; long-term this
+  // should also become a server-side AVG() RPC.
   const { data: reviews = [] } = useQuery({
     queryKey: ["stats-reviews"],
     queryFn: () => api.entities.Review.filter({ review_type: "passenger_rates_driver" }),
     enabled: statsEnabled,
+    staleTime: 60_000,
   });
 
   useEffect(() => {
     if (!statsEnabled) return;
-    const u1 = api.entities.Trip.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-trips"] }));
+    const u1 = api.entities.Trip.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["stats-trips"] });
+      qc.invalidateQueries({ queryKey: ["stats-completed-trips-count"] });
+    });
     const u2 = api.entities.Review.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-reviews"] }));
     return () => { u1(); u2(); };
   }, [qc, statsEnabled]);
@@ -79,9 +117,8 @@ export default function StatsBar() {
   // round numbers as "social proof" is not honest and risks app-store
   // rejection for misleading marketing.
   if (!statsEnabled) return null;
-  if (users.length < minUsers) return null;
+  if (totalUsers < minUsers) return null;
 
-  const completedTrips = trips.filter(t => t.status === "completed").length;
   const cities = new Set([...trips.map(t => t.from_city), ...trips.map(t => t.to_city)].filter(Boolean)).size;
   // Filter out null / non-numeric ratings before averaging. A single
   // null in the dataset (e.g. a soft-deleted review whose rating was
@@ -97,8 +134,8 @@ export default function StatsBar() {
   // Each tile only appears if its underlying data is real and meaningful.
   // Empty list of stats → bar renders nothing.
   const stats = [];
-  if (users.length > 0) stats.push({
-    icon: Users, label: "مسافر فلسطيني", value: users.length,
+  if (totalUsers > 0) stats.push({
+    icon: Users, label: "مسافر فلسطيني", value: totalUsers,
     color: "text-primary", bg: "bg-primary/10", emoji: "👥",
   });
   if (completedTrips > 0) stats.push({

@@ -307,6 +307,37 @@ function createEntityClient(tableName) {
       return true;
     },
 
+    /**
+     * Server-side count — returns the total number of rows matching
+     * conditions without fetching the rows themselves. Uses supabase-js's
+     * head:true + count:exact, which sends an HTTP HEAD-style request
+     * that returns ONLY the Content-Range header with the count, no body.
+     *
+     * Replaces the count-via-list anti-pattern (e.g. `(await Trip.list()).length`)
+     * which:
+     *   1. Downloaded all row data just to get the length — wasteful
+     *   2. Silently capped at PostgREST's default limit (1000) so any
+     *      table with > 1000 rows reported a wrong count
+     *   3. Affected Dashboard stats (totalTrips/totalBookings/totalUsers)
+     *      which used a 100-row list and reported max 100 once tables grew
+     *
+     * @param {object} conditions - optional eq filters, same shape as filter()
+     * @returns {Promise<number>} the matching row count
+     */
+    count: async (conditions) => {
+      let query = supabase
+        .from(tableName)
+        .select('*', { count: 'exact', head: true });
+      if (conditions && typeof conditions === 'object') {
+        Object.entries(conditions).forEach(([key, val]) => {
+          if (val !== undefined && val !== null) query = query.eq(key, val);
+        });
+      }
+      const { count, error } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    },
+
     subscribe: (callback) => {
       // Shared per-table channel with a callback registry.
       //
