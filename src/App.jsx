@@ -9,10 +9,15 @@ const PageErrorFallback = ({ onReset }) => (
       </div>
       <h3 className="font-bold text-foreground mb-2">فشل تحميل هذه الصفحة</h3>
       <p className="text-sm text-muted-foreground mb-4">يرجى المحاولة مجدداً</p>
-      <button onClick={onReset || (() => window.location.reload())}
-        className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
-        إعادة المحاولة
-      </button>
+      <div className="flex gap-3 justify-center">
+        <button onClick={onReset || (() => window.location.reload())}
+          className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
+          إعادة المحاولة
+        </button>
+        <a href="/" className="px-4 py-2 bg-muted text-foreground rounded-xl text-sm font-medium">
+          الرئيسية
+        </a>
+      </div>
     </div>
   </div>
 );
