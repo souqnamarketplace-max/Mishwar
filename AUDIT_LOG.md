@@ -1044,3 +1044,101 @@ if (mobileScroller) mobileScroller.scrollTop = 0;
 ```
 querySelector returns null on desktop or before mount — silently skipped. Works regardless of which layout is active. ✅
 
+
+═══════════════════════════════════════════════════════════════════════
+# AUDIT COMPLETE — FINAL SUMMARY
+═══════════════════════════════════════════════════════════════════════
+
+## Coverage
+
+**Phase 1 (pages):** 20 / 20 page-level files (~6,000 LOC)
+**Phase 2 (components):** 61 / ~64 component files (~8,500 LOC), skipping `src/components/ui/*` (shadcn vendor) and a few <30 LOC trivial wrappers
+
+Total surface audited: **~14,500 LOC across 81 files** in 14 commits over phase 2.
+
+## Defects found
+
+**Page audit (phase 1):** 40+ bugs, 4 critical
+**Component audit (phase 2):** 40+ bugs, ~12 critical/high
+
+**Grand total: ~80 bugs found, ~16 critical/high severity**
+
+## Critical / HIGH defects (by impact)
+
+1. **apiClient.subscribe shared-channel race** (1 root cause, 18+ callers affected) — every list view in the app had broken realtime updates
+2. **MyTrips platform-newest-200 anti-pattern** — passengers' older bookings invisible
+3. **AccountSettings license docs in public bucket** — PII exposure
+4. **DriverDashboard earnings understated** — same platform-newest pattern, financial UI
+5. **Favorites disappearing** — same pattern
+6. **DriverTripsList orphan bookings** — delete trip left dangling booking rows
+7. **DriverSubscriptionSection payment proofs in public bucket** — financial PII exposure
+8. **UserActionsMenu rules-of-hooks violation** — globally mounted, could trigger crashes
+9. **DriverReviewWizard missing notifyUser import** — runtime ReferenceError
+10. **PassengerReviewWizard + DriverReviewWizard duplicate-on-retry** — best-effort notifications inside authoritative try
+11. **DriverPaymentSetup data loss** — saved IBAN wiped when user resolved async
+12. **DriverVehicleEditor data loss** — same pattern + try/finally with no catch
+13. **DriverRatingsDashboard review filter** — driver's own outgoing reviews mixed in
+14. **DashboardSidebar logout button no onClick** — non-functional
+15. **GPSTripTracker duplicate trip-completed notifications** — same best-effort pattern
+16. **start_trip RPC COALESCE bug** (production-blocking) — migrations/052 fix
+
+## Patterns identified across the codebase
+
+These recurring patterns came up enough that future PRs should grep for them:
+
+| Pattern | Occurrences |
+|---|---|
+| **Best-effort side-effects awaited inside authoritative try block** | 6 (Feedback, PassengerReviewWizard, DriverReviewWizard, SuggestCityModal, DriverRatePassengers, GPSTripTracker) |
+| **Platform-newest-N anti-pattern** (entity.list with limit, then client filter) | 4 (MyTrips, DriverDashboard earnings, Favorites, BookingRequestPopup) |
+| **Async-user data loss** (useState init from user prop) | 3 (DriverPaymentSetup, DriverVehicleEditor, PassengerPaymentSetup) |
+| **Rules-of-hooks auth-gate** (early return before all hooks) | 5 (4 pages + UserActionsMenu critical) |
+| **Outside-click missing touchstart** | 4 (CityAutocomplete, Navbar, DashboardSidebar mobile, NotificationBell already had it) |
+| **Fake marketing stats** | 5 (TripDetails, UserProfile, StatsBar, VehicleDetailsSection, CTASection) |
+| **Optimistic update queryKey miss** | 2 (DriverTripsList, DriverPassengers) |
+| **PII to public bucket** | 2 (AccountSettings, DriverSubscriptionSection) |
+| **Payment method ID drift** | 6 surfaces aligned (3 settings + 3 display) |
+| **Review.filter missing review_type** | 2 (DriverRatingsDashboard, UserHistorySection) |
+| **Logout fire-and-forget** | 2 (MobileLayout, Navbar) |
+| **NaN propagation on rating averages** | 2 fixed (StatsBar pre-audit, RatingSummary added in audit) |
+
+## Files with zero real bugs
+
+Worth noting because their authors clearly thought about edge cases. Useful as reference patterns:
+
+- **PullToRefresh** (221 LOC) — ref-based gesture state, stable listeners, scroll container walk-up
+- **LegalSheet** (133 LOC) — ModalPortal escape, body scroll lock cleanup, Esc + backdrop dismiss
+- **NotificationBell** (310 LOC) — mobile-tap race resolution, seenIdsRef dedup
+- **PassengerPaymentsSection** (170 LOC) — migrated platform-newest, cancelled-vs-pending status hierarchy
+- **DashboardCharts** (94 LOC) — lazy-loaded for bundle splitting
+- **StrikeStatusSection** (171 LOC) — DB-mirroring client-side recompute for live accuracy
+- **AdminNotificationBell** — workaround for apiClient defect, now upstream-fixed
+- **MapCityPicker / CityAutocomplete** — never-rewrite per user instruction, but cleaned up around the edges
+
+## Migrations pending user application
+
+- migrations/050_activity_log_user_identifiers.sql
+- migrations/051_messages_realtime_publication.sql
+- **migrations/052_fix_start_trip_coalesce.sql** ← fixes production drivers-blocked-from-start bug
+
+## Deferred follow-ups (NOT fixed — flagged for later)
+
+1. Legacy public-bucket migration (AccountSettings + DriverSubscriptionSection pre-fix files)
+2. start_trip RPC timezone interpretation (server UTC vs Asia/Hebron)
+3. CreateTrip recurring-trip date logic
+4. UserProfile acceptanceRate semantics (conflates driver accept with passenger no-show)
+5. App Store / Play Store submission
+6. Apple Sign In iOS
+7. TestFlight
+8. 1024×1024 app icon
+9. Valhalla 429 fallback
+10. Mobile background GPS
+11. Notification permission UX
+12. StatsBar User.list() + Trip.list(1000) → count-via-list anti-patterns (need server-side COUNT aggregates)
+13. Dashboard MoM revenue delta — currently "—" placeholder
+
+## What to do next
+
+1. **Apply migration 052** in Supabase SQL editor — unblocks drivers from starting trips
+2. **Pull and deploy main** — all 14 commits land cleanly, build clean throughout
+3. Smoke-test the apiClient.subscribe fix (batch 5) and the duplicate-notification fixes
+4. Plan the deferred items in priority order — app-store submission is probably next priority
