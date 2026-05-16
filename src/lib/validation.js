@@ -244,6 +244,68 @@ export function passwordComplianceMessage(check) {
   return `كلمة المرور يجب أن تحتوي على: ${parts.join("، ")}`;
 }
 
+// Minimum age for مشوارو. Stated in Terms section 3 ("يجب أن يكون عمرك
+// 18 سنة أو أكثر"). Enforced here client-side AND in the DB via a CHECK
+// constraint on profiles.date_of_birth (migration 058) — both layers
+// matter: client-side keeps the form honest and shows a helpful Arabic
+// toast, server-side stops API-direct signup bypass attempts.
+//
+// App Store review specifically flags rideshare apps that claim 17+
+// rating without an age affirmation. This validator backs the DOB
+// field added to the signup form.
+export const MIN_AGE_YEARS = 18;
+
+/**
+ * Validate a date-of-birth string (ISO yyyy-mm-dd from a <input type="date">).
+ *
+ * Returns one of:
+ *   { ok: false, reason: "..." }       — bad format, future date, too young, etc.
+ *   { ok: true,  age: <integer> }      — passed all checks
+ *
+ * Age is computed against the user's local clock, which is fine for a
+ * launch-day check — a user 1 day shy of 18 in their timezone but 1 day
+ * past 18 in UTC is an edge case we don't need to hand-craft logic for.
+ * The server-side CHECK constraint computes the same way (current_date -
+ * date_of_birth) so both layers agree.
+ */
+export function validateDateOfBirth(dobIso) {
+  if (!dobIso || typeof dobIso !== "string") {
+    return { ok: false, reason: "يرجى إدخال تاريخ الميلاد" };
+  }
+  // <input type="date"> always emits yyyy-mm-dd. Anything else is suspect.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dobIso)) {
+    return { ok: false, reason: "صيغة التاريخ غير صحيحة" };
+  }
+  const dob = new Date(dobIso + "T00:00:00");
+  if (isNaN(dob.getTime())) {
+    return { ok: false, reason: "تاريخ غير صالح" };
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (dob > today) {
+    return { ok: false, reason: "تاريخ الميلاد لا يمكن أن يكون في المستقبل" };
+  }
+  // Sanity floor — nobody on the platform is 120+ years old. Catches
+  // obvious typos like 1023-04-01.
+  const minBirthYear = today.getFullYear() - 120;
+  if (dob.getFullYear() < minBirthYear) {
+    return { ok: false, reason: "تاريخ الميلاد غير منطقي" };
+  }
+  // Compute age in completed years (the way humans count).
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+    age -= 1;
+  }
+  if (age < MIN_AGE_YEARS) {
+    return {
+      ok: false,
+      reason: `يجب أن يكون عمرك ${MIN_AGE_YEARS} سنة أو أكثر لاستخدام مشوارو`,
+    };
+  }
+  return { ok: true, age };
+}
+
 // Common-password blocklist (top 50 most-leaked passwords ever; the long
 // tail is left to passwordStrength scoring + Supabase Auth's own breach
 // detection if enabled). Lowercased for comparison.

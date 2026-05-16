@@ -371,12 +371,35 @@ export const AuthProvider = ({ children }) => {
    * for production, preview deploys, and localhost development without
    * any environment-specific config.
    */
-  const register = async (email, password, fullName) => {
+  const register = async (email, password, fullNameOrOptions, maybeOptions) => {
+    // Backwards-compatible signature.
+    //   Old:  register(email, password, fullName)
+    //   New:  register(email, password, fullName, { dob, terms_version, terms_accepted_at })
+    //
+    // The login form has been updated to pass the new options object with
+    // age + consent metadata; any other caller (e.g. an admin "create
+    // test user" flow or a script) can still pass just the name and the
+    // handle_new_user trigger will fill profiles.date_of_birth = NULL.
+    // The CHECK constraint on profiles.date_of_birth allows NULL, so old
+    // callers don't break — but the user won't be able to do anything
+    // age-gated until they fill DOB via the account settings page.
+    const fullName = typeof fullNameOrOptions === "string"
+      ? fullNameOrOptions
+      : fullNameOrOptions?.full_name;
+    const opts = (typeof fullNameOrOptions === "object" && fullNameOrOptions !== null)
+      ? fullNameOrOptions
+      : (maybeOptions || {});
+
+    const meta = { full_name: fullName };
+    if (opts.dob) meta.date_of_birth = opts.dob;
+    if (opts.terms_version) meta.terms_version = opts.terms_version;
+    if (opts.terms_accepted_at) meta.terms_accepted_at = opts.terms_accepted_at;
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: meta,
         emailRedirectTo: `${window.location.origin}/login`,
       },
     });

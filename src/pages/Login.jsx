@@ -2,17 +2,18 @@ import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail, validatePasswordCompliance, passwordComplianceMessage, validatePhone, validateFullName } from "@/lib/validation";
+import { passwordStrength, PASSWORD_MIN_LENGTH, PASSWORD_MIN_SCORE, isCommonPassword, isValidPalestinianPhone, isValidEmail, validatePasswordCompliance, passwordComplianceMessage, validatePhone, validateFullName, validateDateOfBirth, MIN_AGE_YEARS } from "@/lib/validation";
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X, ArrowRight } from 'lucide-react';
+import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X, ArrowRight, Calendar } from 'lucide-react';
 import { supabase, setRememberMe, getRememberMe } from '@/lib/supabase';
 import { signInWithGoogle } from '@/lib/googleAuth';
 import { Checkbox } from '@/components/ui/checkbox';
 import LegalSheet from '@/components/legal/LegalSheet';
+import { TERMS_LAST_UPDATED } from '@/lib/legalContent';
 
 export default function Login() {
   useSEO({ title: "تسجيل الدخول", description: "سجل دخولك إلى حسابك في مشوارو" });
@@ -112,7 +113,7 @@ export default function Login() {
     // X button in the email field. Password is NEVER stored.
     let savedEmail = '';
     try { savedEmail = localStorage.getItem('mishwaro_last_email') || ''; } catch {}
-    return { email: savedEmail, password: '', fullName: '', phone: '', confirmPassword: '' };
+    return { email: savedEmail, password: '', fullName: '', phone: '', confirmPassword: '', dob: '', acceptedTerms: false };
   });
 
   useEffect(() => {
@@ -261,6 +262,13 @@ export default function Login() {
     }
     if (!form.email) { toast.error("يرجى إدخال البريد الإلكتروني"); return; }
     if (!isValidEmail(form.email)) { toast.error("صيغة البريد الإلكتروني غير صحيحة"); return; }
+    // Age gate (App Store / Play Store requirement for rideshare apps).
+    // Stated in Terms section 3; enforced here client-side and at the
+    // database layer via a CHECK constraint in migration 058. Both
+    // matter — the client check gives a helpful Arabic toast, the DB
+    // check stops API-direct signup bypass attempts.
+    const dobCheck = validateDateOfBirth(form.dob);
+    if (!dobCheck.ok) { toast.error(dobCheck.reason); return; }
     if (!form.password) { toast.error("يرجى إدخال كلمة المرور"); return; }
     if (form.password !== form.confirmPassword) { toast.error('كلمتا المرور غير متطابقتين'); return; }
     // Mandatory check: password must satisfy Supabase's server-side policy
@@ -278,6 +286,18 @@ export default function Login() {
       toast.error('هذه كلمة مرور شائعة جداً وغير آمنة. اختر كلمة مرور أصعب');
       return;
     }
+    // Explicit consent — required for App Store. We render a checkbox
+    // alongside the existing "بالتسجيل، أنت توافق على..." paragraph
+    // (which alone is "consent through action", borderline-acceptable
+    // but Apple prefers explicit). The checkbox state is stamped onto
+    // the profile row with the current Terms version so we can prove
+    // which version the user agreed to at signup time. If we ever
+    // materially change Terms, we can detect users whose accepted
+    // version < current and re-prompt them.
+    if (!form.acceptedTerms) {
+      toast.error("يجب الموافقة على شروط الاستخدام وسياسة الخصوصية للمتابعة");
+      return;
+    }
     setLoading(true);
     try {
       // Note: passwordStrength score check removed. The compliance check
@@ -285,7 +305,12 @@ export default function Login() {
       // The strength score was advisory — adding 1 point for special chars
       // — but it caused false-positive REJECTIONS when users had a 12-char
       // password without uppercase that scored 4 here but failed Supabase.
-      await register(form.email, form.password, form.fullName);
+      await register(form.email, form.password, {
+        full_name: form.fullName,
+        dob: form.dob,
+        terms_version: TERMS_LAST_UPDATED,
+        terms_accepted_at: new Date().toISOString(),
+      });
       // Success — but they still need to confirm their email. Switch the
       // UI to the resend panel with their email pre-filled, so if the
       // confirmation never arrives they can immediately resend instead
@@ -743,6 +768,62 @@ export default function Login() {
                 )}
               </div>
               <div>
+                <Label className="mb-1.5 block flex items-center justify-between">
+                  <span>تاريخ الميلاد</span>
+                  <span className="text-[10px] font-normal text-slate-500">({MIN_AGE_YEARS}+ سنة)</span>
+                </Label>
+                <div className="relative">
+                  <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                  <Input
+                    name="dob"
+                    type="date"
+                    value={form.dob}
+                    onChange={handleChange}
+                    /* `max` = 18 years ago today, so the native iOS/Android
+                       picker won't even let the user scroll to a date that
+                       would make them under-age. We still validate in JS
+                       on submit because the server-side check enforces
+                       the same rule regardless. */
+                    max={(() => {
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() - MIN_AGE_YEARS);
+                      return d.toISOString().split("T")[0];
+                    })()}
+                    /* `min` = 120 years ago, sanity floor. */
+                    min={(() => {
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() - 120);
+                      return d.toISOString().split("T")[0];
+                    })()}
+                    className="pr-10 text-left"
+                    dir="ltr"
+                    autoComplete="bday"
+                  />
+                </div>
+                {form.dob && (() => {
+                  const c = validateDateOfBirth(form.dob);
+                  if (!c.ok) {
+                    return (
+                      <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                        <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-[9px] font-bold">!</span>
+                        {c.reason}
+                      </p>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-green-600 dark:text-green-400 mt-1.5 flex items-center gap-1">
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-100 dark:bg-green-900/40 text-[9px] font-bold">✓</span>
+                      العمر: {c.age} سنة
+                    </p>
+                  );
+                })()}
+                {!form.dob && (
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1.5">
+                    لاستخدام مشوارو يجب أن يكون عمرك {MIN_AGE_YEARS} سنة أو أكثر
+                  </p>
+                )}
+              </div>
+              <div>
                 <Label className="mb-1.5 block">البريد الإلكتروني</Label>
                 <div className="relative">
                   <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -808,6 +889,50 @@ export default function Login() {
                     value={form.confirmPassword} onChange={handleChange} className="pr-10" autoComplete="new-password" />
                 </div>
               </div>
+              {/* Required consent checkbox. Apple guideline 5.1.1 (Data
+                  Collection and Storage) prefers explicit consent — a
+                  checkbox the user actively ticks — over consent-through-
+                  action (e.g. "by signing up you agree to..."). Both
+                  patterns can pass review but explicit is safer for a
+                  rideshare app, which collects identity-level PII.
+
+                  The footer paragraph below this form (existing) still
+                  shows the links for users who want to read first; this
+                  checkbox is the explicit acceptance. The on-submit
+                  handler enforces the check — we don't disable the
+                  button itself so the user can click and see a clear
+                  toast explaining the requirement. */}
+              <label
+                htmlFor="acceptedTerms"
+                className="flex items-start gap-2.5 cursor-pointer select-none min-h-[44px] py-2"
+              >
+                <Checkbox
+                  id="acceptedTerms"
+                  checked={form.acceptedTerms}
+                  onCheckedChange={(checked) =>
+                    setForm(p => ({ ...p, acceptedTerms: checked === true }))
+                  }
+                  className="mt-0.5 shrink-0"
+                />
+                <span className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  أوافق على{" "}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setOpenLegal("terms"); }}
+                    className="underline underline-offset-2 text-primary font-medium"
+                  >
+                    شروط الاستخدام
+                  </button>
+                  {" "}و
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setOpenLegal("privacy"); }}
+                    className="underline underline-offset-2 text-primary font-medium"
+                  >
+                    سياسة الخصوصية
+                  </button>
+                </span>
+              </label>
               <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
                 {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'إنشاء الحساب'}
               </Button>
