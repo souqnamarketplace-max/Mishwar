@@ -153,6 +153,12 @@ export default function DashboardLogs() {
   });
 
   const isLoading = view === "activity" ? activityQ.isLoading : auditQ.isLoading;
+  // Surface the query's error so an admin sees real failures (e.g. RPC
+  // column-mismatch returning 42703) instead of an empty 'لا توجد نشاطات'
+  // state indistinguishable from a legitimately empty feed. Migration 050
+  // shipped with cs.user_email that didn't exist; migration 055 fixed it.
+  // Without this error branch, the failure was silent for the user.
+  const queryError = view === "activity" ? activityQ.error : auditQ.error;
   const data      = view === "activity" ? activityQ.data : auditQ.data;
   const rows       = data?.rows || [];
   const totalLogs  = data?.total || 0;
@@ -354,6 +360,16 @@ export default function DashboardLogs() {
           {isLoading ? (
             <div className="p-10 text-center">
               <div className="w-6 h-6 border-3 border-muted border-t-primary rounded-full animate-spin mx-auto" />
+            </div>
+          ) : queryError ? (
+            <div className="p-10 text-center space-y-2">
+              <p className="text-sm font-medium text-red-600">تعذر تحميل السجل</p>
+              <p className="text-xs text-muted-foreground break-words">
+                {queryError?.message || String(queryError)}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {queryError?.code ? `code: ${queryError.code}` : null}
+              </p>
             </div>
           ) : rows.length === 0 ? (
             <div className="p-10 text-center text-muted-foreground">لا توجد نشاطات</div>
