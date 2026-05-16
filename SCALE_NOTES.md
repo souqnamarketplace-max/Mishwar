@@ -41,17 +41,44 @@ Admins additionally open:
 ### Channel-count math for capacity planning
 
 ```
-peak_concurrent_users × ~6 channels/user ≤ supabase_realtime_channel_limit
+peak_concurrent_users × ~4 channels/user ≤ project_realtime_channel_limit
 ```
 
-- **Pro tier (500 channels):** ~80 peak concurrent users.
-- **Team tier (~10,000 channels):** ~1,600 peak concurrent users.
-- For **10,000 peak concurrent**, you'd need an enterprise quota or
-  architectural change (e.g. broadcast a single project-wide channel
-  and dispatch client-side, or move some realtime to polling).
+The limit is **per-project**, not org-wide, and depends on Compute size:
 
-**Action item before launching to >100 concurrent:** verify current
-Supabase tier in the project dashboard → Settings → Billing → Plan.
+| Compute size | ~Realtime channel ceiling | ~Concurrent users supported |
+|---|---|---|
+| Micro (default Pro) | ~100 | ~25 |
+| Small | ~200 | ~50 |
+| Medium | ~500 | ~125 |
+| Large | ~1,000 | ~250 |
+| XL+ | scales further | — |
+
+**Current setup (verified 2026-05-15):** Pro plan, TAWSELA project on
+Micro Compute. Capacity ceiling: ~25-50 concurrent realtime users. The
+PostgREST/HTTP side scales further (a few thousand req/sec), so REST
+endpoints (search, book_seat, etc.) handle far more users than realtime
+does. **The bottleneck is realtime.**
+
+### When to upgrade
+
+Watch Supabase dashboard → TAWSELA project → Logs Explorer for:
+
+  - `"too many connections"` errors
+  - Realtime `"channel error"` or `"max connections"` messages
+  - HTTP 503 / 504 spikes during peak commute hours
+
+Watch Reports → Database for:
+
+  - Memory consistently >70% (Micro has 1GB; very easy to saturate)
+  - CPU >50% sustained for >5 min
+
+When ANY of these appear: upgrade TAWSELA to Small Compute (dashboard
+→ Settings → Compute and Disk). Takes ~10 min, brief project restart,
+no code changes. Doubles RAM and roughly doubles realtime ceiling.
+
+The other two projects (Souqnin, MiNest) can stay on Micro as they're
+not the rideshare's hot path.
 
 ### Channels removed for scale (don't reintroduce without reason)
 
