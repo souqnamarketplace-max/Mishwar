@@ -19,7 +19,14 @@ export default function AppLayout() {
   React.useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener("resize", check);
-    return () => window.removeEventListener("resize", check);
+    // Also re-check on orientation change — some mobile browsers don't
+    // fire 'resize' on rotation, leaving the layout stuck in the wrong
+    // breakpoint until the next true resize.
+    window.addEventListener("orientationchange", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
   }, []);
 
   const { data: user } = useQuery({
@@ -27,17 +34,26 @@ export default function AppLayout() {
     queryFn: () => api.auth.me(),
   });
 
+  // NetworkStatus is rendered in BOTH branches. Previously it was only
+  // in the desktop branch — mobile users (who are MORE likely to
+  // experience network issues with cellular signal drops, elevators,
+  // switching wifi/cellular) saw no offline indicator and got no
+  // auto-refetch on reconnect. Strictly worse coverage for the
+  // users who needed it most.
   if (isMobile) {
     return (
-      <MobileLayout user={user}>
-        <PullToRefresh>
-          <AnimatePresence mode="wait">
-            <PageTransition key={location.pathname}>
-              <Outlet />
-            </PageTransition>
-          </AnimatePresence>
-        </PullToRefresh>
-      </MobileLayout>
+      <>
+        <NetworkStatus />
+        <MobileLayout user={user}>
+          <PullToRefresh>
+            <AnimatePresence mode="wait">
+              <PageTransition key={location.pathname}>
+                <Outlet />
+              </PageTransition>
+            </AnimatePresence>
+          </PullToRefresh>
+        </MobileLayout>
+      </>
     );
   }
 

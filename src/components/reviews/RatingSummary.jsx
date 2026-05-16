@@ -14,10 +14,18 @@ export default function RatingSummary({ driverEmail }) {
 
   if (reviews.length === 0) return null;
 
-  const avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
+  // Defensive filter: a single review row with rating=null (soft-deleted,
+  // partial insert, schema drift) would otherwise propagate as NaN through
+  // the average and display 'NaN' on the driver's profile card. Same
+  // pattern as StatsBar's validRatings filter. Histograms below benefit
+  // too — null-rated rows don't show as zero-stars in the distribution.
+  const validReviews = reviews.filter((r) => typeof r.rating === "number" && !isNaN(r.rating));
+  if (validReviews.length === 0) return null;
+
+  const avg = validReviews.reduce((sum, r) => sum + r.rating, 0) / validReviews.length;
   const counts = [5, 4, 3, 2, 1].map((s) => ({
     star: s,
-    count: reviews.filter((r) => r.rating === s).length,
+    count: validReviews.filter((r) => r.rating === s).length,
   }));
 
   return (
@@ -30,7 +38,7 @@ export default function RatingSummary({ driverEmail }) {
         <div className="text-center">
           <p className="text-4xl font-bold text-foreground">{avg.toFixed(1)}</p>
           <StarRating value={Math.round(avg)} readonly size="sm" />
-          <p className="text-xs text-muted-foreground mt-1">{reviews.length} تقييم</p>
+          <p className="text-xs text-muted-foreground mt-1">{validReviews.length} تقييم</p>
         </div>
         <div className="flex-1 space-y-1.5">
           {counts.map(({ star, count }) => (
@@ -40,7 +48,7 @@ export default function RatingSummary({ driverEmail }) {
               <div className="flex-1 bg-muted rounded-full h-1.5">
                 <div
                   className="bg-yellow-500 h-1.5 rounded-full transition-all"
-                  style={{ width: reviews.length ? `${(count / reviews.length) * 100}%` : "0%" }}
+                  style={{ width: validReviews.length ? `${(count / validReviews.length) * 100}%` : "0%" }}
                 />
               </div>
               <span className="text-xs text-muted-foreground w-4">{count}</span>

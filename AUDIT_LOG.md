@@ -394,6 +394,11 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 42 | NotificationPrefsSection.jsx | 90 | ✅ done | 0 real (intentional comingSoon gates documented) |
 | 43 | PassengerPaymentSetup.jsx | 81 | ✅ done | 2 real (MEDIUM: card → credit_card alignment + legacy normalizer; MEDIUM: same async-user data-loss as DriverPaymentSetup) |
 | 44 | CTASection.jsx | 66 | ✅ done | 1 LOW (fake "thousands of Palestinians" marketing claim — replaced with qualitative copy) |
+| 45 | ErrorBoundary.jsx | 62 | ✅ done | 0 real (standard React class error boundary, Sentry capture, recovery UI) |
+| 46 | AppLayout.jsx | 61 | ✅ done | 2 real (MEDIUM: NetworkStatus only in desktop branch — mobile users got no offline indicator; LOW: missing orientationchange listener) |
+| 47 | Pagination.jsx | 61 | ✅ done | 0 real (RTL-aware chevrons, ellipsis logic correct) |
+| 48 | ReviewsList.jsx | 56 | ✅ done | 0 real |
+| 49 | RatingSummary.jsx | 52 | ✅ done | 1 MEDIUM (no NaN defense on rating average — same pattern StatsBar already had) |
 
 Plus assorted smaller (<100 LOC) components — spot-checked.
 
@@ -928,4 +933,37 @@ Same canonical-ID alignment as DriverPaymentSetup (batch 6). PassengerPaymentSet
 Pre-launch app does not have "thousands" of users. This is on the HOMEPAGE — one of the most visible marketing surfaces, the exact kind of unprovable quantitative claim app-store reviewers flag for "misleading marketing." Same pattern as the fake-stat cleanup in phase 1 (TripDetails, UserProfile, StatsBar) and batch 10 (VehicleDetailsSection).
 
 **Fix:** replaced with non-quantitative copy: "شارك الطريق مع جيرانك — وفّر المال، وفّر البيئة، وصِل بأمان" (Share the road with your neighbors — save money, save the environment, arrive safely). Conveys the same community + savings + safety messaging without claiming a user count. ✅
+
+
+## Component Batch 12 — Findings
+
+### Component 45 — ErrorBoundary.jsx (62 LOC)
+**0 real bugs.** Standard React class-based error boundary. Sentry capture with componentStack metadata, optional inline `fallback` prop for non-critical subtrees, default recovery UI with reload + home buttons.
+
+### Component 46 — AppLayout.jsx (61 LOC)
+
+**🟡 MEDIUM — NetworkStatus only rendered on desktop branch**
+The offline banner + auto-refetch-on-reconnect was inside the `<>...</>` return for desktop layout (line 46) but NOT inside the MobileLayout branch return (line 30-42). Mobile users — who experience network issues FAR more often (cellular signal drops, elevators, switching wifi/cellular, going through tunnels) — got no offline indicator and no auto-refetch when they came back online. Strictly worse coverage for the users who needed it most.
+
+**Fix:** rendered `<NetworkStatus />` in both branches (hoisted into the JSX fragment wrapping MobileLayout too). ✅
+
+**🟢 LOW — Missing `orientationchange` listener**
+The breakpoint check `setIsMobile(window.innerWidth < 1024)` ran on `resize` only. Some mobile browsers (Safari iOS in particular) do not fire `resize` on device rotation — they fire `orientationchange`. So a user rotating phone landscape ↔ portrait could end up on the wrong branch's layout until the next true resize.
+
+**Fix:** added the symmetric `orientationchange` listener + cleanup. ✅
+
+### Component 47 — Pagination.jsx (61 LOC)
+**0 real bugs.** RTL-aware navigation (ChevronRight for "previous" in RTL, ChevronLeft for "next"), proper disabled states on first/last page, correct ellipsis insertion between non-consecutive page numbers, locale-aware page numbers (`p.toLocaleString("ar")`).
+
+### Component 48 — ReviewsList.jsx (56 LOC)
+**0 real bugs.** Already filters by `review_type: "passenger_rates_driver"` (this was the right behaviour the whole time — what DriverRatingsDashboard / UserHistorySection were missing in batch 6). Loading skeleton, empty state, graceful date fallback ("—" for old base44 rows missing `created_at`).
+
+### Component 49 — RatingSummary.jsx (52 LOC)
+
+**🟡 MEDIUM — No NaN defense on rating average**
+`avg = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length` — if any review row had `rating === null`, the reduce produces NaN, the `.toFixed(1)` displays "NaN" on the driver's public profile rating card. Same defensive-filter pattern StatsBar already had (added in phase 1), missing here.
+
+Less likely to trigger than the corresponding admin surface (the filter `review_type='passenger_rates_driver'` already excludes most odd rows), but null `rating` is possible for soft-deleted reviews, partial inserts, or schema drift.
+
+**Fix:** added `validReviews = reviews.filter(r => typeof r.rating === 'number' && !isNaN(r.rating))` and use it for both the average AND the histogram counts AND the denominator in the bar widths. Driver's profile rating now never displays "NaN/5" even if one bad row sneaks in. ✅
 
