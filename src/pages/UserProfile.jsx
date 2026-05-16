@@ -136,16 +136,60 @@ export default function UserProfile() {
 
   const completedTrips = trips.filter((t) => t.status === "completed").length;
   const upcomingTrips = trips.filter((t) => ["confirmed", "in_progress"].includes(t.status)).length;
-  // Acceptance rate — null when there's no data to compute from. The
-  // previous default of 92 was a fabricated marketing number that
-  // showed up on every brand-new profile with zero bookings, implying
-  // activity that didn't exist. Same anti-pattern as the hardcoded
-  // 'thousands of users trust us' claims we scrubbed elsewhere — App
-  // Store / privacy review flags these. Display sites should hide the
-  // badge when the rate is null.
-  const acceptanceRate = bookings.length
-    ? Math.round((bookings.filter((b) => b.status !== "cancelled").length / bookings.length) * 100)
-    : null;
+  // Reliability rate — role-aware. The previous single 'acceptanceRate'
+  // was misleading: it was always computed from `bookings` (where this
+  // profile is the passenger), but displayed on a driver profile as
+  // 'معدل القبول' implying driver-side acceptance behaviour. A driver
+  // who never rode as a passenger got `null`; a passenger who booked
+  // twice got a number. Inverted from what viewers expect.
+  //
+  // Now:
+  //   - Driver profile: completion rate of their own trips.
+  //     Numerator   = trips marked completed.
+  //     Denominator = completed + cancelled (driver removed the trip).
+  //     Honest measure of "do their published trips actually run?"
+  //   - Passenger profile: completion rate of their own bookings.
+  //     Numerator   = non-cancelled bookings.
+  //     Denominator = total bookings.
+  //     Honest measure of "do they show up to trips they book?"
+  //
+  // Both gates require >=5 data points so a sample of 1 doesn't show
+  // a misleading 100%. Below the threshold, the card is hidden.
+  // The previous default of 92% for brand-new profiles with zero
+  // history was a fabricated marketing number — App Store / privacy
+  // review flags these — and hiding the card is honest.
+  const RELIABILITY_MIN_SAMPLE = 5;
+
+  const reliability = (() => {
+    if (isDriverProfile) {
+      // For drivers: use the trips array (driver_email-filtered).
+      // 'cancelled' on a trip row means the DRIVER removed it.
+      // Both 'cancelled' and 'completed' are settled states; together
+      // they form the denominator. Pending / confirmed / in_progress
+      // trips are still ongoing and not yet "judged".
+      const settled = trips.filter((t) =>
+        t.status === "completed" || t.status === "cancelled"
+      );
+      const completed = trips.filter((t) => t.status === "completed").length;
+      if (settled.length < RELIABILITY_MIN_SAMPLE) return null;
+      return {
+        pct: Math.round((completed / settled.length) * 100),
+        label: "إتمام الرحلات",
+        sublabel: `${settled.length} رحلة`,
+      };
+    }
+    // For passengers: use the bookings array (passenger_email-filtered).
+    const settled = bookings.filter((b) =>
+      b.status === "completed" || b.status === "cancelled"
+    );
+    const completed = bookings.filter((b) => b.status === "completed").length;
+    if (settled.length < RELIABILITY_MIN_SAMPLE) return null;
+    return {
+      pct: Math.round((completed / settled.length) * 100),
+      label: "إتمام الحجوزات",
+      sublabel: `${settled.length} حجز`,
+    };
+  })();
 
   // confirmedWithUser gates the phone-call button below the avatar.
   //
@@ -365,18 +409,20 @@ export default function UserProfile() {
               value={`${fiveStarPct}%`}
               sublabel={`${fiveStarCount} مراجعة`}
             />
-            {/* Acceptance-rate card only renders when there's real data
-                to compute from. Previously this defaulted to 92% for
-                brand-new profiles with zero bookings, a fabricated
-                marketing number. Hiding the card is honest. */}
-            {acceptanceRate !== null && (
+            {/* Reliability card — role-aware. Shows completion rate of
+                trips (drivers) or bookings (passengers). Hidden when the
+                sample is below RELIABILITY_MIN_SAMPLE so a 100% on a
+                sample of 1 doesn't mislead. The previous version called
+                this 'معدل القبول' (acceptance rate) but computed it from
+                the wrong array — see lines 138-148 for context. */}
+            {reliability && (
               <StatCard
                 icon={Award}
                 iconColor="text-accent"
                 iconBg="bg-accent/10"
-                label="معدل القبول"
-                value={`${acceptanceRate}%`}
-                sublabel="موثوقية"
+                label={reliability.label}
+                value={`${reliability.pct}%`}
+                sublabel={reliability.sublabel}
               />
             )}
           </div>

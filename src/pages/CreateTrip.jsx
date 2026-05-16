@@ -324,17 +324,91 @@ export default function CreateTrip() {
     // opaque RLS error.
     if (!requireOnboarding("/create-trip")) return;
 
+    // ─── Recurring-trip date helper ──────────────────────────────────
+    // Refactored from the inline math that previously lived in both
+    // the conflict pre-check AND the submission loop (they had drifted
+    // by tiny amounts before — single source of truth now).
+    //
+    // Three bugs the old version had:
+    //   1. `new Date("YYYY-MM-DD")` parses as UTC midnight, then
+    //      `toISOString().split("T")[0]` re-emits as UTC date — so a
+    //      driver in Palestine submitting late evening (≥ 21:00 local)
+    //      saw every recurring date shifted by one day. Intermittent.
+    //   2. The feature was called "recurring" but only created ONE
+    //      occurrence per selected weekday (the next one). After a
+    //      single Mon/Wed/Fri batch the driver had 3 trips, not 12,
+    //      and had to re-run the wizard the following week to keep
+    //      the schedule going.
+    //   3. No guard against base dates in the past. UI's min attribute
+    //      blocks this in normal use; a tampered submission would
+    //      otherwise create back-dated trips with status='confirmed'.
+    //
+    // Fix: parse baseDate from yyyy-mm-dd parts, format outputs the
+    // same way (no UTC round-trip), generate RECURRING_WEEKS_HORIZON
+    // occurrences per selected weekday, drop any that fall before
+    // today.
+    const RECURRING_WEEKS_HORIZON = 4;
+    const computeRecurringDates = (baseDateStr, dayIndexes) => {
+      // Parse YYYY-MM-DD as LOCAL midnight. new Date(str) for a date-
+      // only string parses as UTC per spec, which is why we never
+      // construct a Date directly from form.date — we go through
+      // (y, m, d) components to anchor to local time.
+      const [yy, mo, dd] = baseDateStr.split("-").map((n) => parseInt(n, 10));
+      if (!yy || !mo || !dd) return [];
+      const baseDate = new Date(yy, mo - 1, dd);          // local midnight
+      const baseDow  = baseDate.getDay();                 // 0=Sun..6=Sat
+
+      // Today's local midnight, used as the "no past dates" floor.
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const formatLocal = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+      };
+
+      const out = [];
+      for (const dow of dayIndexes) {
+        // Days to add to baseDate to reach the first occurrence of `dow`.
+        // If dow === baseDow we pick the SAME day (week=0), but the
+        // RECURRING_WEEKS_HORIZON loop below still yields 4 trips
+        // (week 0, 1, 2, 3) — that's the rolling horizon.
+        const firstDiff = (dow - baseDow + 7) % 7;
+        for (let week = 0; week < RECURRING_WEEKS_HORIZON; week++) {
+          const d = new Date(baseDate);
+          d.setDate(baseDate.getDate() + firstDiff + week * 7);
+          if (d < today) continue; // skip past-dated occurrences silently
+          out.push({ dow, date: formatLocal(d) });
+        }
+      }
+      // Sort chronologically so the activity log + post-success message
+      // read in the order the driver expects (earliest → latest).
+      out.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      return out;
+    };
+
+    // Past-date guard. The DateInput's `min` attribute makes this
+    // unreachable in normal UI use, but a tampered request or a
+    // race against midnight could otherwise create back-dated trips.
+    if (form.date) {
+      const [yy, mo, dd] = form.date.split("-").map((n) => parseInt(n, 10));
+      const pickedDate = new Date(yy, mo - 1, dd);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (pickedDate < today) {
+        toast.error("لا يمكن نشر رحلة بتاريخ مضى — اختر تاريخاً اليوم أو لاحقاً");
+        return;
+      }
+    }
+
     // ── Pre-submit conflict check (frontend layer; SQL trigger is the source of truth) ──
     try {
       const myTrips = await api.entities.Trip.filter({ driver_id: user.id }, "-created_date", 200);
       const tripsToCheck = form.is_recurring && form.recurring_days.length > 0
-        ? form.recurring_days.map((dayIndex) => {
-            const baseDate = new Date(form.date);
-            const diff = (dayIndex - baseDate.getDay() + 7) % 7;
-            const tripDate = new Date(baseDate);
-            tripDate.setDate(baseDate.getDate() + (diff === 0 ? 7 : diff));
-            return { ...form, date: tripDate.toISOString().split("T")[0] };
-          })
+        ? computeRecurringDates(form.date, form.recurring_days)
+            .map(({ date }) => ({ ...form, date }))
         : [{ ...form }];
 
       for (const candidate of tripsToCheck) {
@@ -416,23 +490,21 @@ export default function CreateTrip() {
     };
 
     if (form.is_recurring && form.recurring_days.length > 0) {
-      // Create a trip for each selected recurring day. We use
+      // Generate one trip per (selected weekday) × (week in horizon).
+      // 3 days selected × 4 weeks = 12 trips per submission.
+      //
       // allSettled (not all) so a date conflict on one specific day
-      // — e.g. the driver already published a trip for next Tuesday
+      // — e.g. driver already published Tuesday's trip three weeks out
       // and the trigger blocks the duplicate — doesn't tank the whole
       // batch. The other days still publish, and we report a partial-
       // success toast so the driver knows exactly what landed.
       const dayNames = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
-      const baseDate = new Date(form.date);
-      const promises = form.recurring_days.map(dayIndex => {
-        // Find next occurrence of this day of week
-        const diff = (dayIndex - baseDate.getDay() + 7) % 7;
-        const tripDate = new Date(baseDate);
-        tripDate.setDate(baseDate.getDate() + (diff === 0 ? 7 : diff));
+      const occurrences = computeRecurringDates(form.date, form.recurring_days);
+      const promises = occurrences.map(({ dow, date }) => {
         return api.entities.Trip.create({
           ...baseData,
-          date: tripDate.toISOString().split("T")[0],
-          driver_note: (baseData.driver_note || "") + " (رحلة يومية - " + dayNames[dayIndex] + ")",
+          date,
+          driver_note: (baseData.driver_note || "") + " (رحلة يومية - " + dayNames[dow] + ")",
         });
       });
       const results = await Promise.allSettled(promises);
@@ -469,7 +541,9 @@ export default function CreateTrip() {
       });
 
       if (failed.length === 0) {
-        toast.success(`تم نشر ${succeeded.length} رحلات متكررة بنجاح! 🎉`);
+        toast.success(
+          `تم نشر ${succeeded.length} رحلات متكررة على مدار ${RECURRING_WEEKS_HORIZON} أسابيع 🎉`
+        );
       } else if (succeeded.length === 0) {
         // All failed — show first error message (likely the same
         // reason for all of them, e.g. eligibility or date conflict)
@@ -1125,7 +1199,9 @@ export default function CreateTrip() {
               </div>
               {form.is_recurring && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">اختر أيام التكرار</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    اختر أيام التكرار — سنُنشئ رحلة لكل يوم على مدار 4 أسابيع
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"].map((day, i) => (
                       <button
