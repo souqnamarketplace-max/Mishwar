@@ -49,6 +49,19 @@ export default function ExpiredTripNotifier({ user }) {
       if (!isTripExpired(trip)) continue;
       if (notified.has(trip.id)) continue;
 
+      // Optimistically mark as notified BEFORE the async insert.
+      // Previously markNotified ran inside the async IIFE after the
+      // insert resolved — but the refetchInterval (60s) can fire
+      // again while the insert is still in-flight, in which case the
+      // same trip passes the notified.has() check a second time and
+      // triggers a duplicate notification insert. Driver gets the
+      // 'trip expired' notification 2-3 times depending on round-trip
+      // latency. Mark synchronously here, then unmark on failure so
+      // a transient error still results in a retry on the next
+      // refetch instead of being permanently silent.
+      notified.add(trip.id);
+      markNotified(trip.id);
+
       // Send notification once. Direct supabase.from() insert (not
       // api.entities.Notification.create) so we use the live JWT —
       // api's restFetch can fall back to the anon key when the
@@ -75,8 +88,14 @@ export default function ExpiredTripNotifier({ user }) {
             is_read: false,
           });
           if (error) throw error;
-          markNotified(trip.id);
         } catch (e) {
+          // Insert failed — unmark so the next refetch will retry.
+          // Without this rollback, a transient error would mark the
+          // trip 'notified' in localStorage forever and the driver
+          // would never get the notification.
+          const cur = getNotified();
+          cur.delete(trip.id);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify([...cur]));
           // Capture to Sentry so production failures surface instead of
           // hiding behind a console.warn that nobody reads.
           captureException(e, { msg: "ExpiredTripNotifier insert failed", extra: { trip_id: trip.id } });

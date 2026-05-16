@@ -1,7 +1,7 @@
 /**
  * PassengerPaymentSetup — preferred payment method for passengers.
  */
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Wallet, Building2, Smartphone, CreditCard, AlertCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -14,12 +14,42 @@ const METHODS = [
   { id: "bank_transfer", label: "تحويل بنكي",  icon: Building2,  color: "bg-blue-500/10 text-blue-600",     desc: "حوّل المبلغ للسائق قبل أو بعد الرحلة" },
   { id: "reflect",       label: "Reflect",      icon: Wallet,     color: "bg-purple-500/10 text-purple-600", desc: "أرسل عبر محفظة Reflect الإلكترونية" },
   { id: "jawwal_pay",    label: "Jawwal Pay",   icon: Smartphone, color: "bg-green-600/10 text-green-700",   desc: "ادفع عبر خدمة Jawwal Pay" },
-  { id: "card",          label: "بطاقة",        icon: CreditCard, color: "bg-rose-500/10 text-rose-600",     desc: "بطاقة ائتمان أو خصم" },
+  // Canonical 'credit_card' — aligns with CreateTrip emit, DriverDashboard
+  // methodLabel decode, DriverPaymentSetup tab IDs (fixed in batch 6).
+  // preferred_payment isn't cross-referenced with trip-accepted methods
+  // yet, so 'card' vs 'credit_card' currently only changes the lookup
+  // label, but aligning now future-proofs the value.
+  { id: "credit_card",   label: "بطاقة",        icon: CreditCard, color: "bg-rose-500/10 text-rose-600",     desc: "بطاقة ائتمان أو خصم" },
 ];
 
+// Existing passenger profiles may have the legacy ID 'card' saved.
+// Normalize at read time so the new canonical 'credit_card' tile
+// still highlights correctly and the bottom-of-page label still
+// finds the right entry. New saves write canonical IDs.
+function normalizeLegacy(id) {
+  if (id === "card") return "credit_card";
+  return id;
+}
+
 export default function PassengerPaymentSetup({ user }) {
-  const [preferred, setPreferred] = useState(user?.preferred_payment || "cash");
+  const [preferred, setPreferred] = useState(normalizeLegacy(user?.preferred_payment) || "cash");
   const qc = useQueryClient();
+
+  // Same async-user hydration pattern as DriverPaymentSetup (batch 6)
+  // and DriverVehicleEditor (batch 7). useState initializer only runs
+  // on first render — if user=undefined on first mount (auth loading)
+  // and resolves later with preferred_payment='bank_transfer', the
+  // local state stays at 'cash' default. User clicks save → PATCH
+  // sends 'cash' → wipes their actual saved preference. hydratedRef
+  // ensures we sync ONCE per user.email so background me re-fetches
+  // don't clobber in-progress tile selections.
+  const hydratedRef = useRef(null);
+  useEffect(() => {
+    if (!user?.email) return;
+    if (hydratedRef.current === user.email) return;
+    hydratedRef.current = user.email;
+    setPreferred(normalizeLegacy(user.preferred_payment) || "cash");
+  }, [user?.email, user?.preferred_payment]);
 
   const save = useMutation({
     mutationFn: () => api.auth.updateMe({ preferred_payment: preferred }),
@@ -73,7 +103,7 @@ export default function PassengerPaymentSetup({ user }) {
 
       {user?.preferred_payment && (
         <p className="text-xs text-center text-muted-foreground">
-          طريقتك المفضلة الحالية: <span className="font-medium text-foreground">{METHODS.find(m=>m.id===user.preferred_payment)?.label}</span>
+          طريقتك المفضلة الحالية: <span className="font-medium text-foreground">{METHODS.find(m=>m.id===normalizeLegacy(user.preferred_payment))?.label}</span>
         </p>
       )}
     </div>

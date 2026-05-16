@@ -390,6 +390,10 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 38 | VehicleDetailsSection.jsx | 100 | ✅ done | 1 LOW (fake "50% increase in bookings" marketing stat — replaced with qualitative copy) |
 | 39 | BlockedUsersSection.jsx | 100 | ✅ done | 0 real (clean unblock flow with proper cache invalidation) |
 | 40 | DashboardCharts.jsx | 94 | ✅ done | 0 real (presentational; the "—" placeholder for month-over-month delta matches Dashboard.jsx — data not wired yet, intentional) |
+| 41 | ExpiredTripNotifier.jsx | 90 | ✅ done | 1 MEDIUM (markNotified ran after async insert → 60s refetch fired duplicate notification while insert in-flight) |
+| 42 | NotificationPrefsSection.jsx | 90 | ✅ done | 0 real (intentional comingSoon gates documented) |
+| 43 | PassengerPaymentSetup.jsx | 81 | ✅ done | 2 real (MEDIUM: card → credit_card alignment + legacy normalizer; MEDIUM: same async-user data-loss as DriverPaymentSetup) |
+| 44 | CTASection.jsx | 66 | ✅ done | 1 LOW (fake "thousands of Palestinians" marketing claim — replaced with qualitative copy) |
 
 Plus assorted smaller (<100 LOC) components — spot-checked.
 
@@ -880,4 +884,48 @@ Code comment at lines 9-11 explicitly documents the intentional product decision
 **0 real bugs.** Presentational — receives `pieData`, `chartData`, `revenueData`, `totalRevenue` props and renders three recharts surfaces. The recharts import deliberately lives here (lazy-loaded with the dashboard route) instead of in Dashboard.jsx so the ~113KB gzipped chart vendor doesn't enter the main admin bundle.
 
 Minor: line 78 has `<span>— مقارنة بالشهر الماضي</span>` — the em-dash is a placeholder for an unwired month-over-month delta. Same placeholder appears in Dashboard.jsx's stat cards (line 130: `change: "—"`). Not a bug, just a half-finished feature; data hasn't been wired. Worth flagging as a TODO but not in audit scope to wire.
+
+
+## Component Batch 11 — Findings
+
+### Component 41 — ExpiredTripNotifier.jsx (90 LOC)
+
+**🟡 MEDIUM — markNotified ran AFTER the async insert → duplicate notifications on slow inserts**
+
+```js
+(async () => {
+  try {
+    await supabase.from("notifications").insert({...});
+    markNotified(trip.id);  // ← AFTER insert resolves
+  } catch (e) { ... }
+})();
+```
+
+The component refetches every 60s (`refetchInterval: 60_000`). If the Supabase insert takes more than 60s (rare but possible on a slow connection or during a temporary backend hiccup), the next refetch's effect runs while the first insert is still in-flight. `notified.has(trip.id)` is still false → second insert fires → driver gets duplicate "trip expired" notification. Could happen 2-3 times for the same trip if the round-trip is consistently slow.
+
+**Fix:** mark optimistically BEFORE the async insert, and unmark on failure so transient errors still result in a retry on the next refetch instead of being permanently silent. ✅
+
+### Component 42 — NotificationPrefsSection.jsx (90 LOC)
+
+**0 real bugs.** Save flow proper, useEffect-from-props correct, SMS + Email channels intentionally marked `comingSoon` with explicit comment explaining why (no gateways wired into backend yet — surfacing them as actionable would let users disable channels that don't deliver anything, then wonder why they aren't getting messages they never could have received).
+
+### Component 43 — PassengerPaymentSetup.jsx (81 LOC)
+
+**🟡 MEDIUM — Payment method ID inconsistency (`"card"` instead of `"credit_card"`)**
+Same canonical-ID alignment as DriverPaymentSetup (batch 6). PassengerPaymentSetup used `"card"` while CreateTrip + DriverDashboard + DriverPaymentSetup use `"credit_card"`. Currently `preferred_payment` isn't cross-referenced with trip-accepted methods so the divergence didn't cause functional bugs, but it locks in the wrong shape for future "driver accepts passenger's preferred method" matcher logic.
+
+**Fix:** changed the METHODS array id to `"credit_card"`. Added `normalizeLegacy(id)` helper that maps existing-passenger `"card"` values to `"credit_card"` at read time, so passengers who already saved the legacy value still see their preferred tile highlighted correctly. New saves write canonical IDs. ✅
+
+**🟡 MEDIUM — Same async-user data-loss pattern as DriverPaymentSetup / DriverVehicleEditor**
+`useState(user?.preferred_payment || "cash")` — if user resolved late, state stayed at "cash" default. Click save → PATCH with "cash" → overwrites the user's actual saved preference. Less severe than DriverPaymentSetup (single tile, user would notice the wrong selection), but still data loss potential.
+
+**Fix:** added `useEffect` + `hydratedRef` pattern (same shape as DriverPaymentSetup batch 6). Sync from user once when `user.email` arrives; gated by hydratedRef so background me re-fetches don't clobber in-progress tile selections. ✅
+
+### Component 44 — CTASection.jsx (66 LOC)
+
+**🟢 LOW — Fake "آلاف الفلسطينيين" (thousands of Palestinians) marketing claim**
+
+Pre-launch app does not have "thousands" of users. This is on the HOMEPAGE — one of the most visible marketing surfaces, the exact kind of unprovable quantitative claim app-store reviewers flag for "misleading marketing." Same pattern as the fake-stat cleanup in phase 1 (TripDetails, UserProfile, StatsBar) and batch 10 (VehicleDetailsSection).
+
+**Fix:** replaced with non-quantitative copy: "شارك الطريق مع جيرانك — وفّر المال، وفّر البيئة، وصِل بأمان" (Share the road with your neighbors — save money, save the environment, arrive safely). Conveys the same community + savings + safety messaging without claiming a user count. ✅
 

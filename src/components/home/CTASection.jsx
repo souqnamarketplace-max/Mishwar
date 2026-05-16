@@ -30,7 +30,7 @@ export default function CTASection() {
               رحلتك القادمة تنتظرك!
             </h2>
             <p className="text-white/80 max-w-md mx-auto mb-3 text-base">
-              انضم إلى آلاف الفلسطينيين الذين يوفرون المال ويصلون بأمان مع مشوارو كل يوم.
+              شارك الطريق مع جيرانك — وفّر المال، وفّر البيئة، وصِل بأمان.
             </p>
             <p className="text-white/60 text-sm mb-8">
               حجز في أقل من دقيقة — بدون رسوم مخفية
