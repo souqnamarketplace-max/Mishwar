@@ -1,9 +1,29 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { api } from "@/api/apiClient";
+import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard, Wallet,
   Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox
 } from "lucide-react";
+
+// Centralised logout for the dashboard sidebar. Mirrors the
+// pattern in components/layout/Navbar.jsx — await api.auth.logout
+// inside a try/catch so a failed logout surfaces a toast (the
+// previous Navbar version's fire-and-forget pattern was fixed in
+// batch 3 of this audit; we use the safe shape from the start
+// here). Critically, this gives the dashboard's "تسجيل الخروج"
+// button an onClick that actually does something — previously the
+// button was a no-op, leaving admins on the dashboard with no
+// in-page way to log out.
+async function handleLogout() {
+  try {
+    await api.auth.logout();
+  } catch (err) {
+    toast.error(friendlyError(err, "فشل تسجيل الخروج. حاول مجدداً."));
+  }
+}
 
 const menuItems = [
   { id: "overview", icon: LayoutDashboard, label: "لوحة التحكم" },
@@ -54,8 +74,15 @@ export function DashboardMobileTabSelector({ activePage, setActivePage }) {
   React.useEffect(() => {
     if (!open) return;
     const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    // Both mousedown AND touchstart — mobile tap-outside doesn't
+    // reliably synthesise a mousedown. Same fix as CityAutocomplete
+    // / NotificationBell / Navbar profile menu in earlier batches.
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
   }, [open]);
 
   return (
@@ -139,7 +166,9 @@ export default function DashboardSidebar({ activePage, setActivePage }) {
           <Home className="w-4 h-4" />
           عرض الموقع
         </Link>
-        <button className="flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-sidebar-accent rounded-lg w-full">
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-sidebar-accent rounded-lg w-full">
           <LogOut className="w-4 h-4" />
           تسجيل الخروج
         </button>

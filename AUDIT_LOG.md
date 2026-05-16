@@ -382,9 +382,10 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 30 | StatsBar.jsx | 149 | ✅ done | 0 real bugs; deferred follow-ups: User.list() + Trip.list(1000) inefficient at scale (count-via-list anti-pattern) |
 | 31 | DashboardFilterBar.jsx | 149 | ✅ done | 0 real (callers documented to debounce; date-range timezone handling correct) |
 | 32 | LegalSheet.jsx | 133 | ✅ done | 0 real (carefully implemented — ModalPortal, body scroll lock cleanup, Esc-to-close all correct) |
-| 33 | GPSTripTracker.jsx | 132 | pending | |
-| 34 | MyReportsSection.jsx | 104 | pending | |
-| 35 | PreferencesSection.jsx | 101 | pending | |
+| 33 | DashboardSidebar.jsx | 148 | ✅ done | 2 real (HIGH: logout button had no onClick — completely non-functional; LOW: mobile tab selector outside-click missing touchstart) |
+| 34 | GPSTripTracker.jsx | 132 | ✅ done | 1 HIGH (best-effort passenger notifications inside authoritative Trip.update try → "failed" toast despite trip completed → driver retried → duplicate notifications to passengers) |
+| 35 | MyReportsSection.jsx | 104 | ✅ done | 0 real (read-only display, clean) |
+| 36 | PreferencesSection.jsx | 101 | ✅ done | 0 real (useEffect-from-props pattern correct, save flow proper) |
 
 Plus assorted smaller (<100 LOC) components — spot-checked.
 
@@ -789,4 +790,64 @@ The `resolveDateRange` helper at the bottom correctly interprets local-time date
 Exemplary. Comments explain every design choice: why a modal not a route navigation (preserves form state), why ModalPortal (escapes parent transform stacking context), why dvh on parent + overflow-y-auto on content (scrollable text while close button stays visible), why both Esc-to-close and backdrop tap (desktop + mobile parity).
 
 Body-scroll-lock cleanup correctly captures `prev = body.style.overflow` and restores it on unmount AND when `kind` changes to null.
+
+
+## Component Batch 9 — Findings
+
+### Component 33 — DashboardSidebar.jsx (148 LOC)
+
+**🟠 HIGH — The "تسجيل الخروج" (Logout) button had NO onClick handler.**
+
+```jsx
+<button className="...">
+  <LogOut className="w-4 h-4" />
+  تسجيل الخروج
+</button>
+```
+
+Admin clicks logout → nothing happens. Forces them to navigate to the consumer-side `/account` or `/` to find a working logout. For admin users this is more than a polish issue: dashboard sessions stay open longer than the admin intends, increasing the risk window for shoulder-surfing, shared-device usage, etc.
+
+**Fix:** added a module-level `async function handleLogout()` mirroring the Navbar pattern from batch 3 (proper try/catch with `friendlyError` toast on failure — not a fire-and-forget). Wired it to the button's onClick. ✅
+
+**🟡 LOW — `DashboardMobileTabSelector` outside-click handler missing touchstart**
+
+Same pattern as CityAutocomplete (batch 5), NotificationBell, Navbar profile menu — mousedown alone doesn't reliably fire on mobile tap-outside. Added the symmetric `touchstart` listener + cleanup. ✅
+
+### Component 34 — GPSTripTracker.jsx (132 LOC)
+
+**🟠 HIGH — Best-effort passenger notifications inside the authoritative Trip.update try block**
+
+```js
+try {
+  await api.entities.Trip.update(trip.id, { status: "completed" });
+  await Promise.all(passengers.map(b => notifyUser({ ... })));  // ← awaited best-effort
+  qc.invalidateQueries(...);
+  toast.success("✅ اكتملت الرحلة!");
+  setShowReviewWizard(true);
+} catch (err) {
+  toast.error(friendlyError(err, "تعذر إنهاء الرحلة"));
+}
+```
+
+If ANY passenger's notifyUser failed, `Promise.all` rejected, catch fired with "تعذر إنهاء الرحلة" (Failed to complete trip). But the trip WAS already completed. This pattern is worse here than in the review wizards because:
+
+1. **Trip status change is irreversible in practice** — no driver-side "uncomplete" button.
+2. **Driver saw "failed"**, tapped the manual completion button again. `Trip.update({status: "completed"})` is a no-op (already completed) but `Promise.all` runs again → **passengers got DUPLICATE "trip completed, rate the driver" notifications**.
+3. **The review wizard never opened.** `setShowReviewWizard(true)` is AFTER the awaited notifyUser. So the driver who was supposed to immediately rate passengers ended up at a "failed" toast with no wizard, then had to navigate to the dashboard's rate-passengers tab — the inferior surface we fixed in batch 7.
+
+**Fix:** split into two phases.
+- Phase 1 (authoritative): `Trip.update` alone. Failure → toast + return. Driver can safely retry.
+- Phase 2 (best-effort): `passengers.map(b => notifyUser({...}).catch(() => {}))`. Each call has its own .catch. The array is `Promise.allSettled`-fired-and-forgotten so the review wizard opens IMMEDIATELY after the trip flip — no waiting for slow notification round-trips. ✅
+
+This is the **fourth** instance of this defect pattern across the audit (Feedback, PassengerReviewWizard, DriverReviewWizard, SuggestCityModal, DriverRatePassengers, now GPSTripTracker). Worth a codebase-wide grep for `Promise.all(... notify` in the future — likely a few more lurking.
+
+### Component 35 — MyReportsSection.jsx (104 LOC)
+
+**0 real bugs.** Read-only display of reports the user filed. CATEGORY_BY_ID lookup, STATUS_DISPLAY mapping, graceful "no reports" empty state, clear admin_note display when present. Comment at line 12-14 explains why reports filed AGAINST the user are intentionally hidden — sound product reasoning.
+
+### Component 36 — PreferencesSection.jsx (101 LOC)
+
+**0 real bugs.** The `useEffect`-from-props pattern at lines 20-24 is correct — syncs local state from user props on dep change, doesn't fire on local-state-only changes, doesn't clobber in-progress edits since the deps are specific user.pref_X fields not the user object itself. Save flow has proper try/catch with friendlyError. Role-aware subtitle text. Tile component is presentational.
+
+Minor edge case (not a bug): if another device updates `pref_smoking` while user is mid-toggle on this device, the effect would fire and overwrite the in-progress edit. Realistic only with two devices logged in simultaneously editing the same field at the same moment — not worth fixing.
 

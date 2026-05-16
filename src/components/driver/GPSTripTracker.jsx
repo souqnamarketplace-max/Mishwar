@@ -27,29 +27,50 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
   const completeTrip = async () => {
     if (completing) return;
     setCompleting(true);
+
+    // ── Phase 1: AUTHORITATIVE — flip trip to completed.
+    // If this fails the trip is NOT completed; show error and let
+    // the driver retry. This is also the only place a 'failed'
+    // toast should appear from this flow.
     try {
       await api.entities.Trip.update(trip.id, { status: "completed" });
-      // Notify all passengers
-      await Promise.all(passengers.map(b =>
-        notifyUser({
-          user_email: b.passenger_email,
-          title: "اكتملت رحلتك! قيّم السائق ⭐",
-          message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مشواروو!`,
-          type: "system",
-          trip_id: trip.id,
-          // Lands passenger on their completed-trips tab so they can
-          // tap the trip and trigger the PassengerReviewWizard.
-          link: "/my-trips?tab=completed",
-        })
-      ));
       qc.invalidateQueries({ queryKey: ["trips"] });
-      toast.success("✅ اكتملت الرحلة! يمكنك الآن تقييم الركاب");
-      setShowReviewWizard(true);
     } catch (err) {
       toast.error(friendlyError(err, "تعذر إنهاء الرحلة"));
-    } finally {
       setCompleting(false);
+      return;
     }
+
+    // ── Phase 2: BEST-EFFORT — notify each passenger. Each call
+    //    has its own .catch so one passenger's notify failure
+    //    cannot surface as 'تعذر إنهاء الرحلة' (the trip IS
+    //    completed; saying it failed is misleading and made
+    //    drivers tap the button again, generating DUPLICATE
+    //    'rate the driver' notifications to all passengers).
+    //    Previously this was awaited inside the same try as the
+    //    Trip.update — same defect as the review wizards in
+    //    batch 4 and SuggestCityModal in batch 6.
+    const sideEffects = passengers.map(b =>
+      notifyUser({
+        user_email: b.passenger_email,
+        title: "اكتملت رحلتك! قيّم السائق ⭐",
+        message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مشواروو!`,
+        type: "system",
+        trip_id: trip.id,
+        // Lands passenger on their completed-trips tab so they can
+        // tap the trip and trigger the PassengerReviewWizard.
+        link: "/my-trips?tab=completed",
+      }).catch(() => { /* non-fatal */ })
+    );
+    // Don't await — fire-and-forget so the review wizard opens
+    // immediately. Passengers get their notifications when they
+    // arrive; if any fail silently, the trip-completed state in
+    // /my-trips is still accurate on their next refresh.
+    Promise.allSettled(sideEffects);
+
+    toast.success("✅ اكتملت الرحلة! يمكنك الآن تقييم الركاب");
+    setShowReviewWizard(true);
+    setCompleting(false);
   };
 
   const { status, distanceKm, minutesLeft, radius, requestLocation } =
