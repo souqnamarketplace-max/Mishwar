@@ -6,6 +6,7 @@ import { queryClientInstance } from '@/lib/query-client';
 import { invalidateBlockCache } from "@/lib/blockUtils";
 import { api } from '@/api/apiClient';
 import { readLocalSession, readSessionToken } from "@/lib/session";
+import { registerNativePush, unregisterNativePush } from "@/lib/pushNotifications";
 
 // Historical alias — the context referenced the function under this name.
 // Both old and new names resolve to the same helper so any in-flight
@@ -119,6 +120,27 @@ export const AuthProvider = ({ children }) => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Native push registration. When the user transitions to authenticated,
+  // ask iOS/Android for permission (if not already granted) and upsert
+  // the device's FCM/APNS token into device_tokens. The effect re-runs
+  // whenever isAuthenticated changes, so:
+  //   - Login (false → true): registerNativePush() fires; if granted,
+  //     token gets upserted. Idempotent — if already registered, the
+  //     RPC just bumps last_seen_at.
+  //   - Logout (handled in logout() below, not here, so the unregister
+  //     completes BEFORE supabase.auth.signOut() invalidates the JWT
+  //     the RPC needs).
+  // No-op on web (Capacitor.isNativePlatform() is false → early return).
+  useEffect(() => {
+    if (isAuthenticated) {
+      registerNativePush().catch(() => {
+        // Errors are captured to Sentry inside registerNativePush.
+        // Swallow here so a push registration failure doesn't crash
+        // the auth flow.
+      });
+    }
+  }, [isAuthenticated]);
 
   const loadUserProfile = async (authUser) => {
     try {
@@ -426,6 +448,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async (shouldRedirect = true) => {
+    // Delete this device's push token BEFORE signOut, so auth.email()
+    // still resolves to the current user inside the delete RPC. If we
+    // signed out first the JWT would be gone and the RPC would 401.
+    // Errors are captured to Sentry inside unregisterNativePush and
+    // swallowed here — a failed token cleanup must not block logout.
+    try { await unregisterNativePush(); } catch {}
     await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);
