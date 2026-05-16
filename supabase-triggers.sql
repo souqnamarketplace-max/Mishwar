@@ -23,28 +23,37 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Notify the driver
-  INSERT INTO public.notifications (
-    user_email, title, message, type, trip_id, from_city, to_city, is_read, created_by
-  ) VALUES (
-    trip_record.driver_email,
-    '🎉 حجز جديد لرحلتك',
-    COALESCE(NEW.passenger_name, 'راكب') || ' حجز ' || COALESCE(NEW.seats_booked, 1)::text ||
-      ' مقاعد في رحلتك من ' || trip_record.from_city || ' إلى ' || trip_record.to_city,
-    'system',
-    trip_record.id::text,
-    trip_record.from_city,
-    trip_record.to_city,
-    false,
-    'system'
-  );
+  -- Notify the driver. Wrapped in EXCEPTION so a transient
+  -- notification failure (e.g. notifications table CHECK violation
+  -- if migration 037 isn't applied) doesn't abort the booking — the
+  -- booking is the authoritative side-effect, the notification is
+  -- best-effort.
+  BEGIN
+    INSERT INTO public.notifications (
+      user_email, title, message, type, trip_id, from_city, to_city, is_read, created_by
+    ) VALUES (
+      trip_record.driver_email,
+      '🎉 حجز جديد لرحلتك',
+      COALESCE(NEW.passenger_name, 'راكب') || ' حجز ' || COALESCE(NEW.seats_booked, 1)::text ||
+        ' مقاعد في رحلتك من ' || trip_record.from_city || ' إلى ' || trip_record.to_city,
+      'system',
+      trip_record.id::text,
+      trip_record.from_city,
+      trip_record.to_city,
+      false,
+      'system'
+    );
+  EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'notify_driver_on_booking: notification skip for booking % — %',
+      NEW.id, SQLERRM;
+  END;
 
-  -- Decrement available seats (never go below 0)
-  UPDATE public.trips
-  SET
-    available_seats = GREATEST(0, COALESCE(available_seats, 1) - COALESCE(NEW.seats_booked, 1)),
-    updated_at = NOW()
-  WHERE id = trip_record.id;
+  -- NOTE: Seat decrement deliberately NOT done here. The book_seat
+  -- RPC (migrations 003/037/045) handles this atomically inside its
+  -- own transaction with FOR UPDATE on the trip row. Doing it here
+  -- too produced a double-decrement (silently wrong for >1-seat
+  -- trips, hard CHECK violation 23514 when available_seats=1).
+  -- See migration 053 for the back-fix on existing databases.
 
   RETURN NEW;
 END;
