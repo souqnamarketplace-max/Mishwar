@@ -73,7 +73,7 @@ export default function VehicleDetailsSection({ user, onSaved }) {
 
       <div>
         <h4 className="font-bold text-sm text-foreground mb-1">المقعد الخلفي</h4>
-        <p className="text-xs text-green-600 mb-3 font-medium">💡 وضع راكبين فقط في الخلف يزيد الحجوزات بـ 50%</p>
+        <p className="text-xs text-green-600 mb-3 font-medium">💡 وضع راكبين فقط في الخلف يجعل الرحلة أكثر راحة للجميع</p>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => setBackRow(2)}

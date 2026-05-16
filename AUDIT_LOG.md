@@ -386,6 +386,10 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 34 | GPSTripTracker.jsx | 132 | ✅ done | 1 HIGH (best-effort passenger notifications inside authoritative Trip.update try → "failed" toast despite trip completed → driver retried → duplicate notifications to passengers) |
 | 35 | MyReportsSection.jsx | 104 | ✅ done | 0 real (read-only display, clean) |
 | 36 | PreferencesSection.jsx | 101 | ✅ done | 0 real (useEffect-from-props pattern correct, save flow proper) |
+| 37 | RequestsTeaser.jsx | 100 | ✅ done | 0 real (role-aware CTA + visibility logic well-commented) |
+| 38 | VehicleDetailsSection.jsx | 100 | ✅ done | 1 LOW (fake "50% increase in bookings" marketing stat — replaced with qualitative copy) |
+| 39 | BlockedUsersSection.jsx | 100 | ✅ done | 0 real (clean unblock flow with proper cache invalidation) |
+| 40 | DashboardCharts.jsx | 94 | ✅ done | 0 real (presentational; the "—" placeholder for month-over-month delta matches Dashboard.jsx — data not wired yet, intentional) |
 
 Plus assorted smaller (<100 LOC) components — spot-checked.
 
@@ -850,4 +854,30 @@ This is the **fourth** instance of this defect pattern across the audit (Feedbac
 **0 real bugs.** The `useEffect`-from-props pattern at lines 20-24 is correct — syncs local state from user props on dep change, doesn't fire on local-state-only changes, doesn't clobber in-progress edits since the deps are specific user.pref_X fields not the user object itself. Save flow has proper try/catch with friendlyError. Role-aware subtitle text. Tile component is presentational.
 
 Minor edge case (not a bug): if another device updates `pref_smoking` while user is mid-toggle on this device, the effect would fire and overwrite the in-progress edit. Realistic only with two devices logged in simultaneously editing the same field at the same moment — not worth fixing.
+
+
+## Component Batch 10 — Findings
+
+### Component 37 — RequestsTeaser.jsx (100 LOC)
+
+**0 real bugs.** Role-aware CTA computation, well-commented visibility rules (the comment at lines 38-49 explicitly explains a previous mis-rule that hid the teaser for drivers when openCount was 0 — they fixed it to always show with role-specific empty-state copy so the discovery surface to /passenger-requests is preserved). Uses the SECURITY DEFINER `public_open_requests_count` RPC for the badge so the count works for everyone without needing the subscription gate.
+
+### Component 38 — VehicleDetailsSection.jsx (100 LOC)
+
+**🟢 LOW — Fake "50% increase in bookings" marketing claim**
+Line 76 had `💡 وضع راكبين فقط في الخلف يزيد الحجوزات بـ 50%` — a quantitative claim that a pre-launch app cannot prove. Same pattern as the fake-marketing-numbers cleanup from phase 1 (TripDetails, UserProfile, StatsBar). Apps with unprovable stats get scrutinized in app-store review.
+
+**Fix:** replaced with qualitative copy: "💡 وضع راكبين فقط في الخلف يجعل الرحلة أكثر راحة للجميع" (Setting back-row to 2 makes the ride more comfortable for everyone). Same nudge intent (drives drivers toward backRow=2 for comfort), no fabricated stat. ✅
+
+### Component 39 — BlockedUsersSection.jsx (100 LOC)
+
+**0 real bugs.** Unblock flow is clean: mutation with proper onSuccess invalidating ALL caches that filter on blocks (search, trip lists, conversations, the blockUtils cache, the local list). Empty-state copy. The `disabled={isPending}` on every button is suboptimal for bulk-unblock UX (one in-flight disables all), but not wrong.
+
+Code comment at lines 9-11 explicitly documents the intentional product decision to NOT surface blocks AGAINST the user — "would just enable harassment retries" — sound reasoning.
+
+### Component 40 — DashboardCharts.jsx (94 LOC)
+
+**0 real bugs.** Presentational — receives `pieData`, `chartData`, `revenueData`, `totalRevenue` props and renders three recharts surfaces. The recharts import deliberately lives here (lazy-loaded with the dashboard route) instead of in Dashboard.jsx so the ~113KB gzipped chart vendor doesn't enter the main admin bundle.
+
+Minor: line 78 has `<span>— مقارنة بالشهر الماضي</span>` — the em-dash is a placeholder for an unwired month-over-month delta. Same placeholder appears in Dashboard.jsx's stat cards (line 130: `change: "—"`). Not a bug, just a half-finished feature; data hasn't been wired. Worth flagging as a TODO but not in audit scope to wire.
 
