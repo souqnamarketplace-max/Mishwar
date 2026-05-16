@@ -1,9 +1,9 @@
 import React from "react";
 import { DollarSign, Users, Car, CheckCircle } from "lucide-react";
 
-export default function DriverStats({ totalEarnings, totalPassengers, activeTrips, completedTrips }) {
+export default function DriverStats({ totalEarnings = 0, totalPassengers = 0, activeTrips = 0, completedTrips = 0 }) {
   const stats = [
-    { label: "إجمالي الأرباح", value: `₪${totalEarnings.toLocaleString()}`, icon: DollarSign, bg: "bg-primary/10", color: "text-primary" },
+    { label: "إجمالي الأرباح", value: `₪${(totalEarnings || 0).toLocaleString()}`, icon: DollarSign, bg: "bg-primary/10", color: "text-primary" },
     { label: "الركاب الكلي", value: totalPassengers, icon: Users, bg: "bg-accent/10", color: "text-accent" },
     { label: "رحلات نشطة", value: activeTrips, icon: Car, bg: "bg-yellow-500/10", color: "text-yellow-600" },
     { label: "رحلات مكتملة", value: completedTrips, icon: CheckCircle, bg: "bg-green-500/10", color: "text-green-600" },

@@ -408,6 +408,9 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 56 | StarRating.jsx | 30 | ✅ done | 0 real (readonly/hover modes correct) |
 | 57 | AccountHubItem.jsx | 30 | ✅ done | 0 real (presentational) |
 | 58 | RequestStatusBadge.jsx | 25 | ✅ done | 0 real (status enum map with fallback) |
+| 59 | DriverStats.jsx | 24 | ✅ done | 1 LOW (no defensive defaults — undefined props would crash on .toLocaleString) |
+| 60 | PageTransition.jsx | 22 | ✅ done | 0 real (standard framer-motion route wrapper) |
+| 61 | ScrollToTop.jsx | 14 | ✅ done | 1 MEDIUM (window.scrollTo no-op on mobile — actual scroll container is data-mobile-content inner element; route changes on mobile didn't scroll to top) |
 
 Plus assorted smaller (<100 LOC) components — spot-checked.
 
@@ -1001,4 +1004,43 @@ Once `wasOffline` became true (after the first offline → online cycle), the gr
 - **StarRating** (30): Hover state correctly gated on !readonly, button disabled on readonly so screen readers see it.
 - **AccountHubItem** (30): Presentational row component with danger variant.
 - **RequestStatusBadge** (25): Status enum map with sensible fallback to 'open'.
+
+
+## Component Batch 14 — Findings (FINAL batch — small file tail)
+
+3 components, 60 LOC. Two real bugs.
+
+### Component 59 — DriverStats.jsx (24 LOC)
+
+**🟢 LOW — No defensive defaults**
+`totalEarnings.toLocaleString()` crashes with TypeError if totalEarnings is undefined (e.g. parent forgot the prop, or future refactor passed only some). Other props would render as the string "undefined".
+
+Current caller (DriverDashboard) always passes numbers via reduce/length so it doesn't trigger today, but the component should not be one wrong prop away from a crash.
+
+**Fix:** added `= 0` default for all four props plus a belt-and-suspenders `(totalEarnings || 0).toLocaleString()`. ✅
+
+### Component 60 — PageTransition.jsx (22 LOC)
+**0 real bugs.** Standard framer-motion route transition wrapper. Variants + ease curve. The `exit` variant only fires when wrapped in `<AnimatePresence mode="wait">` which AppLayout does correctly.
+
+### Component 61 — ScrollToTop.jsx (14 LOC)
+
+**🟡 MEDIUM — `window.scrollTo` is a no-op on mobile**
+
+```js
+useEffect(() => {
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+}, [pathname]);
+```
+
+On mobile, MobileLayout wraps the entire app in `fixed inset-0` and the actual scroll container is `<main data-mobile-content className="overflow-y-auto">`. **window.scrollY is always 0** in that layout — `window.scrollTo` has no observable effect. So route changes on mobile DON'T scroll to top, leaving users at whatever inner scrollTop they had from the previous route.
+
+This is the EXACT same DOM-layout issue PullToRefresh documents in its own comments (batch 5). When a user taps a deep link or navigates from `/my-trips?tab=completed` (scrolled to row 30) to `/account`, the new page mounts but the inner scroll position is preserved — they land mid-page on the new route, often confused why a fresh page is "already scrolled".
+
+**Fix:** scroll BOTH targets defensively:
+```js
+window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+const mobileScroller = document.querySelector("[data-mobile-content]");
+if (mobileScroller) mobileScroller.scrollTop = 0;
+```
+querySelector returns null on desktop or before mount — silently skipped. Works regardless of which layout is active. ✅
 
