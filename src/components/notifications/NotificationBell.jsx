@@ -101,16 +101,13 @@ export default function NotificationBell({ userEmail }) {
     };
   }, [userEmail, navigate, qc]);
 
-  // Keep the older entity-level subscribe too for cache invalidation when an
-  // INSERT goes through a path that doesn't hit the filtered channel above
-  // (e.g. another tab marking-as-read causes UPDATEs we still want to reflect).
-  useEffect(() => {
-    if (!userEmail) return;
-    const unsub = api.entities.Notification.subscribe(() => {
-      qc.invalidateQueries({ queryKey: ["notifications", userEmail] });
-    });
-    return () => unsub();
-  }, [userEmail, qc]);
+  // Note: previously this also subscribed to api.entities.Notification
+  // (shared 'notifications-realtime' channel) to catch cross-tab UPDATE
+  // events when the user marks-as-read in a different tab. That channel
+  // was removed to reduce realtime subscription pressure at scale. The
+  // filtered per-user 'notif-push-' channel above already covers INSERTs
+  // for THIS user, which is the primary event we care about. Cross-tab
+  // is_read flips will reconcile on the 30s staleTime or page nav.
 
   // Mark-as-read / mark-all / delete actions are unified across surfaces.
   // The hook handles optimistic updates, rollback on RLS denial, and

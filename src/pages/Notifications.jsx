@@ -62,16 +62,17 @@ export default function Notifications() {
     enabled: !!user?.email,
   });
 
-  // Real-time subscription for notifications & preferences
+  // Real-time subscription for notifications. TripPreference subscription
+  // was removed — saved-route preferences are a low-frequency niche
+  // feature, and the 60s staleTime is sufficient when the user is on
+  // this page. Dropping that channel saves one shared realtime
+  // subscription per logged-in user on this page.
   useEffect(() => {
     if (!user?.email) return;
     const unsubNotif = api.entities.Notification.subscribe((event) => {
       qc.invalidateQueries({ queryKey: ["notifications", user.email] });
     });
-    const unsubPref = api.entities.TripPreference.subscribe((event) => {
-      qc.invalidateQueries({ queryKey: ["preferences"] });
-    });
-    return () => { unsubNotif(); unsubPref(); };
+    return () => { unsubNotif(); };
   }, [user?.email, qc]);
 
   const createPref = useMutation({

@@ -104,12 +104,15 @@ export default function StatsBar() {
 
   useEffect(() => {
     if (!statsEnabled) return;
+    // Note: Review.subscribe() was removed — homepage stats refresh
+    // every 60s via staleTime, and reviews are submitted at a low
+    // frequency (once per completed trip). Realtime is overkill for
+    // this surface and the shared channel adds up at scale.
     const u1 = api.entities.Trip.subscribe(() => {
       qc.invalidateQueries({ queryKey: ["stats-trips"] });
       qc.invalidateQueries({ queryKey: ["stats-completed-trips-count"] });
     });
-    const u2 = api.entities.Review.subscribe(() => qc.invalidateQueries({ queryKey: ["stats-reviews"] }));
-    return () => { u1(); u2(); };
+    return () => { u1(); };
   }, [qc, statsEnabled]);
 
   // Don't render anything when stats are disabled OR when the real

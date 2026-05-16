@@ -55,11 +55,45 @@ export default function SearchTrips() {
   const { data: trips_unfiltered = [], isLoading, error } = useQuery({
     queryKey: ["trips"],
     queryFn: async () => {
-      // Fetch ALL confirmed trips via Supabase directly (api adds created_by filter)
+      // Fetch upcoming confirmed/in-progress trips. We select only the
+      // columns SearchTrips + TripCard actually use (not SELECT *) to
+      // halve payload size at scale — the full row has 30+ columns
+      // including amenities JSONB, recurring_days JSONB, driver_note,
+      // car_image, driver_avatar, etc. that this page doesn't render.
+      // TripDetails fetches the full row when the user clicks through.
+      //
+      // Combined with the (date, status) index from migration 056, this
+      // is the search hot-path's scaling improvement for the load-
+      // readiness pass.
       const today = new Date().toISOString().split("T")[0];
       const { data, error } = await supabase
         .from("trips")
-        .select("*")
+        .select([
+          "id",
+          "short_code",
+          "from_city",
+          "to_city",
+          "date",
+          "time",
+          "price",
+          "available_seats",
+          "total_seats",
+          "status",
+          "driver_name",
+          "driver_email",
+          "driver_avatar",
+          "driver_gender",
+          "driver_rating",
+          "driver_reviews_count",
+          "stops",
+          "is_direct",
+          "has_checkpoint",
+          "car_model",
+          "car_color",
+          "car_image",
+          "distance",
+          "payment_methods",
+        ].join(","))
         .in("status", ["confirmed", "in_progress"])
         .gte("date", today)
         .order("date", { ascending: true })
