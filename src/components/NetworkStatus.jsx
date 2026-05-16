@@ -26,6 +26,19 @@ export default function NetworkStatus() {
     };
   }, [qc]);
 
+  // Auto-dismiss the 'connection restored' banner. Without this, once
+  // a user has even ONE offline blip during a session, the green
+  // confirmation banner stays at the top of the screen forever —
+  // obstructing other top-bar UI for no useful reason. 3 seconds is
+  // enough for the user to register the message and matches the
+  // sonner toast default. Re-runs whenever offline flips back to
+  // false (so a second reconnect within a session also clears).
+  useEffect(() => {
+    if (offline || !wasOffline) return;
+    const t = setTimeout(() => setWasOffline(false), 3000);
+    return () => clearTimeout(t);
+  }, [offline, wasOffline]);
+
   if (!offline && !wasOffline) return null;
 
   return (

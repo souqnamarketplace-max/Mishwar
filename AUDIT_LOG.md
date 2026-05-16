@@ -399,6 +399,15 @@ Plus retroactive: **UserHistorySection.jsx had the same review_type filter defec
 | 47 | Pagination.jsx | 61 | ✅ done | 0 real (RTL-aware chevrons, ellipsis logic correct) |
 | 48 | ReviewsList.jsx | 56 | ✅ done | 0 real |
 | 49 | RatingSummary.jsx | 52 | ✅ done | 1 MEDIUM (no NaN defense on rating average — same pattern StatsBar already had) |
+| 50 | DateInput.jsx | 43 | ✅ done | 0 real (Arabic Gregorian format, native picker delegation) |
+| 51 | NetworkStatus.jsx | 43 | ✅ done | 1 LOW (connection-restored banner never auto-dismissed → stayed visible forever after first blip) |
+| 52 | ModalPortal.jsx | 40 | ✅ done | 0 real (SSR-safe, well-commented) |
+| 53 | AnnouncementBanner.jsx | 34 | ✅ done | 0 real (transient dismiss is by design; localStorage persistence would be a product choice) |
+| 54 | EmptyState.jsx | 32 | ✅ done | 0 real |
+| 55 | UserNotRegisteredError.jsx | 31 | ✅ done | 0 real (legacy English-only error screen, intentional) |
+| 56 | StarRating.jsx | 30 | ✅ done | 0 real (readonly/hover modes correct) |
+| 57 | AccountHubItem.jsx | 30 | ✅ done | 0 real (presentational) |
+| 58 | RequestStatusBadge.jsx | 25 | ✅ done | 0 real (status enum map with fallback) |
 
 Plus assorted smaller (<100 LOC) components — spot-checked.
 
@@ -966,4 +975,30 @@ The breakpoint check `setIsMobile(window.innerWidth < 1024)` ran on `resize` onl
 Less likely to trigger than the corresponding admin surface (the filter `review_type='passenger_rates_driver'` already excludes most odd rows), but null `rating` is possible for soft-deleted reviews, partial inserts, or schema drift.
 
 **Fix:** added `validReviews = reviews.filter(r => typeof r.rating === 'number' && !isNaN(r.rating))` and use it for both the average AND the histogram counts AND the denominator in the bar widths. Driver's profile rating now never displays "NaN/5" even if one bad row sneaks in. ✅
+
+
+## Component Batch 13 — Findings (small files sweep)
+
+Audited 9 components, 308 LOC total. Only one real bug.
+
+### Component 51 — NetworkStatus.jsx (43 LOC)
+
+**🟢 LOW — "Connection restored" banner never auto-dismissed**
+```js
+if (!offline && !wasOffline) return null;
+```
+Once `wasOffline` became true (after the first offline → online cycle), the green confirmation banner stayed at the top of the screen FOREVER for the rest of the session. One network blip permanently obstructed the top of the viewport with a banner that was no longer informational. Mobile users get worse cellular reliability → more likely to trigger this.
+
+**Fix:** added a useEffect that clears `wasOffline` 3 seconds after `offline` flips false. Re-runs on each reconnect so multiple blips within a session each get a self-clearing banner. 3s matches sonner toast default. ✅
+
+### Components 50, 52-58 — Clean
+
+- **DateInput** (43): Arabic Gregorian format delegated to native date picker via showPicker()/click fallback. Comment explains why ar-SA (Hijri) is intentionally avoided.
+- **ModalPortal** (40): SSR-safe createPortal wrapper. Explicit comment explaining the framer-motion transform-creates-containing-block issue it solves.
+- **AnnouncementBanner** (34): In-memory dismiss is by design (session-scoped). Persistent dismiss would be a product choice, not a bug.
+- **EmptyState** (32): Pure presentational with optional CTA Link.
+- **UserNotRegisteredError** (31): Legacy English-only error screen, intentional (this surface is rare and reachable only by misconfigured-account edge case).
+- **StarRating** (30): Hover state correctly gated on !readonly, button disabled on readonly so screen readers see it.
+- **AccountHubItem** (30): Presentational row component with danger variant.
+- **RequestStatusBadge** (25): Status enum map with sensible fallback to 'open'.
 
