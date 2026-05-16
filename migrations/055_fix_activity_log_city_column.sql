@@ -105,303 +105,465 @@ BEGIN
   v_offset  := (GREATEST(page_param, 1) - 1) * page_size_param;
   v_email_q := NULLIF(trim(COALESCE(search_email, '')), '');
 
-  WITH events AS (
-    -- ═══ (1) admin_audit_log entries ═══
-    SELECT
-      'audit:' || a.id::text                                    AS event_id,
-      public._map_audit_to_activity_type(a.target_type)         AS type,
-      public._compose_audit_text(a.action, a.target_type, a.details, a.admin_email) AS text,
-      a.created_at                                              AS created_at,
-      public._audit_primary_actor(a.action, a.details, a.admin_email) AS actor_email
-    FROM public.admin_audit_log a
+  -- Build the paginated event set. We use a temporary table-less
+  -- approach: declare a single CTE chain and pull out total + page
+  -- in two simple SELECT INTOs (no CTE-before-SELECT-INTO ambiguity
+  -- that confuses plpgsql's parser into treating v_total as a relation).
 
-    UNION ALL
+  -- First: count of all filtered events.
+  SELECT COUNT(*)::INTEGER INTO v_total
+  FROM (
+    SELECT 1
+    FROM (
+      -- ═══ (1) admin_audit_log entries ═══
+      SELECT
+        'audit:' || a.id::text                                    AS event_id,
+        public._map_audit_to_activity_type(a.target_type)         AS type,
+        public._compose_audit_text(a.action, a.target_type, a.details, a.admin_email) AS text,
+        a.created_at                                              AS created_at,
+        public._audit_primary_actor(a.action, a.details, a.admin_email) AS actor_email
+      FROM public.admin_audit_log a
 
-    -- ═══ (2) trips — creation ═══
-    SELECT
-      'derived:trip_created:' || t.id::text,
-      'trip',
-      '🚗 نشر السائق ' || public._actor_label(t.driver_email) ||
-        ' رحلة جديدة (' || t.from_city || ' → ' || t.to_city || ')',
-      t.created_at,
-      t.driver_email
-    FROM public.trips t
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'trip_created' AND target_id = t.id::text
-    )
+      UNION ALL
 
-    UNION ALL
-
-    -- ═══ (3) trips — cancellations ═══
-    SELECT
-      'derived:trip_cancelled:' || t.id::text,
-      'trip',
-      '❌ ألغى السائق ' || public._actor_label(t.driver_email) ||
-        ' رحلته (' || t.from_city || ' → ' || t.to_city || ')',
-      t.updated_at,
-      t.driver_email
-    FROM public.trips t
-    WHERE t.status = 'cancelled'
-      AND NOT EXISTS (
+      -- ═══ (2) trips — creation ═══
+      SELECT
+        'derived:trip_created:' || t.id::text,
+        'trip',
+        '🚗 نشر السائق ' || public._actor_label(t.driver_email) ||
+          ' رحلة جديدة (' || t.from_city || ' → ' || t.to_city || ')',
+        t.created_at,
+        t.driver_email
+      FROM public.trips t
+      WHERE NOT EXISTS (
         SELECT 1 FROM public.admin_audit_log
-        WHERE action IN ('driver_cancel_trip', 'admin_delete_trip',
-                         'driver_delete_trip', 'delete_trip')
-          AND target_id = t.id::text
+        WHERE action = 'trip_created' AND target_id = t.id::text
       )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (4) trips — completions ═══
-    SELECT
-      'derived:trip_completed:' || t.id::text,
-      'trip',
-      '✅ أنهى السائق ' || public._actor_label(t.driver_email) ||
-        ' الرحلة (' || t.from_city || ' → ' || t.to_city || ')',
-      t.updated_at,
-      t.driver_email
-    FROM public.trips t
-    WHERE t.status = 'completed'
-      AND NOT EXISTS (
+      -- ═══ (3) trips — cancellations ═══
+      SELECT
+        'derived:trip_cancelled:' || t.id::text,
+        'trip',
+        '❌ ألغى السائق ' || public._actor_label(t.driver_email) ||
+          ' رحلته (' || t.from_city || ' → ' || t.to_city || ')',
+        t.updated_at,
+        t.driver_email
+      FROM public.trips t
+      WHERE t.status = 'cancelled'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.admin_audit_log
+          WHERE action IN ('driver_cancel_trip', 'admin_delete_trip',
+                           'driver_delete_trip', 'delete_trip')
+            AND target_id = t.id::text
+        )
+
+      UNION ALL
+
+      -- ═══ (4) trips — completions ═══
+      SELECT
+        'derived:trip_completed:' || t.id::text,
+        'trip',
+        '✅ أنهى السائق ' || public._actor_label(t.driver_email) ||
+          ' الرحلة (' || t.from_city || ' → ' || t.to_city || ')',
+        t.updated_at,
+        t.driver_email
+      FROM public.trips t
+      WHERE t.status = 'completed'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.admin_audit_log
+          WHERE action = 'driver_complete_trip' AND target_id = t.id::text
+        )
+
+      UNION ALL
+
+      -- ═══ (5) trips — in-progress (started) ═══
+      SELECT
+        'derived:trip_started:' || t.id::text,
+        'trip',
+        '🚦 بدأ السائق ' || public._actor_label(t.driver_email) ||
+          ' الرحلة (' || t.from_city || ' → ' || t.to_city || ')',
+        t.updated_at,
+        t.driver_email
+      FROM public.trips t
+      WHERE t.status = 'in_progress'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.admin_audit_log
+          WHERE action = 'driver_start_trip' AND target_id = t.id::text
+        )
+
+      UNION ALL
+
+      -- ═══ (6) bookings — created ═══
+      SELECT
+        'derived:booking_created:' || b.id::text,
+        'booking',
+        '🎟️ حجز الراكب ' || public._actor_label(b.passenger_email) || ' مقعداً' ||
+          COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
+        b.created_at,
+        b.passenger_email
+      FROM public.bookings b
+      LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
+      WHERE NOT EXISTS (
         SELECT 1 FROM public.admin_audit_log
-        WHERE action = 'driver_complete_trip' AND target_id = t.id::text
+        WHERE action = 'booking_created' AND target_id = b.id::text
       )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (5) trips — in-progress (started) ═══
-    SELECT
-      'derived:trip_started:' || t.id::text,
-      'trip',
-      '🚦 بدأ السائق ' || public._actor_label(t.driver_email) ||
-        ' الرحلة (' || t.from_city || ' → ' || t.to_city || ')',
-      t.updated_at,
-      t.driver_email
-    FROM public.trips t
-    WHERE t.status = 'in_progress'
-      AND NOT EXISTS (
+      -- ═══ (7) bookings — cancelled ═══
+      SELECT
+        'derived:booking_cancelled:' || b.id::text,
+        'booking',
+        '↩️ ألغى ' || public._actor_label(b.passenger_email) || ' حجزه' ||
+          COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
+        COALESCE(b.updated_at, b.created_at),
+        b.passenger_email
+      FROM public.bookings b
+      LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
+      WHERE b.status = 'cancelled'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.admin_audit_log
+          WHERE action IN ('booking_cancelled_by_passenger',
+                           'driver_cancel_confirmed_booking',
+                           'driver_reject_booking')
+            AND target_id = b.id::text
+        )
+
+      UNION ALL
+
+      -- ═══ (8) bookings — confirmed ═══
+      SELECT
+        'derived:booking_confirmed:' || b.id::text,
+        'booking',
+        '✓ وافق السائق ' || public._actor_label(t.driver_email) ||
+          ' على حجز الراكب ' || public._actor_label(b.passenger_email) ||
+          COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
+        COALESCE(b.updated_at, b.created_at),
+        t.driver_email
+      FROM public.bookings b
+      LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
+      WHERE b.status = 'confirmed'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.admin_audit_log
+          WHERE action IN ('booking_confirmed', 'driver_confirm_booking')
+            AND target_id = b.id::text
+        )
+
+      UNION ALL
+
+      -- ═══ (9) reviews ═══
+      SELECT
+        'derived:review:' || r.id::text,
+        'review',
+        CASE r.review_type
+          WHEN 'driver_rates_passenger' THEN '⭐ قيّم السائق ' || public._actor_label(r.reviewer_email) || ' راكباً'
+          ELSE '⭐ قيّم الراكب ' || public._actor_label(r.reviewer_email) || ' السائق'
+        END || ' (' || r.rating::text || '/5)',
+        r.created_at,
+        r.reviewer_email
+      FROM public.reviews r
+      WHERE NOT EXISTS (
         SELECT 1 FROM public.admin_audit_log
-        WHERE action = 'driver_start_trip' AND target_id = t.id::text
+        WHERE action IN ('driver_review_submitted', 'passenger_review_submitted')
+          AND target_id = r.trip_id::text
       )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (6) bookings — created ═══
-    SELECT
-      'derived:booking_created:' || b.id::text,
-      'booking',
-      '🎟️ حجز الراكب ' || public._actor_label(b.passenger_email) || ' مقعداً' ||
-        COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
-      b.created_at,
-      b.passenger_email
-    FROM public.bookings b
-    LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'booking_created' AND target_id = b.id::text
-    )
-
-    UNION ALL
-
-    -- ═══ (7) bookings — cancelled ═══
-    SELECT
-      'derived:booking_cancelled:' || b.id::text,
-      'booking',
-      '↩️ ألغى ' || public._actor_label(b.passenger_email) || ' حجزه' ||
-        COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
-      COALESCE(b.updated_at, b.created_at),
-      b.passenger_email
-    FROM public.bookings b
-    LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
-    WHERE b.status = 'cancelled'
-      AND NOT EXISTS (
+      -- ═══ (10) user_reports ═══
+      SELECT
+        'derived:report:' || ur.id::text,
+        'report',
+        '🚨 أبلغ ' || public._actor_label(ur.reporter_email) || ' عن مستخدم آخر',
+        ur.created_at,
+        ur.reporter_email
+      FROM public.user_reports ur
+      WHERE NOT EXISTS (
         SELECT 1 FROM public.admin_audit_log
-        WHERE action IN ('booking_cancelled_by_passenger',
-                         'driver_cancel_confirmed_booking',
-                         'driver_reject_booking')
-          AND target_id = b.id::text
+        WHERE action IN ('report_filed', 'report')
+          AND target_id = ur.id::text
       )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (8) bookings — confirmed ═══
-    SELECT
-      'derived:booking_confirmed:' || b.id::text,
-      'booking',
-      '✓ وافق السائق ' || public._actor_label(t.driver_email) ||
-        ' على حجز الراكب ' || public._actor_label(b.passenger_email) ||
-        COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
-      COALESCE(b.updated_at, b.created_at),
-      t.driver_email
-    FROM public.bookings b
-    LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
-    WHERE b.status = 'confirmed'
-      AND NOT EXISTS (
+      -- ═══ (11) support_tickets ═══
+      SELECT
+        'derived:feedback:' || st.id::text,
+        'feedback',
+        '💬 أرسل ' || public._actor_label(st.user_email) || ' ' ||
+          CASE st.type
+            WHEN 'complaint'  THEN 'شكوى'
+            WHEN 'suggestion' THEN 'اقتراح'
+            WHEN 'praise'     THEN 'إشادة'
+            ELSE COALESCE(st.type, 'ملاحظة')
+          END,
+        st.created_at,
+        st.user_email
+      FROM public.support_tickets st
+      WHERE NOT EXISTS (
         SELECT 1 FROM public.admin_audit_log
-        WHERE action IN ('booking_confirmed', 'driver_confirm_booking')
-          AND target_id = b.id::text
+        WHERE action = 'feedback_submitted' AND target_id = st.id::text
       )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (9) reviews ═══
-    SELECT
-      'derived:review:' || r.id::text,
-      'review',
-      CASE r.review_type
-        WHEN 'driver_rates_passenger' THEN '⭐ قيّم السائق ' || public._actor_label(r.reviewer_email) || ' راكباً'
-        ELSE '⭐ قيّم الراكب ' || public._actor_label(r.reviewer_email) || ' السائق'
-      END || ' (' || r.rating::text || '/5)',
-      r.created_at,
-      r.reviewer_email
-    FROM public.reviews r
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action IN ('driver_review_submitted', 'passenger_review_submitted')
-        AND target_id = r.trip_id::text
-    )
+      -- ═══ (12) trip_requests ═══
+      SELECT
+        'derived:trip_request:' || tr.id::text,
+        'trip',
+        '🙋 نشر الراكب ' || public._actor_label(tr.passenger_email) ||
+          ' طلب رحلة (' || tr.from_city || ' → ' || tr.to_city || ')',
+        tr.created_at,
+        tr.passenger_email
+      FROM public.trip_requests tr
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.admin_audit_log
+        WHERE action = 'trip_request_created' AND target_id = tr.id::text
+      )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (10) user_reports ═══
-    SELECT
-      'derived:report:' || ur.id::text,
-      'report',
-      '🚨 أبلغ ' || public._actor_label(ur.reporter_email) || ' عن مستخدم آخر',
-      ur.created_at,
-      ur.reporter_email
-    FROM public.user_reports ur
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action IN ('report_filed', 'report')
-        AND target_id = ur.id::text
-    )
+      -- ═══ (13) driver_subscriptions ═══
+      SELECT
+        'derived:subscription:' || ds.id::text,
+        'user',
+        '💳 طلب السائق ' || public._actor_label(ds.driver_email) ||
+          ' اشتراكاً (' || COALESCE(ds.status, 'pending') || ')',
+        ds.created_at,
+        ds.driver_email
+      FROM public.driver_subscriptions ds
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.admin_audit_log
+        WHERE action = 'subscription_requested' AND target_id = ds.id::text
+      )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (11) support_tickets ═══
-    SELECT
-      'derived:feedback:' || st.id::text,
-      'feedback',
-      '💬 أرسل ' || public._actor_label(st.user_email) || ' ' ||
-        CASE st.type
-          WHEN 'complaint'  THEN 'شكوى'
-          WHEN 'suggestion' THEN 'اقتراح'
-          WHEN 'praise'     THEN 'إشادة'
-          ELSE COALESCE(st.type, 'ملاحظة')
-        END,
-      st.created_at,
-      st.user_email
-    FROM public.support_tickets st
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'feedback_submitted' AND target_id = st.id::text
-    )
+      -- ═══ (14) city_suggestions — FIXED in migration 055 ═══
+      -- Was: cs.user_email (does not exist).
+      -- The actual column per migration 015 is suggested_by_email.
+      SELECT
+        'derived:city:' || cs.id::text,
+        'user',
+        '🗺️ اقترح ' || public._actor_label(cs.suggested_by_email) ||
+          ' إضافة مدينة (' || cs.name || ')',
+        cs.created_at,
+        cs.suggested_by_email
+      FROM public.city_suggestions cs
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.admin_audit_log
+        WHERE action = 'city_suggested' AND target_id = cs.id::text
+      )
 
-    UNION ALL
+      UNION ALL
 
-    -- ═══ (12) trip_requests ═══
-    SELECT
-      'derived:trip_request:' || tr.id::text,
-      'trip',
-      '🙋 نشر الراكب ' || public._actor_label(tr.passenger_email) ||
-        ' طلب رحلة (' || tr.from_city || ' → ' || tr.to_city || ')',
-      tr.created_at,
-      tr.passenger_email
-    FROM public.trip_requests tr
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'trip_request_created' AND target_id = tr.id::text
-    )
-
-    UNION ALL
-
-    -- ═══ (13) driver_subscriptions ═══
-    SELECT
-      'derived:subscription:' || ds.id::text,
-      'user',
-      '💳 طلب السائق ' || public._actor_label(ds.driver_email) ||
-        ' اشتراكاً (' || COALESCE(ds.status, 'pending') || ')',
-      ds.created_at,
-      ds.driver_email
-    FROM public.driver_subscriptions ds
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'subscription_requested' AND target_id = ds.id::text
-    )
-
-    UNION ALL
-
-    -- ═══ (14) city_suggestions — FIXED in migration 055 ═══
-    -- Was: cs.user_email (does not exist).
-    -- The actual column per migration 015 is suggested_by_email.
-    SELECT
-      'derived:city:' || cs.id::text,
-      'user',
-      '🗺️ اقترح ' || public._actor_label(cs.suggested_by_email) ||
-        ' إضافة مدينة (' || cs.name || ')',
-      cs.created_at,
-      cs.suggested_by_email
-    FROM public.city_suggestions cs
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'city_suggested' AND target_id = cs.id::text
-    )
-
-    UNION ALL
-
-    -- ═══ (15) profiles — new signups ═══
-    SELECT
-      'derived:signup:' || p.id::text,
-      'user',
-      '👤 انضم ' || public._actor_label(p.email) || ' للمنصة',
-      p.created_at,
-      p.email
-    FROM public.profiles p
-    WHERE NOT EXISTS (
-      SELECT 1 FROM public.admin_audit_log
-      WHERE action = 'onboarding_completed' AND target_id = p.id::text
-    )
-  ),
-  filtered AS (
-    SELECT * FROM events
-    WHERE (filter_type = 'all' OR type = filter_type)
+      -- ═══ (15) profiles — new signups ═══
+      SELECT
+        'derived:signup:' || p.id::text,
+        'user',
+        '👤 انضم ' || public._actor_label(p.email) || ' للمنصة',
+        p.created_at,
+        p.email
+      FROM public.profiles p
+      WHERE NOT EXISTS (
+        SELECT 1 FROM public.admin_audit_log
+        WHERE action = 'onboarding_completed' AND target_id = p.id::text
+      )
+    ) all_events
+    WHERE (filter_type = 'all' OR all_events.type = filter_type)
       AND (
         v_email_q IS NULL
-        OR actor_email ILIKE '%' || v_email_q || '%'
+        OR all_events.actor_email ILIKE '%' || v_email_q || '%'
         OR (
           (v_email_q ~ '^M-?\d+$' OR v_email_q ~ '^\d+$')
-          AND actor_email = (
+          AND all_events.actor_email = (
             SELECT email FROM public.profiles
              WHERE account_number = (regexp_replace(v_email_q, '\D', '', 'g'))::BIGINT
              LIMIT 1
           )
         )
       )
-  )
-  SELECT
-    COUNT(*)::INTEGER,
-    COALESCE(
-      jsonb_agg(
-        jsonb_build_object(
-          'id',           event_id,
-          'type',         type,
-          'text',         text,
-          'created_at',   created_at,
-          'actor_email',  actor_email
-        )
-        ORDER BY created_at DESC
-      ) FILTER (
-        WHERE row_num > v_offset AND row_num <= v_offset + page_size_param
-      ),
-      '[]'::jsonb
-    )
-    INTO v_total, v_rows
+  ) counted;
+
+  -- Then: paginated page of rows aggregated as JSONB.
+  SELECT COALESCE(jsonb_agg(row_obj ORDER BY created_at DESC), '[]'::jsonb)
+  INTO v_rows
   FROM (
-    SELECT *,
-      ROW_NUMBER() OVER (ORDER BY created_at DESC) AS row_num
-    FROM filtered
-  ) AS numbered;
+    SELECT
+      jsonb_build_object(
+        'id',           event_id,
+        'type',         type,
+        'text',         text,
+        'created_at',   created_at,
+        'actor_email',  actor_email
+      ) AS row_obj,
+      created_at
+    FROM (
+      -- Same UNION ALL as above; one CTE would be cleaner but plpgsql's
+      -- parser has trouble with WITH-clause-before-SELECT-INTO so we
+      -- duplicate the source. Cost: PostgreSQL plans both. Benefit:
+      -- function actually runs.
+      SELECT
+        'audit:' || a.id::text                                    AS event_id,
+        public._map_audit_to_activity_type(a.target_type)         AS type,
+        public._compose_audit_text(a.action, a.target_type, a.details, a.admin_email) AS text,
+        a.created_at                                              AS created_at,
+        public._audit_primary_actor(a.action, a.details, a.admin_email) AS actor_email
+      FROM public.admin_audit_log a
+      UNION ALL
+      SELECT 'derived:trip_created:' || t.id::text, 'trip',
+        '🚗 نشر السائق ' || public._actor_label(t.driver_email) ||
+        ' رحلة جديدة (' || t.from_city || ' → ' || t.to_city || ')',
+        t.created_at, t.driver_email
+      FROM public.trips t
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'trip_created' AND target_id = t.id::text)
+      UNION ALL
+      SELECT 'derived:trip_cancelled:' || t.id::text, 'trip',
+        '❌ ألغى السائق ' || public._actor_label(t.driver_email) ||
+        ' رحلته (' || t.from_city || ' → ' || t.to_city || ')',
+        t.updated_at, t.driver_email
+      FROM public.trips t
+      WHERE t.status = 'cancelled'
+        AND NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action IN ('driver_cancel_trip', 'admin_delete_trip',
+                                         'driver_delete_trip', 'delete_trip')
+                          AND target_id = t.id::text)
+      UNION ALL
+      SELECT 'derived:trip_completed:' || t.id::text, 'trip',
+        '✅ أنهى السائق ' || public._actor_label(t.driver_email) ||
+        ' الرحلة (' || t.from_city || ' → ' || t.to_city || ')',
+        t.updated_at, t.driver_email
+      FROM public.trips t
+      WHERE t.status = 'completed'
+        AND NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'driver_complete_trip' AND target_id = t.id::text)
+      UNION ALL
+      SELECT 'derived:trip_started:' || t.id::text, 'trip',
+        '🚦 بدأ السائق ' || public._actor_label(t.driver_email) ||
+        ' الرحلة (' || t.from_city || ' → ' || t.to_city || ')',
+        t.updated_at, t.driver_email
+      FROM public.trips t
+      WHERE t.status = 'in_progress'
+        AND NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'driver_start_trip' AND target_id = t.id::text)
+      UNION ALL
+      SELECT 'derived:booking_created:' || b.id::text, 'booking',
+        '🎟️ حجز الراكب ' || public._actor_label(b.passenger_email) || ' مقعداً' ||
+        COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
+        b.created_at, b.passenger_email
+      FROM public.bookings b
+      LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'booking_created' AND target_id = b.id::text)
+      UNION ALL
+      SELECT 'derived:booking_cancelled:' || b.id::text, 'booking',
+        '↩️ ألغى ' || public._actor_label(b.passenger_email) || ' حجزه' ||
+        COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
+        COALESCE(b.updated_at, b.created_at), b.passenger_email
+      FROM public.bookings b
+      LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
+      WHERE b.status = 'cancelled'
+        AND NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action IN ('booking_cancelled_by_passenger',
+                                         'driver_cancel_confirmed_booking',
+                                         'driver_reject_booking')
+                          AND target_id = b.id::text)
+      UNION ALL
+      SELECT 'derived:booking_confirmed:' || b.id::text, 'booking',
+        '✓ وافق السائق ' || public._actor_label(t.driver_email) ||
+        ' على حجز الراكب ' || public._actor_label(b.passenger_email) ||
+        COALESCE(' (' || t.from_city || ' → ' || t.to_city || ')', ''),
+        COALESCE(b.updated_at, b.created_at), t.driver_email
+      FROM public.bookings b
+      LEFT JOIN public.trips t ON t.id::text = b.trip_id::text
+      WHERE b.status = 'confirmed'
+        AND NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action IN ('booking_confirmed', 'driver_confirm_booking')
+                          AND target_id = b.id::text)
+      UNION ALL
+      SELECT 'derived:review:' || r.id::text, 'review',
+        CASE r.review_type
+          WHEN 'driver_rates_passenger' THEN '⭐ قيّم السائق ' || public._actor_label(r.reviewer_email) || ' راكباً'
+          ELSE '⭐ قيّم الراكب ' || public._actor_label(r.reviewer_email) || ' السائق'
+        END || ' (' || r.rating::text || '/5)',
+        r.created_at, r.reviewer_email
+      FROM public.reviews r
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action IN ('driver_review_submitted', 'passenger_review_submitted')
+                          AND target_id = r.trip_id::text)
+      UNION ALL
+      SELECT 'derived:report:' || ur.id::text, 'report',
+        '🚨 أبلغ ' || public._actor_label(ur.reporter_email) || ' عن مستخدم آخر',
+        ur.created_at, ur.reporter_email
+      FROM public.user_reports ur
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action IN ('report_filed', 'report')
+                          AND target_id = ur.id::text)
+      UNION ALL
+      SELECT 'derived:feedback:' || st.id::text, 'feedback',
+        '💬 أرسل ' || public._actor_label(st.user_email) || ' ' ||
+          CASE st.type
+            WHEN 'complaint'  THEN 'شكوى'
+            WHEN 'suggestion' THEN 'اقتراح'
+            WHEN 'praise'     THEN 'إشادة'
+            ELSE COALESCE(st.type, 'ملاحظة')
+          END,
+        st.created_at, st.user_email
+      FROM public.support_tickets st
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'feedback_submitted' AND target_id = st.id::text)
+      UNION ALL
+      SELECT 'derived:trip_request:' || tr.id::text, 'trip',
+        '🙋 نشر الراكب ' || public._actor_label(tr.passenger_email) ||
+        ' طلب رحلة (' || tr.from_city || ' → ' || tr.to_city || ')',
+        tr.created_at, tr.passenger_email
+      FROM public.trip_requests tr
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'trip_request_created' AND target_id = tr.id::text)
+      UNION ALL
+      SELECT 'derived:subscription:' || ds.id::text, 'user',
+        '💳 طلب السائق ' || public._actor_label(ds.driver_email) ||
+        ' اشتراكاً (' || COALESCE(ds.status, 'pending') || ')',
+        ds.created_at, ds.driver_email
+      FROM public.driver_subscriptions ds
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'subscription_requested' AND target_id = ds.id::text)
+      UNION ALL
+      SELECT 'derived:city:' || cs.id::text, 'user',
+        '🗺️ اقترح ' || public._actor_label(cs.suggested_by_email) ||
+        ' إضافة مدينة (' || cs.name || ')',
+        cs.created_at, cs.suggested_by_email
+      FROM public.city_suggestions cs
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'city_suggested' AND target_id = cs.id::text)
+      UNION ALL
+      SELECT 'derived:signup:' || p.id::text, 'user',
+        '👤 انضم ' || public._actor_label(p.email) || ' للمنصة',
+        p.created_at, p.email
+      FROM public.profiles p
+      WHERE NOT EXISTS (SELECT 1 FROM public.admin_audit_log
+                        WHERE action = 'onboarding_completed' AND target_id = p.id::text)
+    ) all_events
+    WHERE (filter_type = 'all' OR all_events.type = filter_type)
+      AND (
+        v_email_q IS NULL
+        OR all_events.actor_email ILIKE '%' || v_email_q || '%'
+        OR (
+          (v_email_q ~ '^M-?\d+$' OR v_email_q ~ '^\d+$')
+          AND all_events.actor_email = (
+            SELECT email FROM public.profiles
+             WHERE account_number = (regexp_replace(v_email_q, '\D', '', 'g'))::BIGINT
+             LIMIT 1
+          )
+        )
+      )
+    ORDER BY created_at DESC
+    OFFSET v_offset
+    LIMIT page_size_param
+  ) paged;
 
   RETURN jsonb_build_object(
     'rows',       COALESCE(v_rows, '[]'::jsonb),
