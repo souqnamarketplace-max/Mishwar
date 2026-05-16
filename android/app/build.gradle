@@ -40,6 +40,18 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+
+    // Firebase Cloud Messaging (FCM). The Capacitor push-notifications
+    // plugin on Android relies on Firebase Messaging to obtain FCM
+    // registration tokens. Without this dependency, push registration
+    // returns OS-level tokens that our send-push-notification Edge
+    // Function can't deliver to (it talks to FCM HTTP v1).
+    //
+    // Using the Firebase BoM (Bill of Materials) so we don't have to
+    // pin a version on firebase-messaging — the BoM picks compatible
+    // versions across the Firebase SDK.
+    implementation platform('com.google.firebase:firebase-bom:33.5.1')
+    implementation 'com.google.firebase:firebase-messaging'
 }
 
 apply from: 'capacitor.build.gradle'

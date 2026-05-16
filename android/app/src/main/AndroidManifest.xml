@@ -66,4 +66,12 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- POST_NOTIFICATIONS is required on Android 13+ (API 33) for the
+         app to display notifications, including FCM push. Without
+         this, the runtime permission prompt never appears and FCM
+         messages are silently dropped by the OS. Capacitor's
+         @capacitor/push-notifications plugin requestPermissions()
+         picks up this declaration and triggers the OS prompt. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>
