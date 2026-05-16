@@ -100,11 +100,24 @@ export default function Messages() {
   // We only call this when a request param exists AND the current user
   // is the contacting party (not the passenger receiving), to avoid
   // self-tracking when the passenger views their own conversation.
+  //
+  // IMPORTANT: supabase.rpc() returns a PostgrestFilterBuilder, which
+  // is thenable but NOT a Promise — chaining .catch() directly on it
+  // throws `TypeError: ...catch is not a function` synchronously inside
+  // this effect, which in React 18 bubbles through the commit phase to
+  // the nearest ErrorBoundary and shows فشل تحميل هذه الصفحة. The fix
+  // is to await it inside an async IIFE so the rejection (if any) is
+  // caught by a real try/catch. The RPC also returns errors via the
+  // destructured { error } shape rather than throwing — the try/catch
+  // here is really just defending against unexpected programming errors.
   React.useEffect(() => {
     if (!paramRequest || !paramTo || !user?.email) return;
     if (paramTo === user.email) return; // passenger viewing their own conv
-    supabase.rpc("track_request_contact", { p_request_id: paramRequest })
-      .catch(() => { /* non-fatal — analytics only */ });
+    (async () => {
+      try {
+        await supabase.rpc("track_request_contact", { p_request_id: paramRequest });
+      } catch { /* non-fatal — analytics only */ }
+    })();
   }, [paramRequest, paramTo, user?.email]);
 
   // ─── Fetch all messages where user is sender or receiver ───
