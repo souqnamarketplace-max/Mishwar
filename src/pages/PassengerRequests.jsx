@@ -379,15 +379,12 @@ export default function PassengerRequests() {
               request={r}
               mode="driver"
               onClick={() => {
-                // Open the conversation with the passenger about this request.
-                // The track_request_contact RPC fires from Messages.jsx the
-                // first time the driver sends a message — see commit 5.
-                const params = new URLSearchParams({
-                  to:      r.passenger_email,
-                  name:    r.passenger_name || r.passenger_email.split("@")[0],
-                  request: r.id,
-                });
-                navigate(`/messages?${params.toString()}`);
+                // Open the request-details page. The driver should review
+                // the trip + passenger profile BEFORE deciding to message.
+                // RequestDetails owns the chat-launch button + view_count
+                // tracking; the contact_count RPC fires once the driver
+                // sends their first message in /messages.
+                navigate(`/passenger-requests/${r.id}`);
               }}
             />
           ))}
