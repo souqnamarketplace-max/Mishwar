@@ -1,26 +1,49 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-// Per-page error fallback (smaller than full-page)
-const PageErrorFallback = ({ onReset }) => (
-  <div className="min-h-[60vh] flex items-center justify-center p-8" dir="rtl">
-    <div className="text-center max-w-xs">
-      <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-        <span className="text-2xl">⚠️</span>
-      </div>
-      <h3 className="font-bold text-foreground mb-2">فشل تحميل هذه الصفحة</h3>
-      <p className="text-sm text-muted-foreground mb-4">يرجى المحاولة مجدداً</p>
-      <div className="flex gap-3 justify-center">
-        <button onClick={onReset || (() => window.location.reload())}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
-          إعادة المحاولة
-        </button>
-        <a href="/" className="px-4 py-2 bg-muted text-foreground rounded-xl text-sm font-medium">
-          الرئيسية
-        </a>
+// Per-page error fallback (smaller than full-page).
+// `error` and `componentStack` are injected by ErrorBoundary via cloneElement
+// when this is passed as the `fallback` prop. We surface them behind a tap-
+// to-reveal toggle so mobile users (no DevTools) can still capture the real
+// failure reason without us shipping a separate debug build.
+const PageErrorFallback = ({ onReset, error, componentStack }) => {
+  const [showDetails, setShowDetails] = useState(false);
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center p-8" dir="rtl">
+      <div className="text-center max-w-xs">
+        <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">⚠️</span>
+        </div>
+        <h3 className="font-bold text-foreground mb-2">فشل تحميل هذه الصفحة</h3>
+        <p className="text-sm text-muted-foreground mb-4">يرجى المحاولة مجدداً</p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={onReset || (() => window.location.reload())}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-xl text-sm font-medium">
+            إعادة المحاولة
+          </button>
+          <a href="/" className="px-4 py-2 bg-muted text-foreground rounded-xl text-sm font-medium">
+            الرئيسية
+          </a>
+        </div>
+        {error && (
+          <div className="mt-6">
+            <button
+              onClick={() => setShowDetails(s => !s)}
+              className="text-xs text-muted-foreground underline">
+              {showDetails ? "إخفاء التفاصيل التقنية" : "عرض التفاصيل التقنية"}
+            </button>
+            {showDetails && (
+              <pre className="mt-2 p-3 bg-muted/40 rounded-lg text-[10px] leading-snug text-foreground/80 overflow-auto max-h-64 whitespace-pre-wrap break-all text-left" dir="ltr">
+                {String(error?.message || error)}
+                {error?.stack ? `\n\n${error.stack}` : ""}
+                {componentStack ? `\n\nComponent stack:${componentStack}` : ""}
+              </pre>
+            )}
+          </div>
+        )}
       </div>
     </div>
-  </div>
-);
+  );
+};
 import { Toaster } from "@/components/ui/toaster"
 import { Toaster as SonnerToaster } from "sonner"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -31,7 +54,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 
 import AppLayout from './components/layout/AppLayout';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
 import ScrollToTop from "@/components/shared/ScrollToTop";
 // Code splitting — each page loads on demand
