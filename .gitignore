@@ -68,3 +68,6 @@ android/local.properties
 android/app/release/
 android/app/src/main/assets/public/
 .capacitor/
+
+# Supabase CLI working files — never commit
+supabase/.temp/
