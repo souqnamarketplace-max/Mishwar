@@ -195,7 +195,7 @@ export default function Navbar() {
               {profileOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]">
                   <Link
-                    to={`/profile?email=${user?.email}`}
+                    to="/profile"
                     onClick={() => setProfileOpen(false)}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
                   >
@@ -337,7 +337,7 @@ export default function Navbar() {
                 </>
               ) : null}
               <Link
-                to={`/profile?email=${user?.email}`}
+                to="/profile"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2 px-4 py-2.5 mt-1 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted transition-colors"
               >

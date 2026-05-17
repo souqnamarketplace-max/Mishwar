@@ -208,6 +208,7 @@ const AuthenticatedApp = () => {
         <Route path="/driver" element={<DriverDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<UserProfile />} />
+        <Route path="/profile/:userId" element={<UserProfile />} />
         <Route path="/settings" element={<AccountHub />} />
         <Route path="/booking-confirmation" element={<BookingConfirmation />} />
         <Route path="/account-settings" element={<AccountHub />} />

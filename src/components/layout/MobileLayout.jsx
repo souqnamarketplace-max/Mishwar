@@ -17,7 +17,7 @@ const MOBILE_TABS = [
   { id: "search",   label: "بحث",      icon: Search,        path: "/search" },
   { id: "trips",    label: "رحلاتي",   icon: MapPin,        path: "/my-trips" },
   { id: "messages", label: "الرسائل",  icon: MessageSquare, path: "/messages" },
-  { id: "profile",  label: "الملف",    icon: User,          path: "/profile?email=" },
+  { id: "profile",  label: "الملف",    icon: User,          path: "/profile" },
 ];
 
 const PAGE_TITLES = {

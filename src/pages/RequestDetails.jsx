@@ -322,12 +322,20 @@ export default function RequestDetails() {
               </span>
             </div>
           </div>
-          <Link
-            to={`/profile?email=${encodeURIComponent(passengerEmail || "")}`}
-            className="text-xs text-primary hover:underline shrink-0"
-          >
-            عرض الملف ←
-          </Link>
+          {/* Canonical /profile/:id link — uses the passenger profile's
+              UUID from passengerProfile fetched above. Until the profile
+              query resolves, render a non-clickable label so we never
+              fall back to /profile?email= (the leak this refactor fixes). */}
+          {passengerProfile?.id ? (
+            <Link
+              to={`/profile/${passengerProfile.id}`}
+              className="text-xs text-primary hover:underline shrink-0"
+            >
+              عرض الملف ←
+            </Link>
+          ) : (
+            <span className="text-xs text-muted-foreground shrink-0">عرض الملف ←</span>
+          )}
         </div>
       </div>
 

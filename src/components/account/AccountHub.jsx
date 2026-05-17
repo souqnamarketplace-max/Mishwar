@@ -96,7 +96,7 @@ export default function AccountHub() {
       <h1 className="text-2xl font-bold text-foreground mb-6">حسابي</h1>
 
       <Link
-        to={`/profile?email=${encodeURIComponent(user.email)}`}
+        to="/profile"
         className="block bg-card border border-border rounded-2xl p-4 mb-4 hover:bg-muted/40 transition-colors"
       >
         <div className="flex items-center gap-3">

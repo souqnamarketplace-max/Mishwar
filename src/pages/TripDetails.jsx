@@ -668,9 +668,21 @@ export default function TripDetails() {
                   <span className="text-xs text-muted-foreground">{trip.driver_reviews_count ? `(${trip.driver_reviews_count} تقييم)` : "(لا يوجد تقييم بعد)"}</span>
                 </div>
               </div>
-              <Link to={`/profile?email=${trip.created_by || ""}`} className="text-xs text-primary hover:underline">
-                عرض الملف ←
-              </Link>
+              {/* Driver profile link uses the canonical UUID path so the
+                  driver's email doesn't leak into browser history, referer
+                  headers, or analytics logs. driverProfile is fetched
+                  above; if it's not loaded yet (rare — same render frame)
+                  the link is disabled rather than falling back to email.
+                  Note: api.entities.Profile.filter() returns an ARRAY, not
+                  a single row — even with limit=1 — so we index [0] both
+                  here and on the carImage line further down. */}
+              {driverProfile?.[0]?.id ? (
+                <Link to={`/profile/${driverProfile[0].id}`} className="text-xs text-primary hover:underline">
+                  عرض الملف ←
+                </Link>
+              ) : (
+                <span className="text-xs text-muted-foreground">عرض الملف ←</span>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">

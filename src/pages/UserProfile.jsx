@@ -1,11 +1,12 @@
 import { useSEO } from "@/hooks/useSEO";
-import React, { useState } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useSearchParams, useParams, useNavigate, Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
+import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import {
   Star, Car, MapPin, Calendar, Shield, Award,
-  MessageCircle, ArrowLeft, Phone, Settings, CheckCircle2,
+  MessageCircle, ArrowLeft, Settings, CheckCircle2,
   TrendingUp, Clock, ThumbsUp, BadgeCheck, CreditCard
 , LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,17 +16,6 @@ import ReviewsList from "../components/reviews/ReviewsList";
 import PassengerPaymentSetup from "../components/user/PassengerPaymentSetup";
 import EmptyState from "@/components/shared/EmptyState";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
-
-// Friendly display name extracted from email
-function prettyNameFromEmail(email) {
-  if (!email) return "مستخدم";
-  const local = email.split("@")[0];
-  // Capitalize-ish: split by dots/underscores/dashes and Title Case Latin parts
-  return local
-    .split(/[._-]+/)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ");
-}
 
 function formatJoinedDate(dateStr) {
   if (!dateStr) return null;
@@ -37,8 +27,27 @@ function formatJoinedDate(dateStr) {
 export default function UserProfile() {
   useSEO({ title: "الملف الشخصي", description: "الملف الشخصي للمستخدم في مشوارو" });
 
+  // ─── URL params ──────────────────────────────────────────────
+  // Canonical form is /profile/:userId where userId is the UUID from
+  // profiles.id. Email-keyed form (?email=...) is supported only for
+  // back-compat with deep links sitting in old chat messages or
+  // bookmarks — when we detect one, we look up the profile, then
+  // navigate(..., { replace: true }) to the canonical UUID URL so the
+  // email doesn't sit in browser history, referrer headers, or
+  // analytics logs.
+  //
+  // Email is PII and never belonged in a URL. Migrating away because:
+  //   - Browser history can be screenshot-shared
+  //   - Referer headers leak it to any image CDN / analytics
+  //   - Vercel + Sentry access logs persist URLs
+  //   - App Store / Play Store reviewers flag PII in URLs
+  // UUIDs aren't PII — they don't identify a real-world person by
+  // themselves, only when joined against profiles.
+  const { userId: paramUserId } = useParams();         // canonical
   const [searchParams] = useSearchParams();
-  const email = searchParams.get("email");
+  const legacyEmail = searchParams.get("email");       // back-compat only
+  const navigate = useNavigate();
+
   const [tab, setTab] = useState("reviews");
 
   const { data: currentUser } = useQuery({
@@ -46,19 +55,75 @@ export default function UserProfile() {
     queryFn: () => api.auth.me(),
   });
 
-  const isOwnProfile = !email || currentUser?.email === email;
-  const targetEmail = email || currentUser?.email;
-
-  // Fetch the actual profile record (NEW — was missing before, displayed raw email instead!)
+  // ─── Profile fetch ──────────────────────────────────────────
+  // Three resolution modes, in order of preference:
+  //   1. /profile/:userId  → fetch by id (canonical)
+  //   2. /profile?email=X  → fetch by email (legacy, will redirect)
+  //   3. /profile          → fetch the current signed-in user
+  //
+  // Note we always use supabase directly (not api.entities.User) so
+  // that the id-keyed path can use eq.id. The base44 entity client
+  // wraps queries with a created_by filter in some modes — for the
+  // single-row profile lookup we just want the raw row.
   const { data: profile } = useQuery({
-    queryKey: ["profile", targetEmail],
+    queryKey: ["profile", paramUserId || legacyEmail || currentUser?.email || null],
     queryFn: async () => {
-      if (!targetEmail) return null;
-      const list = await api.entities.User.filter({ email: targetEmail });
-      return list?.[0] || null;
+      if (paramUserId) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", paramUserId)
+          .maybeSingle();
+        if (error) { console.warn("profile by id error:", error); return null; }
+        return data || null;
+      }
+      if (legacyEmail) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("email", legacyEmail)
+          .maybeSingle();
+        if (error) { console.warn("profile by email error:", error); return null; }
+        return data || null;
+      }
+      if (currentUser?.email) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("email", currentUser.email)
+          .maybeSingle();
+        if (error) { console.warn("profile self error:", error); return null; }
+        return data || null;
+      }
+      return null;
     },
-    enabled: !!targetEmail,
+    enabled: !!paramUserId || !!legacyEmail || !!currentUser?.email,
   });
+
+  // Resolved identifiers — these are what every downstream query keys off.
+  // The profile row is the source of truth, NOT the URL. After a legacy
+  // email lookup resolves, all subsequent queries use the email from the
+  // profile row (same value, but conceptually unified). When the redirect
+  // below fires, the URL changes to /profile/:id but our state continues
+  // operating on the same email until the page re-renders with the new
+  // route — react-query keeps both keys cached so no flicker.
+  const targetEmail = profile?.email || currentUser?.email || null;
+  const targetId = profile?.id || null;
+
+  const isOwnProfile = !!currentUser && (
+    (!paramUserId && !legacyEmail) ||
+    currentUser.id === targetId ||
+    currentUser.email === targetEmail
+  );
+
+  // ─── Legacy ?email= → canonical /profile/:id redirect ─────
+  // Fires once profile is fetched. Uses { replace: true } so the
+  // back button doesn't bounce between the email URL and the id URL.
+  useEffect(() => {
+    if (!legacyEmail) return;
+    if (!profile?.id) return;
+    navigate(`/profile/${profile.id}`, { replace: true });
+  }, [legacyEmail, profile?.id, navigate]);
 
   const { data: trips = [] } = useQuery({
     queryKey: ["driver-trips", targetEmail],
@@ -114,12 +179,25 @@ export default function UserProfile() {
   }
 
   // Derived data
+  // Note: when the profile has no full_name we fall back to a generic
+  // label, NOT prettyNameFromEmail. Deriving a display name from the
+  // email's local part (e.g. "engallam27@gmail.com" → "Engallam27") was
+  // still an email leak in disguise — anyone visiting the profile page
+  // could read it off. Profiles missing full_name are exceedingly rare
+  // post-migration 034 (onboarding-gate-for-writes), but defensive
+  // fallback matters for legacy rows and admin-soft-deleted users.
   const displayName =
     profile?.full_name ||
     trips[0]?.driver_name ||
-    prettyNameFromEmail(targetEmail);
+    "مستخدم";
   const avatarUrl = profile?.avatar_url || trips[0]?.driver_avatar;
-  const phoneNumber = profile?.phone || trips[0]?.driver_phone;
+  // Phone number is intentionally NOT pulled from the profile row anywhere
+  // on this page. Contact happens through in-app messaging only. Drivers
+  // and passengers who need to call each other about a confirmed trip
+  // see the phone in /trip/:id (post-booking) and /my-trips, where the
+  // context makes the disclosure necessary. Surfacing a call button on
+  // a public profile is too broad — any subscribed driver could harvest
+  // passenger numbers by walking the request list.
   const carModel = profile?.car_model;
   const carPlate = profile?.car_plate;
   const accountType = profile?.account_type; // 'driver' | 'passenger' | 'both'
@@ -191,36 +269,12 @@ export default function UserProfile() {
     };
   })();
 
-  // confirmedWithUser gates the phone-call button below the avatar.
-  //
-  // Was previously `bookings.some(b => b.status === 'confirmed')`, which
-  // was a privacy leak: the bookings query is keyed by `passenger_email:
-  // targetEmail`, so the array contains the TARGET'S own passenger
-  // bookings — totally unrelated to whether the VIEWING user has a
-  // booking with them. The old check evaluated to true whenever the
-  // target had ever confirmed any booking on the platform as a
-  // passenger — which means the target's phone number leaked to any
-  // viewer the moment the target took their first ride.
-  //
-  // The correct check is: does the bookings array contain a confirmed
-  // row that pairs the current user with the target as the
-  // counterparty? Two scenarios:
-  //   (1) target was passenger AND current user was the driver
-  //   (2) target was driver AND current user was the passenger
-  // The bookings query is keyed on passenger_email = targetEmail, so
-  // (1) is covered directly. (2) requires looking at this user's own
-  // trip-side bookings, which we don't fetch here — the phone for that
-  // direction is already shown on /my-trips for the booking, which is
-  // a more contextual surface anyway. Limiting to (1) is conservative
-  // and privacy-preserving: it under-reveals rather than over-reveals.
-  // If we later want to expand to (2), add a second query keyed on
-  // driver_email = targetEmail.
-  //
-  // Also gated on !isOwnProfile so the call button never appears on
-  // your own profile (where it would be a no-op).
-  const confirmedWithUser = !isOwnProfile && currentUser?.email && bookings.some(
-    b => b.status === "confirmed" && b.driver_email === currentUser.email
-  );
+  // Note: previously this section computed `confirmedWithUser` (a flag
+  // checking whether the viewing user and the profile owner have a
+  // confirmed booking together) and used it to gate a profile-page call
+  // button. That button is gone (see the phoneNumber comment above) and
+  // the flag along with it. The bookings array is still fetched because
+  // its length feeds the "Rides as passenger" stat card + reliability%.
   const showCarInfo = (accountType === "driver" || accountType === "both") && (carModel || carPlate);
 
   // Initials for avatar fallback
@@ -304,14 +358,11 @@ export default function UserProfile() {
                       تواصل
                     </Button>
                   </Link>
-                  {confirmedWithUser && phoneNumber && (
-                    <a href={`tel:${phoneNumber}`}>
-                      <Button size="sm" className="rounded-xl gap-1.5 h-9 bg-primary text-primary-foreground">
-                        <Phone className="w-4 h-4" />
-                        اتصال
-                      </Button>
-                    </a>
-                  )}
+                  {/* Call button intentionally removed. Phone numbers belong
+                      in /trip/:id (post-booking) and /my-trips — surfaces
+                      where the disclosure is justified by the relationship.
+                      A profile-page call button let any subscribed driver
+                      harvest passenger numbers by walking the request list. */}
                   {/* Block / Report menu — same component used on TripDetails.
                       Without this, mobile users had no way to report or
                       block someone they reached via a profile link (no 3-dot
@@ -320,7 +371,7 @@ export default function UserProfile() {
                       no extra guard needed. */}
                   <UserActionsMenu
                     targetEmail={targetEmail}
-                    targetName={profile?.full_name || prettyNameFromEmail(targetEmail)}
+                    targetName={profile?.full_name || displayName}
                     contextType="profile"
                     contextId={targetEmail}
                   />

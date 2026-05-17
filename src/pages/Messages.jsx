@@ -756,12 +756,26 @@ export default function Messages() {
                   </button>
                   <Avatar name={activeConv.otherName} size={40} imgSrc={getProfilePic(profilesByEmail[activeConv.otherEmail])} />
                   <div className="flex-1 min-w-0">
-                    <Link
-                      to={`/profile?email=${encodeURIComponent(activeConv.otherEmail)}`}
-                      className="font-semibold text-base text-foreground hover:underline truncate block"
-                    >
-                      {activeConv.otherName}
-                    </Link>
+                    {/* Profile link uses the canonical UUID path. The id
+                        comes from profilesByEmail which is fetched on chat
+                        load — see the chat-profiles useQuery above. If
+                        the profile hasn't been fetched yet (first paint,
+                        rare), render a non-linked span instead of falling
+                        back to the email URL — email-in-URL is the leak
+                        we just fixed and we shouldn't reintroduce it as
+                        a "graceful degradation". */}
+                    {profilesByEmail[activeConv.otherEmail]?.id ? (
+                      <Link
+                        to={`/profile/${profilesByEmail[activeConv.otherEmail].id}`}
+                        className="font-semibold text-base text-foreground hover:underline truncate block"
+                      >
+                        {activeConv.otherName}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-base text-foreground truncate block">
+                        {activeConv.otherName}
+                      </span>
+                    )}
                     <p className="text-xs text-muted-foreground truncate">{activeConv.otherEmail}</p>
                   </div>
                   {/* Block / Report — same component used on TripDetails &
