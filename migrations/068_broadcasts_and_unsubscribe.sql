@@ -8,7 +8,7 @@
 -- side — admin-composed broadcasts sent to filtered audiences (all, drivers,
 -- passengers, or users in a specific city) via in-app + push + email
 -- channels, with mandatory one-click unsubscribe for legal compliance
--- (Israeli Communications Law 30A, CAN-SPAM, future GDPR).
+-- (applicable data protection + email-marketing regulations + GDPR).
 --
 -- THREE PIECES IN THIS MIGRATION
 --

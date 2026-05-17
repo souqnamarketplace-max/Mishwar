@@ -354,7 +354,7 @@ function tripReminderTemplate(profile: ProfileLite, trip: TripLite | null, ctaUr
 // log loudly. The template detects empty token and renders the
 // unsubscribe link as "go to settings" instead — graceful fallback that
 // still satisfies the unsubscribe-availability requirement of CAN-SPAM
-// /Israeli Communications Law (the user can opt out, just via a longer
+// /applicable email-marketing regulations (the user can opt out, just via a longer
 // path).
 async function generateUnsubscribeToken(email: string): Promise<string> {
   if (!UNSUBSCRIBE_SECRET) {
@@ -389,9 +389,9 @@ async function generateUnsubscribeToken(email: string): Promise<string> {
  *     recipient understands this isn't about their booking.
  *  2. A visible unsubscribe link inside the body (not just the footer)
  *     so the user can find it without scrolling.
- *  3. A physical business address in the footer — required by Israeli
- *     Communications Law 30A (the equivalent of CAN-SPAM's "physical
- *     postal address" requirement).
+ *  3. A physical business address in the footer — required by
+ *     applicable email-marketing regulations (CAN-SPAM-equivalent
+ *     "physical postal address" requirement).
  *
  *  Visually the shell is the same green/gold/cream as transactional —
  *  brand recognition is good, and the "promotional" label + unsubscribe

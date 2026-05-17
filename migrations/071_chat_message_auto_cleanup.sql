@@ -14,9 +14,10 @@
 --      reclaim. Linear unbounded growth.
 --
 --   2. PRIVACY COMPLIANCE — GDPR Article 17 (right to erasure) +
---      Israeli Privacy Law require predictable data lifecycles for
---      personal communications. 'We keep your chats forever' is not
---      a defensible posture if a regulator asks.
+--      applicable data protection regulations require predictable
+--      data lifecycles for personal communications. 'We keep your
+--      chats forever' is not a defensible posture if a regulator
+--      asks.
 --
 --   3. STALE CONVERSATIONS — the /messages page lists every chat the
 --      user ever had. Six months in, finding "the conversation about
@@ -91,13 +92,14 @@ BEGIN
   -- pass. UNION ALL because the three categories are disjoint (a
   -- message can't simultaneously have a trip_id and not have one).
   --
-  -- NOTE on the ::text casts: messages.trip_id and messages.request_id
-  -- are stored as TEXT (legacy from the base44-generated schema), but
-  -- trips.id and trip_requests.id are UUID. Postgres has no implicit
-  -- uuid=text comparison, so we cast on the trips/requests side to
-  -- match the storage type of the message FK column. Doing it this
-  -- way (UUID → TEXT) is safe in all cases; the reverse (TEXT → UUID)
-  -- would throw if any FK value were malformed.
+  -- NOTE on the column types: this schema has inconsistent FK types
+  -- on messages (legacy from the base44-generated schema):
+  --   messages.trip_id    → TEXT (no FK constraint; stores uuid as text)
+  --   messages.request_id → UUID (proper FK to trip_requests, mig 021)
+  -- So the joins look different:
+  --   trip join:    t.id::text = m.trip_id    (cast UUID → text)
+  --   request join: r.id       = m.request_id (both UUID, no cast)
+  -- Cleanup of the legacy text storage is a separate post-launch task.
   WITH candidates AS (
     -- a) Trip-bound messages, trip ended 30+ days ago
     SELECT m.id, m.attachment_path
@@ -112,7 +114,7 @@ BEGIN
     -- b) Request-bound messages, request closed 30+ days ago
     SELECT m.id, m.attachment_path
       FROM public.messages m
-      JOIN public.trip_requests r ON r.id::text = m.request_id
+      JOIN public.trip_requests r ON r.id = m.request_id
      WHERE m.request_id IS NOT NULL
        AND r.status IN ('matched', 'cancelled', 'expired')
        AND r.updated_at < NOW() - INTERVAL '30 days'
@@ -235,7 +237,7 @@ END $$;
 --     ) AS context
 --   FROM public.messages m
 --   LEFT JOIN public.trips         t ON t.id::text = m.trip_id
---   LEFT JOIN public.trip_requests r ON r.id::text = m.request_id
+--   LEFT JOIN public.trip_requests r ON r.id       = m.request_id
 --   WHERE
 --      (t.status IN ('completed','cancelled') AND t.date < CURRENT_DATE - INTERVAL '30 days')
 --   OR (r.status IN ('matched','cancelled','expired') AND r.updated_at < NOW() - INTERVAL '30 days')

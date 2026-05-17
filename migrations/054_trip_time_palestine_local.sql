@@ -39,18 +39,20 @@
 --        for late-evening trips, which means a passenger could keep
 --        their seat hold for hours past departure on a no-show driver.
 --
--- THE FIX
--- Three call sites, one expression pattern. Wrap the naive timestamp in
--- AT TIME ZONE 'Asia/Jerusalem' so it's interpreted as Palestine local
--- before assignment to TIMESTAMPTZ. This matches the front-end's TZ
--- constant in src/lib/tripScheduling.js (Asia/Jerusalem and Asia/Hebron
--- are aliases for the same zone — Palestine and Israel observe identical
--- DST so both names resolve to the same offset year-round).
---
 -- The fix is intentionally NOT in change_trip_time (it works on TIME
 -- only, no zone math), NOT in complete_trip (no time comparison), and
 -- NOT in passive display anywhere (toLocaleString already uses the
 -- user's browser zone, which for Mishwaro users IS Palestine).
+--
+-- TIMEZONE NOTE
+-- 'Asia/Jerusalem' is the IANA timezone identifier we use throughout
+-- the codebase for Palestine local time. 'Asia/Hebron' is an IANA
+-- alias for the same offset (UTC+2 winter / UTC+3 DST summer), so
+-- they're functionally interchangeable. We stick with Asia/Jerusalem
+-- because it's the canonical name supported across older IANA tzdata
+-- versions and avoids any client-side library version skew. Renaming
+-- to Asia/Hebron in a future migration is a one-line change with no
+-- behavioural impact — the DST switchover dates are identical.
 --
 -- DST CORRECTNESS
 -- AT TIME ZONE is the standard PostgreSQL way to do zone-aware

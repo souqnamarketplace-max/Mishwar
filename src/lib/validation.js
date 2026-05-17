@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ─── PHONE: accepts any valid international phone number (7–15 digits)
-// Preferred formats for Palestinian/Israeli users:
+// Preferred formats for Palestinian users:
 //   Local:         0501234567, 0591234567 (Palestinian)
 //   International: +970501234567, +972501234567, +1 555 123 4567, etc.
 //
@@ -30,7 +30,7 @@ export const isValidPhone = isValidPalestinianPhone;
 // Recognized "good" formats (any of these passes):
 //   - Palestinian local:   05XXXXXXXX (10 digits, starts with 05)
 //   - Palestinian intl:    +970 5XXXXXXXX
-//   - Israeli intl:        +972 5XXXXXXXX
+//   - International format:  +972 5XXXXXXXX
 //   - Other international: +CCNNNNNNN... (7–15 digits total)
 //
 // We don't reject non-Palestinian numbers (family-abroad use case is

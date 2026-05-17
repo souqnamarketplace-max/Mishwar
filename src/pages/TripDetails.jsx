@@ -318,7 +318,7 @@ export default function TripDetails() {
   // seat price. This lets Google surface the route + price as a rich
   // result for queries like "رام الله إلى نابلس". The PostalAddress
   // bits are city-level only (we don't have street precision and
-  // shouldn't pretend to). priceCurrency is ILS — Israeli Shekel,
+  // shouldn't pretend to). priceCurrency is ILS — the local currency,
   // the actual currency drivers and passengers transact in inside
   // the West Bank and Gaza.
   const tripJsonLd = trip ? {

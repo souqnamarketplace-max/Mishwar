@@ -4,8 +4,8 @@
 //
 // Reached from the "إلغاء الاشتراك بنقرة واحدة" link in every marketing
 // email. NO AUTH REQUIRED — the HMAC token in the URL is the auth.
-// Required to be public for legal compliance (CAN-SPAM, Israeli
-// Communications Law 30A) — users must be able to opt out without
+// Required to be public for legal compliance (CAN-SPAM-equivalent
+// email-marketing regulations) — users must be able to opt out without
 // having to log in.
 //
 // FLOW
