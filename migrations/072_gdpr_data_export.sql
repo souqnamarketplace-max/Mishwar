@@ -227,14 +227,22 @@ BEGIN
     -- 12. Device tokens (without the actual token strings — those are
     --     cryptographic material used to deliver push notifications
     --     and don't constitute "personal data" the user provided)
+    --
+    --     NOTE: column is last_seen_at, not last_used_at. The naming
+    --     here is the historical migration-059 choice (the column
+    --     gets updated every app open, which the original author
+    --     thought of as "we last saw this device" rather than "user
+    --     last used it"). The exported JSON key reads more naturally
+    --     as 'last_seen_at' for the recipient, so we don't rename
+    --     it in the output either.
     'device_tokens', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
         'id',          dt.id,
         'platform',    dt.platform,
         'device_id',   dt.device_id,
         'created_at',  dt.created_at,
-        'last_used_at', dt.last_used_at
-      ) ORDER BY dt.last_used_at DESC NULLS LAST)
+        'last_seen_at', dt.last_seen_at
+      ) ORDER BY dt.last_seen_at DESC NULLS LAST)
         FROM public.device_tokens dt
        WHERE dt.user_email = v_email
     ), '[]'::JSONB),
