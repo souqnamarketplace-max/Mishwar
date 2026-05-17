@@ -6,7 +6,7 @@ import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import { logAudit } from "@/lib/adminAudit";
 import React, { useState, useEffect } from "react";
 import { api } from "@/api/apiClient";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +64,7 @@ export default function CreateTrip() {
   useSEO({ title: "أنشر رحلتك", description: "انشر رحلتك واكسب من طريقك اليومي" });
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const requireOnboarding = useOnboardingGate();
   const [step, setStep] = useState(1);
 
@@ -211,6 +212,65 @@ export default function CreateTrip() {
       if (user.reflect_number) paymentFromProfile.push("reflect");
       if (user.credit_card_enabled) paymentFromProfile.push("credit_card");
 
+      // ── URL prefill from /my-trips "Repost this trip" button ────────
+      // When the user lands here via /create-trip?from_city=...&to_city=...,
+      // those params come from a "repost" click on a past trip card. We
+      // apply them LAST so they win over both the default form state and
+      // the profile-derived defaults (car_*, driver_note). Empty / missing
+      // params are passed through as undefined → React's setForm spread
+      // semantics leave the prev value intact.
+      //
+      // Why not just put these directly in initial useState? The user
+      // profile load is async — by the time it resolves we want url
+      // params to still apply. Doing it in the same effect as profile
+      // overlay guarantees the right ordering (user-defaults → URL
+      // overrides → form ready).
+      //
+      // Date is intentionally NOT consumed from URL params even if
+      // present: rerunning the same trip should force the driver to
+      // pick a new date, preventing accidental same-day duplicates
+      // and matching the form's past-date guard.
+      const urlPrefill = {};
+      const sp = searchParams;
+      const grab = (key) => {
+        const v = sp.get(key);
+        return v == null || v === "" ? undefined : v;
+      };
+      if (grab("from_city"))       urlPrefill.from_city       = grab("from_city");
+      if (grab("to_city"))         urlPrefill.to_city         = grab("to_city");
+      if (grab("time"))            urlPrefill.time            = grab("time");
+      if (grab("driver_note"))     urlPrefill.driver_note     = grab("driver_note");
+      if (grab("checkpoint_note")) urlPrefill.checkpoint_note = grab("checkpoint_note");
+      if (sp.get("has_checkpoint") === "1") urlPrefill.has_checkpoint = true;
+      // Numeric fields — coerce + sanity-bound. parseInt with bad input
+      // yields NaN, in which case we don't include the key (form keeps
+      // its default).
+      const seatsNum = parseInt(grab("available_seats"), 10);
+      if (Number.isFinite(seatsNum) && seatsNum > 0 && seatsNum <= 8) {
+        urlPrefill.available_seats = seatsNum;
+      }
+      const priceNum = parseInt(grab("price"), 10);
+      if (Number.isFinite(priceNum) && priceNum >= 0 && priceNum <= 10000) {
+        urlPrefill.price = priceNum;
+      }
+      // CSV → array for amenities + payment_methods. Filter to known
+      // option ids so a malicious URL can't inject arbitrary values
+      // into the trip row.
+      const amenitiesCSV = grab("amenities");
+      if (amenitiesCSV) {
+        const validAmenities = new Set(amenitiesList.map(a => a.id));
+        const arr = amenitiesCSV.split(",").map(s => s.trim()).filter(s => validAmenities.has(s));
+        if (arr.length > 0) urlPrefill.amenities = arr;
+      }
+      const paymentsCSV = grab("payment_methods");
+      if (paymentsCSV) {
+        // Accept the four supported payment types. Stay defensive against
+        // unknown values that could break the payment-method UI.
+        const validPayments = new Set(["cash", "bank_transfer", "jawwal_pay", "reflect", "credit_card"]);
+        const arr = paymentsCSV.split(",").map(s => s.trim()).filter(s => validPayments.has(s));
+        if (arr.length > 0) urlPrefill.payment_methods = arr;
+      }
+
       setForm((prev) => ({
         ...prev,
         car_model: user.car_model || "",
@@ -223,10 +283,12 @@ export default function CreateTrip() {
         pref_smoking: profileSmoking,
         pref_chattiness: profileChattiness,
         pref_pets: profilePets,
+        // URL prefill LAST — overrides anything above for these fields
+        ...urlPrefill,
       }));
       setFormInitialized(true);
     }
-  }, [user, formInitialized]);
+  }, [user, formInitialized, searchParams]);
 
   // Role gate — render-time guard. All hooks above run unconditionally
   // on every render (rules-of-hooks compliant). When the resolved user

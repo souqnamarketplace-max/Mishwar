@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Pagination from "@/components/dashboard/Pagination";
 import RequestStatusBadge from "@/components/requests/RequestStatusBadge";
+import { useConfirm } from "@/hooks/useConfirm";
 
 /**
  * DashboardRequests — admin moderation list for trip_requests.
@@ -42,6 +43,11 @@ export default function DashboardRequests() {
   const [search, setSearch] = useState("");
   const [page, setPage]     = useState(1);
   const [adminNotes, setAdminNotes] = useState({}); // per-row admin note
+  // Confirmation before force-cancelling a passenger request. The
+  // passenger receives a notification with the admin note, so we want
+  // admins to deliberate before triggering it — accidental cancel
+  // would send a confusing message to a real user.
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const { data: pageData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
     queryKey: ["admin-trip-requests", filter, page, search],
@@ -203,7 +209,15 @@ export default function DashboardRequests() {
                 request={r}
                 note={adminNotes[r.id] || ""}
                 setNote={(v) => setAdminNotes(prev => ({ ...prev, [r.id]: v }))}
-                onCancel={() => cancelMutation.mutate({ id: r.id, note: adminNotes[r.id] })}
+                onCancel={async () => {
+                  const ok = await confirm({
+                    title: "إلغاء طلب الرحلة",
+                    message: `سيتم إلغاء طلب ${r.passenger_email} (${r.from_city} ← ${r.to_city}). سيصل الراكب إشعار بالإلغاء${adminNotes[r.id] ? ' مع الملاحظة المُدخلة' : ''}.`,
+                    confirmLabel: "تأكيد الإلغاء",
+                    destructive: true,
+                  });
+                  if (ok) cancelMutation.mutate({ id: r.id, note: adminNotes[r.id] });
+                }}
                 cancelling={cancelMutation.isPending}
               />
             ))}
@@ -216,6 +230,7 @@ export default function DashboardRequests() {
           />
         </>
       )}
+      {confirmDialog}
     </div>
   );
 }

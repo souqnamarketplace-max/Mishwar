@@ -2,23 +2,24 @@ import { toast } from "sonner";
 import { logAudit } from "@/lib/adminAudit";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import ModalPortal from "@/components/shared/ModalPortal";
 import { api } from "@/api/apiClient";
 import { isTripExpired, isTripCompleted } from "@/lib/tripScheduling";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
-  Search, CheckCircle, AlertCircle, XCircle, Navigation
+  Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy
 } from "lucide-react";
 import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
 import { MessageCircle } from "lucide-react";
+import MyTripsFilterBar from "@/components/mytrips/MyTripsFilterBar";
 
 const tabs = [
   { id: "all", label: "الكل", icon: Car },
@@ -44,6 +45,7 @@ const statusConfig = {
 export default function MyTrips() {
   useSEO({ title: "رحلاتي", description: "شاهد رحلاتك السابقة والقادمة" });
 
+  const navigate = useNavigate();
   const [confirmCancel, setConfirmCancel] = useState({ open: false, bookingId: null, reason: "" });
   const [searchParams] = useSearchParams();
   // Read the tab from the URL on initial render so deep-links from
@@ -57,6 +59,23 @@ export default function MyTrips() {
     _validTabIds.includes(_paramTab) ? _paramTab : "all"
   );
   const [wizardTrip, setWizardTrip] = useState(null); // trip object for PassengerReviewWizard
+
+  // ── Filter state (lifted from MyTripsFilterBar) ─────────────────────
+  // All five filter values feed the react-query keys below so changing
+  // any of them triggers a refetch with the new criteria. Empty string
+  // = filter inactive. Date strings are YYYY-MM-DD to match the
+  // trips.date column format (which is plain text date, not timestamp).
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFrom,   setDateFrom]   = useState("");
+  const [dateTo,     setDateTo]     = useState("");
+  const [routeFrom,  setRouteFrom]  = useState("");
+  const [routeTo,    setRouteTo]    = useState("");
+  // Convenience: are any filters active? Drives the "no results match"
+  // vs "you have no trips" empty-state distinction below.
+  const anyFilterActive = Boolean(
+    searchTerm.trim() || dateFrom || dateTo || routeFrom || routeTo
+  );
+
   const qc = useQueryClient();
   const highlightTripId = searchParams.get("trip");
   const highlightRef = useRef(null);
@@ -170,26 +189,98 @@ export default function MyTrips() {
   // Role detection — passengers don't have driver trips, drivers may not have bookings
   const isDriver = user?.account_type === "driver" || user?.account_type === "both";
 
-  // Role detection done above — driverTrips ONLY queried for drivers
-  const { data: driverTrips = [], isLoading: driverTripsLoading } = useQuery({
-    queryKey: ["my-driver-trips", user?.email],
-    queryFn: () => user?.email
-      ? api.entities.Trip.filter({ driver_email: user.email }, "-created_date", 50)
-      : [],
-    enabled: !!user?.email && isDriver,  // Don't run for passengers — saves a hung query
+  // Page size for both driver-trips and passenger-bookings pagination.
+  // 25 hits the sweet spot for mobile: small enough to render fast,
+  // big enough that most users see everything without paging.
+  const PAGE_SIZE = 25;
+
+  // ── Driver trips with server-side pagination + filtering ────────────
+  // useInfiniteQuery replaces the flat .filter(..., 50) so heavy drivers
+  // (50+ trips) can actually see their full history. paginate() under
+  // the hood is `range()` with count: 'exact', returning { rows, total,
+  // totalPages, page } — exactly what useInfiniteQuery expects when paired
+  // with getNextPageParam.
+  //
+  // The queryKey includes every filter value, so changing any of them
+  // resets pagination and re-fetches from page 1 (standard react-query
+  // behavior — different key, fresh cache entry).
+  //
+  // Filters applied SERVER-SIDE:
+  //   - driver_email = current user (always)
+  //   - status = activeTab (when not "all") — uses idx_trips_driver_created
+  //     for the driver_email seek, then filters status from those rows
+  //   - from_city / to_city — exact city match via .eq()
+  //   - date range — gte/lte on the date column (YYYY-MM-DD lexical compare)
+  //   - searchTerm — ilike across from_city + to_city
+  const driverTripsInf = useInfiniteQuery({
+    queryKey: ["my-driver-trips", user?.email, activeTab, searchTerm, dateFrom, dateTo, routeFrom, routeTo],
+    queryFn: ({ pageParam = 1 }) => api.entities.Trip.paginate({
+      page: pageParam,
+      pageSize: PAGE_SIZE,
+      sort: "-created_date",
+      conditions: {
+        driver_email: user.email,
+        // Only constrain status when a specific tab is active. The "all"
+        // tab keeps every status in the result set so the grouping logic
+        // below can render multiple sections from one query.
+        ...(activeTab !== "all" && { status: activeTab }),
+        ...(routeFrom ? { from_city: routeFrom } : {}),
+        ...(routeTo   ? { to_city:   routeTo   } : {}),
+      },
+      dateColumn: "date",
+      dateFrom: dateFrom || null,
+      dateTo:   dateTo   || null,
+      searchTerm: searchTerm.trim() || null,
+      searchColumns: ["from_city", "to_city"],
+    }),
+    initialPageParam: 1,
+    // Stop paginating once we've consumed all pages. paginate() returns
+    // totalPages computed from `count`, so this is exact.
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
+    enabled: !!user?.email && isDriver,
   });
+
+  // Flatten all loaded pages into a single array. trips render order is
+  // newest-created first (server sort), preserved by Array.prototype.flat.
+  const driverTrips    = driverTripsInf.data?.pages.flatMap(p => p.rows) || [];
+  const driverTotal    = driverTripsInf.data?.pages[0]?.total ?? 0;
+  const driverTripsLoading = driverTripsInf.isLoading;
 
   // For passengers, isLoading is governed by passenger booking + allTrips queries
   const isLoading = isDriver ? driverTripsLoading : false;
 
-  // Bookings this user made AS PASSENGER
-  const { data: passengerBookings = [] } = useQuery({
-    queryKey: ["my-passenger-bookings", user?.email],
-    queryFn: () => user?.email
-      ? api.entities.Booking.filter({ passenger_email: user.email }, "-created_date", 50)
-      : [],
+  // ── Passenger bookings — also paginated for symmetry ────────────────
+  // Bookings don't carry route/date info themselves — those live on the
+  // associated trip row. So filters can't be applied to this query
+  // server-side. Instead we paginate by booking date and apply
+  // route/date/search filters to the trips fetch below.
+  //
+  // This is fine UX-wise because the trip filter is what users actually
+  // care about ("trips to Bethlehem"), not "bookings made in March". If
+  // a user wants to find an old booking, they bump the page count up.
+  const passengerBookingsInf = useInfiniteQuery({
+    queryKey: ["my-passenger-bookings", user?.email, activeTab],
+    queryFn: ({ pageParam = 1 }) => api.entities.Booking.paginate({
+      page: pageParam,
+      pageSize: PAGE_SIZE,
+      sort: "-created_date",
+      conditions: {
+        passenger_email: user.email,
+        // Bookings have their own status column. When user clicks "confirmed",
+        // they want trips where their booking is confirmed (regardless of
+        // whether the driver subsequently cancelled the whole trip).
+        ...(activeTab !== "all" && { status: activeTab }),
+      },
+    }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.totalPages ? lastPage.page + 1 : undefined,
     enabled: !!user?.email,
   });
+
+  const passengerBookings = passengerBookingsInf.data?.pages.flatMap(p => p.rows) || [];
+  const passengerTotal    = passengerBookingsInf.data?.pages[0]?.total ?? 0;
 
   // Trips the user has booked. Previously this fetched the PLATFORM's
   // 200 newest trips (`api.entities.Trip.list("-created_date", 200)`)
@@ -203,15 +294,34 @@ export default function MyTrips() {
   // Booking.trip_id as an .in() filter. This makes every booking
   // visible regardless of trip age AND drastically reduces bandwidth
   // (1 trip per booking instead of 200 unrelated ones).
+  //
+  // FILTERS: applied here so passenger trips also get the date/route
+  // filter behavior. Since we already do an `.in(id, [...])` query,
+  // adding `.gte/lte` and `.eq` is a free piggyback that the trips_pkey
+  // index uses for the .in() seek and the planner adds the others as
+  // bitmap-and clauses.
   const myBookedTripIds = (passengerBookings || []).map(b => b.trip_id).filter(Boolean);
   const { data: allTrips = [] } = useQuery({
-    queryKey: ["my-booked-trips", user?.email, myBookedTripIds.join(",")],
+    queryKey: [
+      "my-booked-trips",
+      user?.email,
+      myBookedTripIds.join(","),
+      dateFrom, dateTo, routeFrom, routeTo, searchTerm,
+    ],
     queryFn: async () => {
       if (myBookedTripIds.length === 0) return [];
-      const { data, error } = await supabase
-        .from("trips")
-        .select("*")
-        .in("id", myBookedTripIds);
+      let q = supabase.from("trips").select("*").in("id", myBookedTripIds);
+      if (dateFrom)  q = q.gte("date", dateFrom);
+      if (dateTo)    q = q.lte("date", dateTo);
+      if (routeFrom) q = q.eq("from_city", routeFrom);
+      if (routeTo)   q = q.eq("to_city",   routeTo);
+      if (searchTerm.trim()) {
+        // Escape any chars that would break Supabase's .or() syntax,
+        // matching the apiClient.paginate() escape rules.
+        const escaped = searchTerm.trim().replace(/[%,()]/g, " ");
+        q = q.or(`from_city.ilike.%${escaped}%,to_city.ilike.%${escaped}%`);
+      }
+      const { data, error } = await q;
       if (error) throw error;
       return data || [];
     },
@@ -299,13 +409,43 @@ export default function MyTrips() {
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
       {/* Header */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-6">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
           <Car className="w-7 h-7 text-primary" />
         </div>
         <h1 className="text-3xl font-bold text-foreground">رحلاتي</h1>
-        <p className="text-muted-foreground text-sm mt-1">جميع رحلاتك الحالية والسابقة في مكان واحد</p>
+        <p className="text-muted-foreground text-sm mt-1">
+          {/* Total counts surfaced inline with the page subtitle so users
+              know how many rows they have without scrolling. driverTotal
+              and passengerTotal come from paginate()'s count: 'exact'. */}
+          {isDriver && driverTotal > 0 && (
+            <span className="inline-block mx-1">
+              {driverTotal} رحلة كسائق
+            </span>
+          )}
+          {isDriver && driverTotal > 0 && passengerTotal > 0 && <span>·</span>}
+          {passengerTotal > 0 && (
+            <span className="inline-block mx-1">
+              {passengerTotal} حجز كراكب
+            </span>
+          )}
+          {driverTotal === 0 && passengerTotal === 0 && (
+            <span>جميع رحلاتك الحالية والسابقة في مكان واحد</span>
+          )}
+        </p>
       </div>
+
+      {/* Filter bar — collapsible, contains free-text search + date range +
+          route from/to. Renders above the status tabs so users filter
+          BEFORE picking a status. Filter changes auto-reset pagination
+          (queryKey includes all filter values). */}
+      <MyTripsFilterBar
+        searchTerm={searchTerm}   setSearchTerm={setSearchTerm}
+        dateFrom={dateFrom}       setDateFrom={setDateFrom}
+        dateTo={dateTo}           setDateTo={setDateTo}
+        routeFrom={routeFrom}     setRouteFrom={setRouteFrom}
+        routeTo={routeTo}         setRouteTo={setRouteTo}
+      />
 
       {/* Tabs */}
       <div className="flex flex-wrap justify-center gap-2 mb-8">
@@ -342,7 +482,29 @@ export default function MyTrips() {
         // a "no trips, start posting!" state when they tapped "completed"
         // before they had any completed ones. Same UX pattern shipped
         // for /passenger-requests in commit 780db6d.
-        trips.length > 0 ? (
+        //
+        // Filter case (added in mig 074 frontend): when filters are active
+        // and zero rows match, show a "no results for your filters" empty
+        // state with a "مسح الفلاتر" action — distinct from "you have no
+        // trips at all" which would suggest creating a new trip.
+        anyFilterActive ? (
+          <div className="text-center py-16">
+            <Search className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+            <h3 className="font-bold text-foreground mb-1">لا توجد نتائج تطابق الفلاتر</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              جرّب توسيع نطاق التاريخ أو إزالة فلتر المسار.
+            </p>
+            <button
+              onClick={() => {
+                setSearchTerm(""); setDateFrom(""); setDateTo("");
+                setRouteFrom(""); setRouteTo("");
+              }}
+              className="text-sm text-primary hover:underline font-medium"
+            >
+              مسح كل الفلاتر
+            </button>
+          </div>
+        ) : trips.length > 0 ? (
           <div className="text-center py-16">
             <Car className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
             <h3 className="font-bold text-foreground mb-1">لا توجد رحلات في هذا التبويب</h3>
@@ -567,12 +729,124 @@ export default function MyTrips() {
                           شكراً — تم تقييم هذه الرحلة ✅
                         </p>
                       )}
+
+                      {/* Repost button — driver's own completed/cancelled trips
+                          only. Quick path to re-create the same route without
+                          re-entering every field. Navigates to /create-trip with
+                          the trip's identifying fields as URL params, which the
+                          CreateTrip page reads on mount to prefill the form.
+                          Date is intentionally NOT included so the driver picks
+                          a fresh future date (preventing accidental same-day
+                          duplicates and matching the form's past-date guard).
+                          Source: dashboard scale-audit P1 #3 (1h estimate). */}
+                      {driverTrips.find(dt => dt.id === trip.id)
+                        && (status === "completed" || status === "cancelled") && (
+                        <div className="mt-3 mx-4">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              // Build URL params from the trip's repost-relevant
+                              // fields. Keys match the CreateTrip form state
+                              // shape (from_city, to_city, etc) for direct
+                              // hydration on the other side. Amenities is a
+                              // JSON array → CSV for URL safety.
+                              const amenitiesCSV = Array.isArray(trip.amenities)
+                                ? trip.amenities.filter(Boolean).join(",")
+                                : "";
+                              const paymentsCSV = Array.isArray(trip.payment_methods)
+                                ? trip.payment_methods.filter(Boolean).join(",")
+                                : "";
+                              const params = new URLSearchParams({
+                                from_city:       trip.from_city || "",
+                                to_city:         trip.to_city   || "",
+                                time:            trip.time      || "",
+                                available_seats: String(trip.available_seats ?? 3),
+                                price:           String(trip.price ?? 50),
+                                ...(amenitiesCSV && { amenities: amenitiesCSV }),
+                                ...(paymentsCSV  && { payment_methods: paymentsCSV }),
+                                ...(trip.driver_note     && { driver_note: trip.driver_note }),
+                                ...(trip.has_checkpoint  && { has_checkpoint: "1" }),
+                                ...(trip.checkpoint_note && { checkpoint_note: trip.checkpoint_note }),
+                              });
+                              navigate(`/create-trip?${params.toString()}`);
+                            }}
+                            className="w-full flex items-center justify-center gap-2 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-xl px-4 py-2.5 transition-colors active:scale-[0.99]"
+                          >
+                            <Copy className="w-4 h-4 text-primary" aria-hidden="true" />
+                            <span className="text-sm font-bold text-primary">
+                              إعادة نشر هذه الرحلة
+                            </span>
+                            <span className="text-[10px] text-muted-foreground mr-1">
+                              ({trip.from_city} → {trip.to_city})
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             );
           })}
+
+          {/* ── Load More controls — one button per role section ────────
+              Shown when the corresponding infinite-query has another
+              page available. For drivers, this fetches the next 25
+              trips matching the current filters (server-side via
+              paginate). For passengers, it fetches the next 25 booking
+              rows; the trip-fetch subquery re-runs automatically with
+              the new trip_ids. Both buttons are disabled while loading
+              to prevent double-firing. */}
+          {(driverTripsInf.hasNextPage || passengerBookingsInf.hasNextPage) && (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              {driverTripsInf.hasNextPage && (
+                <Button
+                  variant="outline"
+                  onClick={() => driverTripsInf.fetchNextPage()}
+                  disabled={driverTripsInf.isFetchingNextPage}
+                  className="rounded-xl gap-2 min-w-[260px]"
+                >
+                  {driverTripsInf.isFetchingNextPage ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Car className="w-4 h-4" aria-hidden="true" />
+                  )}
+                  {driverTripsInf.isFetchingNextPage
+                    ? "جاري التحميل..."
+                    : `تحميل المزيد من رحلاتي كسائق (${driverTrips.length} من ${driverTotal})`}
+                </Button>
+              )}
+              {passengerBookingsInf.hasNextPage && (
+                <Button
+                  variant="outline"
+                  onClick={() => passengerBookingsInf.fetchNextPage()}
+                  disabled={passengerBookingsInf.isFetchingNextPage}
+                  className="rounded-xl gap-2 min-w-[260px]"
+                >
+                  {passengerBookingsInf.isFetchingNextPage ? (
+                    <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" aria-hidden="true" />
+                  )}
+                  {passengerBookingsInf.isFetchingNextPage
+                    ? "جاري التحميل..."
+                    : `تحميل المزيد من حجوزاتي (${passengerBookings.length} من ${passengerTotal})`}
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* All-loaded indicator — only shown when the user has loaded
+              every page across both roles AND has results. Prevents the
+              "is there more?" question on heavy histories. */}
+          {!driverTripsInf.hasNextPage
+            && !passengerBookingsInf.hasNextPage
+            && trips.length > PAGE_SIZE && (
+            <p className="text-center text-xs text-muted-foreground pt-2">
+              ✓ تم تحميل جميع رحلاتك ({trips.length} من إجمالي {driverTotal + passengerTotal})
+            </p>
+          )}
         </div>
       )}
     {/* Passenger review wizard portal */}

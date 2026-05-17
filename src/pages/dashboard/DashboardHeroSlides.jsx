@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { Trash2, Plus, Eye, EyeOff, Upload, ImageIcon, CheckCircle } from "lucide-react";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const DEFAULT_SLIDES = [
   { city: "القدس",   subtitle: "المدينة المقدسة",        img: "https://images.unsplash.com/photo-1552423314-cf29ab68ad73?w=1400&h=800&fit=crop&q=80", active: true },
@@ -146,6 +147,12 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
 
 export default function DashboardHeroSlides() {
   const qc = useQueryClient();
+  // Confirmation for slide deletion. Slide deletion is irreversible —
+  // the slide JSON gets removed from app_settings.hero_city_slides and
+  // there's no soft-delete / restore path. Accidental delete during
+  // routine slide reordering would force the admin to manually
+  // recreate the slide from scratch including re-uploading the image.
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   // Use Supabase directly — bypasses api created_by filter.
   //
@@ -205,7 +212,16 @@ export default function DashboardHeroSlides() {
     save.mutate(updated);
   };
 
-  const deleteSlide = (idx) => save.mutate(slides.filter((_, i) => i !== idx));
+  const deleteSlide = async (idx) => {
+    const slide = slides[idx];
+    const ok = await confirm({
+      title: "حذف الشريحة",
+      message: `سيتم حذف شريحة "${slide?.city || `#${idx + 1}`}" نهائياً من الصفحة الرئيسية. لا يوجد خيار للاستعادة.`,
+      confirmLabel: "حذف الشريحة",
+      destructive: true,
+    });
+    if (ok) save.mutate(slides.filter((_, i) => i !== idx));
+  };
 
   const addSlide = () => save.mutate([...slides, { city: "مدينة جديدة", subtitle: "", img: "", active: false }]);
 
@@ -258,6 +274,7 @@ export default function DashboardHeroSlides() {
       <p className="text-xs text-center text-muted-foreground mt-6">
         التغييرات تُحفظ تلقائياً • {slides.filter(s => s.active).length} شريحة ظاهرة من أصل {slides.length}
       </p>
+      {confirmDialog}
     </div>
   );
 }

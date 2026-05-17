@@ -9,9 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Tag, Plus, Trash2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { todayISO } from "@/lib/validation";
+import { useConfirm } from "@/hooks/useConfirm";
 
 export default function DashboardOffers() {
   const qc = useQueryClient();
+  // Confirmation dialog for destructive coupon delete. Coupons are
+  // referenced from booking history via coupon_code, so deletion
+  // doesn't invalidate past bookings — but the action is still
+  // irreversible from the admin's perspective (no soft-delete /
+  // restore path), so it warrants a confirm step.
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ code: "", discount_percent: 10, max_uses: 100, expires_at: "" });
   const [search, setSearch] = useState("");
@@ -211,7 +218,19 @@ export default function DashboardOffers() {
                   >
                     {coupon.is_active ? "نشط" : "معطل"}
                   </button>
-                  <button onClick={() => deleteMutation.mutate(coupon.id)} className="text-destructive hover:opacity-70">
+                  <button
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "حذف الكوبون",
+                        message: `سيتم حذف الكوبون "${coupon.code}" نهائياً. الحجوزات السابقة التي استخدمته لن تتأثر، ولكن لن يتمكن أحد من استخدامه مجدداً.`,
+                        confirmLabel: "حذف الكوبون",
+                        destructive: true,
+                      });
+                      if (ok) deleteMutation.mutate(coupon.id);
+                    }}
+                    className="text-destructive hover:opacity-70"
+                    aria-label={`حذف كوبون ${coupon.code}`}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -223,6 +242,10 @@ export default function DashboardOffers() {
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
+      {/* useConfirm dialog — sits outside the list so it can portal
+          above the page regardless of where the destructive button
+          was clicked. */}
+      {confirmDialog}
     </div>
   );
 }

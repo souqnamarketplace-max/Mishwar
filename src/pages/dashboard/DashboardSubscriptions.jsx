@@ -12,7 +12,7 @@
  * On reject: rejected_reason is required. Driver can resubmit a new
  * pending request. Old rejected row stays for audit.
  */
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import ModalPortal from "@/components/shared/ModalPortal";
 import Pagination from "@/components/dashboard/Pagination";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -605,18 +605,38 @@ function SubscriptionRow({ row, showActions, onApprove, onReject, actionPending 
 
 function RejectModal({ row, onClose, onSubmit, submitting }) {
   const [reason, setReason] = useState("");
+  // Auto-focus the textarea when the modal opens — screen readers
+  // announce the dialog name (aria-labelledby) and then the user
+  // can immediately type the rejection reason without manual tabbing.
+  const textareaRef = useRef(null);
+  useEffect(() => { textareaRef.current?.focus(); }, []);
+  // Close on Escape key — standard expectation for dialog UI.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reject-modal-title"
+      aria-describedby="reject-modal-desc"
+    >
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
-        <h3 className="font-bold text-lg mb-1">رفض طلب الاشتراك</h3>
-        <p className="text-sm text-muted-foreground mb-4">
+        <h3 id="reject-modal-title" className="font-bold text-lg mb-1">رفض طلب الاشتراك</h3>
+        <p id="reject-modal-desc" className="text-sm text-muted-foreground mb-4">
           سنرسل سبب الرفض للسائق ليتمكن من تصحيح المعلومات وإعادة الإرسال.
         </p>
         <p className="text-xs text-muted-foreground mb-1.5">السائق</p>
         <p className="text-sm font-medium mb-3 truncate">{row.driver_email}</p>
-        <label className="text-xs text-muted-foreground mb-1 block">سبب الرفض *</label>
+        <label htmlFor="reject-reason" className="text-xs text-muted-foreground mb-1 block">سبب الرفض *</label>
         <textarea
+          id="reject-reason"
+          ref={textareaRef}
           value={reason}
           onChange={e => setReason(e.target.value)}
           rows={3}
@@ -669,18 +689,25 @@ function GrantSingleModal({ onClose, onSubmit, submitting }) {
 
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="grant-single-modal-title"
+      aria-describedby="grant-single-modal-desc"
+    >
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-lg flex items-center gap-2">
-            <Gift className="w-5 h-5 text-primary" />
+          <h3 id="grant-single-modal-title" className="font-bold text-lg flex items-center gap-2">
+            <Gift className="w-5 h-5 text-primary" aria-hidden="true" />
             منح اشتراك مجاني
           </h3>
           <button onClick={onClose} className="p-1 hover:bg-muted rounded-lg" aria-label="إغلاق">
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
-        <p className="text-sm text-muted-foreground mb-4">
+        <p id="grant-single-modal-desc" className="text-sm text-muted-foreground mb-4">
           سيتم تفعيل اشتراك مجاني للسائق فوراً، بدون مراجعة. مناسب للسائقين المميزين أو في حالات خاصة.
         </p>
 
@@ -757,18 +784,25 @@ function GrantBulkModal({ onClose, onSubmit, submitting }) {
 
   return (
     <ModalPortal>
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="grant-bulk-modal-title"
+      aria-describedby="grant-bulk-modal-desc"
+    >
       <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-bold text-lg flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-primary" />
+          <h3 id="grant-bulk-modal-title" className="font-bold text-lg flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-primary" aria-hidden="true" />
             منح فترة سماح لجميع السائقين
           </h3>
           <button onClick={onClose} className="p-1 hover:bg-muted rounded-lg" aria-label="إغلاق">
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
-        <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 mb-4 text-xs text-muted-foreground leading-relaxed">
+        <div id="grant-bulk-modal-desc" className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 mb-4 text-xs text-muted-foreground leading-relaxed">
           سيتم منح اشتراك مجاني لكل السائقين الذين لا يملكون اشتراكاً نشطاً حالياً.
           يفيد قبل تفعيل نظام الاشتراك ليحصل السائقون على فترة سماح بدلاً من حظرهم فجأة.
           <br /><br />

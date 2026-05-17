@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Headphones, CheckCircle, Clock, AlertCircle, Trash2, MessageSquare, X, Download, Lightbulb, ThumbsUp, Filter } from "lucide-react";
 import { toast } from "sonner";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const statusConfig = {
   open: { label: "مفتوحة", color: "bg-yellow-500/10 text-yellow-600" },
@@ -28,6 +29,11 @@ function exportCSV(data, filename) {
 }
 
 export default function DashboardSupport() {
+  // Confirmation for ticket deletion. Tickets are user-submitted complaints/
+  // suggestions/praise — once deleted, the user's message is gone (no soft
+  // delete). For complaint-type tickets especially, accidental deletion
+  // could mean losing a paper trail the admin team relies on.
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const qc = useQueryClient();
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyNote, setReplyNote] = useState("");
@@ -148,7 +154,19 @@ export default function DashboardSupport() {
                     <option value="in_progress">قيد المعالجة</option>
                     <option value="resolved">محلولة</option>
                   </select>
-                  <button onClick={() => deleteMutation.mutate(ticket.id)} className="text-destructive hover:opacity-70">
+                  <button
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "حذف التذكرة",
+                        message: "سيتم حذف التذكرة وكل محتوياتها نهائياً. هذا الإجراء لا يمكن التراجع عنه.",
+                        confirmLabel: "حذف نهائياً",
+                        destructive: true,
+                      });
+                      if (ok) deleteMutation.mutate(ticket.id);
+                    }}
+                    className="text-destructive hover:opacity-70"
+                    aria-label="حذف التذكرة"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -186,6 +204,7 @@ export default function DashboardSupport() {
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
+      {confirmDialog}
     </div>
   );
 }
