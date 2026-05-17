@@ -89,22 +89,43 @@ const config: CapacitorConfig = {
   },
 
   // ─── Server config ────────────────────────────────────────────────
-  // Production: leave url unset — the app loads from `webDir` (bundled
-  // dist/). The hostname below tells Capacitor what origin to use
-  // internally for cookies and CORS — must match what the server-side
-  // code (api/trip.js, Supabase auth redirects) expects.
+  //
+  // CRITICAL — DO NOT set `hostname: "www.mishwaro.com"` with
+  // `iosScheme: "https"`. That combination makes the iOS WKWebView
+  // load the app over the public internet from
+  // https://www.mishwaro.com/, BYPASSING the bundled `dist/` entirely.
+  // We hit that bug once — debug session 2026-05-17 — and the symptom
+  // is mysterious: native code rebuilds and reinstalls correctly, the
+  // JS bundle in `ios/App/App/public/` is current, but the user sees
+  // a stale UI because the WebView is silently loading Vercel's last
+  // deploy instead. Catastrophic on flaky networks (ERR_NETWORK_CHANGED
+  // floods the console) and impossible to ship to App Store reviewers
+  // who'll test on airplane mode.
+  //
+  // The correct pattern for loading the bundled app while still
+  // namespacing cookies/storage to a stable origin is:
+  //   - iosScheme: "capacitor"  (the Capacitor 4+ default)
+  //   - hostname: "localhost"   (or omit entirely)
+  // This makes the WebView load from `capacitor://localhost/` which
+  // resolves to the local bundle. Cookies and localStorage are
+  // keyed to that origin and persist across launches.
+  //
+  // If you ever NEED to point at a remote URL (e.g. live-reload during
+  // native dev), set `server.url` explicitly — that's the documented
+  // way. Never rely on hostname+scheme to do it implicitly.
+  //
+  // Android uses `https://localhost` by default which is fine; the
+  // androidScheme below makes it consistent.
   server: {
-    // For production builds, leave commented. The app loads dist/ locally.
-    // url: "http://192.168.1.42:5173",
-    // cleartext: true,
+    // For production builds, leave url unset. The app loads dist/ locally.
+    // For dev with live-reload: uncomment and point at your LAN IP.
+    //   url: "http://192.168.1.42:5173",
+    //   cleartext: true,
     androidScheme: "https",
-    iosScheme: "https",
-    // App-internal hostname — keeps cookies / localStorage / Supabase
-    // session keyed to this origin instead of the random Capacitor
-    // ionic://localhost. Match the production domain so a session
-    // started in the web app can be recognized in the native shell
-    // when the user signs in (not currently needed but future-proof).
-    hostname: "www.mishwaro.com",
+    iosScheme: "capacitor",
+    // No hostname — let Capacitor use its default (localhost). The
+    // previous value (www.mishwaro.com) combined with iosScheme:https
+    // caused the WebView to fetch from the real internet.
   },
 
   // ─── Plugin configuration ─────────────────────────────────────────
