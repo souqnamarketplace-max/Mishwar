@@ -1625,14 +1625,38 @@ function MessageInput({ draft, setDraft, onSend, onSendImage, onSendLocation, di
             size="icon"
             disabled={disabled}
             onClick={() => setAttachOpen(o => !o)}
-            className="rounded-full h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground"
+            // Explicit background-transparent + grey-text styling so the
+            // button matches the composer's flat look. Without explicit
+            // `bg-transparent` the Button component's default ghost-variant
+            // hover state can render a tinted disc on some platforms,
+            // which on iOS rendered as a gold/yellow circle (debug
+            // 2026-05-17). The active: state gives a subtle press feedback
+            // without the disc.
+            className="rounded-full h-11 w-11 shrink-0 bg-transparent hover:bg-muted/50 active:bg-muted text-muted-foreground hover:text-foreground"
             aria-label={attachOpen ? "إغلاق قائمة الإرفاق" : "إرفاق"}
           >
             <Paperclip className={`w-5 h-5 transition-transform ${attachOpen ? "rotate-45" : ""}`} />
           </Button>
           {attachOpen && (
             <div
-              className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-2xl shadow-lg overflow-hidden min-w-[180px] z-50"
+              // POSITIONING — pin to the RIGHT edge of the paperclip button.
+              //
+              // The composer is dir="rtl" so the paperclip sits at the RIGHT
+              // side of the screen. With `left-0` the menu would anchor to
+              // the paperclip's LEFT edge and grow rightward — pushing the
+              // 180px menu off the right edge of the viewport on every
+              // phone width. Visible symptom (debug 2026-05-17): only ~40px
+              // of the menu sliver renders on screen, options unreachable.
+              //
+              // With `right-0` the menu anchors to the paperclip's RIGHT
+              // edge and grows leftward — fully within the viewport on
+              // every mobile width from iPhone SE (375px) and up.
+              //
+              // `max-w-[calc(100vw-24px)]` is a defensive cap: even if a
+              // future translation or longer option label expands the menu
+              // beyond 180px, it can never exceed the viewport minus the
+              // composer's left+right padding.
+              className="absolute bottom-full mb-2 right-0 bg-card border border-border rounded-2xl shadow-lg overflow-hidden min-w-[180px] max-w-[calc(100vw-24px)] z-50"
               dir="rtl"
             >
               <button
