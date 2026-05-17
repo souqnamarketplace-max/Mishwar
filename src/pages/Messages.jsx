@@ -11,7 +11,7 @@ import { sanitizeText, getContactViolation } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
 import {
   Search, Send, ArrowLeft, MessageCircle, Lock,
-  MapPin, ChevronLeft
+  MapPin, ChevronLeft, Paperclip, ImageIcon, X, Camera, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
@@ -20,6 +20,11 @@ import PassengerReviewWizard from "@/components/reviews/PassengerReviewWizard";
 import { useBlockedEmails } from "@/lib/blockUtils";
 import { isDeletedUserEmail } from "@/lib/userStatus";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
+import {
+  compressImage, uploadAttachment, deleteAttachment,
+  getCurrentLocation, buildMapsUrl,
+} from "@/lib/chatAttachments";
+import { createPortal } from "react-dom";
 
 /**
  * Messages page — Poparide-style chat.
@@ -543,10 +548,28 @@ export default function Messages() {
   };
 
   // ─── Send mutation ───
+  // Accepts either:
+  //   • A plain string (QuickReplies / sendQuick path) — sent as text
+  //   • An object: { text } | { attachment: { type:'image', url, path } }
+  //                | { attachment: { type:'location', latitude, longitude } }
+  //
+  // The single-arg overload is preserved so the existing
+  // QuickReplies / handleSubmit call sites don't need to change.
+  // All mutations route through one INSERT path so trip/request
+  // scoping, block guards, and the request-contact notification all
+  // fire identically regardless of message_type.
   const send = useMutation({
-    mutationFn: async (overrideText) => {
-      const text = (overrideText !== undefined ? overrideText : draft).trim();
-      if (!text || !activeConv || !user?.email) return;
+    mutationFn: async (arg) => {
+      // Normalize the argument into { text, attachment }.
+      const opts = (typeof arg === "string" || arg === undefined)
+        ? { text: arg }
+        : (arg || {});
+      const attachment = opts.attachment || null;
+      const text = (opts.text !== undefined ? opts.text : draft).trim();
+      // For text messages we still need text content to send.
+      // For attachment messages we don't — the bubble renders the media.
+      if (!attachment && !text) return;
+      if (!activeConv || !user?.email) return;
       // Onboarding gate — RLS policy messages_require_onboarded_insert
       // (migration 034) is what actually blocks the INSERT server-side
       // for a non-onboarded user; this client check prevents the
@@ -568,9 +591,23 @@ export default function Messages() {
         toast.error("لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر");
         return;
       }
-      const cleaned = sanitizeText(text).slice(0, 5000);
-      const violation = getContactViolation(cleaned);
-      if (violation) { toast.error(violation, { duration: 5000 }); return; }
+      // Text validation only applies to text messages. Media messages
+      // are user-generated content of a different kind (image, location)
+      // and the phone-number / off-platform-contact regex doesn't apply.
+      let cleaned = "";
+      if (attachment) {
+        // Set a readable fallback content so legacy clients without
+        // image/location render support (or push notification bodies
+        // which display message.message but receive 'content' as the
+        // body text) still see something meaningful.
+        cleaned = attachment.type === "image"    ? "📷 صورة"
+                : attachment.type === "location" ? "📍 موقع"
+                : "";
+      } else {
+        cleaned = sanitizeText(text).slice(0, 5000);
+        const violation = getContactViolation(cleaned);
+        if (violation) { toast.error(violation, { duration: 5000 }); return; }
+      }
       // Per-trip / per-request conversation IDs: a passenger booking 2 different
       // trips with the same driver gets 2 separate threads. Trip-request
       // conversations get their OWN thread too — request_id and trip_id are
@@ -595,7 +632,12 @@ export default function Messages() {
                 ? `request_${requestIdToPersist}__${emailPair}`
                 : emailPair))
         : activeConv.id;
-      const { error: msgErr } = await supabase.from("messages").insert({
+      // Build the per-type insert payload. The DB has a CHECK constraint
+      // (migration 063) that enforces consistency between message_type
+      // and the attachment/lat-lng columns; passing the wrong combination
+      // would surface as a CHECK violation, but our switch here keeps
+      // us in lockstep with the constraint.
+      const insertPayload = {
         conversation_id: convId,
         sender_email:   user.email,
         sender_name:    user.full_name || user.email.split("@")[0],
@@ -603,11 +645,26 @@ export default function Messages() {
         receiver_name:  activeConv.otherName || activeConv.otherEmail.split("@")[0],
         content:        cleaned,
         is_read:        false,
-        message_type:   "text",
+        message_type:   attachment?.type || "text",
         trip_id:        tripIdToPersist || null,
         request_id:     requestIdToPersist,
-      });
-      if (msgErr) { console.error("Message insert error:", msgErr); throw new Error(msgErr.message); }
+        attachment_url:  attachment?.type === "image"    ? attachment.url       : null,
+        attachment_path: attachment?.type === "image"    ? attachment.path      : null,
+        latitude:        attachment?.type === "location" ? attachment.latitude  : null,
+        longitude:       attachment?.type === "location" ? attachment.longitude : null,
+      };
+      const { error: msgErr } = await supabase.from("messages").insert(insertPayload);
+      if (msgErr) {
+        // Orphan-cleanup: if the message INSERT failed AFTER we uploaded
+        // an attachment to storage, delete the storage object so the
+        // bucket doesn't accumulate orphans. deleteAttachment is best-
+        // effort and silent on failure (we're already in an error path).
+        if (attachment?.type === "image" && attachment.path) {
+          await deleteAttachment(attachment.path);
+        }
+        console.error("Message insert error:", msgErr);
+        throw new Error(msgErr.message);
+      }
 
       // ─── Trip-request notification (audit-fixed in commit ?) ───
       // When a driver sends their first message about a passenger trip
@@ -627,7 +684,11 @@ export default function Messages() {
         } catch (e) { console.warn("Request-contact notification failed:", e); }
       }
 
-      setDraft("");
+      // Only clear the draft on TEXT sends. For attachment sends, the
+      // user may have typed something while picking the image — don't
+      // wipe their in-progress text just because they sent a media
+      // message in parallel.
+      if (!attachment) setDraft("");
       setNewConv(null);
       // Only change activeId if we just transitioned out of "__new__".
       // Otherwise we'd overwrite the trip-scoped id (trip_X__a__b) with the
@@ -642,6 +703,42 @@ export default function Messages() {
     onError: (err) => toast.error(friendlyError(err, "تعذر إرسال الرسالة")),
   });
   const sendQuick = (text) => send.mutate(text);
+
+  // Image-attachment send. Compresses, uploads, then routes through the
+  // unified send mutation with attachment metadata. We do the compress +
+  // upload OUTSIDE the mutation so the loading toast can wrap the whole
+  // operation and the mutation's mutationFn stays focused on inserting
+  // the messages row.
+  const sendImage = async (file) => {
+    if (!file || !user?.email) return;
+    const tId = toast.loading("جاري رفع الصورة...");
+    try {
+      const blob = await compressImage(file);
+      const { url, path } = await uploadAttachment(blob, user.email);
+      await send.mutateAsync({ attachment: { type: "image", url, path } });
+      toast.dismiss(tId);
+    } catch (err) {
+      toast.dismiss(tId);
+      toast.error(friendlyError(err, "تعذر إرسال الصورة"));
+    }
+  };
+
+  // Location-attachment send. Asks the OS for current location then
+  // inserts a message with lat/lng. The user-visible content fallback
+  // is set inside the send mutation ('📍 موقع') so push notifications
+  // and legacy clients show something meaningful.
+  const sendLocation = async () => {
+    if (!user?.email) return;
+    const tId = toast.loading("جاري تحديد موقعك...");
+    try {
+      const { latitude, longitude } = await getCurrentLocation();
+      await send.mutateAsync({ attachment: { type: "location", latitude, longitude } });
+      toast.dismiss(tId);
+    } catch (err) {
+      toast.dismiss(tId);
+      toast.error(err?.message || "تعذر تحديد الموقع");
+    }
+  };
 
   // ─── Group active messages by date for separators ───
   const groupedMessages = useMemo(() => {
@@ -858,6 +955,8 @@ export default function Messages() {
                       draft={draft}
                       setDraft={setDraft}
                       onSend={() => send.mutate()}
+                      onSendImage={sendImage}
+                      onSendLocation={sendLocation}
                       disabled={send.isPending}
                       violation={getContactViolation(draft)}
                       otherName={activeConv.otherName}
@@ -1061,6 +1160,36 @@ function DateSeparator({ iso }) {
 }
 
 function MessageBubble({ message, mine, otherName, otherImgSrc }) {
+  // Branch on message_type. Legacy rows pre-migration 063 don't have
+  // the column set — null/undefined falls through to the text path,
+  // preserving rendering of every existing message.
+  const type = message.message_type || "text";
+
+  if (type === "image" && message.attachment_url) {
+    return (
+      <ImageBubble
+        message={message}
+        mine={mine}
+        otherName={otherName}
+        otherImgSrc={otherImgSrc}
+      />
+    );
+  }
+  if (type === "location" && message.latitude != null && message.longitude != null) {
+    return (
+      <LocationBubble
+        message={message}
+        mine={mine}
+        otherName={otherName}
+        otherImgSrc={otherImgSrc}
+      />
+    );
+  }
+
+  // Text — default and fallback. If somehow an image-type message
+  // arrives without attachment_url (corrupt row, partial insert), we
+  // still render its `content` so the receiver isn't left staring at
+  // an empty bubble.
   return (
     <div className={`flex items-end gap-2 ${mine ? "justify-start" : "justify-end flex-row-reverse"}`}>
       {!mine && <Avatar name={otherName} size={28} className="mb-1" imgSrc={otherImgSrc} />}
@@ -1071,6 +1200,153 @@ function MessageBubble({ message, mine, otherName, otherImgSrc }) {
       }`}>
         <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
         <p className={`text-[10px] mt-0.5 ${mine ? "text-primary-foreground/70" : "text-muted-foreground"} text-left`}>
+          {formatTimeShort(message.created_at)}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Image bubble — thumbnail rendered as <img>, tap to open a fullscreen
+// viewer (portal-mounted to escape any overflow:hidden containers in
+// the chat scroll area). The thumbnail uses object-cover with a max
+// height so very-tall portrait photos don't blow up the bubble layout.
+function ImageBubble({ message, mine, otherName, otherImgSrc }) {
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className={`flex items-end gap-2 ${mine ? "justify-start" : "justify-end flex-row-reverse"}`}>
+      {!mine && <Avatar name={otherName} size={28} className="mb-1" imgSrc={otherImgSrc} />}
+      <div className={`max-w-[75%] rounded-2xl overflow-hidden ${
+        mine
+          ? "bg-primary rounded-br-md"
+          : "bg-card border border-border rounded-bl-md"
+      }`}>
+        <button
+          type="button"
+          onClick={() => !failed && setViewerOpen(true)}
+          className="block relative bg-black/5 min-w-[160px] min-h-[120px]"
+          aria-label={failed ? "تعذر تحميل الصورة" : "فتح الصورة"}
+        >
+          {!loaded && !failed && (
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/70">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          )}
+          {failed ? (
+            <div className="px-6 py-8 text-xs text-muted-foreground text-center">
+              تعذر تحميل الصورة
+            </div>
+          ) : (
+            <img
+              src={message.attachment_url}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className={`block max-w-[280px] max-h-[360px] w-auto h-auto object-cover transition-opacity ${
+                loaded ? "opacity-100" : "opacity-0"
+              }`}
+              onLoad={() => setLoaded(true)}
+              onError={() => { setLoaded(true); setFailed(true); }}
+            />
+          )}
+        </button>
+        <p className={`text-[10px] px-2 py-1 ${
+          mine ? "text-primary-foreground/70" : "text-muted-foreground"
+        } text-left`}>
+          {formatTimeShort(message.created_at)}
+        </p>
+      </div>
+      {viewerOpen && createPortal(
+        <ImageViewer url={message.attachment_url} onClose={() => setViewerOpen(false)} />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// Fullscreen image viewer — portal to document.body so it escapes any
+// overflow:hidden containers in the chat scroll area. ESC and backdrop
+// click close. Body scroll is locked while the viewer is open so two-
+// finger zoom on the image doesn't accidentally scroll the chat.
+function ImageViewer({ url, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white"
+        aria-label="إغلاق"
+      >
+        <X className="w-5 h-5" />
+      </button>
+      <img
+        src={url}
+        alt=""
+        // Stop click propagation so tapping the image itself doesn't
+        // close the viewer — only the backdrop click should close.
+        onClick={(e) => e.stopPropagation()}
+        className="max-w-full max-h-full object-contain"
+      />
+    </div>
+  );
+}
+
+// Location bubble — pin icon + lat/lng + "Open in Maps" button. We
+// deliberately skip a static map preview thumbnail because (a) it
+// requires a Maps API key with billing enabled, and (b) Mishwaro
+// already has Leaflet for the request city picker but instantiating
+// a fresh Leaflet map per location bubble is expensive on long
+// threads. Future iteration: render a tiny Leaflet thumbnail with
+// pan/zoom disabled.
+function LocationBubble({ message, mine, otherName, otherImgSrc }) {
+  const url = buildMapsUrl(message.latitude, message.longitude);
+  return (
+    <div className={`flex items-end gap-2 ${mine ? "justify-start" : "justify-end flex-row-reverse"}`}>
+      {!mine && <Avatar name={otherName} size={28} className="mb-1" imgSrc={otherImgSrc} />}
+      <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
+        mine
+          ? "bg-primary text-primary-foreground rounded-br-md"
+          : "bg-card border border-border rounded-bl-md"
+      }`}>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-2 py-1 ${
+            mine ? "text-primary-foreground" : "text-foreground"
+          }`}
+        >
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+            mine ? "bg-primary-foreground/15" : "bg-primary/10"
+          }`}>
+            <MapPin className={`w-5 h-5 ${mine ? "text-primary-foreground" : "text-primary"}`} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">موقع مُشارَك</p>
+            <p className={`text-xs ${mine ? "text-primary-foreground/70" : "text-muted-foreground"} underline`}>
+              فتح في الخرائط ←
+            </p>
+          </div>
+        </a>
+        <p className={`text-[10px] mt-1 ${
+          mine ? "text-primary-foreground/70" : "text-muted-foreground"
+        } text-left`}>
           {formatTimeShort(message.created_at)}
         </p>
       </div>
@@ -1100,7 +1376,7 @@ function QuickReplies({ onPick, disabled, bookingStatus }) {
   );
 }
 
-function MessageInput({ draft, setDraft, onSend, disabled, violation, otherName }) {
+function MessageInput({ draft, setDraft, onSend, onSendImage, onSendLocation, disabled, violation, otherName }) {
   // When the user taps the input on a mobile device, the OS keyboard
   // animates up and the WKWebView resizes. Add a small delay then scroll
   // the input into view — this is the belt-and-suspenders fix that
@@ -1116,6 +1392,46 @@ function MessageInput({ draft, setDraft, onSend, disabled, violation, otherName 
     }, 300);
   };
 
+  // Attachment menu — closed by default, opens above the paperclip
+  // button. A separate piece of state for each picker would be
+  // wasteful; one bool + two refs (file inputs) cover both flows.
+  const [attachOpen, setAttachOpen] = useState(false);
+  const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const menuRef = useRef(null);
+
+  // Close the menu on outside click. The paperclip button itself sits
+  // inside the menu's parent so a click on it is handled by its own
+  // onClick; this listener handles taps elsewhere.
+  useEffect(() => {
+    if (!attachOpen) return;
+    const handler = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) return;
+      setAttachOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [attachOpen]);
+
+  // Reset the file input value after each pick so the same image can
+  // be re-picked. Without this, picking the same file twice in a row
+  // fires no onChange because the value didn't change.
+  const handleFilePick = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setAttachOpen(false);
+    if (file && onSendImage) onSendImage(file);
+  };
+
+  const handleLocationPick = () => {
+    setAttachOpen(false);
+    if (onSendLocation) onSendLocation();
+  };
+
   return (
     <form
       onSubmit={(e) => { e.preventDefault(); if (draft.trim()) onSend(); }}
@@ -1128,6 +1444,76 @@ function MessageInput({ draft, setDraft, onSend, disabled, violation, otherName 
         </div>
       )}
       <div className="flex items-center gap-2">
+        {/* Attachment trigger + menu container. The menu is positioned
+            ABSOLUTE relative to this wrapper so it floats above the
+            composer without taking up layout space. */}
+        <div className="relative" ref={menuRef}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={disabled}
+            onClick={() => setAttachOpen(o => !o)}
+            className="rounded-full h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={attachOpen ? "إغلاق قائمة الإرفاق" : "إرفاق"}
+          >
+            <Paperclip className={`w-5 h-5 transition-transform ${attachOpen ? "rotate-45" : ""}`} />
+          </Button>
+          {attachOpen && (
+            <div
+              className="absolute bottom-full mb-2 left-0 bg-card border border-border rounded-2xl shadow-lg overflow-hidden min-w-[180px] z-50"
+              dir="rtl"
+            >
+              <button
+                type="button"
+                onClick={() => { setAttachOpen(false); cameraInputRef.current?.click(); }}
+                className="flex items-center gap-3 px-4 py-3 w-full hover:bg-muted/50 active:bg-muted text-sm text-foreground"
+              >
+                <Camera className="w-4 h-4 text-primary" />
+                التقاط صورة
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAttachOpen(false); fileInputRef.current?.click(); }}
+                className="flex items-center gap-3 px-4 py-3 w-full hover:bg-muted/50 active:bg-muted text-sm text-foreground border-t border-border/60"
+              >
+                <ImageIcon className="w-4 h-4 text-primary" />
+                اختيار من المعرض
+              </button>
+              <button
+                type="button"
+                onClick={handleLocationPick}
+                className="flex items-center gap-3 px-4 py-3 w-full hover:bg-muted/50 active:bg-muted text-sm text-foreground border-t border-border/60"
+              >
+                <MapPin className="w-4 h-4 text-primary" />
+                مشاركة الموقع
+              </button>
+            </div>
+          )}
+        </div>
+        {/* Two hidden file inputs:
+              - cameraInputRef has `capture="environment"` which on iOS
+                + Android opens the camera directly instead of the
+                gallery. Desktop browsers ignore capture and show
+                the file picker.
+              - fileInputRef has no capture, so it opens the gallery
+                on mobile and the disk picker on desktop.
+            Both accept image/* so HEIC, JPEG, PNG, WebP all work. */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={handleFilePick}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={handleFilePick}
+        />
         <Input
           value={draft}
           onChange={e => setDraft(e.target.value)}

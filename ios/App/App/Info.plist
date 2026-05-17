@@ -62,11 +62,11 @@
 	     also rejects for permission strings present without a
 	     corresponding API call. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>نحتاج موقعك لتحديد نقطة الانطلاق المناسبة وتتبع تقدم الرحلة</string>
+	<string>نحتاج موقعك لتحديد نقطة الانطلاق، تتبع تقدم الرحلة، ومشاركة موقعك في الدردشة عند الطلب</string>
 	<key>NSCameraUsageDescription</key>
-	<string>للتحقق من هوية السائقين والركاب من خلال صورة سيلفي ورخصة القيادة</string>
+	<string>للتحقق من هوية السائقين والركاب من خلال صورة سيلفي، والتقاط صور لمشاركتها في الدردشة مع المستخدمين الآخرين</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>لاختيار صورة الملف الشخصي وصور وثائق التحقق</string>
+	<string>لاختيار صورة الملف الشخصي، صور وثائق التحقق، والصور التي تريد إرسالها في الدردشة</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>لحفظ صور الرحلات وإيصالات الدفع في معرض الصور</string>
 

@@ -74,4 +74,30 @@
          @capacitor/push-notifications plugin requestPermissions()
          picks up this declaration and triggers the OS prompt. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Location — used by chat "share my location" and by trip
+         pickup-coordinate capture. navigator.geolocation in the
+         WebView proxies through these permissions. We declare both
+         FINE (GPS, precise to metres) and COARSE (cell + wifi, ~100m)
+         so the OS can fall back gracefully when GPS is unavailable.
+         The runtime prompt fires the first time getCurrentPosition
+         is called. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Camera — used by chat "take photo" capture and the selfie
+         verification flow. Without this declaration, the
+         <input capture="environment"> file picker can't access the
+         camera, and the picker falls back to gallery-only on some
+         devices. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Storage reads — needed for the gallery picker on Android 12-
+         and below. Android 13+ uses scoped storage with READ_MEDIA_*
+         permissions instead; we declare both so the manifest works
+         across the full version range. The OS auto-selects the right
+         one based on targetSdkVersion. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+                     android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 </manifest>
