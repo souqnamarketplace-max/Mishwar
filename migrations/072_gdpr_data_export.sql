@@ -217,17 +217,22 @@ BEGIN
 
     -- 8. Reviews RECEIVED
     --
-    -- NOTE: the column is reviewed_email, not reviewee_email. The
-    -- naming is a base44 quirk — the original schema author treated
-    -- 'reviewed' as the noun (the person being reviewed) rather than
-    -- 'reviewee' (which is more correct English). The codebase
-    -- standardized on reviewed_email everywhere (see mig 002 reviews
-    -- RLS policy, mig 003 anonymization function). Keeping it for
-    -- compatibility.
+    -- COLUMN NAME WARNING: the canonical column is rated_user_email,
+    -- NOT reviewee_email (correct English), NOT reviewed_email (base44
+    -- convention used in some older migration comments). Earlier
+    -- versions of this migration used the wrong names and crashed at
+    -- runtime. Verified via seed_apple_reviewer_accounts.sql which
+    -- does INSERT INTO public.reviews (... reviewer_email,
+    -- driver_email, rated_user_email, ...) — and via direct
+    -- information_schema.columns query on production. The schema
+    -- pairs reviewer_email (who wrote it) with rated_user_email
+    -- (who's being rated). Do NOT 'fix' this to reviewee_email or
+    -- reviewed_email — both will throw 'column does not exist' and
+    -- the GDPR button will break.
     'reviews_received', COALESCE((
       SELECT jsonb_agg(to_jsonb(rv) ORDER BY rv.created_at DESC)
         FROM public.reviews rv
-       WHERE rv.reviewed_email = v_email
+       WHERE rv.rated_user_email = v_email
     ), '[]'::JSONB),
 
     -- 9. Reports FILED by user
