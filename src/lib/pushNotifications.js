@@ -105,11 +105,29 @@ export async function ensurePermission() {
 
 /**
  * Show a notification for an incoming row from the notifications table.
- * Always toasts; additionally fires a system banner when permission is granted
- * and the tab is hidden/blurred.
+ *
+ * ON WEB: toasts always; additionally fires a system Notification banner
+ * when permission is granted and the tab is hidden/blurred.
+ *
+ * ON NATIVE iOS/ANDROID (Capacitor): returns early — does NOT toast.
+ * Reason: the same notifications-table INSERT that triggered this function
+ * via the realtime channel ALSO triggers migration 060's push pipeline,
+ * which delivers via APNS/FCM, which lands either as an OS banner (when
+ * app is backgrounded) or as a Capacitor `pushNotificationReceived`
+ * event (when app is foregrounded). The Capacitor event listener in
+ * registerNativePush() emits its OWN sonner toast on foreground. So if
+ * we ALSO toasted here, every notification on a native foregrounded
+ * device would show TWO toasts — once from realtime, once from FCM
+ * delivery. Native push is authoritative on native; let it handle the
+ * user-visible alert. The badge update (via qc.invalidateQueries) is
+ * UNAFFECTED — it still happens in NotificationBell on every realtime
+ * INSERT event regardless of platform.
  */
 export function showIncomingNotification(notif, { onClick } = {}) {
   if (!notif) return;
+  // Native devices: defer to the Capacitor push pipeline. See docstring.
+  if (Capacitor.isNativePlatform()) return;
+
   const title = notif.title || "إشعار جديد";
   const body  = notif.message || "";
 

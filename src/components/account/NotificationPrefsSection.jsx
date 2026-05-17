@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Bell, Mail, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
-import { getPermission, ensurePermission } from "@/lib/pushNotifications";
+import {
+  getPermission,
+  ensurePermission,
+  getNativePermission,
+  registerNativePush,
+} from "@/lib/pushNotifications";
 
 /**
  * NotificationPrefsSection — push, email, SMS, marketing toggles.
@@ -25,7 +31,7 @@ import { getPermission, ensurePermission } from "@/lib/pushNotifications";
 //   - 'denied'     → warning + platform-aware instructions to re-enable
 //                    (browser-level setting, not something we can flip)
 //   - 'unsupported'→ info that the browser doesn't expose Notification API
-function PermissionStatusCard({ permission, onAsk, asking }) {
+function PermissionStatusCard({ permission, onAsk, asking, isNative }) {
   if (permission === "unsupported") {
     return (
       <div className="flex items-start gap-3 p-3 bg-muted/40 border border-border rounded-xl mb-4">
@@ -53,9 +59,16 @@ function PermissionStatusCard({ permission, onAsk, asking }) {
     );
   }
   if (permission === "denied") {
-    // Don't try to detect iOS Safari vs Chrome vs Android specifically;
-    // give general instructions that cover the common cases. Most
-    // platforms put it in the lock-icon menu or site/app settings.
+    // Native iOS / Android: the permission lives in the OS Settings
+    // app, not in browser site settings. Showing browser instructions
+    // on a native build would be misleading — there's no Safari
+    // "Sites" menu inside a Capacitor WKWebView.
+    //
+    // Native iOS path: Settings → Mishwaro → الإشعارات → السماح
+    // Native Android path: Settings → Apps → Mishwaro → Notifications → Allow
+    //
+    // Web users see the legacy browser-chrome instructions that cover
+    // desktop Chrome/Safari and mobile Chrome.
     return (
       <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-4">
         <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
@@ -65,11 +78,18 @@ function PermissionStatusCard({ permission, onAsk, asking }) {
             قمت بحظر الإشعارات سابقاً. لن نتمكن من تنبيهك على هاتفك للحجوزات والرسائل.
             لإعادة التفعيل:
           </p>
-          <ul className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1.5 mr-4 space-y-0.5 list-disc">
-            <li>على متصفح الحاسوب: انقر على أيقونة القفل بجانب عنوان الموقع → إعدادات الموقع → الإشعارات → السماح</li>
-            <li>على iPhone (Safari): الإعدادات → Safari → المواقع → الإشعارات → mishwaro.com → السماح</li>
-            <li>على Android: الإعدادات → التطبيقات → Chrome → الإشعارات → السماح</li>
-          </ul>
+          {isNative ? (
+            <ul className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1.5 mr-4 space-y-0.5 list-disc">
+              <li>على iPhone: الإعدادات → مشوارو → الإشعارات → السماح بالإشعارات</li>
+              <li>على Android: الإعدادات → التطبيقات → مشوارو → الإشعارات → السماح</li>
+            </ul>
+          ) : (
+            <ul className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1.5 mr-4 space-y-0.5 list-disc">
+              <li>على متصفح الحاسوب: انقر على أيقونة القفل بجانب عنوان الموقع → إعدادات الموقع → الإشعارات → السماح</li>
+              <li>على iPhone (Safari): الإعدادات → Safari → المواقع → الإشعارات → mishwaro.com → السماح</li>
+              <li>على Android: الإعدادات → التطبيقات → Chrome → الإشعارات → السماح</li>
+            </ul>
+          )}
         </div>
       </div>
     );
@@ -104,12 +124,10 @@ export default function NotificationPrefsSection({ user, onSaved }) {
   const [marketing, setMarketing]  = useState(user?.notif_marketing === true);
   const [saving, setSaving]        = useState(false);
 
-  // OS permission state — refreshed on mount and after the user
-  // taps 'تفعيل الإشعارات' (so the card updates immediately when
-  // the browser prompt resolves).
-  const [permission, setPermission] = useState(() => getPermission());
-  const [asking, setAsking] = useState(false);
-
+  // Sync local toggle state when the parent's user object updates
+  // (e.g. after the save() round-trip invalidates the 'me' query and
+  // a fresh profile flows in via prop). Without this, the toggles
+  // would stay at their initial-mount values until next remount.
   useEffect(() => {
     setPush(user?.notif_push !== false);
     setEmail(user?.notif_email !== false);
@@ -117,30 +135,71 @@ export default function NotificationPrefsSection({ user, onSaved }) {
     setMarketing(user?.notif_marketing === true);
   }, [user?.notif_push, user?.notif_email, user?.notif_sms, user?.notif_marketing]);
 
-  // Re-read permission when the tab gains focus — covers the case
-  // where the user went to browser/iOS settings, changed the
-  // permission, then came back. Without this, the card would still
-  // show the stale 'denied' state until full reload.
+  // Detect whether we're running inside a Capacitor native shell. The
+  // permission API and the "go re-enable" instructions differ between
+  // web (browser Notification API + browser chrome settings) and
+  // native (Capacitor PushNotifications plugin + iOS/Android Settings
+  // app). Computed once on mount — the platform doesn't change at
+  // runtime; isNative is stable for the life of the page.
+  const isNative = Capacitor.isNativePlatform();
+
+  // OS permission state — refreshed on mount and after the user
+  // taps 'تفعيل الإشعارات' (so the card updates immediately when
+  // the browser prompt resolves). On native, the value comes from
+  // the Capacitor PushNotifications plugin via getNativePermission()
+  // which returns "granted" | "denied" | "prompt" | "prompt-with-rationale"
+  // | "unsupported". We normalize "prompt" / "prompt-with-rationale"
+  // to "default" so the status card's CASE handles both web and
+  // native uniformly (the card's "default" branch is the CTA path).
+  const [permission, setPermission] = useState("default");
+  const [asking, setAsking] = useState(false);
+
+  // Read permission once on mount, then again whenever the tab gains
+  // focus. Async on native because the Capacitor plugin returns a
+  // Promise; we use a cleanup flag to drop stale results if the
+  // component unmounts mid-fetch.
   useEffect(() => {
-    const refresh = () => setPermission(getPermission());
+    let cancelled = false;
+    const refresh = async () => {
+      let next;
+      if (isNative) {
+        const raw = await getNativePermission();
+        // Map native states → the four states the card knows about.
+        next = (raw === "prompt" || raw === "prompt-with-rationale")
+          ? "default"
+          : raw;     // "granted" | "denied" | "unsupported"
+      } else {
+        next = getPermission();
+      }
+      if (!cancelled) setPermission(next);
+    };
+    refresh();
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => {
+      cancelled = true;
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, []);
+  }, [isNative]);
 
   const askPermission = async () => {
     setAsking(true);
     try {
-      await ensurePermission();
+      if (isNative) {
+        // On native, registerNativePush() handles permission request
+        // AND token registration in one call. If the user grants,
+        // they also get device_tokens populated so pushes can be
+        // delivered immediately (no second-trip). Returns void; we
+        // refresh permission state afterwards.
+        await registerNativePush();
+        const raw = await getNativePermission();
+        setPermission((raw === "prompt" || raw === "prompt-with-rationale") ? "default" : raw);
+      } else {
+        await ensurePermission();
+        setPermission(getPermission());
+      }
     } finally {
-      // Re-read whatever the user chose. ensurePermission resolves
-      // to the new state but we re-fetch from Notification.permission
-      // directly to handle the edge case where the browser doesn't
-      // honour the request (e.g. permission policy blocks).
-      setPermission(getPermission());
       setAsking(false);
     }
   };
@@ -201,6 +260,7 @@ export default function NotificationPrefsSection({ user, onSaved }) {
         permission={permission}
         onAsk={askPermission}
         asking={asking}
+        isNative={isNative}
       />
 
       <Toggle checked={push} onChange={setPush} icon={Bell} title="الإشعارات داخل التطبيق" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" recommended />
