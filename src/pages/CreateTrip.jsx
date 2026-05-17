@@ -132,6 +132,21 @@ export default function CreateTrip() {
     [licenses, subscriptionStatus]
   );
   const driverLicense = eligibility.latest || licenses?.[0]; // for prefilling form fields
+
+  // Car info is REQUIRED to publish a trip. The DB row carries
+  // car_model/year/color/plate so passengers see what they're booking.
+  // Previously the check fired at step 3 — where the form only DISPLAYS
+  // the profile car (no entry fields) — so a driver with empty profile
+  // car fields would fill steps 1 + 2, reach step 3, see an amber
+  // 'add car info' warning, then have to abandon the wizard and start
+  // over after adding the car. Now we detect at mount time so step 1
+  // can surface a prominent gate at the top with a direct CTA to
+  // /driver?tab=vehicle, and validateStep(1) blocks 'التالي' until
+  // the profile has the data. car_plate is not required here because
+  // some drivers operate motorcycles/registered fleet vehicles where
+  // the plate isn't user-facing — keep gate gentle and only check the
+  // visible-to-passenger fields.
+  const needsCarInfo = !user?.car_model || !user?.car_year || !user?.car_color;
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
     from_city: "",
@@ -281,6 +296,22 @@ export default function CreateTrip() {
 
   const validateStep = (currentStep) => {
     if (currentStep === 1) {
+      // CAR-INFO PREFLIGHT GATE.
+      // Previously this check only fired at step 3, where the form
+      // SHOWS the user's car details from their profile (read-only,
+      // no entry fields). If the user's profile had no car_model,
+      // they could fill steps 1 + 2 (trip route, seats, price),
+      // reach step 3, get told 'add car info first' — and find no
+      // way to add it inline. The only path was to leave the wizard
+      // and go to /driver?tab=vehicle, losing all entered data.
+      //
+      // Catching this at step 1 means the driver finds out BEFORE
+      // they invest effort in the form. The error toast names the
+      // exact next action.
+      if (needsCarInfo) {
+        toast.error("يرجى إضافة بيانات سيارتك (الموديل واللوحة) من لوحة السائق قبل نشر الرحلة ⚠️");
+        return false;
+      }
       if (!form.from_city) { toast.error("يرجى اختيار مدينة الانطلاق ⚠️"); return false; }
       if (!form.to_city) { toast.error("يرجى اختيار مدينة الوصول ⚠️"); return false; }
       if (form.from_city === form.to_city) { toast.error("مدينة الانطلاق والوصول لا يمكن أن تكونا نفس المدينة ⚠️"); return false; }
@@ -764,6 +795,39 @@ export default function CreateTrip() {
               <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center">1</span>
               تفاصيل الرحلة
             </h3>
+
+            {/* Car-info preflight banner. Renders above the form fields
+                so the driver sees the requirement BEFORE investing time
+                filling in the route. Pairs with the validateStep(1)
+                check that blocks 'التالي' until the profile has car
+                data. The link opens /driver?tab=vehicle in a same-tab
+                navigation — driver fills in the vehicle card, returns
+                to /create-trip, and the form picks up the new values
+                via the useEffect that watches user.car_model on
+                re-mount. */}
+            {needsCarInfo && (
+              <div
+                className="bg-amber-500/10 border border-amber-500/40 rounded-xl p-4 flex items-start gap-3"
+                role="alert"
+              >
+                <span className="text-2xl shrink-0" aria-hidden="true">🚗</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-amber-900 dark:text-amber-200 mb-1">
+                    أضف بيانات سيارتك قبل المتابعة
+                  </p>
+                  <p className="text-xs text-amber-800/85 dark:text-amber-300/85 leading-relaxed mb-3">
+                    لنشر رحلة، يحتاج المسافرون أن يروا موديل السيارة ولونها وسنة الصنع. أضفها مرة واحدة من لوحة السائق ↓ ميزة "مركبتي" وستظهر تلقائياً في كل رحلاتك القادمة.
+                  </p>
+                  <Link to="/driver?tab=vehicle">
+                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg gap-2 h-9">
+                      <span aria-hidden="true">🚗</span>
+                      إضافة بيانات السيارة
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>من <span className="text-destructive">*</span></Label>
@@ -1244,8 +1308,10 @@ export default function CreateTrip() {
         </Button>
         {step < 4 ? (
           <Button
-            className="rounded-xl bg-primary text-primary-foreground gap-2"
+            className="rounded-xl bg-primary text-primary-foreground gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => { if (validateStep(step)) setStep(step + 1); }}
+            disabled={step === 1 && needsCarInfo}
+            aria-label={step === 1 && needsCarInfo ? "أضف بيانات السيارة أولاً للمتابعة" : "الانتقال للخطوة التالية"}
           >
             التالي
             <ArrowLeft className="w-4 h-4" />

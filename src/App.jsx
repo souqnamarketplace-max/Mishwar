@@ -244,7 +244,17 @@ function App() {
             </Routes>
           </Router>
           <Toaster />
-          <SonnerToaster position="top-center" richColors />
+          {/* SonnerToaster position 'top-right' matches the convention
+              used by Gmail, iMessage, WhatsApp Web, Discord, Slack —
+              new-message and notification toasts sit out of the way of
+              page content. The previous 'top-center' position landed
+              directly over the main content area of every page, which
+              users mistook for browser/system notifications because
+              of its central prominence. RTL-aware: in RTL languages
+              browsers flip 'right' to the visual left, which is also
+              the convention in Arabic UI (away from the user's reading
+              flow, anchored at the page corner). */}
+          <SonnerToaster position="top-right" richColors />
         </QueryClientProvider>
       </AuthProvider></ErrorBoundary>
     </HelmetProvider>
