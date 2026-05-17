@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard, Wallet,
-  Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox
+  Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox, Megaphone
 } from "lucide-react";
 
 // Centralised logout for the dashboard sidebar. Mirrors the
@@ -37,6 +37,7 @@ const menuItems = [
   { id: "subscriptions", icon: Wallet, label: "اشتراكات السائقين" },
   { id: "reports", icon: Flag, label: "بلاغات المستخدمين" },
   { id: "notifications", icon: Bell, label: "الإشعارات" },
+  { id: "broadcasts", icon: Megaphone, label: "البث والتسويق" },
   { id: "support", icon: Headphones, label: "الدعم والشكاوى" },
   { id: "feedback", icon: MessageSquarePlus, label: "الاقتراحات والشكاوى" },
   { id: "licenses", icon: Shield, label: "توثيق السائقين" },

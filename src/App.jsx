@@ -85,6 +85,7 @@ const Safety           = lazy(() => import('./pages/Safety'));
 const AccountSettings  = lazy(() => import('./pages/AccountSettings'));
 const AccountHub       = lazy(() => import('./components/account/AccountHub'));
 const Login            = lazy(() => import('./pages/Login'));
+const Unsubscribe      = lazy(() => import('./pages/Unsubscribe'));
 const BookingConfirmation = lazy(() => import('./pages/BookingConfirmation'));
 const Feedback = lazy(() => import('./pages/Feedback'));
 const PrivacyPolicy    = lazy(() => import('./pages/PrivacyPolicy'));
@@ -162,6 +163,11 @@ const AuthenticatedApp = () => {
   return (
     <ErrorBoundary fallback={<PageErrorFallback />}><Suspense fallback={<PageFallback />}><Routes>
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
+      {/* Public marketing-email unsubscribe — no auth, no chrome.
+          Reached from the link inside every marketing email. The HMAC
+          token in the URL is the auth; see migration 068 for the
+          server-side verification logic. */}
+      <Route path="/unsubscribe" element={<Unsubscribe />} />
       <Route element={<AppLayout />}>
         {/* PUBLIC pages — viewable without sign-in */}
         <Route path="/" element={<Home />} />

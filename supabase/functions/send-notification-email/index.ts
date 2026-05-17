@@ -65,6 +65,16 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const RESEND_API_KEY            = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL              = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+// Shared secret with the public_unsubscribe_marketing RPC. Used to sign
+// the per-recipient unsubscribe link in every marketing email. MUST
+// match the value stored in vault (key: 'unsubscribe_secret') — the
+// RPC re-computes the HMAC and compares. Mismatch → unsubscribe page
+// shows "invalid token" even though the link came from us.
+//
+// If the env var is missing, the marketing template still renders BUT
+// the unsubscribe link is non-functional. We log loudly so this gets
+// noticed in production. Transactional emails are unaffected.
+const UNSUBSCRIBE_SECRET = Deno.env.get("UNSUBSCRIBE_SECRET");
 
 // Public-facing app URL used in template CTAs. We don't currently expose
 // the trip's deep link inside email body — the button goes to /trips/{id}
@@ -77,11 +87,15 @@ const FROM_EMAIL = "noreply@mishwaro.com";
 const FROM_NAME  = "مشوارو";
 
 // Types we have email templates for. Everything else is skipped silently.
+// Note 'broadcast' uses notif_MARKETING (not notif_email) — the
+// preference gate is different for marketing vs transactional. We
+// handle that distinction in the handler before sending.
 const SUPPORTED_TYPES = new Set([
   "booking_confirmed",
   "booking_cancelled",
   "trip_cancelled",
   "trip_reminder",
+  "broadcast",
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -101,6 +115,7 @@ interface ProfileLite {
   email: string;
   full_name: string | null;
   notif_email: boolean | null;
+  notif_marketing: boolean | null;
 }
 
 interface TripLite {
@@ -115,7 +130,7 @@ interface TripLite {
 }
 
 async function fetchProfile(email: string): Promise<ProfileLite | null> {
-  const url = `${SUPABASE_URL}/rest/v1/profiles?select=email,full_name,notif_email&email=eq.${encodeURIComponent(email)}&limit=1`;
+  const url = `${SUPABASE_URL}/rest/v1/profiles?select=email,full_name,notif_email,notif_marketing&email=eq.${encodeURIComponent(email)}&limit=1`;
   const res = await fetch(url, {
     headers: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
@@ -327,6 +342,147 @@ function tripReminderTemplate(profile: ProfileLite, trip: TripLite | null, ctaUr
   });
 }
 
+// ─── HMAC unsubscribe token signing ──────────────────────────────────────
+// Matches the verifier in migration 068's public_unsubscribe_marketing()
+// RPC exactly. The token format is hmac-sha256(secret, lower(email) +
+// ':unsubscribe-v1') encoded as 64-char hex. Lowercasing the email
+// makes the token robust to capitalization drift between profiles.email
+// (stored as-entered) and the URL-decoded email param the unsubscribe
+// page passes back.
+//
+// If UNSUBSCRIBE_SECRET isn't configured, we return an empty string and
+// log loudly. The template detects empty token and renders the
+// unsubscribe link as "go to settings" instead — graceful fallback that
+// still satisfies the unsubscribe-availability requirement of CAN-SPAM
+// /Israeli Communications Law (the user can opt out, just via a longer
+// path).
+async function generateUnsubscribeToken(email: string): Promise<string> {
+  if (!UNSUBSCRIBE_SECRET) {
+    console.error("[send-notification-email] UNSUBSCRIBE_SECRET missing — token generation disabled");
+    return "";
+  }
+
+  const encoder = new TextEncoder();
+  const keyData = encoder.encode(UNSUBSCRIBE_SECRET);
+  const message = encoder.encode(`${email.trim().toLowerCase()}:unsubscribe-v1`);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyData,
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+
+  const signature = await crypto.subtle.sign("HMAC", key, message);
+
+  // Convert ArrayBuffer to hex
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Marketing-email template. Distinct from transactional templates in
+ *  THREE legally-mandated ways:
+ *
+ *  1. A clearly-labeled "promotional message" banner at the top so the
+ *     recipient understands this isn't about their booking.
+ *  2. A visible unsubscribe link inside the body (not just the footer)
+ *     so the user can find it without scrolling.
+ *  3. A physical business address in the footer — required by Israeli
+ *     Communications Law 30A (the equivalent of CAN-SPAM's "physical
+ *     postal address" requirement).
+ *
+ *  Visually the shell is the same green/gold/cream as transactional —
+ *  brand recognition is good, and the "promotional" label + unsubscribe
+ *  positioning is what differentiates it. */
+function marketingTemplate(
+  profile: ProfileLite,
+  title: string,
+  body: string,
+  ctaUrl: string,
+  unsubscribeUrl: string,
+): string {
+  const greeting = profile.full_name ? `مرحباً ${profile.full_name}،` : "مرحباً،";
+
+  // Body content — preserve line breaks the admin typed by converting
+  // \n to <br>. Defense against HTML injection: the admin can write
+  // anything but RPC validates length only, not content. We strip
+  // common script-injection vectors but allow the admin to use basic
+  // formatting (bold via *text*, links not parsed for now).
+  const safeBody = body
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:${BRAND_CREAM};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;text-align:right;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:${BRAND_CREAM};padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(26,61,42,0.08);">
+
+        <!-- Promotional-label banner — legal compliance -->
+        <tr>
+          <td style="background:#fff8e7;padding:8px 24px;text-align:center;border-bottom:1px solid #f0e6d0;">
+            <div style="color:#8a6d1c;font-size:11px;font-weight:600;letter-spacing:0.5px;">📢 رسالة ترويجية من مشوارو</div>
+          </td>
+        </tr>
+
+        <!-- Header -->
+        <tr>
+          <td style="background:${BRAND_GREEN};padding:28px 24px;text-align:center;">
+            <div style="color:${BRAND_GOLD};font-size:28px;font-weight:bold;margin:0;">مشوارو</div>
+            <div style="color:rgba(255,255,255,0.8);font-size:13px;margin-top:4px;">منصة مشاركة الرحلات الفلسطينية</div>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px 28px;color:${BRAND_GREEN};font-size:15px;line-height:1.7;">
+            <p style="margin:0 0 16px 0;color:#6b7280;font-size:13px;">${greeting}</p>
+            <h1 style="font-size:22px;font-weight:bold;margin:0 0 18px 0;color:${BRAND_GREEN};">${title}</h1>
+            <div style="margin:0 0 12px 0;color:#374151;">${safeBody}</div>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:24px 0;">
+              <tr><td align="center">
+                <a href="${ctaUrl}" style="display:inline-block;background:${BRAND_GREEN};color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;padding:14px 40px;border-radius:12px;">افتح التطبيق</a>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- In-body unsubscribe — must be visible without scrolling -->
+        <tr>
+          <td style="padding:16px 28px;background:#fafafa;border-top:1px solid #f0f0f0;text-align:center;">
+            <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
+              لا تريد استلام رسائل ترويجية؟
+              <a href="${unsubscribeUrl}" style="color:${BRAND_GREEN};font-weight:bold;text-decoration:underline;">إلغاء الاشتراك بنقرة واحدة</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Compliance footer with physical address -->
+        <tr>
+          <td style="background:${BRAND_CREAM};padding:20px 28px;text-align:center;color:#6b7280;font-size:11px;line-height:1.7;">
+            <p style="margin:0 0 4px 0;font-weight:600;color:${BRAND_GREEN};">مشوارو — منصة مشاركة الرحلات</p>
+            <p style="margin:0 0 8px 0;">رام الله، فلسطين</p>
+            <p style="margin:0 0 6px 0;">تلقيت هذا البريد لأنك مسجل في مشوارو وقمت بتفعيل خيار "العروض والتسويق" من إعدادات حسابك.</p>
+            <p style="margin:0;color:#9ca3af;">© 2026 مشوارو. جميع الحقوق محفوظة.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 // ─── Handler ──────────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -407,25 +563,56 @@ serve(async (req) => {
     });
   }
 
-  // notif_email = false → user opted out of emails. Skip silently. NULL or
-  // true means email is allowed (default-on, matching the toggle UI).
-  if (profile.notif_email === false) {
-    return new Response(JSON.stringify({ skipped: "user_opted_out" }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+  // ─── Preference gate — type-dependent ──────────────────────────────
+  // Transactional types check notif_email (default-on, NULL or true =>
+  // send). Marketing 'broadcast' type checks notif_MARKETING — same
+  // toggle the admin asked about earlier. NULL is treated as opt-OUT
+  // for marketing (stricter than transactional, matching the
+  // affirmative-consent requirement of marketing email regulations).
+  //
+  // Note: by the time we get here for 'broadcast', the SQL audience
+  // filter in admin_send_broadcast() already pre-filtered by
+  // notif_marketing = TRUE — so the row only exists if the user is
+  // opted in. We re-check here as defense in depth (someone could
+  // manually INSERT a broadcast notification bypassing the RPC).
+  if (type === "broadcast") {
+    if (profile.notif_marketing !== true) {
+      return new Response(JSON.stringify({ skipped: "user_not_opted_in_marketing" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  } else {
+    // Transactional types — notif_email = false → skip. NULL or true → send.
+    if (profile.notif_email === false) {
+      return new Response(JSON.stringify({ skipped: "user_opted_out" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   // Fetch trip context for the templates. Trip may legitimately be null
   // if the notification doesn't have a trip_id (defensive — current types
-  // all should, but we don't crash if one doesn't).
-  const trip = await fetchNotificationTrip(notificationId);
+  // all should, but we don't crash if one doesn't). Broadcasts don't
+  // have a trip_id by design — we skip the fetch.
+  const trip = type === "broadcast" ? null : await fetchNotificationTrip(notificationId);
 
-  // Compute the CTA URL — link to the trip details page if we have one.
-  // Falls back to /notifications when there's no trip context.
-  const ctaUrl = trip?.id
-    ? `${APP_BASE_URL}/trip/${trip.id}`
-    : `${APP_BASE_URL}/notifications`;
+  // Compute the CTA URL — link to the trip details page if we have one,
+  // or for broadcasts the admin-supplied link from notification.link
+  // (relative path, e.g. '/' for home or '/search' for promo). Falls
+  // back to /notifications when there's no context.
+  let ctaUrl: string;
+  if (type === "broadcast") {
+    const broadcastLink = payload.data?.link || "/";
+    ctaUrl = broadcastLink.startsWith("http")
+      ? broadcastLink
+      : `${APP_BASE_URL}${broadcastLink.startsWith("/") ? "" : "/"}${broadcastLink}`;
+  } else if (trip?.id) {
+    ctaUrl = `${APP_BASE_URL}/trip/${trip.id}`;
+  } else {
+    ctaUrl = `${APP_BASE_URL}/notifications`;
+  }
 
   // Pick template + subject.
   let html: string;
@@ -448,6 +635,21 @@ serve(async (req) => {
       html = tripReminderTemplate(profile, trip, ctaUrl);
       subject = "⏰ رحلتك بعد ساعة — مشوارو";
       break;
+    case "broadcast": {
+      // Generate per-recipient unsubscribe link. Failure falls back to
+      // /account/notifications (still satisfies opt-out availability).
+      const token = await generateUnsubscribeToken(userEmail);
+      const unsubscribeUrl = token
+        ? `${APP_BASE_URL}/unsubscribe?email=${encodeURIComponent(userEmail)}&token=${token}`
+        : `${APP_BASE_URL}/account?section=notifications`;
+
+      html = marketingTemplate(profile, payload.title, payload.body, ctaUrl, unsubscribeUrl);
+      // Marketing subject = admin-chosen title verbatim. NO 🎉 / ⚠️ prefix
+      // — admins control framing entirely. Avoids "every email has an
+      // emoji" feeling that hurts deliverability.
+      subject = payload.title;
+      break;
+    }
     default:
       // Unreachable — SUPPORTED_TYPES filter above. Defensive fallback.
       return new Response(JSON.stringify({ skipped: "no_template" }), {

@@ -17,6 +17,7 @@ import DashboardPayments from "./dashboard/DashboardPayments";
 import DashboardSubscriptions from "./dashboard/DashboardSubscriptions";
 import DashboardReports from "./dashboard/DashboardReports";
 import DashboardNotifications from "./dashboard/DashboardNotifications";
+import DashboardBroadcasts from "./dashboard/DashboardBroadcasts";
 import DashboardSupport from "./dashboard/DashboardSupport";
 import DashboardFeedback from "./dashboard/DashboardFeedback";
 import DashboardContent from "./dashboard/DashboardContent";
@@ -712,6 +713,7 @@ export default function Dashboard() {
         {activePage === "subscriptions" && <DashboardSubscriptions />}
         {activePage === "reports" && <DashboardReports />}
         {activePage === "notifications" && <DashboardNotifications />}
+        {activePage === "broadcasts" && <DashboardBroadcasts />}
         {activePage === "support" && <DashboardSupport />}
         {activePage === "feedback" && <DashboardFeedback />}
         {activePage === "licenses" && <DashboardLicenses />}
