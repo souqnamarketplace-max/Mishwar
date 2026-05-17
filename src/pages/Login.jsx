@@ -342,6 +342,22 @@ export default function Login() {
         redirectTo: window.location.origin + '/login',
       });
       setForgotSent(true);
+
+      // Audit-log the reset request to admin_audit_log so it surfaces in
+      // /dashboard activity log. Supabase Auth's resetPasswordForEmail
+      // writes nothing to our app schema — without this RPC call, admins
+      // are blind to who's requesting resets (useful signal during a
+      // credential-stuffing attempt — a flood of distinct emails
+      // suggests automated probing). The RPC is rate-limited to 5
+      // requests per email per hour and silently no-ops above that, so
+      // we don't need to guard the call. Fire-and-forget: if logging
+      // fails we don't surface the error to the user since the actual
+      // reset email already went out.
+      supabase
+        .rpc('log_password_reset_request', { p_email: forgotEmail })
+        .then(({ error: logErr }) => {
+          if (logErr) console.warn('Password reset audit-log failed:', logErr);
+        });
     } catch (err) {
       toast.error(friendlyError(err, 'تعذر إرسال رابط الاستعادة — تأكد من البريد الإلكتروني'));
     }
