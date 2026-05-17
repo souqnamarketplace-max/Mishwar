@@ -11,6 +11,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { notifyUser } from "@/lib/notifyUser";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const STATUS_LABELS = {
   pending: { label: "قيد المراجعة", color: "yellow" },
@@ -39,6 +40,7 @@ const REPORTER_NOTIF_BY_STATUS = {
 
 export default function DashboardReports() {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [filter, setFilter] = useState("pending");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -127,14 +129,25 @@ export default function DashboardReports() {
   const handleBulkAction = async (status) => {
     if (selectedIds.size === 0) return;
     const ids = Array.from(selectedIds);
-    const confirmMsg = status === "dismissed"
-      ? `رفض ${ids.length} بلاغ؟`
+    const title = status === "dismissed"
+      ? "رفض البلاغات"
       : status === "reviewed"
-        ? `وضع علامة "تمت المراجعة" على ${ids.length} بلاغ؟`
-        : `تطبيق "${status}" على ${ids.length} بلاغ؟`;
-    if (!window.confirm(confirmMsg)) return;
-    let ok = 0;
-    let fail = 0;
+        ? "تأكيد المراجعة"
+        : "تطبيق حالة";
+    const confirmMsg = status === "dismissed"
+      ? `سيتم رفض ${ids.length} بلاغ. لا يمكن التراجع بعد التطبيق.`
+      : status === "reviewed"
+        ? `سيتم وضع علامة "تمت المراجعة" على ${ids.length} بلاغ.`
+        : `سيتم تطبيق الحالة "${status}" على ${ids.length} بلاغ.`;
+    const ok = await confirm({
+      title,
+      message: confirmMsg,
+      confirmLabel: "متابعة",
+      destructive: status === "dismissed",
+    });
+    if (!ok) return;
+    let okCount = 0;
+    let failCount = 0;
     for (const id of ids) {
       try {
         const { error } = await supabase.from("user_reports").update({
@@ -148,16 +161,16 @@ export default function DashboardReports() {
         try {
           await logAdminAction(`report_bulk_${status}`, "report", id, { bulk: true });
         } catch { /* non-fatal */ }
-        ok++;
+        okCount++;
       } catch {
-        fail++;
+        failCount++;
       }
     }
     qc.invalidateQueries({ queryKey: ["reports"] });
     qc.invalidateQueries({ queryKey: ["my-reports"] });
-    if (fail === 0) toast.success(`تم تحديث ${ok} بلاغ`);
-    else if (ok === 0) toast.error(`فشل تحديث ${fail} بلاغ`);
-    else toast.warning(`نجح ${ok}، فشل ${fail}`);
+    if (failCount === 0) toast.success(`تم تحديث ${okCount} بلاغ`);
+    else if (okCount === 0) toast.error(`فشل تحديث ${failCount} بلاغ`);
+    else toast.warning(`نجح ${okCount}، فشل ${failCount}`);
     clearSelection();
   };
 
@@ -405,6 +418,7 @@ export default function DashboardReports() {
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
+      {confirmDialog}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Settings, Save, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const defaultSettings = {
   // Commission default is 0% — the launch posture is "drivers keep
@@ -48,6 +49,7 @@ const defaultSettings = {
 export default function DashboardSettings() {
   const qc = useQueryClient();
   const [saved, setSaved] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   const { data: settingsArr = [], isLoading } = useQuery({
     queryKey: ["app_settings"],
@@ -174,19 +176,19 @@ export default function DashboardSettings() {
             </p>
           </div>
           <button
-            onClick={() => {
+            onClick={async () => {
               // When flipping FROM off TO on, warn about existing drivers
               // and direct admin to grant them grace first. Without this
               // confirm step, every existing driver immediately can't post
               // trips the moment the toggle saves.
               if (!form.subscription_required) {
-                const ok = window.confirm(
-                  "تحذير: عند تفعيل نظام الاشتراك، السائقون الذين لا يملكون اشتراكاً نشطاً " +
-                  "سيُمنعون فوراً من نشر رحلات جديدة.\n\n" +
-                  "نوصي بزيارة صفحة 'اشتراكات السائقين' أولاً ومنح فترة سماح للسائقين الحاليين " +
-                  "قبل تفعيل النظام.\n\n" +
-                  "هل تريد المتابعة؟"
-                );
+                const ok = await confirm({
+                  title: "تفعيل نظام الاشتراك",
+                  message:
+                    "تحذير: عند تفعيل نظام الاشتراك، السائقون الذين لا يملكون اشتراكاً نشطاً سيُمنعون فوراً من نشر رحلات جديدة. نوصي بزيارة صفحة 'اشتراكات السائقين' أولاً ومنح فترة سماح للسائقين الحاليين قبل تفعيل النظام. هل تريد المتابعة؟",
+                  confirmLabel: "متابعة",
+                  destructive: true,
+                });
                 if (!ok) return;
               }
               update("subscription_required", !form.subscription_required);
@@ -463,6 +465,7 @@ export default function DashboardSettings() {
       >
         {saved ? <><CheckCircle className="w-4 h-4" />تم الحفظ</> : <><Save className="w-4 h-4" />حفظ الإعدادات</>}
       </Button>
+      {confirmDialog}
     </div>
   );
 }

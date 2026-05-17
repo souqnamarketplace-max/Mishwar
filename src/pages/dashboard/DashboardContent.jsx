@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { FileText, Plus, Trash2, Edit2, Check, X, Megaphone, MessageSquare, Users, Newspaper, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const TABS = [
   { id: "announcements", label: "إعلانات",   icon: Megaphone },
@@ -71,6 +72,7 @@ export default function DashboardContent() {
 // ============================================================================
 function AnnouncementsTab() {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [newText, setNewText] = useState("");
@@ -203,7 +205,7 @@ function AnnouncementsTab() {
                   <button onClick={() => { setEditingId(a.id); setEditText(a.text); }} className="text-primary hover:opacity-70">
                     <Edit2 className="w-4 h-4" />
                   </button>
-                  <button onClick={() => { if (confirm("هل أنت متأكد؟")) del.mutate(a.id); }} className="text-destructive hover:opacity-70">
+                  <button onClick={async () => { if (await confirm({ title: "حذف الإعلان", message: "هل أنت متأكد من حذف هذا الإعلان؟", confirmLabel: "حذف", destructive: true })) del.mutate(a.id); }} className="text-destructive hover:opacity-70" aria-label="حذف الإعلان">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -216,6 +218,7 @@ function AnnouncementsTab() {
           <Pagination page={page} totalPages={annData.totalPages} onChange={setPage} />
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
@@ -231,6 +234,7 @@ const EMPTY_TESTIMONIAL = {
 
 function TestimonialsTab() {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [editing, setEditing] = useState(null); // null = no editor; {} = new; {id, ...} = existing
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -327,7 +331,7 @@ function TestimonialsTab() {
                     {r.is_published ? "منشور" : "مسودة"}
                   </span>
                   <button onClick={() => setEditing({ ...r })} className="text-primary hover:opacity-70 p-1"><Edit2 className="w-4 h-4" /></button>
-                  <button onClick={() => { if (confirm("حذف هذا الرأي؟")) del.mutate(r.id); }} className="text-destructive hover:opacity-70 p-1"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={async () => { if (await confirm({ title: "حذف الرأي", message: "هل أنت متأكد من حذف هذا الرأي؟", confirmLabel: "حذف", destructive: true })) del.mutate(r.id); }} className="text-destructive hover:opacity-70 p-1" aria-label="حذف الرأي"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             ))}
@@ -337,6 +341,7 @@ function TestimonialsTab() {
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
+      {confirmDialog}
     </div>
   );
 }
@@ -419,6 +424,7 @@ const EMPTY_MEMBER = { full_name: "", role_title: "", emoji: "👤", avatar_url:
 
 function TeamTab() {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [editing, setEditing] = useState(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -508,7 +514,7 @@ function TeamTab() {
                 </div>
                 <div className="flex flex-col gap-1 shrink-0">
                   <button onClick={() => setEditing({ ...m })} className="text-primary hover:opacity-70 p-1"><Edit2 className="w-4 h-4" /></button>
-                  <button onClick={() => { if (confirm("حذف؟")) del.mutate(m.id); }} className="text-destructive hover:opacity-70 p-1"><Trash2 className="w-4 h-4" /></button>
+                  <button onClick={async () => { if (await confirm({ title: "حذف العضو", message: "هل أنت متأكد من حذف هذا العضو من الفريق؟", confirmLabel: "حذف", destructive: true })) del.mutate(m.id); }} className="text-destructive hover:opacity-70 p-1" aria-label="حذف العضو"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             ))}
@@ -518,6 +524,7 @@ function TeamTab() {
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
+      {confirmDialog}
     </div>
   );
 }
@@ -588,6 +595,7 @@ const EMPTY_POST = {
 
 function BlogTab() {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [editing, setEditing] = useState(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -682,7 +690,7 @@ function BlogTab() {
                   </span>
                   <div className="flex gap-1">
                     <button onClick={() => setEditing({ ...p })} className="text-primary hover:opacity-70 p-1"><Edit2 className="w-4 h-4" /></button>
-                    <button onClick={() => { if (confirm("حذف هذا المقال؟")) del.mutate(p.id); }} className="text-destructive hover:opacity-70 p-1"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={async () => { if (await confirm({ title: "حذف المقال", message: "هل أنت متأكد من حذف هذا المقال؟ لا يمكن التراجع.", confirmLabel: "حذف", destructive: true })) del.mutate(p.id); }} className="text-destructive hover:opacity-70 p-1" aria-label="حذف المقال"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
               </div>
@@ -693,6 +701,7 @@ function BlogTab() {
       {!isLoading && totalPages > 1 && (
         <Pagination page={page} totalPages={totalPages} onChange={setPage} />
       )}
+      {confirmDialog}
     </div>
   );
 }

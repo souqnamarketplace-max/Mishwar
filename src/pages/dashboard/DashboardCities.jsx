@@ -34,6 +34,7 @@ import Pagination from "@/components/dashboard/Pagination";
 import { friendlyError } from "@/lib/errors";
 import { logAdminAction } from "@/lib/adminAudit";
 import { formatArabicDate } from "@/lib/validation";
+import { useConfirm } from "@/hooks/useConfirm";
 
 /**
  * Extract lat/lng from a Google Maps URL.
@@ -87,6 +88,7 @@ const STATUS_CONFIG = {
 
 export default function DashboardCities() {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [view, setView] = useState("pending");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 25;
@@ -312,11 +314,17 @@ export default function DashboardCities() {
                   )}
                 </div>
                 <button
-                  onClick={() => {
-                    if (confirm(`حذف "${city.name}"؟`)) deleteCityMut.mutate({ id: city.id });
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: "حذف المدينة",
+                      message: `هل أنت متأكد من حذف "${city.name}"؟ سيؤثر ذلك على الرحلات والسائقين المرتبطين بهذه المدينة.`,
+                      confirmLabel: "حذف",
+                      destructive: true,
+                    });
+                    if (ok) deleteCityMut.mutate({ id: city.id });
                   }}
                   className="text-destructive hover:opacity-70 p-1"
-                  aria-label="حذف"
+                  aria-label={`حذف ${city.name}`}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -343,6 +351,7 @@ export default function DashboardCities() {
           submitting={rejectMut.isPending}
         />
       )}
+      {confirmDialog}
     </div>
   );
 }

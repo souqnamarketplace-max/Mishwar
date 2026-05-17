@@ -7,6 +7,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { toast } from "sonner";
 import { Car, Users as UsersIcon, AlertTriangle, Star, MessageSquare } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useConfirm } from "@/hooks/useConfirm";
 
 /**
  * UserHistorySection — admin-facing history panel inside the user
@@ -235,6 +236,7 @@ export default function UserHistorySection({ user }) {
 /** Inline strike admin sub-panel with clear-button. */
 function StrikeAdminPanel({ email, active, lateLifetime, lastCanceled }) {
   const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const clearMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc("admin_clear_user_strikes", { p_email: email });
@@ -275,18 +277,24 @@ function StrikeAdminPanel({ email, active, lateLifetime, lastCanceled }) {
         </div>
         {active > 0 && (
           <button
-            onClick={() => {
-              if (window.confirm(`إعادة تعيين نقاط ${email} إلى صفر؟`)) {
-                clearMutation.mutate();
-              }
+            onClick={async () => {
+              const ok = await confirm({
+                title: "إعادة تعيين النقاط",
+                message: `إعادة تعيين نقاط مخالفات ${email} إلى صفر؟`,
+                confirmLabel: "إعادة التعيين",
+                destructive: true,
+              });
+              if (ok) clearMutation.mutate();
             }}
             disabled={clearMutation.isPending}
             className="text-xs text-primary underline shrink-0"
+            aria-label={`إعادة تعيين نقاط مخالفات المستخدم ${email}`}
           >
             {clearMutation.isPending ? "جاري..." : "إعادة تعيين"}
           </button>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

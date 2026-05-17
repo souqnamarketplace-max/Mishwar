@@ -13,10 +13,12 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import Pagination from "@/components/dashboard/Pagination";
 import { usePaginatedData } from "@/hooks/usePaginatedData";
+import { useConfirm } from "@/hooks/useConfirm";
 
 export default function DashboardUsers() {
   // Pagination wired — see <Pagination /> at bottom
   const PAGE_SIZE = 25;
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all"); // all, driver, passenger, admin
   const [selectedUser, setSelectedUser] = useState(null);
@@ -572,10 +574,13 @@ export default function DashboardUsers() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          if (confirm(`تأكيد بريد ${selectedUser.email} يدوياً؟ سيتمكن المستخدم من تسجيل الدخول مباشرة.`)) {
-                            confirmEmailMutation.mutate(selectedUser);
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: "تأكيد البريد يدوياً",
+                            message: `تأكيد بريد ${selectedUser.email} يدوياً؟ سيتمكن المستخدم من تسجيل الدخول مباشرة بعد ذلك.`,
+                            confirmLabel: "تأكيد",
+                          });
+                          if (ok) confirmEmailMutation.mutate(selectedUser);
                         }}
                         disabled={confirmEmailMutation.isPending}
                         className="rounded-lg text-xs"
@@ -607,6 +612,7 @@ export default function DashboardUsers() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }
