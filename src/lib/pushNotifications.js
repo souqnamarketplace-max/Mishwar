@@ -106,8 +106,9 @@ export async function ensurePermission() {
 /**
  * Show a notification for an incoming row from the notifications table.
  *
- * ON WEB: toasts always; additionally fires a system Notification banner
- * when permission is granted and the tab is hidden/blurred.
+ * ON WEB: toasts when the user's notif_push preference is true (or null —
+ * default-on); additionally fires a system Notification banner when
+ * permission is granted, the tab is hidden/blurred, AND notif_push is true.
  *
  * ON NATIVE iOS/ANDROID (Capacitor): returns early — does NOT toast.
  * Reason: the same notifications-table INSERT that triggered this function
@@ -122,11 +123,33 @@ export async function ensurePermission() {
  * user-visible alert. The badge update (via qc.invalidateQueries) is
  * UNAFFECTED — it still happens in NotificationBell on every realtime
  * INSERT event regardless of platform.
+ *
+ * USER PREFERENCE GATING (added after launch-prep audit):
+ * The 'notif_push' profile column gates ALL user-visible notification
+ * surfaces — including the in-app toast here. Previously this function
+ * fired the toast unconditionally, which made the 'الإشعارات داخل
+ * التطبيق' settings toggle look broken: server-side push correctly
+ * stopped (Edge Function checks the column), but the in-app toast
+ * still fired on every realtime insert. Now we respect the preference
+ * symmetrically — toggle OFF means truly no in-app notifications,
+ * matching what the toggle label promises. The badge count update
+ * is NOT gated (it's not a notification, it's just data).
+ *
+ * @param notif The notification row from the realtime subscription
+ * @param opts.onClick Click handler for the toast action button
+ * @param opts.userPrefs Object with notif_push (boolean | null | undefined).
+ *                       Treat null/undefined as TRUE (default-on, matches
+ *                       the column default + the UI's `!== false` check).
  */
-export function showIncomingNotification(notif, { onClick } = {}) {
+export function showIncomingNotification(notif, { onClick, userPrefs } = {}) {
   if (!notif) return;
   // Native devices: defer to the Capacitor push pipeline. See docstring.
   if (Capacitor.isNativePlatform()) return;
+
+  // Respect the user's in-app notification preference. notif_push === false
+  // explicitly opted out; null/undefined/true all default to ON. Same
+  // semantics the toggle UI uses (`user?.notif_push !== false`).
+  if (userPrefs && userPrefs.notif_push === false) return;
 
   const title = notif.title || "إشعار جديد";
   const body  = notif.message || "";

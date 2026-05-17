@@ -46,6 +46,29 @@ export default function NotificationBell({ userEmail }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
+  // Read the user's notification preferences from the AuthContext cache.
+  // Used to gate the in-app toast in showIncomingNotification() — when
+  // notif_push is false, the user explicitly opted out of in-app
+  // notifications via /account-settings, and the toast must not fire
+  // (otherwise the toggle looks broken to the user). The cache is
+  // hydrated by AuthContext.jsx line 302 and re-fetched on every
+  // preference save, so toggling the setting takes effect immediately
+  // for this listener too.
+  const { data: me } = useQuery({
+    queryKey: ["me"],
+    enabled: !!userEmail,
+    // No queryFn — we rely on AuthContext having populated the cache.
+    // If somehow not populated, we treat as default (notif_push !== false → toast fires).
+  });
+  // Keep the latest prefs in a ref so the realtime handler — which only
+  // runs the effect once on mount per userEmail — always sees fresh values.
+  // Without the ref, toggling notif_push wouldn't take effect until the
+  // user navigated away and back (the closure captured the initial value).
+  const userPrefsRef = useRef({ notif_push: me?.notif_push });
+  useEffect(() => {
+    userPrefsRef.current = { notif_push: me?.notif_push };
+  }, [me?.notif_push]);
+
   const { data: notifications = [] } = useQuery({
     queryKey: ["notifications", userEmail],
     queryFn: () => userEmail
@@ -87,11 +110,15 @@ export default function NotificationBell({ userEmail }) {
           // Refresh the inbox so the bell badge updates.
           qc.invalidateQueries({ queryKey: ["notifications", userEmail] });
           // Fire the toast / native banner. Click jumps to the right page.
+          // userPrefs read from the ref so the freshest notif_push value is
+          // used (closures don't capture state mutations from outside the
+          // effect's deps list).
           showIncomingNotification(row, {
             onClick: (n) => {
               const target = getNotifTarget(n);
               if (target) navigate(target);
             },
+            userPrefs: userPrefsRef.current,
           });
         }
       )
