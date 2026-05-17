@@ -95,6 +95,15 @@ export const AuthProvider = ({ children }) => {
         // Tag Sentry events with user.id (NOT email — PII protection).
         // Helps cluster errors by user without leaking PII.
         setSentryUser(session.user.id);
+        // Clear any pessimistic isPasswordRecovery flag set by the lazy
+        // initializer for /login?code=... URLs. supabase-js fires
+        // SIGNED_IN (not PASSWORD_RECOVERY) when the exchanged code was
+        // a regular OAuth / magic-link code, so getting here means this
+        // was NOT a recovery flow — safe to flip recovery off so the
+        // redirect-home useEffect can run. For genuine recovery flows
+        // supabase-js fires PASSWORD_RECOVERY instead, which sets the
+        // flag back to true in the handler below.
+        setIsPasswordRecovery(false);
         await loadUserProfile(session.user);
       } else if (event === 'SIGNED_OUT') {
         clearSentryUser();
