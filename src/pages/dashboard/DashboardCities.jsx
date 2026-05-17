@@ -442,6 +442,11 @@ function SuggestionCard({ row, onApprove, onReject }) {
 }
 
 function ApproveModal({ row, onClose, onSubmit, submitting }) {
+  // Local useConfirm — separate from the parent DashboardCities's instance
+  // because this modal is a sibling component, not a child. Each useConfirm
+  // call creates its own dialog state so rendering both within the same
+  // tree is safe (no shared ref / conflict).
+  const { confirm, dialog: confirmDialog } = useConfirm();
   const [canonicalName, setCanonicalName] = useState(row.name);
   const [mapsUrl, setMapsUrl] = useState("");
   const [lat, setLat] = useState("");
@@ -465,7 +470,7 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const latNum = parseFloat(lat);
     const lngNum = parseFloat(lng);
     if (!canonicalName.trim()) {
@@ -477,9 +482,18 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
       return;
     }
     // West Bank reasonable bounds — gives a friendly error before the
-    // server-side CHECK constraint rejects it
+    // server-side CHECK constraint rejects it. useConfirm replaces the
+    // previous native confirm() which was missed in the App Store
+    // compliance sweep (commit d640acd). Capacitor will not approve
+    // apps that use window.confirm/alert — they appear as system
+    // dialogs that the wrapper can't style and break the native UX.
     if (latNum < 31.0 || latNum > 33.0 || lngNum < 34.5 || lngNum > 36.0) {
-      const ok = confirm("الإحداثيات خارج النطاق المعتاد للضفة الغربية. هل أنت متأكد؟");
+      const ok = await confirm({
+        title: "إحداثيات خارج النطاق",
+        message: "الإحداثيات خارج النطاق المعتاد للضفة الغربية. هل أنت متأكد من المتابعة؟",
+        confirmLabel: "متابعة",
+        cancelLabel: "تعديل",
+      });
       if (!ok) return;
     }
     onSubmit({
@@ -589,6 +603,10 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
         </div>
       </div>
     </div>
+    {/* useConfirm dialog — renders nothing until confirm() is called.
+        Must be inside the ModalPortal so it sits above ApproveModal's
+        z-50 backdrop; rendering at root would be hidden behind it. */}
+    {confirmDialog}
     </ModalPortal>
   );
 }
