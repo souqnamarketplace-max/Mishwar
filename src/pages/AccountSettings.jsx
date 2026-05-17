@@ -15,7 +15,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield, X, LogOut, Copy } from "lucide-react";
+import { ArrowLeft, Lock, Mail, Phone, Image, Trash2, AlertCircle, CheckCircle, Shield, X, LogOut, Copy, Download, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -456,6 +456,49 @@ export default function AccountSettings() {
         delete next[fieldKey];
         return next;
       });
+    }
+  };
+
+  // ─── GDPR Article 20 — data portability export ────────────────────────
+  // Calls public.export_my_data() RPC (mig 072) and triggers a JSON
+  // download in the browser. Rate-limited server-side to 1/hour.
+  // Mobile (Capacitor) note: createObjectURL + a-tag-click works in
+  // both web and WKWebView/Android System WebView; the file lands
+  // in the user's Downloads folder via the system's standard
+  // download interception.
+  const [exportLoading, setExportLoading] = useState(false);
+  const exportMyData = async () => {
+    setExportLoading(true);
+    try {
+      const { data, error } = await supabase.rpc("export_my_data");
+      if (error) {
+        // Pre-detect rate-limit error so the toast is helpful
+        if (/rate_limited/i.test(error.message || "")) {
+          toast.error("تم تصدير بياناتك مؤخراً. يرجى المحاولة بعد ساعة.");
+        } else {
+          toast.error(friendlyError(error, "تعذر تصدير البيانات"));
+        }
+        return;
+      }
+      // Serialize + download as a JSON file.
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
+      a.href = url;
+      a.download = `mishwaro-data-export-${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Release the blob URL after the download has started
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success("تم تصدير بياناتك بنجاح");
+    } catch (err) {
+      captureException(err);
+      toast.error(friendlyError(err, "تعذر تصدير البيانات"));
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -1266,6 +1309,49 @@ export default function AccountSettings() {
             <LogOut className="w-4 h-4" />
             تسجيل الخروج
           </Button>
+        </div>
+
+        {/* GDPR Article 20 — data portability. User can download all
+            their personal data as a JSON file at any time. Required by
+            EU GDPR Article 20 and considered best-practice for any
+            jurisdiction with data-protection law. Rate-limited
+            server-side to 1 export per user per hour. */}
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <div className="flex items-start gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Download className="w-5 h-5 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-bold text-foreground">تنزيل بياناتي</h3>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                حقك في الحصول على نسخة من جميع البيانات الشخصية التي يحتفظ بها مشواروو
+                عنك (الملف الشخصي، الرحلات، الحجوزات، الرسائل، التقييمات) بصيغة JSON قابلة
+                للمعالجة الآلية. وفقاً للمادة 20 من اللائحة الأوروبية لحماية البيانات.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={exportMyData}
+            disabled={exportLoading}
+            variant="outline"
+            className="w-full rounded-xl gap-2 h-11"
+            aria-label="تنزيل ملف JSON يحتوي على جميع بياناتك الشخصية"
+          >
+            {exportLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                جارٍ التصدير...
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                تنزيل بياناتي (JSON)
+              </>
+            )}
+          </Button>
+          <p className="text-[10px] text-muted-foreground/70 mt-2 text-center">
+            يُسمح بتصدير واحد كل ساعة
+          </p>
         </div>
 
         <div className="bg-destructive/5 rounded-2xl border border-destructive/20 p-6">
