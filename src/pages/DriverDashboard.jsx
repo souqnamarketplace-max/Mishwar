@@ -122,6 +122,29 @@ function DesktopTabBar({ tabs, active, onChange }) {
 }
 
 // ─── Earnings tab (inline) ──────────────────────────────────────────────────
+//
+// Enhanced for scale (scale audit P1 #4): adds time-period summary tiles
+// (this week / this month / last 30 days), top-routes ranking, and avg
+// per trip. The original tab showed only lifetime totals + per-payment-
+// method + last 10 trips — fine for a driver with 5 trips, but a daily
+// commuter wants to know "did this week earn more than last week?".
+//
+// All computations are client-side from already-fetched `bookings` and
+// `trips`. No new server query needed — earnings data is local to the
+// driver's existing dataset.
+//
+// Date matching strategy:
+// - "This week" = bookings on trips with date >= Monday of current
+//   Asia/Jerusalem week (Palestinian work week starts Monday locally;
+//   no fiqh-week-start ambiguity for earnings reporting)
+// - "This month" = bookings on trips with date >= 1st of current month
+// - "Last 30 days" = bookings on trips with date >= today - 30 days
+//   (rolling window, useful when month is fresh)
+//
+// We bucket by trip.date (when the trip actually happened) rather than
+// booking.created_at (when the seat was reserved). A passenger who books
+// today for a trip next month should count against next month's earnings,
+// not this month's — matching how the driver thinks about cash flow.
 function EarningsTab({ bookings, trips, totalEarnings }) {
   const confirmed = bookings.filter(b => b.status === "confirmed" || b.status === "completed");
   const byMethod = confirmed.reduce((acc, b) => {
@@ -141,14 +164,162 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
     credit_card:   "بطاقة 💳",
   };
 
+  // ── Time-bucket math ─────────────────────────────────────────────────
+  // Compute Palestinian-local "now" so the week/month boundaries match
+  // what the driver experiences on the calendar. Without TZ awareness,
+  // a driver in Ramallah looking at the dashboard at 11pm Sunday would
+  // see UTC's Monday already started, which would split Monday's
+  // earnings across two weeks visually.
+  const now = new Date();
+  const tzNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jerusalem" }));
+  const todayISO = tzNow.toISOString().split("T")[0]; // YYYY-MM-DD, matches trips.date
+
+  // Monday of current week (Palestine convention). getDay() returns
+  // 0=Sun, 1=Mon, ..., 6=Sat. To get Monday-as-start-of-week, shift by
+  // ((day + 6) % 7) days back — handles Sunday correctly (0 → 6 back).
+  const dayOfWeek = tzNow.getDay();
+  const daysToMonday = (dayOfWeek + 6) % 7;
+  const monday = new Date(tzNow);
+  monday.setDate(tzNow.getDate() - daysToMonday);
+  monday.setHours(0, 0, 0, 0);
+  const mondayISO = monday.toISOString().split("T")[0];
+
+  // 1st of current month
+  const firstOfMonth = new Date(tzNow.getFullYear(), tzNow.getMonth(), 1);
+  const monthStartISO = firstOfMonth.toISOString().split("T")[0];
+
+  // 30 days ago (rolling)
+  const thirtyDaysAgo = new Date(tzNow);
+  thirtyDaysAgo.setDate(tzNow.getDate() - 30);
+  const thirtyDaysAgoISO = thirtyDaysAgo.toISOString().split("T")[0];
+
+  // Map trip_id → trip object so we can join booking.total_price back to
+  // its trip.date in O(1). Precomputed once outside the reduce loops.
+  const tripById = new Map(trips.map(t => [t.id, t]));
+
+  // Sum earnings for a date predicate. Walks confirmed bookings, looks
+  // up parent trip's date (string compare on YYYY-MM-DD works since
+  // ISO dates sort lexicographically). Earnings-less bookings (cash
+  // not yet tallied) still count if status is confirmed/completed —
+  // matches the overall totalEarnings calc above.
+  const sumWhere = (predicate) => {
+    let total = 0;
+    let count = 0;
+    for (const b of confirmed) {
+      const trip = tripById.get(b.trip_id);
+      if (!trip || !trip.date) continue;
+      if (predicate(trip.date)) {
+        total += (b.total_price || 0);
+        count += 1;
+      }
+    }
+    return { total, count };
+  };
+
+  const thisWeek    = sumWhere(d => d >= mondayISO       && d <= todayISO);
+  const thisMonth   = sumWhere(d => d >= monthStartISO   && d <= todayISO);
+  const last30Days  = sumWhere(d => d >= thirtyDaysAgoISO && d <= todayISO);
+
+  // Average per booking (more meaningful than per-trip since a trip can
+  // have multiple passengers). Guard division by zero — newly-onboarded
+  // drivers with no bookings yet would otherwise see NaN.
+  const avgPerBooking = confirmed.length > 0
+    ? Math.round(totalEarnings / confirmed.length)
+    : 0;
+
+  // ── Top routes by earnings ────────────────────────────────────────────
+  // Group confirmed bookings by their trip's "from → to" route, sum,
+  // sort descending, take top 5. Useful for a daily commuter: "you've
+  // made most of your money on the Ramallah → Hebron route — keep
+  // listing that one." Falls back to "—" placeholder when route info
+  // is missing (shouldn't happen, but defensive).
+  const routeEarnings = confirmed.reduce((acc, b) => {
+    const trip = tripById.get(b.trip_id);
+    if (!trip) return acc;
+    const route = `${trip.from_city || "؟"} ← ${trip.to_city || "؟"}`;
+    if (!acc[route]) acc[route] = { earnings: 0, count: 0 };
+    acc[route].earnings += (b.total_price || 0);
+    acc[route].count += 1;
+    return acc;
+  }, {});
+  const topRoutes = Object.entries(routeEarnings)
+    .map(([route, data]) => ({ route, ...data }))
+    .sort((a, b) => b.earnings - a.earnings)
+    .slice(0, 5);
+
   return (
     <div className="space-y-4" dir="rtl">
-      {/* Summary card */}
+      {/* Summary card — all-time, hero treatment */}
       <div className="bg-gradient-to-br from-primary to-accent rounded-2xl p-5 text-primary-foreground">
         <p className="text-sm opacity-80 mb-1">إجمالي الأرباح</p>
         <p className="text-4xl font-black">₪{totalEarnings.toLocaleString()}</p>
-        <p className="text-xs opacity-70 mt-2">{confirmed.length} حجز مؤكد</p>
+        <p className="text-xs opacity-70 mt-2">{confirmed.length} حجز مؤكد · متوسط ₪{avgPerBooking}/حجز</p>
       </div>
+
+      {/* Time-period quick stats grid. Four tiles: this week, this month,
+          last 30 days rolling, all-time count. Mobile: 2 cols. Desktop: 4 cols.
+          Each tile shows: label, amount, booking count below. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <EarningsTile
+          label="هذا الأسبوع"
+          sublabel="من الإثنين"
+          amount={thisWeek.total}
+          count={thisWeek.count}
+          accent="text-blue-600 bg-blue-500/10"
+        />
+        <EarningsTile
+          label="هذا الشهر"
+          sublabel="منذ بداية الشهر"
+          amount={thisMonth.total}
+          count={thisMonth.count}
+          accent="text-green-600 bg-green-500/10"
+        />
+        <EarningsTile
+          label="آخر 30 يوماً"
+          sublabel="نافذة متحركة"
+          amount={last30Days.total}
+          count={last30Days.count}
+          accent="text-amber-600 bg-amber-500/10"
+        />
+        <EarningsTile
+          label="إجمالي الرحلات"
+          sublabel="منذ التسجيل"
+          amount={null}
+          count={trips.length}
+          countLabel="رحلة"
+          accent="text-purple-600 bg-purple-500/10"
+        />
+      </div>
+
+      {/* Top routes — only show when the driver has earnings on multiple
+          routes. A driver who only drives one route would see a trivial
+          single-entry list which adds no value. */}
+      {topRoutes.length > 1 && (
+        <div className="bg-card rounded-2xl border border-border p-4">
+          <p className="font-bold text-sm mb-3">أكثر المسارات ربحاً</p>
+          <div className="space-y-2">
+            {topRoutes.map((r, idx) => (
+              <div key={r.route} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                <div className="flex items-center gap-2">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                    idx === 0 ? "bg-yellow-500/20 text-yellow-700" :
+                    idx === 1 ? "bg-gray-300/30 text-gray-700"     :
+                    idx === 2 ? "bg-orange-500/20 text-orange-700" :
+                                "bg-muted text-muted-foreground"
+                  }`}>
+                    {idx + 1}
+                  </span>
+                  <span className="text-sm font-bold text-primary">₪{r.earnings.toLocaleString()}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium">{r.route}</p>
+                  <p className="text-xs text-muted-foreground">{r.count} حجز</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* By payment method */}
       {Object.keys(byMethod).length > 0 && (
@@ -186,6 +357,36 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
             })
         }
       </div>
+    </div>
+  );
+}
+
+// ─── Earnings tile (small reusable card for the quick-stats grid) ──────
+//
+// Keeps the JSX in EarningsTab readable. Variants:
+//   - amount=null + count + countLabel: shows just the count (used for
+//     "total trips" tile which is a count, not an amount)
+//   - amount + count: shows ₪amount on top, "{count} حجز" below
+//
+// `accent` is a Tailwind classname pair (text-X bg-X/10) so the tile's
+// number color matches its corner badge color, giving each tile a
+// distinct visual identity at a glance.
+function EarningsTile({ label, sublabel, amount, count, countLabel = "حجز", accent }) {
+  return (
+    <div className="bg-card border border-border rounded-2xl p-3">
+      <div className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mb-2 ${accent}`}>
+        <DollarSign className="w-4 h-4" aria-hidden="true" />
+      </div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-[10px] text-muted-foreground/70 mb-1.5">{sublabel}</p>
+      {amount !== null ? (
+        <>
+          <p className={`text-xl font-bold ${accent.split(" ")[0]}`}>₪{amount.toLocaleString()}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{count} {countLabel}</p>
+        </>
+      ) : (
+        <p className={`text-xl font-bold ${accent.split(" ")[0]}`}>{count} {countLabel}</p>
+      )}
     </div>
   );
 }

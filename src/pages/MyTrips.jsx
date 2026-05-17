@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
-  Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy
+  Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy, Repeat
 } from "lucide-react";
 import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
 import { MessageCircle } from "lucide-react";
@@ -728,6 +728,53 @@ export default function MyTrips() {
                           <CheckCircle className="w-3 h-3 text-accent" />
                           شكراً — تم تقييم هذه الرحلة ✅
                         </p>
+                      )}
+
+                      {/* Book again — passenger-side mirror of the driver's
+                          repost button. Appears on completed trips where the
+                          user was a passenger (booked, not the driver). Drops
+                          them into /search-trips pre-scoped to the same route,
+                          so they can pick a fresh trip on the route they've
+                          travelled before.
+
+                          Why /search-trips and not /request-trip:
+                          - The most common passenger flow is "find me an
+                            existing trip on this route" not "post a new
+                            request and wait". Search-first matches the
+                            existing-driver supply.
+                          - SearchTrips already reads from/to/date URL params
+                            (lines 22-24), so navigating with them produces
+                            an immediate scoped result.
+
+                          Why no date prefill (unlike a more aggressive
+                          'rebook next Monday' default):
+                          - Forcing the date picker open keeps the user in
+                            control of when they want to travel. Auto-picking
+                            a date risks them booking the wrong day if they
+                            click straight through.
+                          - Empty date in SearchTrips means 'any date',
+                            which is the most useful default for power
+                            commuters scanning availability across the week.
+
+                          Source: scale audit P1 #6 (2h estimate). */}
+                      {bookedTripIds.has(trip.id)
+                        && !driverTrips.find(dt => dt.id === trip.id)
+                        && (status === "completed" || status === "cancelled") && (
+                        <div className="mt-3 mx-4">
+                          <Link
+                            to={`/search?from=${encodeURIComponent(trip.from_city || "")}&to=${encodeURIComponent(trip.to_city || "")}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full flex items-center justify-center gap-2 bg-accent/5 hover:bg-accent/10 border border-accent/20 rounded-xl px-4 py-2.5 transition-colors active:scale-[0.99]"
+                          >
+                            <Repeat className="w-4 h-4 text-accent" aria-hidden="true" />
+                            <span className="text-sm font-bold text-accent">
+                              احجز رحلة مماثلة
+                            </span>
+                            <span className="text-[10px] text-muted-foreground mr-1">
+                              ({trip.from_city} → {trip.to_city})
+                            </span>
+                          </Link>
+                        </div>
                       )}
 
                       {/* Repost button — driver's own completed/cancelled trips
