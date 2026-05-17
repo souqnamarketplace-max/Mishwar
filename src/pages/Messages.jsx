@@ -349,7 +349,7 @@ export default function Messages() {
   // friendly notice instead of a raw error.
   const activeIsDeleted = isDeletedUserEmail(activeConv?.otherEmail);
 
-  // ─── Auto-open from URL params (fires ONCE per to+trip URL combo) ───
+  // ─── Auto-open from URL params (fires ONCE per to+trip+request URL combo) ───
   const autoOpenedRef = useRef(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -359,7 +359,12 @@ export default function Messages() {
     // Without this, conversations.length changing (e.g. after send) re-fires
     // this effect and forces UI back to the URL's trip — closing the conv
     // the user just switched to.
-    const urlKey = `${paramTo}__${paramTrip || ''}`;
+    //
+    // Include paramRequest in the key so navigating between two requests
+    // with the same passenger re-fires correctly. Without it, the second
+    // request would inherit the autoOpenedRef from the first and never
+    // switch threads.
+    const urlKey = `${paramTo}__${paramTrip || ''}__${paramRequest || ''}`;
     if (autoOpenedRef.current === urlKey) return;
     autoOpenedRef.current = urlKey;
     if (paramTrip) {
@@ -375,8 +380,35 @@ export default function Messages() {
         setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
         setActiveId("__new__");
       }
+    } else if (paramRequest) {
+      // STRICT per-request mode (same shape as the per-trip branch):
+      // when the driver arrives from /passenger-requests/:id → 'راسل الراكب',
+      // the chat must be scoped to THIS request specifically. If the driver
+      // happens to already have a chat with this passenger from a different
+      // context — e.g. the passenger booked a trip the driver posted last
+      // week — falling through to the email-only match below would dump
+      // the request reply into that old trip thread, which is exactly the
+      // bug @souqnamarketplace reported.
+      //
+      // Match only on (otherEmail + a message with this request_id). If no
+      // such thread exists, force "__new__" so the first send creates a
+      // fresh conv keyed by request_id (see the requestIdToPersist branch
+      // in the send handler below — it picks up paramRequest from the URL
+      // when activeConv.id === "__new__").
+      const requestScoped = conversations.find(c =>
+        c.otherEmail === paramTo && c.messages?.some(m => m.request_id === paramRequest)
+      );
+      if (requestScoped) {
+        setActiveId(requestScoped.id);
+        setNewConv(null);
+      } else {
+        setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+        setActiveId("__new__");
+      }
     } else {
-      // No trip context — legacy behavior, prefer existing email-pair convo.
+      // No trip or request context — legacy behavior, prefer existing email-pair convo.
+      // This branch is reached only when the driver/passenger opens /messages
+      // directly with just ?to=, e.g. from the profile page's "Message" button.
       const existing = conversations.find(c => c.otherEmail === paramTo);
       if (existing) {
         setActiveId(existing.id);
@@ -386,7 +418,7 @@ export default function Messages() {
         setActiveId("__new__");
       }
     }
-  }, [paramTo, paramTrip, user?.email, conversations.length]);
+  }, [paramTo, paramTrip, paramRequest, user?.email, conversations.length]);
 
   // ─── Auto-scroll ───
   useEffect(() => {
