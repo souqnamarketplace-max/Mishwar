@@ -33,12 +33,23 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/AuthContext";
 import { CheckCircle2, XCircle, Loader2, Home } from "lucide-react";
 
 export default function Unsubscribe() {
   const [searchParams] = useSearchParams();
   const email = searchParams.get("email") || "";
   const token = searchParams.get("token") || "";
+
+  // useAuth is null-safe — Unsubscribe is mounted outside AppLayout
+  // so it works for logged-out users too. When the user IS logged in
+  // (most common case — they clicked the link in the same browser
+  // they're signed into), we call refreshUser() after a successful
+  // unsubscribe so the in-app notification toggle reflects the new
+  // FALSE state immediately. Without this, navigating back to
+  // /account?section=notifications shows the stale TRUE state until
+  // the user does a hard refresh — confusing UX.
+  const auth = useAuth();
 
   // state machine: 'loading' | 'success' | 'already' | 'invalid' | 'error'
   const [status, setStatus] = useState("loading");
@@ -75,6 +86,15 @@ export default function Unsubscribe() {
           setResolvedEmail(data.email || email);
           // Distinguish first unsubscribe from re-clicking (idempotent)
           setStatus(data.note === "already_unsubscribed" ? "already" : "success");
+
+          // Refresh the cached user object so the in-app notification
+          // toggle reflects the new FALSE state. No-op if the visitor
+          // isn't signed in (refreshUser silently does nothing without
+          // a session). Fire-and-forget — the visual state machine
+          // already moved to "success", we don't gate on this.
+          if (auth?.refreshUser) {
+            auth.refreshUser().catch(() => {});
+          }
         } else if (data?.error === "invalid_token" || data?.error === "invalid_token_format") {
           setStatus("invalid");
         } else if (data?.error === "service_unavailable") {
@@ -92,7 +112,7 @@ export default function Unsubscribe() {
 
     doUnsubscribe();
     return () => { cancelled = true; };
-  }, [email, token]);
+  }, [email, token, auth]);
 
   return (
     <div
