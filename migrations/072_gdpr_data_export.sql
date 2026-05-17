@@ -62,15 +62,38 @@
 BEGIN;
 
 -- ─── 1. Export audit log + rate-limit table ────────────────────────────
+--
+-- NO FK to public.profiles. Two reasons:
+--
+--   1. profiles.email has no UNIQUE constraint in production, so a FK
+--      referencing it would fail at CREATE TABLE with
+--      'no unique constraint matching given keys for referenced table'
+--      (Postgres requires the referenced column to be unique).
+--
+--   2. The audit log SHOULD persist after account deletion. GDPR Article
+--      30 (records of processing) requires that we can show — for some
+--      regulatory window — that we honored a data export request, even
+--      if the user later deletes their account. ON DELETE CASCADE would
+--      wipe that paper trail. user_email in this table is treated as
+--      free-form text, populated only by the SECURITY DEFINER RPC from
+--      auth.email() so it's guaranteed valid at insert time.
+--
+-- After account deletion, the email value rotates to the
+-- 'deleted-{uuid}@deleted.local' form (per mig 003). That's the correct
+-- anonymized state for the audit log to preserve.
 CREATE TABLE IF NOT EXISTS public.data_export_log (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_email TEXT NOT NULL,
   exported_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ip_hint    TEXT,                    -- optional, for support investigation
-  bytes      INTEGER,                 -- size of payload for capacity planning
-  CONSTRAINT data_export_log_user_email_fk
-    FOREIGN KEY (user_email) REFERENCES public.profiles(email) ON DELETE CASCADE
+  bytes      INTEGER                  -- size of payload for capacity planning
 );
+
+-- Defensive: if a previous version of this migration (with the FK) was
+-- partially applied in some environment, drop the constraint so re-runs
+-- succeed. IF EXISTS makes this a no-op when the constraint isn't there.
+ALTER TABLE public.data_export_log
+  DROP CONSTRAINT IF EXISTS data_export_log_user_email_fk;
 
 CREATE INDEX IF NOT EXISTS idx_data_export_log_user_time
   ON public.data_export_log(user_email, exported_at DESC);
