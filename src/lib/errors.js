@@ -86,7 +86,7 @@ const KNOWN_PATTERNS = [
   [/network[_ ]?error|networkerror|failed to fetch|fetch.*failed/i,
                                                            "لا يوجد اتصال بالإنترنت — تحقق من شبكتك وحاول مجدداً"],
   [/timeout|timed out|aborted/i,                           "استغرقت العملية وقتاً أطول من المتوقع. تحقق من الإنترنت وحاول مجدداً"],
-  [/rate limit|too many requests|429/i,                    "طلبات كثيرة من حسابك — انتظر دقيقة وحاول مجدداً"],
+  [/rate limit|too many requests|429/i,                    "طلبات كثيرة في وقت قصير — انتظر دقيقة وحاول مجدداً"],
   [/^5\d\d|internal server error|service unavailable|bad gateway/i,
                                                            "الخادم لا يستجيب حالياً — حاول بعد دقيقة"],
   [/cors|blocked by cors/i,                                "تعذر الاتصال بالخادم — يرجى تحديث الصفحة"],

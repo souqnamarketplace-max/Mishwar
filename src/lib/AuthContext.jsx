@@ -393,7 +393,13 @@ export const AuthProvider = ({ children }) => {
         throw new Error('يجب تأكيد البريد الإلكتروني أولاً. تحقق من بريدك');
       }
       if (error.message?.includes('rate limit')) {
-        throw new Error('محاولات كثيرة جداً. حاول مرة أخرى بعد دقائق');
+        // Server-side (Supabase) rate limit — distinct from the
+        // client-side 5/15min throttle in Login.jsx but indistinguishable
+        // to the user. Same "من هذا الجهاز" wording so the experience
+        // is consistent regardless of which limit they hit, and points
+        // at the password-reset flow as an out (recover endpoint is
+        // separately rate-limited).
+        throw new Error('محاولات تسجيل دخول كثيرة من هذا الجهاز. انتظر بضع دقائق، أو استخدم "نسيت كلمة المرور؟" لاستعادة حسابك.');
       }
       throw error;
     }

@@ -168,7 +168,17 @@ export default function Login() {
     if (!isValidEmail(form.email)) { toast.error('صيغة البريد الإلكتروني غير صحيحة'); return; }
     if (!checkRateLimit()) {
       const mins = Math.ceil((getRateLimit().until - Date.now()) / 60000);
-      toast.error(`تم تجاوز عدد المحاولات. انتظر ${mins} دقيقة`);
+      // Explicit "من هذا الجهاز" wording so users don't think the lock
+      // is account-specific and waste time trying other emails — the
+      // counter is per-device (localStorage), not per-email. Suggests
+      // the password-reset flow as an out: it goes through Supabase's
+      // /auth/v1/recover endpoint, which is rate-limited separately,
+      // so a locked-out user can still recover access immediately
+      // instead of waiting the full 15 minutes.
+      toast.error(
+        `محاولات تسجيل دخول كثيرة من هذا الجهاز. انتظر ${mins} دقيقة، أو استخدم "نسيت كلمة المرور؟" أدناه لاستعادة حسابك.`,
+        { duration: 8000 }
+      );
       return;
     }
     setLoading(true);
