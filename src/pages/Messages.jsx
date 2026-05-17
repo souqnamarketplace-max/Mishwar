@@ -446,11 +446,24 @@ export default function Messages() {
   // of N individual queries). For a chat with 50 unread messages
   // that's 50 parallel network requests. Replaced with a single
   // UPDATE using .in() — one round trip regardless of unread count.
+  //
+  // SECONDARY: clear matching message-notifications. As of migration
+  // 064, every new message inserts a notification row keyed by
+  // type='message' and created_by=<sender_email>. Without this side-
+  // effect, opening a chat would mark MESSAGES read but leave the
+  // bell badge counting the (now-stale) notifications. Single
+  // additional UPDATE keyed on (type, user_email, created_by, is_read)
+  // — same shape as the messages mark-read, one round trip.
   useEffect(() => {
     if (!activeConv || !user?.email) return;
     const unread = activeConv.messages.filter(m => m.receiver_email === user.email && !m.is_read);
     if (unread.length === 0) return;
     const unreadIds = unread.map(m => m.id);
+    // Distinct sender emails across the unread set. Usually 1 (the
+    // other party) — defensive for edge cases like admin-impersonation
+    // or future group-chat. Cap at the unique sender list to avoid
+    // touching unrelated notification rows in batched calls.
+    const senderEmails = Array.from(new Set(unread.map(m => m.sender_email).filter(Boolean)));
     supabase
       .from("messages")
       .update({ is_read: true })
@@ -467,6 +480,29 @@ export default function Messages() {
         qc.invalidateQueries({ queryKey: ["unread-messages-count", user.email] });
         qc.invalidateQueries({ queryKey: ["mobile-msg-badge", user.email] });
       });
+    // Clear message-type notifications from these senders. Best-effort:
+    // the bell badge will eventually self-correct on next bell refresh
+    // even if this UPDATE fails. Don't block messages mark-read on this.
+    if (senderEmails.length > 0) {
+      supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_email", user.email)
+        .eq("type", "message")
+        .eq("is_read", false)
+        .in("created_by", senderEmails)
+        .then(({ error }) => {
+          if (error) {
+            if (import.meta.env.DEV) {
+              // eslint-disable-next-line no-console
+              console.warn("[Messages] notification mark-read failed:", error);
+            }
+            return;
+          }
+          qc.invalidateQueries({ queryKey: ["notifications", user.email] });
+          qc.invalidateQueries({ queryKey: ["notifications-unread-count", user.email] });
+        });
+    }
   }, [activeId, activeConv, user?.email, qc]);
 
   // ─── Mobile chat overlay mode ───
@@ -1307,44 +1343,179 @@ function ImageViewer({ url, onClose }) {
   );
 }
 
-// Location bubble — pin icon + lat/lng + "Open in Maps" button. We
-// deliberately skip a static map preview thumbnail because (a) it
-// requires a Maps API key with billing enabled, and (b) Mishwaro
-// already has Leaflet for the request city picker but instantiating
-// a fresh Leaflet map per location bubble is expensive on long
-// threads. Future iteration: render a tiny Leaflet thumbnail with
-// pan/zoom disabled.
+// Location bubble — small Leaflet map preview + 'Open in Maps' link.
+//
+// PERFORMANCE — INTERSECTIONOBSERVER LAZY MOUNT
+// A long thread with many location messages could mount many Leaflet
+// instances simultaneously, each pulling tile resources. We use an
+// IntersectionObserver to defer the map init until the bubble actually
+// scrolls into view, then KEEP it mounted (we don't unmount on
+// off-screen — that would re-init on every scroll past). Same
+// pattern as lazy image loading: pay the cost once, when visible.
+//
+// LAYOUT — RESERVE SPACE BEFORE MOUNT
+// The map container has fixed dimensions (240x160) reserved BEFORE
+// the map mounts. Without this, the bubble would be small until the
+// map mounted and then jump in size — bad UX on a scrolling thread.
+//
+// INTERACTION — READ-ONLY
+// Tap/click the map → opens Google Maps externally. No pan, no zoom,
+// no double-tap-to-zoom. The bubble is a preview; the real navigation
+// is the external maps app.
 function LocationBubble({ message, mine, otherName, otherImgSrc }) {
   const url = buildMapsUrl(message.latitude, message.longitude);
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Watch for visibility — only mount the map when the bubble enters
+  // the viewport. rootMargin: '200px' pre-mounts maps that are about
+  // to be scrolled into view, smoothing the scroll experience without
+  // bulk-mounting offscreen ones.
+  useEffect(() => {
+    if (mounted) return;
+    if (!mapContainerRef.current) return;
+    if (typeof IntersectionObserver === "undefined") {
+      // Old browser without IntersectionObserver — mount immediately.
+      // Functionally equivalent; trades the perf optimization for
+      // baseline correctness.
+      setMounted(true);
+      return;
+    }
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some(e => e.isIntersecting)) {
+          setMounted(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    obs.observe(mapContainerRef.current);
+    return () => obs.disconnect();
+  }, [mounted]);
+
+  // Mount the Leaflet map once `mounted` flips true. Cleanup on unmount
+  // — important because the bubble could be unmounted by React when
+  // virtualization kicks in or the conversation changes; without
+  // map.remove() the Leaflet instance would leak its container + tile
+  // listeners.
+  useEffect(() => {
+    if (!mounted) return;
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;     // defensive — never double-init
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const L = (await import("leaflet")).default;
+        if (cancelled || !mapContainerRef.current) return;
+        // Ensure Leaflet CSS is on the page. Loaded once globally for
+        // the whole app (idempotent — same id, same href as the
+        // city-picker uses), so subsequent bubbles just rely on it
+        // being present.
+        if (!document.getElementById("mishwar-leaflet-css")) {
+          const link = document.createElement("link");
+          link.id   = "mishwar-leaflet-css";
+          link.rel  = "stylesheet";
+          link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          document.head.appendChild(link);
+        }
+        const lat = Number(message.latitude);
+        const lng = Number(message.longitude);
+        const map = L.map(mapContainerRef.current, {
+          center: [lat, lng],
+          zoom: 15,
+          // Read-only preview — kill every interaction.
+          dragging:         false,
+          scrollWheelZoom:  false,
+          doubleClickZoom:  false,
+          touchZoom:        false,
+          boxZoom:          false,
+          keyboard:         false,
+          zoomControl:      false,
+          attributionControl: false,
+          tap:              false,   // disables the click-after-touch
+        });
+        mapInstanceRef.current = map;
+
+        L.tileLayer(
+          "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+          { subdomains: "abcd", maxZoom: 19, attribution: "" }
+        ).addTo(map);
+
+        // Use a CircleMarker instead of the default icon — avoids the
+        // marker-icon-broken-in-Vite dance (fixLeafletIcons elsewhere)
+        // and renders crisply at any retina density. The bullseye look
+        // also reads as "you are here" without the pin-shape ambiguity.
+        L.circleMarker([lat, lng], {
+          radius: 7,
+          color: "#ffffff",
+          weight: 2,
+          fillColor: "#1a3d2a",   // mishwaro forest green
+          fillOpacity: 1,
+        }).addTo(map);
+      } catch (e) {
+        // Leaflet load failure — leave the placeholder div visible.
+        // The 'Open in Maps' link below still works, so the bubble
+        // remains useful even if the preview never renders.
+        if (import.meta.env.DEV) {
+          console.warn("LocationBubble map init failed:", e);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (mapInstanceRef.current) {
+        try { mapInstanceRef.current.remove(); } catch { /* */ }
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [mounted, message.latitude, message.longitude]);
+
   return (
     <div className={`flex items-end gap-2 ${mine ? "justify-start" : "justify-end flex-row-reverse"}`}>
       {!mine && <Avatar name={otherName} size={28} className="mb-1" imgSrc={otherImgSrc} />}
-      <div className={`max-w-[75%] rounded-2xl px-3.5 py-2 ${
+      <div className={`max-w-[75%] rounded-2xl overflow-hidden ${
         mine
           ? "bg-primary text-primary-foreground rounded-br-md"
           : "bg-card border border-border rounded-bl-md"
       }`}>
+        {/* Map preview — wraps the map div in an anchor so the entire
+            preview is the tap target for opening external maps. */}
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`flex items-center gap-2 py-1 ${
-            mine ? "text-primary-foreground" : "text-foreground"
-          }`}
+          aria-label="فتح الموقع في الخرائط"
+          className="block"
         >
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-            mine ? "bg-primary-foreground/15" : "bg-primary/10"
-          }`}>
-            <MapPin className={`w-5 h-5 ${mine ? "text-primary-foreground" : "text-primary"}`} />
+          <div
+            ref={mapContainerRef}
+            className="w-[240px] h-[160px] bg-muted relative"
+          >
+            {/* Placeholder while map hasn't mounted yet — shows a pin
+                centered in the reserved space so the layout never
+                shifts when the real tiles paint over the top. */}
+            {!mounted && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <MapPin className="w-7 h-7 text-muted-foreground/60" />
+              </div>
+            )}
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium">موقع مُشارَك</p>
-            <p className={`text-xs ${mine ? "text-primary-foreground/70" : "text-muted-foreground"} underline`}>
-              فتح في الخرائط ←
-            </p>
+          <div className={`flex items-center gap-2 px-3 py-2 ${
+            mine ? "text-primary-foreground" : "text-foreground"
+          }`}>
+            <MapPin className={`w-4 h-4 ${mine ? "text-primary-foreground" : "text-primary"}`} />
+            <span className="text-sm font-medium">موقع مُشارَك</span>
+            <span className={`text-xs ml-auto ${mine ? "text-primary-foreground/70" : "text-muted-foreground"} underline`}>
+              فتح ←
+            </span>
           </div>
         </a>
-        <p className={`text-[10px] mt-1 ${
+        <p className={`text-[10px] px-3 pb-1 ${
           mine ? "text-primary-foreground/70" : "text-muted-foreground"
         } text-left`}>
           {formatTimeShort(message.created_at)}
