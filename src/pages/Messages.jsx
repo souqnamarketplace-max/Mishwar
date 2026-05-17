@@ -820,6 +820,14 @@ export default function Messages() {
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">الرسائل</h1>
           <p className="text-muted-foreground text-sm mt-1">محادثاتك مع السائقين والركاب</p>
+          {/* Retention notice. Subtle so it doesn't alarm — most users
+              never think about message lifetimes. Surfaces here so we
+              never have to answer "where did my old messages go?" in
+              support tickets. Matches the policy enforced by the daily
+              pg_cron job in migration 071. */}
+          <p className="text-muted-foreground/70 text-[11px] mt-1">
+            تُحذف الرسائل تلقائياً بعد 30 يوم من انتهاء الرحلة
+          </p>
         </div>
 
         <div
