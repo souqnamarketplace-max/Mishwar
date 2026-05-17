@@ -565,19 +565,14 @@ serve(async (req) => {
 
   // ─── Preference gate — type-dependent ──────────────────────────────
   // Transactional types check notif_email (default-on, NULL or true =>
-  // send). Marketing 'broadcast' type checks notif_MARKETING — same
-  // toggle the admin asked about earlier. NULL is treated as opt-OUT
-  // for marketing (stricter than transactional, matching the
-  // affirmative-consent requirement of marketing email regulations).
-  //
-  // Note: by the time we get here for 'broadcast', the SQL audience
-  // filter in admin_send_broadcast() already pre-filtered by
-  // notif_marketing = TRUE — so the row only exists if the user is
-  // opted in. We re-check here as defense in depth (someone could
-  // manually INSERT a broadcast notification bypassing the RPC).
+  // send). Marketing 'broadcast' type checks notif_MARKETING. As of
+  // migration 069, marketing is ALSO default-on — NULL or true = send,
+  // only explicit FALSE skips. (Was strict opt-in: !== true; changed
+  // to default-on at user request. Compliance safety net is the
+  // working unsubscribe link in every marketing email.)
   if (type === "broadcast") {
-    if (profile.notif_marketing !== true) {
-      return new Response(JSON.stringify({ skipped: "user_not_opted_in_marketing" }), {
+    if (profile.notif_marketing === false) {
+      return new Response(JSON.stringify({ skipped: "user_unsubscribed_marketing" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });

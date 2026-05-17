@@ -121,7 +121,11 @@ export default function NotificationPrefsSection({ user, onSaved }) {
   const [push, setPush]            = useState(user?.notif_push !== false);
   const [email, setEmail]          = useState(user?.notif_email !== false);
   const [sms, setSms]              = useState(user?.notif_sms === true);
-  const [marketing, setMarketing]  = useState(user?.notif_marketing === true);
+  // CHANGED in mig 069: marketing is now default-ON. Was `=== true`
+  // (only explicit true rendered ON, NULL = OFF). Now `!== false`
+  // (NULL/true both ON, only explicit FALSE renders OFF). Matches the
+  // new column default + backfill from migration 069.
+  const [marketing, setMarketing]  = useState(user?.notif_marketing !== false);
   const [saving, setSaving]        = useState(false);
 
   // Sync local toggle state when the parent's user object updates
@@ -132,7 +136,7 @@ export default function NotificationPrefsSection({ user, onSaved }) {
     setPush(user?.notif_push !== false);
     setEmail(user?.notif_email !== false);
     setSms(user?.notif_sms === true);
-    setMarketing(user?.notif_marketing === true);
+    setMarketing(user?.notif_marketing !== false);
   }, [user?.notif_push, user?.notif_email, user?.notif_sms, user?.notif_marketing]);
 
   // Detect whether we're running inside a Capacitor native shell. The

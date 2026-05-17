@@ -273,6 +273,20 @@ export const AuthProvider = ({ children }) => {
         pref_pets:       profile?.pref_pets       ?? null,
         vehicle_luggage: profile?.vehicle_luggage ?? null,
         vehicle_back_row: profile?.vehicle_back_row ?? null,
+        // ── Notification preferences (used by /account → notifications) ──
+        // CRITICAL: these MUST be projected here. NotificationPrefsSection
+        // reads them via the user prop and renders the toggles based on
+        // those values. Omitting them caused the marketing toggle to
+        // revert to OFF on every page refresh — DB had TRUE, but
+        // user.notif_marketing was undefined here, so the toggle's
+        // initial state computed `undefined === true` → false. Push +
+        // email had the same silent bug; they appeared correct only
+        // because their UI reads `!== false` (NULL/undefined/true all
+        // render ON).
+        notif_push:      profile?.notif_push      ?? null,
+        notif_email:     profile?.notif_email     ?? null,
+        notif_sms:       profile?.notif_sms       ?? null,
+        notif_marketing: profile?.notif_marketing ?? null,
         // ── Payment fields (via get_my_payment_info RPC, owner-only) ──
         bank_name:           payment?.bank_name           ?? null,
         bank_account_name:   payment?.bank_account_name   ?? null,
