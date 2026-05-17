@@ -264,13 +264,19 @@ export default function NotificationPrefsSection({ user, onSaved }) {
       />
 
       <Toggle checked={push} onChange={setPush} icon={Bell} title="الإشعارات داخل التطبيق" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" recommended />
-      {/* SMS and Email are intentionally marked "قريباً" — there is no SMS
-          gateway (Twilio/local provider) or transactional email sender wired
-          into the backend yet. Showing the toggle as actionable would let
-          users disable a delivery channel that doesn't exist, then wonder
-          why they aren't getting messages they never could have received. */}
+      {/* SMS is marked "قريباً" — there is no SMS gateway (Twilio/local
+          provider) wired into the backend yet. Showing the toggle as
+          actionable would let users disable a delivery channel that
+          doesn't exist, then wonder why they aren't getting messages
+          they never could have received.
+
+          EMAIL is now live (mig 066 + Resend Edge Function). Transactional
+          types — booking_confirmed / booking_cancelled / trip_cancelled /
+          trip_reminder — fire emails to opted-in users. So the email
+          toggle is actionable: NULL or true → user gets transactional
+          emails; false → all transactional emails are skipped silently. */}
       <Toggle checked={sms} onChange={setSms} icon={MessageSquare} title="الرسائل النصية SMS" desc="للحجوزات الجديدة والإلغاءات فقط" comingSoon />
-      <Toggle checked={email} onChange={setEmail} icon={Mail} title="البريد الإلكتروني" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" comingSoon />
+      <Toggle checked={email} onChange={setEmail} icon={Mail} title="البريد الإلكتروني" desc="تأكيد الحجوزات، الإلغاءات، تذكير الرحلات" />
       <Toggle checked={marketing} onChange={setMarketing} icon={Megaphone} title="العروض والتسويق" desc="عروض خاصة، ميزات جديدة، أخبار مشواروو" />
 
       <Button onClick={save} disabled={saving} className="w-full rounded-xl bg-primary text-primary-foreground mt-4">
