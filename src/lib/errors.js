@@ -99,6 +99,13 @@ const KNOWN_PATTERNS = [
   [/password should contain at least one character|weak[_ ]?password/i,
                                                            "كلمة المرور ضعيفة. يجب أن تحتوي على حرف كبير وحرف صغير ورقم"],
   [/password.*at least.*characters/i,                      "كلمة المرور قصيرة جداً — استخدم 8 أحرف على الأقل"],
+  // Supabase 'Leaked password protection' — checks new passwords against the
+  // HaveIBeenPwned breach corpus (~850M known compromised passwords). Triggers
+  // even when the password meets the length/complexity rules, if it has ever
+  // appeared in a public breach. Common matches: 'Password123', 'Welcome2024',
+  // any password the user has reused from a breached site.
+  [/password.*(?:known|found).*(?:weak|breach|easy to guess|compromised)|pwned|leaked password/i,
+                                                           "هذه الكلمة شائعة وموجودة في تسريبات معروفة — اختر كلمة مرور أخرى لم تستخدمها في موقع آخر"],
   [/for security purposes.*request this after (\d+)\s*seconds?/i,
                                                            "أرسلت طلب من قبل قريباً — حاول مجدداً بعد دقيقة"],
   [/database error saving new user/i,                      "تعذر إنشاء الحساب بسبب خطأ في النظام — يرجى التواصل مع الدعم"],
