@@ -250,6 +250,28 @@ export const AuthProvider = ({ children }) => {
       try { queryClientInstance.setQueryData(["me"], fullUser); } catch {}
       setIsAuthenticated(true);
       setAuthError(null);
+
+      // ─── Native push registration ───
+      // Fire-and-forget. Idempotent — safe to call on every auth state
+      // transition (sign-in, token refresh, app boot with existing
+      // session). On native iOS / Android this:
+      //   1. Asks the OS for push permission (only once — iOS won't
+      //      re-prompt after the first answer)
+      //   2. Calls Push.register() which triggers APNS registration
+      //      and adds the "Notifications" row to Settings → Mishwaro
+      //   3. Receives the FCM token via the 'registration' listener
+      //   4. Upserts the token into device_tokens via RPC
+      // On web this is a no-op (Capacitor.isNativePlatform() = false).
+      //
+      // We deliberately don't await this — push registration shouldn't
+      // gate the rest of the auth flow. If APNS is slow or unreachable
+      // (e.g. behind a corporate proxy), the user still gets in and
+      // realtime notifications still work; only the lock-screen banners
+      // are deferred until the token resolves.
+      //
+      // Errors are captured inside registerNativePush via captureException
+      // so we don't need a try/catch here.
+      registerNativePush();
     } catch (err) {
       captureException(err, { msg: 'Profile load error:' });
       // Even on error, set the user as authenticated with basic info
@@ -263,6 +285,11 @@ export const AuthProvider = ({ children }) => {
       });
       setIsAuthenticated(true);
       setAuthError(null);
+      // Same fire-and-forget native push registration as the success
+      // path above. We attempt it even when the profile fetch failed —
+      // the device should still receive push notifications regardless
+      // of whether the profile RPC was reachable.
+      registerNativePush();
     }
   };
 
