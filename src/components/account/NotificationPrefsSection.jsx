@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Bell, Mail, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, Info } from "lucide-react";
+import { Bell, Mail, MessageSquare, Megaphone, CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import {
@@ -31,7 +31,7 @@ import {
 //   - 'denied'     → warning + platform-aware instructions to re-enable
 //                    (browser-level setting, not something we can flip)
 //   - 'unsupported'→ info that the browser doesn't expose Notification API
-function PermissionStatusCard({ permission, onAsk, asking, isNative }) {
+function PermissionStatusCard({ permission, onAsk, asking, isNative, onDismiss }) {
   if (permission === "unsupported") {
     return (
       <div className="flex items-start gap-3 p-3 bg-muted/40 border border-border rounded-xl mb-4">
@@ -71,7 +71,7 @@ function PermissionStatusCard({ permission, onAsk, asking, isNative }) {
     // desktop Chrome/Safari and mobile Chrome.
     return (
       <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-4">
-        <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+        <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" aria-hidden="true" />
         <div className="flex-1">
           <p className="text-sm font-medium text-amber-900 dark:text-amber-200">إشعارات الجهاز معطّلة</p>
           <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1 leading-relaxed">
@@ -91,6 +91,18 @@ function PermissionStatusCard({ permission, onAsk, asking, isNative }) {
             </ul>
           )}
         </div>
+        {/* Dismiss — hides the warning for 7 days via localStorage.
+            The user has read the instructions; keeping the banner
+            permanent is noisy. They can still see permission state
+            from the absence of the green "granted" card. */}
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="shrink-0 w-7 h-7 rounded-lg hover:bg-amber-500/20 flex items-center justify-center text-amber-700 dark:text-amber-300 transition-colors"
+          aria-label="إخفاء هذا التحذير"
+        >
+          <X className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
       </div>
     );
   }
@@ -127,6 +139,35 @@ export default function NotificationPrefsSection({ user, onSaved }) {
   // new column default + backfill from migration 069.
   const [marketing, setMarketing]  = useState(user?.notif_marketing !== false);
   const [saving, setSaving]        = useState(false);
+
+  // Dismiss state for the 'إشعارات الجهاز معطلة' warning. Persisted to
+  // localStorage so it stays dismissed across page refreshes for 7 days.
+  // After 7 days the warning reappears — long enough to not be naggy,
+  // short enough that the user is reminded again before they forget
+  // and start wondering why their notifications never fire.
+  //
+  // Storage key includes the user's email so different accounts on the
+  // same browser don't share dismissals (mostly relevant in family/
+  // shared-device scenarios).
+  const DISMISS_KEY = user?.email ? `mw_perm_warn_dismissed_${user.email}` : null;
+  const DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+  const [warningDismissed, setWarningDismissed] = useState(() => {
+    if (!DISMISS_KEY || typeof window === "undefined") return false;
+    try {
+      const ts = parseInt(window.localStorage.getItem(DISMISS_KEY) || "0", 10);
+      return ts > 0 && Date.now() - ts < DISMISS_WINDOW_MS;
+    } catch {
+      // localStorage can throw in some private/sandbox modes — treat as
+      // not dismissed (show the warning) which is the safer default.
+      return false;
+    }
+  });
+  const dismissWarning = () => {
+    setWarningDismissed(true);
+    if (DISMISS_KEY && typeof window !== "undefined") {
+      try { window.localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* non-fatal */ }
+    }
+  };
 
   // Sync local toggle state when the parent's user object updates
   // (e.g. after the save() round-trip invalidates the 'me' query and
@@ -230,7 +271,7 @@ export default function NotificationPrefsSection({ user, onSaved }) {
   const Toggle = ({ checked, onChange, icon: Icon, title, desc, recommended, comingSoon }) => (
     <div className={`flex items-start gap-3 py-4 border-b border-border/50 ${comingSoon ? "opacity-60" : ""}`}>
       <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-        <Icon className="w-4 h-4 text-primary" />
+        <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
@@ -240,13 +281,33 @@ export default function NotificationPrefsSection({ user, onSaved }) {
         </div>
         <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
       </div>
+      {/* iOS-style toggle. Track uses bg-muted-foreground/30 when OFF so
+          it has visible contrast against the white card (the previous
+          bg-muted was nearly indistinguishable from the card background,
+          making the entire toggle render as a "floating white crescent"
+          and leaving users unable to tell ON from OFF at a glance).
+          ON state stays bg-primary (forest green) for clear differentiation.
+          Same pattern as the /notifications page route watchlist toggles. */}
       <button
         onClick={() => !comingSoon && onChange(!checked)}
         disabled={comingSoon}
-        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${checked && !comingSoon ? "bg-primary" : "bg-muted"} ${comingSoon ? "cursor-not-allowed" : ""}`}
-        role="switch" aria-checked={checked} aria-disabled={comingSoon || undefined}
+        type="button"
+        className={`relative w-12 h-7 rounded-full transition-colors duration-200 shrink-0 focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+          checked && !comingSoon ? "bg-primary" : "bg-muted-foreground/30"
+        } ${comingSoon ? "cursor-not-allowed" : "cursor-pointer"}`}
+        role="switch"
+        aria-checked={checked}
+        aria-disabled={comingSoon || undefined}
+        aria-label={`${title} — ${checked ? "مفعّل" : "معطّل"}`}
       >
-        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-all ${checked && !comingSoon ? "right-0.5" : "right-[1.4rem]"}`} />
+        <span
+          className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-200 ${
+            // RTL: in 'ON' state the thumb sits on the LEFT end of the
+            // track (mirror of the LTR convention). Using transform
+            // rather than right-X so the animation is smooth.
+            checked && !comingSoon ? "right-0.5" : "right-[1.6rem]"
+          }`}
+        />
       </button>
     </div>
   );
@@ -259,13 +320,22 @@ export default function NotificationPrefsSection({ user, onSaved }) {
           users see the OS state before flipping the profile preference.
           Previously, a user could enable notif_push in their profile
           while the BROWSER had notifications denied and see no indication
-          why notifications weren't actually arriving. */}
-      <PermissionStatusCard
-        permission={permission}
-        onAsk={askPermission}
-        asking={asking}
-        isNative={isNative}
-      />
+          why notifications weren't actually arriving.
+
+          The 'denied' warning can be dismissed (X button on the card)
+          and stays dismissed for 7 days via localStorage. The 'granted'
+          and 'default' states aren't dismissible — they're either
+          confirmation (green check) or a CTA, neither of which is
+          spammy enough to need hiding. */}
+      {!(permission === "denied" && warningDismissed) && (
+        <PermissionStatusCard
+          permission={permission}
+          onAsk={askPermission}
+          asking={asking}
+          isNative={isNative}
+          onDismiss={dismissWarning}
+        />
+      )}
 
       <Toggle checked={push} onChange={setPush} icon={Bell} title="الإشعارات داخل التطبيق" desc="لكل النشاطات المهمة: الحجوزات، الرسائل، التقييمات" recommended />
       {/* SMS is marked "قريباً" — there is no SMS gateway (Twilio/local
