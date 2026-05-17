@@ -216,10 +216,18 @@ BEGIN
     ), '[]'::JSONB),
 
     -- 8. Reviews RECEIVED
+    --
+    -- NOTE: the column is reviewed_email, not reviewee_email. The
+    -- naming is a base44 quirk — the original schema author treated
+    -- 'reviewed' as the noun (the person being reviewed) rather than
+    -- 'reviewee' (which is more correct English). The codebase
+    -- standardized on reviewed_email everywhere (see mig 002 reviews
+    -- RLS policy, mig 003 anonymization function). Keeping it for
+    -- compatibility.
     'reviews_received', COALESCE((
       SELECT jsonb_agg(to_jsonb(rv) ORDER BY rv.created_at DESC)
         FROM public.reviews rv
-       WHERE rv.reviewee_email = v_email
+       WHERE rv.reviewed_email = v_email
     ), '[]'::JSONB),
 
     -- 9. Reports FILED by user
