@@ -44,14 +44,27 @@ export default function AppLayout() {
     return (
       <>
         <NetworkStatus />
+        {/* ─── Skip to main content link (mobile) ────────────────────
+            WCAG 2.4.1 (Bypass Blocks). Mobile keyboard users (Bluetooth
+            keyboard on phone, accessibility switches) and screen-reader
+            users can skip the mobile-nav drawer and bottom tab bar to
+            land on the page content directly. Visible only on focus. */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[200] focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+        >
+          تخطّي إلى المحتوى الرئيسي
+        </a>
         <MobileLayout user={user}>
-          <PullToRefresh>
-            <AnimatePresence mode="wait">
-              <PageTransition key={location.pathname}>
-                <Outlet />
-              </PageTransition>
-            </AnimatePresence>
-          </PullToRefresh>
+          <main id="main-content" tabIndex={-1}>
+            <PullToRefresh>
+              <AnimatePresence mode="wait">
+                <PageTransition key={location.pathname}>
+                  <Outlet />
+                </PageTransition>
+              </AnimatePresence>
+            </PullToRefresh>
+          </main>
         </MobileLayout>
       </>
     );

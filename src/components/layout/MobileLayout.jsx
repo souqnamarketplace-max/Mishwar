@@ -154,8 +154,11 @@ export default function MobileLayout({ children, user, showHeader = true, header
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
                 className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+                aria-label={showMobileMenu ? "إغلاق القائمة" : "فتح القائمة"}
+                aria-expanded={showMobileMenu}
+                aria-controls="mobile-menu-drawer"
               >
-                {showMobileMenu ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {showMobileMenu ? <X className="w-5 h-5" aria-hidden="true" /> : <Menu className="w-5 h-5" aria-hidden="true" />}
               </button>
               {/* Anonymous CTA — without this, mobile visitors had zero
                   visible auth surface anywhere on the screen (Navbar.jsx
@@ -352,8 +355,13 @@ export default function MobileLayout({ children, user, showHeader = true, header
       {/* Mobile Menu Overlay + Drawer */}
       {showMobileMenu && (
         <>
-          <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileMenu(false)} />
-          <div className="fixed top-0 right-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowMobileMenu(false)} aria-hidden="true" />
+          <div
+            id="mobile-menu-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="القائمة"
+            className="fixed top-0 right-0 bottom-0 z-50 w-72 bg-card shadow-2xl flex flex-col overflow-hidden"
             style={{ borderRadius: "24px 0 0 24px" }}>
 
             {user ? (
