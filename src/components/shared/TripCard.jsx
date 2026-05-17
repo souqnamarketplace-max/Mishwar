@@ -252,6 +252,7 @@ function Card({ t, noSeats, urgentSeats }) {
           {/* Share */}
           <button
             onClick={(e) => share(e, t.id)}
+            aria-label="مشاركة الرحلة"
             className="shrink-0 w-8 h-8 flex items-center justify-center rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/8 active:bg-primary/15 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />

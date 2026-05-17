@@ -472,8 +472,10 @@ export default function Login() {
                       autoFocus
                     />
                     <button type="button" onClick={() => setShowNewPassword(!showNewPassword)}
+                      aria-label={showNewPassword ? "إخفاء كلمة المرور الجديدة" : "إظهار كلمة المرور الجديدة"}
+                      aria-pressed={showNewPassword}
                       className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showNewPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                     </button>
                   </div>
                   {/* Same live requirements indicator used by signup —
@@ -648,22 +650,24 @@ export default function Login() {
           {!recoveryMode && !needsConfirm && mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <Label className="mb-1.5 block">البريد الإلكتروني</Label>
+                <Label htmlFor="login-email" className="mb-1.5 block">البريد الإلكتروني</Label>
                 <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input name="email" type="email" placeholder="example@email.com"
+                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                  <Input id="login-email" name="email" type="email" placeholder="example@email.com"
                     value={form.email} onChange={handleChange} className="pr-10 text-left" dir="ltr" autoComplete="email" />
                 </div>
               </div>
               <div>
-                <Label className="mb-1.5 block">كلمة المرور</Label>
+                <Label htmlFor="login-password" className="mb-1.5 block">كلمة المرور</Label>
                 <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••"
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
+                  <Input id="login-password" name="password" type={showPassword ? 'text' : 'password'} placeholder="••••••••"
                     value={form.password} onChange={handleChange} className="pr-10 pl-10" autoComplete="current-password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                    aria-pressed={showPassword}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
               </div>
@@ -847,12 +851,14 @@ export default function Login() {
                   <span className="text-[10px] font-normal text-slate-500">(انظر المتطلبات أدناه)</span>
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" aria-hidden="true" />
                   <Input name="password" type={showPassword ? 'text' : 'password'} placeholder="مثال: Mishwar123"
                     value={form.password} onChange={handleChange} className="pr-10 pl-10" autoComplete="new-password" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                    aria-pressed={showPassword}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    {showPassword ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
                   </button>
                 </div>
                 {/* Password requirements panel — ALWAYS visible (not gated

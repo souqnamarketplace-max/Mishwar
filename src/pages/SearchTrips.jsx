@@ -216,6 +216,7 @@ export default function SearchTrips() {
           {/* Swap + divider */}
           <div className="flex items-center px-4 py-1 gap-3">
             <button onClick={handleSwap}
+              aria-label="عكس المسار — مبادلة من وإلى"
               className="w-9 h-9 rounded-full bg-primary/10 hover:bg-primary/20 border border-primary/30 flex items-center justify-center transition-all hover:rotate-180 duration-300 shrink-0 z-10">
               <ArrowLeftRight className="w-3.5 h-3.5 text-primary" />
             </button>

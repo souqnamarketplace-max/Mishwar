@@ -194,27 +194,36 @@ export default function UserActionsMenu({ targetEmail, targetName, contextType, 
           onClick={() => setOpen(!open)}
           className="p-2 rounded-lg hover:bg-muted/50 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
           aria-label="إجراءات المستخدم"
+          aria-haspopup="menu"
+          aria-expanded={open}
         >
           <MoreVertical className="w-5 h-5 text-muted-foreground" />
         </button>
         {open && (
           <>
-            <div className="fixed inset-0 z-[1500]" onClick={() => setOpen(false)} />
-            <div className="absolute left-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg z-[1600] min-w-[180px] overflow-hidden" dir="rtl">
+            <div className="fixed inset-0 z-[1500]" onClick={() => setOpen(false)} aria-hidden="true" />
+            <div
+              role="menu"
+              aria-label="إجراءات المستخدم"
+              className="absolute left-0 top-full mt-1 bg-card border border-border rounded-xl shadow-lg z-[1600] min-w-[180px] overflow-hidden"
+              dir="rtl"
+            >
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => { setShowReport(true); setOpen(false); }}
                 className="w-full px-3 py-2.5 text-sm text-right hover:bg-muted/50 transition-colors flex items-center gap-2"
               >
-                <Flag className="w-4 h-4 text-yellow-600" />
+                <Flag className="w-4 h-4 text-yellow-600" aria-hidden="true" />
                 <span>الإبلاغ عن المستخدم</span>
               </button>
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => { setShowBlock(true); setOpen(false); }}
                 className="w-full px-3 py-2.5 text-sm text-right hover:bg-muted/50 transition-colors flex items-center gap-2 border-t border-border"
               >
-                <Shield className="w-4 h-4 text-destructive" />
+                <Shield className="w-4 h-4 text-destructive" aria-hidden="true" />
                 <span>حظر المستخدم</span>
               </button>
             </div>

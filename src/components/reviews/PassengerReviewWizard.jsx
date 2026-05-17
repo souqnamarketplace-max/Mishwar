@@ -145,7 +145,7 @@ export default function PassengerReviewWizard({ trip, driverEmail, driverName, p
           </div>
         )}
         {step < 5 && (
-          <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-muted z-10">
+          <button onClick={onClose} className="absolute top-4 left-4 p-2 rounded-full hover:bg-muted z-10" aria-label="إغلاق نموذج التقييم">
             <X className="w-4 h-4 text-muted-foreground" />
           </button>
         )}

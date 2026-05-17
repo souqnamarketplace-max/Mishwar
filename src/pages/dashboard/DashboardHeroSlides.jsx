@@ -57,12 +57,12 @@ function SlideCard({ slide, idx, onUpdate, onDelete, onMove, isFirst, isLast }) 
             placeholder="وصف قصير" className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-0 flex-1" />
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={() => onMove(-1)} disabled={isFirst} className="p-1 hover:bg-muted rounded disabled:opacity-20 text-xs">▲</button>
-          <button onClick={() => onMove(1)} disabled={isLast} className="p-1 hover:bg-muted rounded disabled:opacity-20 text-xs">▼</button>
-          <button onClick={() => onUpdate("active", !slide.active)} className="p-1 hover:bg-muted rounded text-muted-foreground" title={slide.active ? "إخفاء" : "إظهار"}>
+          <button onClick={() => onMove(-1)} disabled={isFirst} className="p-1 hover:bg-muted rounded disabled:opacity-20 text-xs" aria-label="نقل لأعلى">▲</button>
+          <button onClick={() => onMove(1)} disabled={isLast} className="p-1 hover:bg-muted rounded disabled:opacity-20 text-xs" aria-label="نقل لأسفل">▼</button>
+          <button onClick={() => onUpdate("active", !slide.active)} className="p-1 hover:bg-muted rounded text-muted-foreground" title={slide.active ? "إخفاء" : "إظهار"} aria-label={slide.active ? "إخفاء الشريحة" : "إظهار الشريحة"}>
             {slide.active ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4 opacity-40" />}
           </button>
-          <button onClick={onDelete} className="p-1 hover:bg-destructive/10 rounded text-destructive">
+          <button onClick={onDelete} className="p-1 hover:bg-destructive/10 rounded text-destructive" aria-label="حذف الشريحة">
             <Trash2 className="w-4 h-4" />
           </button>
         </div>

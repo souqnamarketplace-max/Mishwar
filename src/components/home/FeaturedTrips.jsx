@@ -168,6 +168,7 @@ function FeaturedCard({ trip, index }) {
 
                 {/* Share */}
                 <button onClick={shareTrip}
+                  aria-label="مشاركة الرحلة"
                   className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
                     isFemale ? "text-rose-400 hover:bg-rose-50" : "text-muted-foreground hover:bg-muted"
                   }`}>

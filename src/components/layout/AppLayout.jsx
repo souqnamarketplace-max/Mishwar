@@ -61,8 +61,19 @@ export default function AppLayout() {
     <>
     <NetworkStatus />
     <div className="min-h-screen flex flex-col">
+      {/* ─── Skip to main content link ───────────────────────────────
+          WCAG 2.4.1 (Bypass Blocks) compliance. Visible only when
+          focused (sr-only by default, then unfurls). Lets keyboard
+          and screen-reader users skip the navbar to land directly
+          on the page content. Free win for accessibility audits. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[200] focus:bg-primary focus:text-primary-foreground focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+      >
+        تخطّي إلى المحتوى الرئيسي
+      </a>
       <Navbar />
-      <main className="flex-1">
+      <main id="main-content" className="flex-1" tabIndex={-1}>
         <PullToRefresh>
           <AnimatePresence mode="wait">
             <PageTransition key={location.pathname}>

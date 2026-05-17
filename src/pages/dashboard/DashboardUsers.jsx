@@ -274,6 +274,7 @@ export default function DashboardUsers() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ابحث بالاسم أو الإيميل أو رقم الحساب (M-1000)..."
+              aria-label="بحث في المستخدمين"
               className="pr-10 rounded-xl"
             />
           </div>

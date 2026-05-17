@@ -842,6 +842,7 @@ export default function Messages() {
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="ابحث في المحادثات..."
+                  aria-label="بحث في المحادثات"
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="pr-10 h-10 rounded-xl"
@@ -1331,6 +1332,7 @@ function ImageViewer({ url, onClose }) {
       className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
+      aria-label="عرض الصورة في وضع ملء الشاشة"
     >
       <button
         onClick={onClose}

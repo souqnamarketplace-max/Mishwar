@@ -174,10 +174,12 @@ export default function NotificationBell({ userEmail }) {
     <div ref={btnRef}>
       <button onClick={handleToggle}
         className="relative p-2 rounded-lg hover:bg-muted transition-colors"
-        aria-label="الإشعارات">
-        <Bell className="w-5 h-5 text-muted-foreground" />
+        aria-label={unreadCount > 0 ? `الإشعارات (${unreadCount} غير مقروء)` : "الإشعارات"}
+        aria-haspopup="dialog"
+        aria-expanded={open}>
+        <Bell className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+          <span className="absolute top-1 right-1 w-4 h-4 bg-destructive rounded-full text-[9px] text-white flex items-center justify-center font-bold" aria-hidden="true">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
