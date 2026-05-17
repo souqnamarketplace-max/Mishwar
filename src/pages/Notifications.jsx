@@ -5,7 +5,7 @@ import { useNotificationActions } from "@/lib/useNotificationActions";
 import React, { useState, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft, ToggleRight, Check } from "lucide-react";
+import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft, ToggleRight, Check, AlertTriangle, X as XIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -29,6 +29,9 @@ export default function Notifications() {
 
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  // Tracks which preference id is in the delete-confirmation modal.
+  // null = no modal, uuid = modal open for that preference.
+  const [deletePending, setDeletePending] = useState(null);
   // Default to "inbox" — when a user lands on /notifications (either
   // by tapping the "عرض جميع الإشعارات" footer link, by URL, or by the
   // type-based fallback for notifications without trip_id+link), they
@@ -112,9 +115,22 @@ export default function Notifications() {
 
   const deletePref = useMutation({
     mutationFn: (id) => api.entities.TripPreference.delete(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["preferences"] }); toast.success("تم حذف التفضيل"); },
-    onError: (err) => toast.error(friendlyError(err, "تعذر حذف التفضيل")),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["preferences"] });
+      toast.success("تم حذف التفضيل");
+      setDeletePending(null);
+    },
+    onError: (err) => {
+      toast.error(friendlyError(err, "تعذر حذف التفضيل"));
+      setDeletePending(null);
+    },
   });
+
+  // Resolve the pending preference for the modal (defensive — could
+  // be null if the user opens then dismisses before this renders).
+  const pendingPref = deletePending
+    ? preferences.find((p) => p.id === deletePending)
+    : null;
 
   // Unified actions hook — same source of truth as the bell popup. The
   // hook does optimistic update + RLS-no-op detection + rollback so we
@@ -278,28 +294,49 @@ export default function Notifications() {
             <div className="space-y-3">
               {preferences.map((pref) => (
                 <div key={pref.id} className={`bg-card rounded-2xl border p-4 transition-all ${pref.is_active ? "border-border" : "border-border/50 opacity-60"}`}>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2 font-bold text-foreground">
-                      <MapPin className="w-4 h-4 text-primary" />
-                      <span>{pref.from_city}</span>
-                      <ArrowLeft className="w-4 h-4 text-muted-foreground" />
-                      <span>{pref.to_city}</span>
+                  <div className="flex items-center justify-between mb-3 gap-3">
+                    <div className="flex items-center gap-2 font-bold text-foreground min-w-0 flex-1">
+                      <MapPin className="w-4 h-4 text-primary shrink-0" />
+                      <span className="truncate">{pref.from_city}</span>
+                      <ArrowLeft className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <span className="truncate">{pref.to_city}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* Action cluster — both buttons hit the 44×44 touch
+                        target Apple's HIG mandates. The old ToggleLeft/
+                        ToggleRight icons were ~24px and packed tightly
+                        next to a 24px trash icon, making mobile usage
+                        tap-roulette. New: proper iOS-style switch
+                        (40×24 toggle with thumb that slides) + 44px
+                        square trash button with confirmation modal. */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {/* iOS-style switch */}
                       <button
+                        type="button"
+                        role="switch"
+                        aria-checked={pref.is_active}
+                        aria-label={pref.is_active ? "تعطيل التنبيهات لهذا المسار" : "تفعيل التنبيهات لهذا المسار"}
+                        disabled={togglePref.isPending}
                         onClick={() => togglePref.mutate({ id: pref.id, is_active: !pref.is_active })}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                        title={pref.is_active ? "تعطيل" : "تفعيل"}
+                        className={`relative inline-flex items-center h-7 w-12 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                          pref.is_active ? "bg-primary" : "bg-muted-foreground/30"
+                        } ${togglePref.isPending ? "opacity-60 cursor-wait" : "cursor-pointer"}`}
                       >
-                        {pref.is_active
-                          ? <ToggleRight className="w-6 h-6 text-primary" />
-                          : <ToggleLeft className="w-6 h-6" />}
+                        <span
+                          className={`inline-block h-5 w-5 rounded-full bg-white shadow-sm transform transition-transform duration-200 ${
+                            // RTL-aware: in RTL the "on" position is at left
+                            // (mirror of LTR). translate-x values negative for RTL.
+                            pref.is_active ? "-translate-x-5" : "-translate-x-1"
+                          }`}
+                        />
                       </button>
+                      {/* Delete with confirmation */}
                       <button
-                        onClick={() => deletePref.mutate(pref.id)}
-                        className="p-1 rounded-lg hover:bg-destructive/10 text-destructive"
+                        type="button"
+                        aria-label="حذف التفضيل"
+                        onClick={() => setDeletePending(pref.id)}
+                        className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-destructive/10 text-destructive transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -404,6 +441,56 @@ export default function Notifications() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── Delete confirmation modal ───────────────────────────────
+          Two-step delete prevents fat-finger taps from wiping a saved
+          route. createPortal isn't needed here — this component isn't
+          inside a Framer Motion transform (unlike the bell popup),
+          so fixed positioning works directly. */}
+      {pendingPref && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => !deletePref.isPending && setDeletePending(null)}
+        >
+          <div
+            className="bg-card rounded-2xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-destructive" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-foreground mb-1">حذف التفضيل</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  هل أنت متأكد من حذف تنبيه المسار{" "}
+                  <strong>{pendingPref.from_city} ← {pendingPref.to_city}</strong>؟
+                  لن تصلك إشعارات عن رحلات هذا المسار بعد الحذف.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <Button
+                onClick={() => setDeletePending(null)}
+                variant="outline"
+                disabled={deletePref.isPending}
+                className="flex-1"
+              >
+                إلغاء
+              </Button>
+              <Button
+                onClick={() => deletePref.mutate(pendingPref.id)}
+                disabled={deletePref.isPending}
+                className="flex-1 bg-destructive hover:bg-destructive/90 text-white gap-2"
+              >
+                {deletePref.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                {deletePref.isPending ? "جارٍ الحذف..." : "حذف"}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
