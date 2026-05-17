@@ -138,6 +138,13 @@ const KNOWN_PATTERNS = [
   [/invalid seat count/i,                                  "عدد المقاعد غير صحيح"],
   [/passenger has.*conflict|booking conflict|overlap.*booking|conflict.*booking/i,
                                                            "لديك حجز آخر في نفس الوقت — ألغِ الحجز السابق أولاً"],
+  // Driver trip conflict — raised by prevent_driver_trip_conflict
+  // trigger (migration 062) when a driver tries to publish a second
+  // trip on a day they already have an active trip. Same-day rule
+  // mirrors the passenger booking guard. Wording mirrors the HINT
+  // text the trigger emits ("Cancel it first or pick another day").
+  [/trip conflict.*driver already has an active trip on/i,
+                                                           "لديك رحلة منشورة في نفس اليوم — ألغِها أولاً أو اختر يوماً آخر"],
 
   // Trip lifecycle RPCs (migration 048 — start_trip / complete_trip /
   // change_trip_time). The RPCs use English exception text by design

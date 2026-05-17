@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer } from "lucide-react";
+import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart } from "lucide-react";
 import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
 import { api } from "@/api/apiClient";
+import { useFavorite } from "@/lib/favorites";
 
 // ── Palestinian date formatter ────────────────────────────────────────────────
 const PS_MONTHS = [
@@ -53,6 +54,13 @@ function share(e, id) {
 function Card({ t, noSeats, urgentSeats }) {
   const isFemale = t.driver_gender === "female";
   const stops    = Array.isArray(t.stops) ? t.stops.filter(s => s.city) : [];
+  // Heart-toggle on each card. Same localStorage list TripDetails uses,
+  // namespaced per user — see src/lib/favorites.js. Lets passengers
+  // save a trip directly from search results / home / any list, without
+  // having to open the detail page first. The hook handles e.preventDefault
+  // + e.stopPropagation so a heart-tap doesn't bubble up to the wrapping
+  // Link and navigate away from the list.
+  const [favorited, toggleFavorite] = useFavorite(t.id);
 
   // Theme colours
   const theme = isFemale
@@ -227,6 +235,19 @@ function Card({ t, noSeats, urgentSeats }) {
               : <><Users className="w-3 h-3" /> {t.available_seats}</>
             }
           </div>
+
+          {/* Favorite — heart icon, persisted to localStorage via useFavorite */}
+          <button
+            onClick={toggleFavorite}
+            aria-label={favorited ? "إزالة من المفضلة" : "إضافة للمفضلة"}
+            className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-xl transition-colors ${
+              favorited
+                ? "text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/20"
+                : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/8 active:bg-rose-500/15"
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 ${favorited ? "fill-rose-500" : ""}`} />
+          </button>
 
           {/* Share */}
           <button

@@ -250,12 +250,31 @@ export default function MobileLayout({ children, user, showHeader = true, header
       >
         <div className="flex items-end justify-around h-20 px-2 pb-1">
           {MOBILE_TABS.map((tab, idx) => {
-            const Icon = tab.icon;
-            const isActive = location.pathname.startsWith(tab.path.split("?")[0]);
-            const href = tab.id === "profile" ? `${tab.path}${user?.email}` : tab.path;
             const isDriver = user?.account_type === "driver" || user?.account_type === "both";
             const isPassenger = user?.account_type === "passenger";
             const isBoth = user?.account_type === "both";
+
+            // Role-aware "trips" slot. Originally pointed at /my-trips
+            // unconditionally, but /my-trips is the PASSENGER surface
+            // (shows bookings the user has made). Drivers visiting it
+            // saw an empty list and had no obvious way to reach
+            // /driver, which is where they actually manage their posted
+            // trips (start trip, change time, complete, see passengers).
+            //
+            // Swap the label, icon, and path based on account_type so
+            // mobile drivers land on their dashboard with one tap. Both
+            // accounts get the driver surface — it's their primary
+            // active role; /my-trips remains reachable from the side
+            // menu for the rare cross-role check.
+            const resolvedTab = (tab.id === "trips" && isDriver)
+              ? { ...tab, label: "لوحتي", icon: LayoutDashboard, path: "/driver" }
+              : tab;
+            const TabIcon = resolvedTab.icon;
+            const isActive = location.pathname.startsWith(resolvedTab.path.split("?")[0]);
+            // After the profile-URL refactor (commit c16e572) the profile
+            // tab points at the bare /profile route and resolves to the
+            // signed-in user server-side. NO email param appended.
+            const href = resolvedTab.path;
             // Center FAB inserted between the 2nd and 3rd tabs (visually
             // sits in the middle of the 5-tab strip). Role-aware:
             //   - Pure driver    → "نشر رحلة" → /create-trip      (direct)
@@ -268,9 +287,9 @@ export default function MobileLayout({ children, user, showHeader = true, header
             const fabLabel = isBoth ? "إنشاء" : (isPassenger && !isDriver ? "اطلب رحلة" : "نشر رحلة");
 
             const handleTabClick = (e) => {
-              if (isActive && location.pathname !== tab.path.split("?")[0]) {
+              if (isActive && location.pathname !== resolvedTab.path.split("?")[0]) {
                 e.preventDefault();
-                navigate(tab.path);
+                navigate(resolvedTab.path);
               }
               setShowMobileMenu(false);
             };
@@ -308,8 +327,8 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 }`}
               >
                 <div className="relative">
-                  <Icon className="w-6 h-6 mb-1" />
-                  {tab.id === "messages" && unreadCount > 0 && (
+                  <TabIcon className="w-6 h-6 mb-1" />
+                  {resolvedTab.id === "messages" && unreadCount > 0 && (
                     <span
                       className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
                       aria-label={`${unreadCount} رسائل غير مقروءة`}
@@ -318,7 +337,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] font-medium">{tab.label}</span>
+                <span className="text-[10px] font-medium">{resolvedTab.label}</span>
               </Link>
               </React.Fragment>
             );
