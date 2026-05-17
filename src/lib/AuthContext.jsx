@@ -26,27 +26,56 @@ export const AuthProvider = ({ children }) => {
 
   // ─── Password recovery flag ─────────────────────────────────────────
   // True when the user landed here via a "Reset Password" email link.
-  // Two ways this gets set:
-  //   1. Lazy initializer below — checks the URL hash for type=recovery
-  //      synchronously on first render, BEFORE any other useEffect
-  //      runs. This is the fast path for the implicit-flow recovery
-  //      URL format (#access_token=...&type=recovery&...).
+  // Three ways this gets set (defense in depth — supabase-js's recovery
+  // event timing is flaky across flow types):
+  //   1. Lazy initializer below — checks the URL synchronously on first
+  //      render, BEFORE any other useEffect runs. This is the fast path
+  //      that prevents Login.jsx's auth-redirect useEffect from bouncing
+  //      the user away from the recovery form.
   //   2. PASSWORD_RECOVERY event in onAuthStateChange — Supabase fires
-  //      this after processing the URL. This is the canonical signal,
-  //      and it covers BOTH implicit AND PKCE flows (?code=...).
+  //      this after processing the URL. Authoritative signal.
+  //   3. URL query for `?code=...&type=recovery` (some Supabase versions
+  //      include type=recovery in PKCE-flow redirects).
   //
-  // The lazy initializer is the critical fix: previously this state
-  // was set inside a useEffect, which runs AFTER the auth-redirect
-  // useEffect on Login.jsx, so the redirect-home code fired BEFORE
-  // recoveryMode flipped to true → user landed on home, not on the
-  // password-set form.
+  // FLOW-TYPE COVERAGE — critical fix
+  // The lazy init originally only checked window.location.hash, which
+  // covers the IMPLICIT flow URL format:
+  //   /login#access_token=...&type=recovery&...
+  // But the Supabase client uses PKCE by default (supabase-js v2.40+),
+  // and PKCE recovery URLs have the format:
+  //   /login?code=<otp>            (no hash, no type=recovery indicator)
+  // For PKCE we cannot distinguish recovery vs normal sign-in from the
+  // URL alone — only from the PASSWORD_RECOVERY event AFTER the code
+  // has been exchanged.
+  //
+  // The race condition we hit: in PKCE flow, supabase-js processes the
+  // ?code=... and fires SIGNED_IN BEFORE PASSWORD_RECOVERY (or the two
+  // fire in unpredictable order). Login.jsx's redirect-home useEffect
+  // sees isAuthenticated=true && recoveryMode=false momentarily, and
+  // navigates the user away from the recovery form before they ever
+  // see it.
+  //
+  // Defensive fix: any presence of a ?code= query param OR a recovery-
+  // typed hash makes us assume recovery MIGHT be incoming. If it turns
+  // out NOT to be recovery (regular OAuth code exchange), the
+  // PASSWORD_RECOVERY event simply never fires and we clear the flag
+  // via the SIGNED_IN handler. The cost of a false positive is a
+  // microsecond delay before redirecting to home; the cost of a false
+  // negative is a broken password reset flow.
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => {
     if (typeof window === 'undefined') return false;
+    const hash = window.location.hash || '';
+    const query = window.location.search || '';
     // Implicit flow: #access_token=...&type=recovery
-    if (window.location.hash.includes('type=recovery')) return true;
-    // PKCE flow: we can't tell from ?code= alone whether this is
-    // recovery vs normal sign-in — the PASSWORD_RECOVERY event below
-    // will catch it after Supabase exchanges the code.
+    if (hash.includes('type=recovery')) return true;
+    // PKCE flow: explicit ?type=recovery (some Supabase versions emit this)
+    if (query.includes('type=recovery')) return true;
+    // PKCE flow: bare ?code=... — could be recovery OR OAuth sign-in.
+    // We pessimistically assume recovery so the redirect-home useEffect
+    // waits for the PASSWORD_RECOVERY / SIGNED_IN events to disambiguate.
+    // If it WAS a regular OAuth sign-in, the SIGNED_IN handler clears
+    // this flag and the user proceeds to home as normal.
+    if (/[?&]code=/.test(query) && window.location.pathname === '/login') return true;
     return false;
   });
 
