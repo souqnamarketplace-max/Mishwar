@@ -35,6 +35,16 @@ export function getNotifTarget(notif) {
   const t    = notif.title || "";
   const type = notif.type || "system";
 
+  // Private thank-you messages from passengers (PassengerReviewWizard).
+  // Producer sets link="/notifications", but tapping the card on that
+  // page used to do nothing (target === current path). Now we route
+  // with ?msg=<id> so the Notifications page auto-opens the
+  // thank-you modal on mount. Detection mirrors the helper in
+  // src/pages/Notifications.jsx — title-based, no schema change.
+  if (t.includes("رسالة خاصة") && notif.id) {
+    return `/notifications?msg=${encodeURIComponent(notif.id)}`;
+  }
+
   // 1. Explicit deep-link wins
   if (notif.link) return notif.link;
 

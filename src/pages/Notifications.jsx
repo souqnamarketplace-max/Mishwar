@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import EmptyState from "@/components/shared/EmptyState";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { createPortal } from "react-dom";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 
 const emptyForm = {
@@ -100,6 +101,25 @@ function categoryFor(notifType) {
   return TYPE_TO_CATEGORY[notifType] || "system";
 }
 
+// Detects "private thank-you" notifications from PassengerReviewWizard.
+// The producer inserts notifications with title "رسالة خاصة من راكب 📩"
+// when a passenger sends a private message alongside their review. The
+// notification's link points to /notifications (this page), which was
+// effectively a dead end — tapping the card from this page did nothing
+// since navigate(currentPath) is a no-op. We intercept those clicks and
+// render a dedicated modal instead, with clear "no reply needed" copy.
+//
+// Title-based detection (rather than a new notif.type) keeps the change
+// scoped: no migration, no producer change, no admin_audit_log churn.
+// If/when we add more "view-only" notification kinds, we can promote
+// this to a notif.kind field. For now, one-message families don't
+// justify the schema work.
+function isPrivateThankYou(notif) {
+  if (!notif) return false;
+  const t = notif.title || "";
+  return t.includes("رسالة خاصة");
+}
+
 export default function Notifications() {
   useSEO({ title: "الإشعارات", description: "إشعارات حسابك في مشوارو" });
 
@@ -123,8 +143,18 @@ export default function Notifications() {
   // miss?') rather than a saved preference. Resetting on every visit
   // matches the user's mental model (a fresh look at the inbox).
   const [activeCategory, setActiveCategory] = useState("all");
+  // Modal for "private thank-you" notifications (post-trip messages from
+  // passengers via PassengerReviewWizard). The producer sets link to
+  // "/notifications" which routed users to this page — but tapping the
+  // card on the page itself was a no-op (target === current path → skip
+  // navigate). Now we render a dedicated modal that shows the full
+  // message with explicit "no reply needed" framing, since these are
+  // one-way thank-you notes attached to a completed trip's review, not
+  // a chat thread the driver should reply to.
+  const [viewingMessage, setViewingMessage] = useState(null);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Fetch user
   const { data: user } = useQuery({
@@ -147,6 +177,26 @@ export default function Notifications() {
         : [],
     enabled: !!user?.email,
   });
+
+  // Auto-open the thank-you modal when ?msg=<notif_id> is in the URL.
+  // This is how the bell popup (NotificationBell.jsx) delivers users
+  // who tap a thank-you notification: routing returns
+  // /notifications?msg=<id>, this effect fires when notifications load,
+  // finds the row, opens the modal, then strips the param so refresh
+  // doesn't keep re-opening it.
+  useEffect(() => {
+    const targetId = searchParams.get("msg");
+    if (!targetId || notifications.length === 0) return;
+    const match = notifications.find((n) => String(n.id) === targetId);
+    if (match && isPrivateThankYou(match)) {
+      setViewingMessage(match);
+      // Strip the param so the modal doesn't re-open on every render
+      // and the URL stays clean after they close it.
+      const params = new URLSearchParams(searchParams);
+      params.delete("msg");
+      setSearchParams(params, { replace: true });
+    }
+  }, [searchParams, notifications, setSearchParams]);
 
   // Real-time subscription for notifications. TripPreference subscription
   // was removed — saved-route preferences are a low-frequency niche
@@ -521,6 +571,16 @@ export default function Notifications() {
                     // on the server round-trip; the UI flips instantly
                     // via the optimistic cache update.
                     if (!notif.is_read) markRead(notif.id);
+                    // Private thank-you messages get a modal popup instead
+                    // of attempted navigation. The producer sets link to
+                    // /notifications, which is THIS page — navigate to
+                    // current path is a no-op, so the old behavior was
+                    // "click did nothing visible". The modal shows the
+                    // full message with explicit "no reply needed" copy.
+                    if (isPrivateThankYou(notif)) {
+                      setViewingMessage(notif);
+                      return;
+                    }
                     // Routing — single source of truth shared with the bell
                     // popup (src/lib/notificationRouting.js). Returns null
                     // for notifications with no actionable destination
@@ -545,7 +605,7 @@ export default function Notifications() {
                         <div className="flex items-center gap-3 mt-2">
                           {(notif.trip_id || notif.link) && (
                             <span className="text-xs text-primary">
-                              اضغط للعرض ←
+                              {isPrivateThankYou(notif) ? "اضغط لقراءة الرسالة 💌" : "اضغط للعرض ←"}
                             </span>
                           )}
                           <span className="text-xs text-muted-foreground">
@@ -630,6 +690,97 @@ export default function Notifications() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── Private thank-you message modal ───────────────────────────
+          Renders when the user taps a "رسالة خاصة من راكب" notification.
+          Shows the full message body in a friendly format with explicit
+          "no reply needed" copy. createPortal so it sits above the
+          layout's stacking context (the route layout uses transforms
+          for the page-transition animations, which would otherwise
+          shrink-wrap fixed positioning to the wrong viewport). */}
+      {viewingMessage && typeof document !== "undefined" && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setViewingMessage(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="thank-you-modal-title"
+        >
+          <div
+            className="bg-card rounded-2xl border border-border max-w-md w-full p-6 max-h-[80vh] overflow-y-auto shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl" aria-hidden="true">💌</span>
+                  <h2 id="thank-you-modal-title" className="text-lg font-bold text-foreground">
+                    رسالة شكر من راكب
+                  </h2>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {viewingMessage.created_at
+                    ? new Date(viewingMessage.created_at).toLocaleDateString("ar-EG", {
+                        year: "numeric", month: "long", day: "numeric",
+                      })
+                    : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingMessage(null)}
+                className="p-2 rounded-lg hover:bg-muted text-muted-foreground shrink-0"
+                aria-label="إغلاق"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Message body — preserve newlines via whitespace-pre-wrap
+                in case the passenger sent a multi-line note. */}
+            <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-4">
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap break-words">
+                {viewingMessage.message}
+              </p>
+            </div>
+
+            {/* Explicit "no reply needed" disclosure — this is the
+                user-requested change. Thank-you messages aren't a chat
+                thread; they're a one-way courtesy attached to the
+                passenger's post-trip review. */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-amber-900 leading-relaxed">
+                ℹ️ <strong>هذه رسالة شكر بعد انتهاء الرحلة</strong> — أُرسلت مع تقييم الراكب. لا حاجة للرد عليها، فلا توجد محادثة قائمة بعد اكتمال الرحلة.
+              </p>
+            </div>
+
+            {/* Optional trip link — if the notification was attached to
+                a specific trip, offer a way to see the trip details. */}
+            {viewingMessage.trip_id && (
+              <button
+                type="button"
+                onClick={() => {
+                  setViewingMessage(null);
+                  navigate(`/trip/${viewingMessage.trip_id}`);
+                }}
+                className="w-full mb-2 px-4 py-2.5 rounded-xl border border-border hover:bg-muted text-sm font-medium text-foreground transition-colors min-h-[44px]"
+              >
+                عرض تفاصيل الرحلة
+              </button>
+            )}
+
+            <Button
+              onClick={() => setViewingMessage(null)}
+              className="w-full min-h-[44px]"
+            >
+              تم الاطلاع
+            </Button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
