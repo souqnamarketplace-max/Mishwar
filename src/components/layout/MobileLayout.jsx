@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { useGlobalSearch } from "@/lib/GlobalSearchContext";
+import { useUnreadReleaseNotes } from "@/hooks/useUnreadReleaseNotes";
 import BookingRequestPopup from "@/components/driver/BookingRequestPopup";
 import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -70,6 +72,10 @@ function resolveDynamicTitle(pathname) {
 export default function MobileLayout({ children, user, showHeader = true, headerTitle = "" }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { open: openGlobalSearch } = useGlobalSearch();
+  // Same RPC the Navbar uses — single source of truth for unread
+  // release notes across the two layouts.
+  const unreadReleaseNotes = useUnreadReleaseNotes(user?.email);
   const qc = useQueryClient();
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   // For "both" account users (driver + passenger combined), the center FAB
@@ -178,6 +184,38 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 </Link>
               )}
               <NotificationBell userEmail={user?.email} />
+              {/* Cmd-K palette trigger for mobile.
+                  Mobile users don't have keyboard shortcuts, so this
+                  is the ONLY way to reach the global search palette
+                  on phones. Placed next to the bell so it sits in the
+                  same cluster as other action icons. */}
+              <button
+                onClick={openGlobalSearch}
+                className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+                aria-label="بحث شامل"
+              >
+                <Search className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              </button>
+              {/* What's new — entry point for /whats-new. Sparkle icon
+                  + red badge for unread count, matching the bell +
+                  message badge pattern elsewhere in the app. */}
+              {user && (
+                <Link
+                  to="/whats-new"
+                  className="relative h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+                  aria-label={unreadReleaseNotes > 0 ? `ما الجديد (${unreadReleaseNotes} غير مقروء)` : "ما الجديد"}
+                >
+                  <Sparkles className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+                  {unreadReleaseNotes > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
+                      aria-hidden="true"
+                    >
+                      {unreadReleaseNotes > 9 ? "9+" : unreadReleaseNotes}
+                    </span>
+                  )}
+                </Link>
+              )}
             </div>
 
             {/* CENTER: Page title */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/apiClient";
@@ -9,6 +9,7 @@ import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
 import { toast } from "sonner";
 import NotificationBell from "../notifications/NotificationBell";
 import { useGlobalSearch } from "@/lib/GlobalSearchContext";
+import { useUnreadReleaseNotes } from "@/hooks/useUnreadReleaseNotes";
 
 const LOGO_URL = "/logo.png";
 
@@ -44,6 +45,11 @@ export default function Navbar() {
   // hook's internal Supabase realtime subscription — no manual
   // refresh needed when a new message arrives.
   const unreadMessages = useUnreadMessageCount(user?.email);
+
+  // Drives the red badge on the sparkle (/whats-new) icon. Polls
+  // every 5min via tanstack-query; release notes are infrequent
+  // enough that realtime would be overkill.
+  const unreadReleaseNotes = useUnreadReleaseNotes(user?.email);
 
   // Close the profile dropdown on outside click. Previously the
   // dropdown only closed via tapping a menu item or the trigger
@@ -163,12 +169,33 @@ export default function Navbar() {
             )}
             <button
               onClick={openGlobalSearch}
-              className="relative p-2 rounded-lg hover:bg-muted transition-colors hidden sm:inline-flex items-center justify-center w-11 h-11"
-              aria-label="بحث شامل (Cmd-K)"
-              title="بحث شامل · ⌘K"
+              className="relative p-2 rounded-lg hover:bg-muted transition-colors inline-flex items-center justify-center w-11 h-11"
+              aria-label="بحث شامل"
+              title="بحث شامل · ⌘K / Ctrl+K"
             >
               <Search className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
             </button>
+            {/* What's new — entry point for /whats-new. The sparkle
+                icon is recognized by users as "new/highlights" across
+                most apps. Red badge mirrors the unread-messages
+                pattern so the visual grammar is consistent across
+                all three indicators (messages, notifications, whats-new). */}
+            <Link
+              to="/whats-new"
+              className="relative p-2 rounded-lg hover:bg-muted transition-colors hidden sm:inline-flex items-center justify-center w-11 h-11"
+              aria-label={unreadReleaseNotes > 0 ? `ما الجديد (${unreadReleaseNotes} غير مقروء)` : "ما الجديد"}
+              title="ما الجديد"
+            >
+              <Sparkles className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              {unreadReleaseNotes > 0 && (
+                <span
+                  className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
+                  aria-hidden="true"
+                >
+                  {unreadReleaseNotes > 9 ? "9+" : unreadReleaseNotes}
+                </span>
+              )}
+            </Link>
             <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors" aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}>
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
               {/* Real badge tied to the unread-messages hook. Was
