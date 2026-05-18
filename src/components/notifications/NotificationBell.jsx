@@ -200,7 +200,7 @@ export default function NotificationBell({ userEmail }) {
   return (
     <div ref={btnRef}>
       <button onClick={handleToggle}
-        className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+        className="relative rounded-lg hover:bg-muted transition-colors inline-flex items-center justify-center w-11 h-11"
         aria-label={unreadCount > 0 ? `الإشعارات (${unreadCount} غير مقروء)` : "الإشعارات"}
         aria-haspopup="dialog"
         aria-expanded={open}>

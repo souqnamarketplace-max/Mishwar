@@ -159,7 +159,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+                className="h-11 w-11 rounded-lg hover:bg-muted flex items-center justify-center"
                 aria-label={showMobileMenu ? "إغلاق القائمة" : "فتح القائمة"}
                 aria-expanded={showMobileMenu}
                 aria-controls="mobile-menu-drawer"
@@ -191,7 +191,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   same cluster as other action icons. */}
               <button
                 onClick={openGlobalSearch}
-                className="h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+                className="h-11 w-11 rounded-lg hover:bg-muted flex items-center justify-center"
                 aria-label="بحث شامل"
               >
                 <Search className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
@@ -202,7 +202,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
               {user && (
                 <Link
                   to="/whats-new"
-                  className="relative h-10 w-10 rounded-lg hover:bg-muted flex items-center justify-center"
+                  className="relative h-11 w-11 rounded-lg hover:bg-muted flex items-center justify-center"
                   aria-label={unreadReleaseNotes > 0 ? `ما الجديد (${unreadReleaseNotes} غير مقروء)` : "ما الجديد"}
                 >
                   <Sparkles className="w-5 h-5 text-muted-foreground" aria-hidden="true" />

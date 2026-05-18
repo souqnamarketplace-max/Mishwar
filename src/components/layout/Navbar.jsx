@@ -196,7 +196,11 @@ export default function Navbar() {
                 </span>
               )}
             </Link>
-            <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors" aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}>
+            <Link
+              to="/messages"
+              className="relative rounded-lg hover:bg-muted transition-colors inline-flex items-center justify-center w-11 h-11"
+              aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}
+            >
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
               {/* Real badge tied to the unread-messages hook. Was
                   previously a static dot that always appeared, even
