@@ -12,7 +12,8 @@ import {
   ArrowRight, MapPin, Clock, Calendar, Users, Star, Car,
   Shield, Phone, MessageCircle, Heart, Share2, Navigation,
   Snowflake, Music, Cigarette, Briefcase, ChevronLeft, CheckCircle,
-  Headphones, X, Check, CreditCard, Wallet, Building2, AlertCircle
+  Headphones, X, Check, CreditCard, Wallet, Building2, AlertCircle,
+  UserPlus, UserCheck
 } from "lucide-react";
 import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
@@ -23,6 +24,7 @@ import { friendlyError } from "@/lib/errors";
 import { useBlockedEmails } from "@/lib/blockUtils";
 import { useOnboardingGate } from "@/hooks/useOnboardingGate";
 import { logAudit } from "@/lib/adminAudit";
+import { useIsFavoriteDriver } from "@/lib/favoriteDrivers";
 
 const amenityIcons = {
   "تكييف": Snowflake,
@@ -262,6 +264,12 @@ export default function TripDetails() {
   const carImage = driverProfile?.car_image || tripData?.car_image || null;
   // Detect if current user is the driver of this trip
   const isOwnTrip = !!user?.email && !!trip?.created_by && user.email === trip.created_by;
+  // Driver-favorite hook — server-side, shared cache with TripCard hearts
+  // and the SearchTrips "only favorites" filter, so toggling here is
+  // immediately reflected everywhere. Returns [favorited, toggle].
+  // Safe to call before trip is loaded — useIsFavoriteDriver(undefined)
+  // returns [false, noop], so the chain doesn't crash on first render.
+  const [driverFavorited, toggleDriverFavorite] = useIsFavoriteDriver(trip?.driver_email);
 
   // Onboarding gate — fires AFTER the auth check below, BEFORE the
   // confirm modal opens. A non-onboarded user (typically a fresh
@@ -668,6 +676,33 @@ export default function TripDetails() {
                   <span className="text-xs text-muted-foreground">{trip.driver_reviews_count ? `(${trip.driver_reviews_count} تقييم)` : "(لا يوجد تقييم بعد)"}</span>
                 </div>
               </div>
+              {/* Driver-favorite button — server-side, syncs with the
+                  list-view UserPlus icons via shared react-query cache.
+                  Only shown when:
+                    - Viewer is logged in (anonymous viewers can't favorite)
+                    - Viewer isn't the driver themselves (no self-favoriting;
+                      enforced by mig 076 CHECK constraint too, but hiding
+                      the UI avoids a confusing toast on tap)
+                    - Driver email is known (legacy rows without driver_email
+                      shouldn't even render — match the TripCard guard)
+                  Positioned BEFORE "عرض الملف ←" so it doesn't push the
+                  profile link off the row on narrow screens. */}
+              {user?.email && !isOwnTrip && trip?.driver_email && (
+                <button
+                  onClick={toggleDriverFavorite}
+                  aria-label={driverFavorited ? "إلغاء تفضيل السائق" : "إضافة السائق للمفضلة"}
+                  title={driverFavorited ? "سائق مفضل — اضغط للإلغاء" : "أضف السائق للمفضلة"}
+                  className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl transition-colors mr-1 ${
+                    driverFavorited
+                      ? "text-rose-500 hover:bg-rose-500/10 bg-rose-500/5"
+                      : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/8"
+                  }`}
+                >
+                  {driverFavorited
+                    ? <UserCheck className="w-4 h-4" aria-hidden="true" />
+                    : <UserPlus  className="w-4 h-4" aria-hidden="true" />}
+                </button>
+              )}
               {/* Driver profile link uses the canonical UUID path so the
                   driver's email doesn't leak into browser history, referer
                   headers, or analytics logs. driverProfile is fetched
