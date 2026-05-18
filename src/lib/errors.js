@@ -153,10 +153,16 @@ const KNOWN_PATTERNS = [
   [/passenger has.*conflict|booking conflict|overlap.*booking|conflict.*booking/i,
                                                            "لديك حجز آخر في نفس الوقت — ألغِ الحجز السابق أولاً"],
   // Driver trip conflict — raised by prevent_driver_trip_conflict
-  // trigger (migration 062) when a driver tries to publish a second
-  // trip on a day they already have an active trip. Same-day rule
-  // mirrors the passenger booking guard. Wording mirrors the HINT
-  // text the trigger emits ("Cancel it first or pick another day").
+  // trigger (migration 062, relaxed in 087). The rule now blocks
+  // only trips within ONE HOUR of an existing same-day trip, not
+  // any same-day trip. Wording reflects that nuance and tells the
+  // driver which existing time conflicts so they know what to shift.
+  // The new format includes the time + date in the postgres exception
+  // message; we extract via capture groups when possible.
+  [/trip conflict.*driver already has an active trip at (\S+) on (\S+).*within 1 hour/i,
+   (m) => `لديك رحلة أخرى في الساعة ${m[1]} بتاريخ ${m[2]} — اختر وقتاً يبعد ساعة واحدة على الأقل قبل أو بعدها`],
+  // Fallback for older error strings (if mig 087 not applied yet,
+  // mig 062's format still emits — keep this match alive).
   [/trip conflict.*driver already has an active trip on/i,
                                                            "لديك رحلة منشورة في نفس اليوم — ألغِها أولاً أو اختر يوماً آخر"],
 

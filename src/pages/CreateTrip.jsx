@@ -290,6 +290,65 @@ export default function CreateTrip() {
     }
   }, [user, formInitialized, searchParams]);
 
+  // ── Real-time driver-conflict pre-flight check ─────────────────────
+  // Mig 087 relaxed the same-day rule to a 1-hour-overlap rule. To give
+  // drivers immediate feedback (instead of letting them complete the
+  // entire 3-step wizard only to fail on submit), we run the same
+  // checkDriverConflict() helper any time their selected date+time
+  // change. The toast fires only when:
+  //   - Both date and time are set
+  //   - The user has at least one OTHER active trip
+  //   - The check returns invalid
+  // Failures are silent (network blip, RLS, etc.) — the SQL trigger
+  // remains the source of truth on submit.
+  const { data: driverConflictTrips = [] } = useQuery({
+    queryKey: ["driver-conflict-trips", user?.email],
+    queryFn: async () => {
+      if (!user?.email) return [];
+      try {
+        // Pull only what checkDriverConflict actually reads: id, date,
+        // time, status, from_city, to_city. Limit 200 — more than any
+        // single driver realistically has active.
+        return await api.entities.Trip.filter(
+          { driver_id: user.id },
+          "-created_date",
+          200,
+        );
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!user?.email && !!user?.id,
+    staleTime: 30 * 1000, // cache for 30s so picker-fiddling doesn't refetch
+  });
+
+  // Track the last conflict message we toasted so we don't spam the
+  // user with identical toasts on every keystroke. Re-show only when
+  // the conflict CHANGES (different time / different conflicting trip).
+  const lastConflictRef = React.useRef("");
+  useEffect(() => {
+    if (!form.date || !form.time) {
+      lastConflictRef.current = "";
+      return;
+    }
+    const result = checkDriverConflict(
+      { ...form, id: undefined },  // explicit undefined — we're creating, not editing
+      driverConflictTrips,
+    );
+    if (!result.valid && result.message) {
+      if (result.message !== lastConflictRef.current) {
+        toast.error(result.message, { duration: 6000, id: "trip-conflict" });
+        lastConflictRef.current = result.message;
+      }
+    } else if (result.valid) {
+      lastConflictRef.current = "";
+    }
+    // We DO NOT include the toast or ref in the deps — toasting is a
+    // side effect we want to fire only when the form values change,
+    // not when external state shifts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.date, form.time, form.from_city, form.to_city, driverConflictTrips.length]);
+
   // Role gate — render-time guard. All hooks above run unconditionally
   // on every render (rules-of-hooks compliant). When the resolved user
   // is a passenger we render the upgrade-account CTA in place of the

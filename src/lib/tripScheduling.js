@@ -4,14 +4,32 @@
 // Mirrors the SQL trigger logic so users get instant feedback before they hit
 // "Save". The SQL triggers are the source of truth (defense in depth).
 //
-// Constants (must match migration-trip-scheduling.sql):
-//   - TRIP_WINDOW_MINUTES = 30
-//   - GEO_GAP_HOURS       = 4
-//   - TZ                  = Asia/Jerusalem
+// RELAXED IN MIG 087 (2026-05-18):
+//   The old rule blocked any same-day trip AND required cities to match
+//   within a 4-hour gap. That was too strict for real Palestinian
+//   rideshare patterns (return trips, multi-route drivers).
+//
+//   New rule (SQL trigger + this file in sync):
+//     - Two trips conflict only when they're within 1 HOUR of each other
+//     - Different cities are fine — drivers can do Ramallah→Nablus then
+//       Bethlehem→Hebron the same day, as long as the start times are
+//       60+ minutes apart
+//     - Past-trip block remains
+//
+// Constants:
+//   - TRIP_WINDOW_MINUTES = 60   (was 30 — match SQL trigger's 1-hour rule)
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const TRIP_WINDOW_MINUTES = 30;
-export const GEO_GAP_HOURS = 4;
+// 60-minute conflict window. New trip must start ≥60 min before OR after
+// every other active trip by the same driver on the same day. Matches the
+// `< 3600 seconds` check in migration 087's check_driver_trip_conflict().
+export const TRIP_WINDOW_MINUTES = 60;
+// 4-hour geographic-continuity window for PASSENGER booking conflict only.
+// This is INTERNAL — not exported — because the driver-side check was
+// relaxed in mig 087 and no longer uses this rule. Passengers genuinely
+// can't be in two cities at once, so the geographic constraint still
+// applies to bookings.
+const GEO_GAP_HOURS = 4;
 const TZ = "Asia/Jerusalem";
 
 /**
@@ -123,40 +141,19 @@ export function checkDriverConflict(newTrip, existingTrips) {
     const existingWindow = getTripWindow(existing);
     if (!existingWindow) continue;
 
-    // (a) Time overlap?
+    // (a) Time overlap — the only driver-side conflict rule after mig 087.
+    // Two trips conflict when they start within 60 minutes of each other.
+    // Geographic continuity (the old 4-hour city-must-match check) was
+    // removed because drivers genuinely can do non-continuous routes
+    // (e.g. Ramallah→Nablus at 9 AM then Bethlehem→Hebron at 2 PM) — they
+    // drive between bases off-platform.
     if (windowsOverlap(newWindow, existingWindow)) {
       return {
         valid: false,
         conflictingTrip: existing,
         reason: "time_overlap",
-        message: `يتعارض هذا الموعد مع رحلتك من ${existing.from_city} إلى ${existing.to_city} الساعة ${existing.time}`,
+        message: `يتعارض هذا الموعد مع رحلتك من ${existing.from_city} إلى ${existing.to_city} الساعة ${existing.time}. اختر وقتاً يبعد ساعة واحدة على الأقل.`,
       };
-    }
-
-    // (b) Geographic continuity (within 4 hours)
-    const gapHours = Math.abs(newStart.getTime() - existingWindow.start.getTime()) / 3_600_000;
-    if (gapHours < GEO_GAP_HOURS) {
-      if (newStart > existingWindow.start) {
-        // New trip is AFTER existing → must start where existing ended
-        if (newTrip.from_city !== existing.to_city) {
-          return {
-            valid: false,
-            conflictingTrip: existing,
-            reason: "geographic_mismatch_after",
-            message: `مكان انطلاقك (${newTrip.from_city}) لا يطابق وجهة رحلتك السابقة في ${existing.to_city} الساعة ${existing.time}. الفجوة بين الرحلات أقل من 4 ساعات.`,
-          };
-        }
-      } else {
-        // New trip is BEFORE existing → must end where existing starts
-        if (newTrip.to_city !== existing.from_city) {
-          return {
-            valid: false,
-            conflictingTrip: existing,
-            reason: "geographic_mismatch_before",
-            message: `وجهة رحلتك (${newTrip.to_city}) لا تطابق مكان انطلاق رحلتك التالية من ${existing.from_city} الساعة ${existing.time}. الفجوة بين الرحلات أقل من 4 ساعات.`,
-          };
-        }
-      }
     }
   }
 
