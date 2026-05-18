@@ -6,6 +6,7 @@ import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
 import { captureException } from "@/lib/sentry";
 import { logAdminAction } from "@/lib/adminAudit";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/api/apiClient";
@@ -90,6 +91,18 @@ export default function AccountSettings() {
   // render a persistent inline banner with a direct CTA to /my-trips.
   const [deletionBlockedBy, setDeletionBlockedBy] = useState(null);
   // shape: null | { type: "driver" | "passenger", count: number }
+  // ─── GDPR Art. 20 data export checkbox state ─────────────────────
+  // Defaults TRUE — the safer default is to send the user a copy of
+  // their data before we anonymize it. They can opt out if they
+  // don't want the email. After the deletion succeeds we ALWAYS send
+  // the deletion-confirmed email regardless of this flag.
+  const [requestDataExport, setRequestDataExport] = useState(true);
+  // Active driver subscription detected at pre-flight time. Surfaced
+  // as a yellow warning panel so the driver knows they're forfeiting
+  // any remaining paid period (per business policy: no refund on
+  // self-deletion).
+  const [activeSubscription, setActiveSubscription] = useState(null);
+  // shape: null | { id, period_end, plan_name }
 
   useEffect(() => {
     if (user) {
@@ -650,6 +663,65 @@ export default function AccountSettings() {
           ? deletionReasonOther.trim().slice(0, 500) || "other"
           : deletionReason || null;
 
+      // ── Detect active driver subscription (mig 088 cancels it
+      // server-side during the delete RPC, but we surface it here so
+      // the modal can warn the driver they're forfeiting any remaining
+      // paid period. Per business policy: no refund.) ──────────────
+      let detectedSub = null;
+      try {
+        const { data: subs, error: subErr } = await supabase
+          .from("driver_subscriptions")
+          .select("id, period_end, plan_name, status")
+          .eq("driver_email", user.email)
+          .in("status", ["active", "pending"])
+          .order("period_end", { ascending: false })
+          .limit(1);
+        if (!subErr && subs && subs.length > 0) {
+          detectedSub = subs[0];
+        }
+      } catch (_) {
+        // Table may not exist on legacy DBs; non-fatal.
+      }
+      setActiveSubscription(detectedSub);
+
+      // ── Send the user a copy of their data BEFORE we anonymize ─────
+      // Defaults to true; the user can uncheck in the modal. If sending
+      // fails (Resend down, no email on profile, etc.) we surface the
+      // error and ABORT the deletion — the user shouldn't lose their
+      // account AND not get their data. They can retry or untick the
+      // checkbox to proceed without the export.
+      if (requestDataExport) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const jwt = session?.access_token;
+          if (!jwt) throw new Error("missing session");
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL || "https://dimtdwahtwaslmnuakij.supabase.co"}/functions/v1/send-account-email`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${jwt}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ kind: "data_export" }),
+            },
+          );
+          if (!res.ok) {
+            const body = await res.text();
+            throw new Error(`HTTP ${res.status}: ${body.slice(0, 200)}`);
+          }
+          toast.success("تم إرسال نسخة من بياناتك إلى بريدك الإلكتروني 📧");
+        } catch (e) {
+          captureException?.(e);
+          toast.error(
+            "تعذر إرسال نسخة من بياناتك. ألغ هذا الخيار أو حاول لاحقاً قبل المتابعة.",
+            { duration: 7000 },
+          );
+          setDeletionLoading(false);
+          return;
+        }
+      }
+
       // Record intent BEFORE we touch the row, so even if the next step
       // silently fails (e.g. expired session vs RLS), the admin team sees
       // that this user attempted to delete.
@@ -775,9 +847,70 @@ export default function AccountSettings() {
           confirmed_deleted_at: rpcSucceeded
             ? (rpcResult?.deleted_at || new Date().toISOString())
             : updatedRows[0].deleted_at,
+          cancelled_subscriptions: rpcResult?.cancelled_subscriptions ?? 0,
+          account_type: user.account_type || null,
           ...cascadeCounts,
         }
       );
+
+      // ── Notify admin via bell + create_notification RPC ────────────
+      // Without this the admin only sees deletions if they happen to
+      // browse the activity log. With deletion volume expected to be
+      // low (1-5 / week early on), a real notification is the right
+      // signal-to-noise tradeoff. Includes the reason inline so admin
+      // can triage at a glance without opening the dashboard.
+      try {
+        const reasonLine = reasonToPersist
+          ? `السبب: ${reasonToPersist}`
+          : "بدون ذكر سبب";
+        const typeLine = user.account_type === "driver"
+          ? "(سائق)"
+          : user.account_type === "both"
+            ? "(راكب وسائق)"
+            : "(راكب)";
+        const subLine = rpcResult?.cancelled_subscriptions > 0
+          ? ` — تم إلغاء ${rpcResult.cancelled_subscriptions} اشتراك`
+          : "";
+        await notifyAdmin({
+          title: "🗑️ حذف حساب",
+          message: `قام مستخدم ${typeLine} بحذف حسابه. ${reasonLine}.${subLine}`,
+          link: "/dashboard?tab=deletions",
+        });
+      } catch (e) {
+        // Don't fail the deletion flow if the admin notification fails.
+        // The audit log already captured it; admin can find it there.
+        captureException?.(e);
+      }
+
+      // ── Send the user a deletion-confirmation email ───────────────
+      // Belt-and-suspenders against unauthorized deletions: even if
+      // someone else managed to delete the account (compromised
+      // session, etc.), the real owner gets an email explaining what
+      // happened and how to reach support within 30 days. We send
+      // this BEFORE rotating the email on auth.users (the deletion
+      // RPC already ran) but the email field on the JWT-derived
+      // profile is still cached client-side, so the call works.
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const jwt = session?.access_token;
+        if (jwt) {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL || "https://dimtdwahtwaslmnuakij.supabase.co"}/functions/v1/send-account-email`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${jwt}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ kind: "deletion_confirmed", reason: reasonToPersist }),
+            },
+          );
+          // Fire-and-forget — failure shouldn't block the success
+          // toast or the sign-out flow.
+        }
+      } catch (e) {
+        captureException?.(e);
+      }
 
       try {
         await api.auth.deleteMe?.();
@@ -1538,7 +1671,21 @@ export default function AccountSettings() {
 
               {!showDeleteModal ? (
                 <Button
-                  onClick={() => setShowDeleteModal(true)}
+                  onClick={async () => {
+                    // Pre-detect subscription so the warning panel
+                    // shows immediately, not after delete is clicked.
+                    try {
+                      const { data: subs } = await supabase
+                        .from("driver_subscriptions")
+                        .select("id, period_end, plan_name, status")
+                        .eq("driver_email", user.email)
+                        .in("status", ["active", "pending"])
+                        .order("period_end", { ascending: false })
+                        .limit(1);
+                      setActiveSubscription(subs?.[0] || null);
+                    } catch (_) { /* non-fatal */ }
+                    setShowDeleteModal(true);
+                  }}
                   className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl"
                 >
                   فهمت، متابعة الحذف
@@ -1579,6 +1726,49 @@ export default function AccountSettings() {
                       />
                     )}
                   </div>
+
+                  {/* GDPR Art. 20 data export checkbox. Defaults TRUE so
+                      the user is opted-in to receiving their data — they
+                      can opt out, but the safer default is "send the
+                      email". Once they delete, anonymization is
+                      irreversible; we want to make sure they have a copy. */}
+                  <label className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={requestDataExport}
+                      onChange={(e) => setRequestDataExport(e.target.checked)}
+                      disabled={deletionLoading}
+                      className="mt-0.5 shrink-0 accent-blue-700"
+                    />
+                    <div className="flex-1 text-xs text-blue-900 leading-relaxed">
+                      <p className="font-bold">📧 أرسل لي نسخة من بياناتي قبل الحذف</p>
+                      <p className="text-blue-800 mt-1">
+                        سترسل لك رسالة بريد إلكتروني تحتوي على ملفك الشخصي وملخّص رحلاتك وحجوزاتك. يمكنك حفظها كـ PDF من تطبيق البريد لديك.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Active subscription warning — only shown when the
+                      pre-flight detected one. Per business policy: no
+                      refund on self-deletion. The driver forfeits any
+                      remaining paid period at the moment of deletion. */}
+                  {activeSubscription && (
+                    <div className="p-3 rounded-lg bg-yellow-50 border border-yellow-300">
+                      <p className="text-xs font-bold text-yellow-900 mb-1">
+                        ⚠️ لديك اشتراك سائق نشط
+                      </p>
+                      <p className="text-xs text-yellow-800 leading-relaxed">
+                        سيتم إنهاء اشتراكك فوراً عند حذف الحساب. <strong>لن يتم استرداد</strong> أي مبلغ متبقٍّ من فترة الاشتراك المدفوعة.
+                        {activeSubscription.period_end && (
+                          <> الاشتراك الحالي ينتهي بشكل طبيعي بتاريخ {(() => {
+                            try {
+                              return new Date(activeSubscription.period_end).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
+                            } catch { return "—"; }
+                          })()}.</>
+                        )}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Typed-confirmation guard — modal previously claimed to
                       require typing "حذف حسابي" but had no input field. */}

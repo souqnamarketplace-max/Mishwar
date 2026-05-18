@@ -21,6 +21,7 @@ import DashboardBroadcasts from "./dashboard/DashboardBroadcasts";
 import DashboardSupport from "./dashboard/DashboardSupport";
 import DashboardFeedback from "./dashboard/DashboardFeedback";
 import DashboardContent from "./dashboard/DashboardContent";
+import DashboardDeletions from "./dashboard/DashboardDeletions";
 // DashboardOffers import removed — coupons hidden for v1.0 launch (M-06).
 // File kept on disk; re-import when redemption pipeline ships.
 import DashboardSettings from "./dashboard/DashboardSettings";
@@ -497,6 +498,7 @@ function Overview() {
 const pageTitles = {
   overview: { title: "الرئيسية", subtitle: "نظرة عامة على المنصة" },
   users: { title: "إدارة المستخدمين", subtitle: "عرض وإدارة جميع المستخدمين" },
+  deletions: { title: "حذف الحسابات", subtitle: "إحصائيات وأسباب حذف المستخدمين لحساباتهم" },
   trips: { title: "إدارة الرحلات", subtitle: "عرض وإدارة جميع الرحلات" },
   bookings: { title: "إدارة الحجوزات", subtitle: "عرض وإدارة جميع الحجوزات" },
   reviews: { title: "التقييمات والمراجعات", subtitle: "إدارة تقييمات المستخدمين" },
@@ -718,6 +720,7 @@ export default function Dashboard() {
         {activePage === "feedback" && <DashboardFeedback />}
         {activePage === "licenses" && <DashboardLicenses />}
         {activePage === "content" && <DashboardContent />}
+        {activePage === "deletions" && <DashboardDeletions />}
         {/* Offers / coupons — hidden from sidebar but URL-accessible via
             bookmarks. Render a "coming soon" notice instead of the half-
             wired DashboardOffers UI so admin doesn't accidentally create
