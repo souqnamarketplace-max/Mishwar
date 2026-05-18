@@ -475,7 +475,7 @@ export default function MyTrips() {
                 لديك {cancellableCount} {cancellableCount === 1 ? "حجز نشط" : "حجوزات نشطة"}
               </p>
               <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                لإلغاء أي حجز، افتحه أدناه واضغط زر «إلغاء الحجز» الأحمر في أسفل البطاقة.
+                لإلغاء حجز، اضغط زر «إلغاء الحجز» الأحمر الموجود في بطاقة الرحلة بالأسفل.
               </p>
               <button
                 onClick={() => setActiveTab("confirmed")}
@@ -734,22 +734,40 @@ export default function MyTrips() {
                         </div>
                       )}
 
-                      {/* Cancel + Message driver buttons for confirmed/in_progress passenger trips */}
+                      {/* Cancel + Message driver buttons for confirmed/in_progress passenger trips.
+                          UX FIX: cancel-booking used to be a tiny underlined
+                          text link sitting next to "راسل السائق". Users
+                          consistently missed it on mobile — the visual
+                          weight matched the inline message link, not a
+                          destructive action. Fix:
+                            - Stacks the two buttons vertically on mobile so
+                              the cancel button has its own full-width row
+                              (easier tap target, no fighting for the same
+                              horizontal space).
+                            - Cancel becomes a proper bordered destructive
+                              button (matches DriverTripsList cancel pattern)
+                              with explicit padding (py-2.5) ensuring ≥44pt
+                              touch target.
+                            - Message-driver remains as a primary chip-style
+                              link so it visually splits from cancel. */}
                       {(status === "confirmed" || status === "in_progress" || status === "pending") && bookedTripIds.has(trip.id) && (
-                        <div className="mt-2 px-1 flex items-center justify-between gap-3">
-                          {/* Message driver */}
+                        <div className="mt-3 px-1 flex flex-col sm:flex-row gap-2">
+                          {/* Message driver — chip style, primary color */}
                           <Link
                             to={`/messages?to=${encodeURIComponent(trip.driver_email || trip.created_by)}&name=${encodeURIComponent(trip.driver_name || "السائق")}`}
-                            className="flex items-center gap-1.5 text-sm text-primary hover:underline font-medium"
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-primary/30 bg-primary/5 text-primary text-sm font-medium hover:bg-primary/10 active:scale-[0.98] transition-all min-h-[44px]"
                             onClick={e => e.stopPropagation()}
                           >
                             <MessageCircle className="w-4 h-4" />
                             راسل السائق
                           </Link>
 
-                          {/* Cancel booking */}
+                          {/* Cancel booking — destructive style, FULL-WIDTH on
+                              mobile to ensure discoverability. Only shown when
+                              status allows cancellation. */}
                           {(status === "confirmed" || status === "pending") && (
                             <button
+                              type="button"
                               onClick={() => {
                                 const booking = passengerBookings.find(b => b.trip_id === trip.id);
                                 if (booking) setConfirmCancel({
@@ -761,9 +779,11 @@ export default function MyTrips() {
                                 });
                               }}
                               disabled={cancelBookingMutation.isPending}
-                              className="text-sm text-destructive hover:underline flex items-center gap-1"
+                              className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-destructive/40 bg-destructive/5 text-destructive text-sm font-bold hover:bg-destructive/10 active:scale-[0.98] transition-all min-h-[44px] disabled:opacity-60"
+                              aria-label="إلغاء الحجز"
                             >
-                              ✕ إلغاء الحجز
+                              <XCircle className="w-4 h-4" />
+                              إلغاء الحجز
                             </button>
                           )}
                         </div>

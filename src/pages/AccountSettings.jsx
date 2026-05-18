@@ -82,6 +82,14 @@ export default function AccountSettings() {
   const [deletionReason, setDeletionReason] = useState("");
   const [deletionReasonOther, setDeletionReasonOther] = useState("");
   const [deletionConfirmText, setDeletionConfirmText] = useState("");
+  // Inline blocker state — when the pre-flight check finds active trips
+  // or bookings, we used to fire a toast that disappeared after 5
+  // seconds with no actionable next step. Users coming HERE specifically
+  // to delete their account had to leave the page, find /my-trips,
+  // figure out where the cancel buttons live, then come back. Now we
+  // render a persistent inline banner with a direct CTA to /my-trips.
+  const [deletionBlockedBy, setDeletionBlockedBy] = useState(null);
+  // shape: null | { type: "driver" | "passenger", count: number }
 
   useEffect(() => {
     if (user) {
@@ -612,6 +620,7 @@ export default function AccountSettings() {
         toast.error(
           `لا يمكن حذف الحساب — لديك ${activeDriverTrips.length} رحلة قادمة كسائق. يرجى إلغاؤها أولاً.`
         );
+        setDeletionBlockedBy({ type: "driver", count: activeDriverTrips.length });
         setDeletionLoading(false);
         return;
       }
@@ -619,9 +628,13 @@ export default function AccountSettings() {
         toast.error(
           `لا يمكن حذف الحساب — لديك ${activeBookings.length} حجز قادم كراكب. يرجى إلغاؤها أولاً.`
         );
+        setDeletionBlockedBy({ type: "passenger", count: activeBookings.length });
         setDeletionLoading(false);
         return;
       }
+      // Clear any prior blocker if both checks passed (user came back
+      // here after cancelling their trips and wants to try again).
+      setDeletionBlockedBy(null);
 
       // Build the anonymisation payload. We persist a deletion_reason so
       // the admin team can see why people are leaving (the column already
@@ -1467,6 +1480,46 @@ export default function AccountSettings() {
                 </button>
               </div>
               
+              {/* Persistent blocker banner — appears when the pre-flight
+                  delete-account check finds active trips or bookings.
+                  Stays visible (not a toast) until the user fixes the
+                  blocker OR tries delete again successfully. CTA links
+                  directly to the relevant tab on /my-trips so the user
+                  doesn't have to hunt for the cancel buttons. */}
+              {deletionBlockedBy && (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3" dir="rtl">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+                      <span className="text-lg" aria-hidden="true">⚠️</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-amber-900">
+                        لا يمكن حذف الحساب الآن
+                      </p>
+                      <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                        {deletionBlockedBy.type === "driver" ? (
+                          <>
+                            لديك <strong>{deletionBlockedBy.count}</strong> {deletionBlockedBy.count === 1 ? "رحلة قادمة" : "رحلات قادمة"} كسائق.
+                            يجب إلغاؤها أولاً (سيتم إعلام الركاب وإرجاع المبلغ).
+                          </>
+                        ) : (
+                          <>
+                            لديك <strong>{deletionBlockedBy.count}</strong> {deletionBlockedBy.count === 1 ? "حجز قادم" : "حجوزات قادمة"} كراكب.
+                            يجب إلغاء الحجوزات أولاً قبل حذف الحساب.
+                          </>
+                        )}
+                      </p>
+                      <Link
+                        to={deletionBlockedBy.type === "driver" ? "/driver" : "/my-trips?tab=confirmed"}
+                        className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-100 hover:bg-amber-200 active:bg-amber-300 border border-amber-400 text-sm font-bold text-amber-900 min-h-[44px] transition-colors"
+                      >
+                        {deletionBlockedBy.type === "driver" ? "اذهب إلى رحلاتي كسائق" : "اذهب إلى حجوزاتي النشطة ←"}
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 space-y-2">
                 <p className="text-sm font-medium text-destructive flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0" />

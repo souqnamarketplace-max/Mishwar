@@ -5,6 +5,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { resolveDocumentUrls } from "@/lib/licenseUrls";
+import { normalizeArabic } from "@/lib/cities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
