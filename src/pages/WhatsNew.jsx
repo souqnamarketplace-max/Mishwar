@@ -59,14 +59,35 @@ export default function WhatsNew() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  // Determine user audience for filtering
-  const isAdmin   = user?.role === "admin";
-  const isDriver  = user?.role === "driver" || isAdmin;
-  const audiences = isAdmin
-    ? ["all", "admins", "drivers", "passengers"]  // admins see everything
-    : isDriver
-      ? ["all", "drivers"]
-      : ["all", "passengers"];
+  // ─── Audience filter — use account_type (NOT role) ──────────────
+  //
+  // BUG FIX (paired with mig 084): previously checked `user?.role`
+  // for driver-status. But `role` is the platform privilege column
+  // (admin / user), not the rideshare-side classification. The driver
+  // vs passenger distinction lives in `account_type`, with values:
+  //   - 'driver'    → posts trips, doesn't book
+  //   - 'passenger' → books trips, doesn't post
+  //   - 'both'      → does both (sees both audience-targeted feeds)
+  //
+  // Wrong filter meant drivers and 'both' accounts were treated as
+  // passengers here, missing every 'drivers'-audience release note.
+  // Now matches the rules used in mig 068 broadcasts + mig 084 count
+  // RPC: one consistent audience semantics across the platform.
+  const isAdmin     = user?.role === "admin";
+  const isDriver    = isAdmin
+    || user?.account_type === "driver"
+    || user?.account_type === "both";
+  const isPassenger = isAdmin
+    || user?.account_type === "passenger"
+    || user?.account_type === "both"
+    || !user?.account_type; // fallback for new onboarders pre-choice
+
+  // Build the audience whitelist. Admins see everything. 'both' users
+  // hit BOTH isDriver and isPassenger branches and get the union.
+  const audiences = ["all"];
+  if (isDriver)    audiences.push("drivers");
+  if (isPassenger) audiences.push("passengers");
+  if (isAdmin)     audiences.push("admins");
 
   const { data: notes = [], isLoading } = useQuery({
     queryKey: ["release-notes", audiences.join(",")],
