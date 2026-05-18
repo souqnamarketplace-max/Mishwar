@@ -1,4 +1,5 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useCanSeeDebugDetails } from '@/hooks/useCanSeeDebugDetails';
 
 // Per-page error fallback (smaller than full-page).
 // `error` and `componentStack` are injected by ErrorBoundary via cloneElement
@@ -7,6 +8,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 // failure reason without us shipping a separate debug build.
 const PageErrorFallback = ({ onReset, error, componentStack }) => {
   const [showDetails, setShowDetails] = useState(false);
+  // Same gate as the top-level ErrorBoundary fallback — admin/dev/
+  // ?debug=1 only. See src/hooks/useCanSeeDebugDetails.js docblock.
+  const canSeeDetails = useCanSeeDebugDetails();
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-8" dir="rtl">
       <div className="text-center max-w-xs">
@@ -24,7 +28,7 @@ const PageErrorFallback = ({ onReset, error, componentStack }) => {
             الرئيسية
           </a>
         </div>
-        {error && (
+        {error && canSeeDetails && (
           <div className="mt-6">
             <button
               onClick={() => setShowDetails(s => !s)}

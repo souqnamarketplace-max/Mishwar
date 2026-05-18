@@ -1,5 +1,6 @@
 import React from "react";
 import { captureException } from "@/lib/sentry";
+import { useCanSeeDebugDetails } from "@/hooks/useCanSeeDebugDetails";
 
 export class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -64,8 +65,34 @@ export class ErrorBoundary extends React.Component {
 // Default full-screen fallback. Extracted from inline JSX so it can hold
 // its own useState for the details toggle without converting the class
 // boundary to a hook component (which would lose getDerivedStateFromError).
+//
+// PRIVACY GATE: the technical details section (stack trace, component
+// stack) is hidden by default for ALL users — it can leak internal
+// component names, file paths, env-specific strings, and confuses
+// non-technical users.
+//
+// It becomes visible only when ANY of the following is true:
+//   1. The current Supabase session belongs to the admin email
+//      (ADMIN_EMAIL constant). Read directly from localStorage so it
+//      works EVEN WHEN the auth context itself has crashed (which is
+//      what the ErrorBoundary catches).
+//   2. The URL has ?debug=1 query param (admin can append this when
+//      diagnosing an issue on a device where they're not logged in,
+//      e.g. someone else's phone).
+//   3. The build is a dev/preview build (import.meta.env.DEV) —
+//      developers running locally always see details.
+//
+// The check runs once on mount (no live re-fetch) since the boundary
+// state doesn't change after error capture. If Supabase localStorage
+// is unreadable (e.g. private browsing mode), the check fails closed
+// — details stay hidden, which is the safer default.
 function DefaultFallback({ error, componentStack }) {
   const [showDetails, setShowDetails] = React.useState(false);
+  // Gate visibility of technical details — see useCanSeeDebugDetails
+  // docblock for the full reasoning. tl;dr: hidden by default, shown
+  // for admin / dev / ?debug=1.
+  const canSeeDetails = useCanSeeDebugDetails();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4" dir="rtl">
       <div className="text-center max-w-sm">
@@ -85,7 +112,7 @@ function DefaultFallback({ error, componentStack }) {
             الرئيسية
           </a>
         </div>
-        {error && (
+        {error && canSeeDetails && (
           <div className="mt-6 text-right">
             <button
               onClick={() => setShowDetails(s => !s)}
