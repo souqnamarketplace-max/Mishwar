@@ -18,13 +18,14 @@ import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Trash2, Edit2, Check, X, Megaphone, MessageSquare, Users, Newspaper, MapPin } from "lucide-react";
+import { FileText, Plus, Trash2, Edit2, Check, X, Megaphone, MessageSquare, Users, Newspaper, MapPin, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { useConfirm } from "@/hooks/useConfirm";
 
 const TABS = [
   { id: "announcements", label: "إعلانات",   icon: Megaphone },
+  { id: "release-notes", label: "ما الجديد",  icon: Sparkles },
   { id: "testimonials",  label: "آراء المستخدمين", icon: MessageSquare },
   { id: "team",          label: "الفريق",      icon: Users },
   { id: "blog",          label: "المدونة",     icon: Newspaper },
@@ -59,6 +60,7 @@ export default function DashboardContent() {
       </div>
 
       {tab === "announcements" && <AnnouncementsTab />}
+      {tab === "release-notes" && <ReleaseNotesTab />}
       {tab === "testimonials"  && <TestimonialsTab />}
       {tab === "team"          && <TeamTab />}
       {tab === "blog"          && <BlogTab />}
@@ -793,6 +795,323 @@ function CitiesTab() {
         إجمالي: {CITIES.length} مدينة وقرية. لتعديل القائمة يرجى التواصل مع المطور
         (مرتبطة بإحداثيات الخريطة).
       </p>
+    </div>
+  );
+}
+
+// ============================================================================
+// Release notes ("ما الجديد") — admin-authored changelog entries
+// ============================================================================
+//
+// Replaces the SQL-only workflow that mig 083 originally shipped with.
+// Admins can now post entries via this UI without ever opening the
+// Supabase SQL editor. Same table (public.release_notes), same RLS
+// (admin-all policy gates writes), same audience/icon allowlists.
+//
+// EDITOR FIELDS:
+//   title       — required, 1-200 chars (enforced by CHECK constraint)
+//   body        — required, 1-5000 chars (enforced by CHECK constraint)
+//   audience    — select: all / drivers / passengers / admins
+//   icon        — select from the same allowlist WhatsNew.jsx renders
+//                 (any name outside the allowlist falls back to Sparkles
+//                  on the public page, so the admin can technically type
+//                  anything — but the select limits typos)
+//   is_pinned   — checkbox; pinned entries sort to the top of /whats-new
+//   published_at — defaults to NOW() on insert. Editing this column
+//                  via the UI is intentionally NOT supported; if an
+//                  admin needs to schedule a future-published note,
+//                  they fall back to SQL (rare case).
+
+// ICON ALLOWLIST — must match the ICONS map in src/pages/WhatsNew.jsx
+const RELEASE_ICONS = [
+  "Sparkles", "Repeat", "Heart", "Bell", "Car", "MessageCircle",
+  "UserCheck", "MapPin", "Calendar", "Clock", "Star", "Settings",
+  "ShieldCheck", "Zap", "Gift", "TrendingUp", "Award", "AlertCircle",
+  "CheckCircle", "Plus", "Search",
+];
+
+const AUDIENCE_LABELS = {
+  all:        "الجميع",
+  drivers:    "السائقون فقط",
+  passengers: "الركاب فقط",
+  admins:     "المسؤولون فقط (إعلان داخلي)",
+};
+
+const EMPTY_RELEASE_NOTE = {
+  title: "",
+  body: "",
+  audience: "all",
+  icon: "Sparkles",
+  is_pinned: false,
+};
+
+function ReleaseNotesTab() {
+  const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [editing, setEditing] = useState(null); // null = no editor; {} = new; {id, ...} = existing
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
+
+  const { data: rowsData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
+    queryKey: ["release-notes-admin", page],
+    queryFn: async () => {
+      const from = (page - 1) * PAGE_SIZE;
+      const to   = from + PAGE_SIZE - 1;
+      // Admin sees ALL audiences (including 'admins'-only entries) —
+      // the admin RLS policy allows full access. The .neq filter that
+      // hides 'admins' entries from regular users doesn't apply here.
+      const { data, error, count } = await supabase
+        .from("release_notes")
+        .select("id, title, body, audience, icon, is_pinned, published_at, created_by, created_at", { count: "exact" })
+        .order("is_pinned", { ascending: false })
+        .order("published_at", { ascending: false })
+        .range(from, to);
+      if (error) throw error;
+      return {
+        rows:       data || [],
+        total:      count || 0,
+        totalPages: Math.max(1, Math.ceil((count || 0) / PAGE_SIZE)),
+      };
+    },
+  });
+  const rows = rowsData.rows;
+  const totalPages = rowsData.totalPages;
+
+  // Get current admin email from auth — used as created_by on INSERT.
+  // We don't trust the client to supply this; the RLS admin policy
+  // requires auth.uid() to match an admin profile, so even if a
+  // tampered client tried to set a different created_by, the row
+  // would still be authored by the actual logged-in admin from the
+  // RLS perspective. The created_by column is just a denormalized
+  // audit trail.
+  const { data: adminEmail } = useQuery({
+    queryKey: ["current-admin-email"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user?.email || "";
+    },
+  });
+
+  const save = useMutation({
+    mutationFn: async (form) => {
+      if (form.id) {
+        const { id, created_by, created_at, ...patch } = form;
+        const { error } = await supabase.from("release_notes").update(patch).eq("id", id);
+        if (error) throw error;
+      } else {
+        // For new entries, include created_by (required NOT NULL column).
+        // published_at omitted → defaults to NOW() per the table default.
+        const { error } = await supabase.from("release_notes").insert({
+          ...form,
+          created_by: adminEmail || "admin",
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["release-notes-admin"] });
+      // Invalidate the public-facing query so any open /whats-new tab
+      // also picks up the new entry on next focus.
+      qc.invalidateQueries({ queryKey: ["release-notes"] });
+      qc.invalidateQueries({ queryKey: ["unread-release-notes-count"] });
+      setEditing(null);
+      toast.success("تم الحفظ — سيرى المستخدمون الإعلان فوراً");
+    },
+    onError: (e) => toast.error(friendlyError(e, "فشل الحفظ")),
+  });
+
+  const del = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("release_notes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["release-notes-admin"] });
+      qc.invalidateQueries({ queryKey: ["release-notes"] });
+      qc.invalidateQueries({ queryKey: ["unread-release-notes-count"] });
+      toast.success("تم الحذف");
+    },
+    onError: (e) => toast.error(friendlyError(e, "فشل الحذف")),
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-xs text-foreground/80">
+        ✨ كل إعلان تنشره هنا يظهر فوراً في صفحة <span className="font-bold">ما الجديد</span> للمستخدمين،
+        ويُضاف عداد أحمر على أيقونة النجمة في الشريط العلوي. اختر الجمهور المناسب لكل إعلان
+        (الجميع، السائقون فقط، الركاب فقط).
+      </div>
+
+      <div className="flex justify-end">
+        <Button size="sm" className="gap-1 rounded-lg" onClick={() => setEditing({ ...EMPTY_RELEASE_NOTE })}>
+          <Plus className="w-4 h-4" /> إعلان جديد
+        </Button>
+      </div>
+
+      {editing && (
+        <ReleaseNoteEditor
+          value={editing}
+          onChange={setEditing}
+          onSave={() => save.mutate(editing)}
+          onCancel={() => setEditing(null)}
+          saving={save.isPending}
+        />
+      )}
+
+      {isLoading ? (
+        <div className="bg-card rounded-xl border border-border p-10 text-center text-muted-foreground">
+          جاري التحميل...
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="bg-card rounded-xl border border-border p-10 text-center text-muted-foreground">
+          لا توجد إعلانات بعد. اضغط "إعلان جديد" لإضافة أول إعلان ⬆️
+        </div>
+      ) : (
+        <div className="bg-card rounded-xl border border-border divide-y divide-border">
+          {rows.map((r) => (
+            <div key={r.id} className="p-4 flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-bold text-sm">{r.title}</p>
+                  {r.is_pinned && (
+                    <span className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded-full font-medium">
+                      مثبَّت
+                    </span>
+                  )}
+                  <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                    {AUDIENCE_LABELS[r.audience] || r.audience}
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{r.body}</p>
+                <p className="text-[11px] text-muted-foreground/70 mt-1">
+                  {new Date(r.published_at).toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" })}
+                  {r.created_by && ` · ${r.created_by}`}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => setEditing({ ...r })}
+                  className="text-primary hover:opacity-70 p-1"
+                  aria-label="تعديل"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={async () => {
+                    if (await confirm({
+                      title: "حذف الإعلان",
+                      message: "سيختفي الإعلان من صفحة 'ما الجديد' لجميع المستخدمين. هل تريد المتابعة؟",
+                      confirmLabel: "حذف",
+                      destructive: true,
+                    })) del.mutate(r.id);
+                  }}
+                  className="text-destructive hover:opacity-70 p-1"
+                  aria-label="حذف"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
+      {confirmDialog}
+    </div>
+  );
+}
+
+function ReleaseNoteEditor({ value, onChange, onSave, onCancel, saving }) {
+  const set = (k, v) => onChange({ ...value, [k]: v });
+  // Validation matches the CHECK constraints in mig 083:
+  //   title  1-200 chars (required)
+  //   body   1-5000 chars (required)
+  const titleLen = (value.title || "").length;
+  const bodyLen  = (value.body  || "").length;
+  const titleValid = titleLen > 0 && titleLen <= 200;
+  const bodyValid  = bodyLen  > 0 && bodyLen  <= 5000;
+  const canSave    = titleValid && bodyValid;
+
+  return (
+    <div className="bg-card rounded-xl border-2 border-primary/40 p-4 space-y-3">
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">العنوان *</label>
+        <input
+          value={value.title || ""}
+          onChange={(e) => set("title", e.target.value)}
+          placeholder="مثال: الرحلات المتكررة 🔁"
+          maxLength={200}
+          className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+        />
+        <p className={`text-[11px] mt-1 ${titleLen > 200 ? "text-destructive" : "text-muted-foreground"}`}>
+          {titleLen}/200
+        </p>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">نص الإعلان *</label>
+        <textarea
+          value={value.body || ""}
+          onChange={(e) => set("body", e.target.value)}
+          rows={5}
+          maxLength={5000}
+          placeholder="اشرح الميزة الجديدة بوضوح. اذكر أين يجدها المستخدم وكيف يستخدمها."
+          className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+        />
+        <p className={`text-[11px] mt-1 ${bodyLen > 5000 ? "text-destructive" : "text-muted-foreground"}`}>
+          {bodyLen}/5000
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">الجمهور</label>
+          <select
+            value={value.audience || "all"}
+            onChange={(e) => set("audience", e.target.value)}
+            className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+          >
+            {Object.entries(AUDIENCE_LABELS).map(([k, label]) => (
+              <option key={k} value={k}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">الأيقونة</label>
+          <select
+            value={value.icon || "Sparkles"}
+            onChange={(e) => set("icon", e.target.value)}
+            className="w-full bg-muted/50 border border-border rounded-lg px-3 py-2 text-sm outline-none"
+          >
+            {RELEASE_ICONS.map((icon) => (
+              <option key={icon} value={icon}>{icon}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={!!value.is_pinned}
+            onChange={(e) => set("is_pinned", e.target.checked)}
+          />
+          تثبيت في الأعلى (للإعلانات المهمة فقط)
+        </label>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={onCancel}>إلغاء</Button>
+          <Button size="sm" onClick={onSave} disabled={saving || !canSave}>
+            {value.id ? "حفظ التغييرات" : "نشر الإعلان"}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
