@@ -1,11 +1,30 @@
 import React, { useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as LucideIcons from "lucide-react";
+import {
+  // Curated icon set for release notes — these are the names admin
+  // can use in the release_notes.icon column. Adding a new icon
+  // requires one import line here. We avoid `import * as LucideIcons`
+  // because Vite cannot tree-shake star-imports — the resulting
+  // bundle ballooned to 759KB (every lucide icon, ~700 of them).
+  // Explicit imports keep WhatsNew chunk under 50KB while still
+  // letting admin pick from a sensible variety.
+  Sparkles, Pin, Loader2,
+  Repeat, Heart, Bell, Car, MessageCircle, UserCheck, MapPin,
+  Calendar, Clock, Star, Settings, ShieldCheck, Zap, Gift,
+  TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { useSEO } from "@/hooks/useSEO";
-import { Sparkles, Pin, Loader2 } from "lucide-react";
 import EmptyState from "@/components/shared/EmptyState";
+
+// String → component lookup. Admins reference these by name in the
+// release_notes.icon column. Unknown names fall back to Sparkles.
+const ICONS = {
+  Sparkles, Repeat, Heart, Bell, Car, MessageCircle, UserCheck,
+  MapPin, Calendar, Clock, Star, Settings, ShieldCheck, Zap,
+  Gift, TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search,
+};
 
 /**
  * /whats-new — public changelog page.
@@ -131,8 +150,7 @@ export default function WhatsNew() {
       ) : (
         <div className="space-y-4">
           {notes.map((note) => {
-            const Icon =
-              (note.icon && LucideIcons[note.icon]) || Sparkles;
+            const Icon = (note.icon && ICONS[note.icon]) || Sparkles;
             const isUnread = !readSet.has(note.id);
             return (
               <div
