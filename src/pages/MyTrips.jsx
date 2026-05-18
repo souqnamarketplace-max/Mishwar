@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
-  Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy, Repeat
+  Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy, Repeat,
+  Briefcase, LayoutDashboard
 } from "lucide-react";
 import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
 import { MessageCircle } from "lucide-react";
@@ -544,49 +545,86 @@ export default function MyTrips() {
         routeTo={routeTo}         setRouteTo={setRouteTo}
       />
 
-      {/* Role toggle — ONLY for users with account_type='both'. Pure
-          drivers and pure passengers never have a mixed list, so the
-          toggle would just be visual noise.
-          User feedback: "this page is confusing when the user has
-          driver and passenger". The fix is to give the user explicit
-          control over WHICH role's activity they're looking at,
-          rather than auto-merging both into one list.
-          Stacks ABOVE the status tabs so the visual hierarchy reads
-          "first pick the role, then narrow by status" — most users
-          care more about role separation than about cancelled vs
-          completed. */}
+      {/* ─── Role selector — primary navigation for 'both' users ─────
+          Replaces the older small chip-row. User feedback: "this page
+          is not designed well and confusing when the account has both
+          driver and passenger". The fix is to make role separation
+          PRIMARY (not secondary to status). Each option is a tall
+          card with icon + label + count, selected state has a
+          colored background + shadow that makes the active view
+          unmistakable at a glance.
+
+          Three options:
+            🚗 الكل    — combined view, no role filter
+            🚗 كسائق   — only driver trips
+            🧳 كراكب   — only passenger bookings
+
+          Only renders when isBoth. Pure passengers/drivers have a
+          single-role list and don't need this. */}
       {isBoth && (
-        <div className="mb-4">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <span className="text-xs text-muted-foreground font-medium">عرض النشاط:</span>
+        <div className="mb-6">
+          <div className="flex items-center justify-between gap-2 mb-2.5">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              عرض النشاط
+            </p>
+            {/* Quick-link back to driver dashboard — both users
+                spend most of their time on /driver managing posts.
+                Always-visible escape hatch when they're done
+                browsing /my-trips. */}
+            <Link
+              to="/driver"
+              className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              لوحة السائق
+            </Link>
           </div>
-          <div className="flex items-center justify-center gap-2">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
-              { id: "all",       label: "الكل",      count: driverTotal + passengerTotal },
-              { id: "driver",    label: "كسائق",     count: driverTotal },
-              { id: "passenger", label: "كراكب",     count: passengerTotal },
+              { id: "all",       label: "الكل",   icon: Car,       count: driverTotal + passengerTotal, color: "primary" },
+              { id: "driver",    label: "كسائق",  icon: Car,       count: driverTotal,                  color: "primary" },
+              { id: "passenger", label: "كراكب",  icon: Briefcase, count: passengerTotal,               color: "amber" },
             ].map((opt) => {
               const isActive = roleFilter === opt.id;
+              const Icon = opt.icon;
               return (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setRoleFilter(opt.id)}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold min-h-[44px] transition-all ${
+                  className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-2xl border-2 transition-all min-h-[80px] ${
                     isActive
-                      ? "bg-primary text-primary-foreground shadow-md"
-                      : "bg-card border border-border text-foreground hover:bg-muted"
+                      ? opt.color === "amber"
+                        ? "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20"
+                        : "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20"
+                      : "bg-card border-border text-foreground hover:bg-muted active:scale-[0.98]"
                   }`}
                   aria-pressed={isActive}
                 >
-                  <span>{opt.label}</span>
-                  <span className={`text-xs ${isActive ? "opacity-80" : "text-muted-foreground"}`}>
-                    ({opt.count})
+                  <Icon className={`w-5 h-5 ${isActive ? "" : opt.color === "amber" ? "text-amber-500" : "text-primary"}`} aria-hidden="true" />
+                  <span className="text-sm font-bold">{opt.label}</span>
+                  <span className={`text-xs ${isActive ? "opacity-90" : "text-muted-foreground"}`}>
+                    {opt.count} {opt.id === "driver" ? "رحلة" : opt.id === "passenger" ? "حجز" : "العدد"}
                   </span>
                 </button>
               );
             })}
           </div>
+        </div>
+      )}
+
+      {/* For pure DRIVERS — same quick-link to dashboard but inline
+          (they don't see the role selector above). Visible only on
+          /my-trips so they remember where to go for active management. */}
+      {isDriver && !isBoth && (
+        <div className="mb-4 flex justify-end">
+          <Link
+            to="/driver"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 text-xs font-bold text-primary min-h-[40px]"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            لوحة السائق ←
+          </Link>
         </div>
       )}
 
@@ -692,16 +730,17 @@ export default function MyTrips() {
                 </h3>
                 <div className="space-y-3">
                   {statusTrips.map((trip) => {
-                    // Role classification — drives the colored left
-                    // border + corner badge. Border colors mirror the
-                    // role-toggle conventions:
-                    //   driver    → primary (forest green) accent
-                    //   passenger → amber (warm) accent
-                    // ONLY shown for 'both' users; pure drivers /
-                    // passengers don't need the visual differentiator
-                    // (the whole list is one role).
+                    // Role classification — drives the top-strip color
+                    // + label. ONLY shown for 'both' users; pure
+                    // drivers / passengers don't need it (their whole
+                    // list is one role). Previously this was a faint
+                    // right border + tiny corner pill, which the user
+                    // reported as still confusing. Now it's a full-
+                    // width strip at the top of every card — same
+                    // pattern used by airline/email apps to label
+                    // categories ("Inbox" / "Spam" / "Promotions").
                     const role = tripRole(trip);
-                    const showRoleBadge = isBoth;
+                    const showRoleStrip = isBoth;
                     return (
                     <div
                       key={trip.id}
@@ -713,29 +752,34 @@ export default function MyTrips() {
                       }`}
                     >
                       <Link to={`/trip/${trip.id}`}>
-                        <div className={`bg-card rounded-2xl border p-4 hover:shadow-md transition-all relative ${
-                          showRoleBadge
-                            ? role === "driver"
-                              ? "border-r-4 border-r-primary border-y border-l border-border"
-                              : "border-r-4 border-r-amber-500 border-y border-l border-border"
-                            : "border-border"
-                        }`}>
-                          {/* Role badge — top-left corner pill, only
-                              shown for 'both' users so they can tell
-                              at a glance which role this card belongs
-                              to without reading. */}
-                          {showRoleBadge && (
-                            <span
-                              className={`absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        <div className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-md transition-all">
+                          {/* Top role strip — clear, prominent role
+                              indicator that runs the full width of the
+                              card header. Green for driver, amber for
+                              passenger. Includes icon + label so the
+                              role reads even on a quick scan. */}
+                          {showRoleStrip && (
+                            <div
+                              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold ${
                                 role === "driver"
-                                  ? "bg-primary/10 text-primary border border-primary/20"
-                                  : "bg-amber-100 text-amber-800 border border-amber-200"
+                                  ? "bg-primary/10 text-primary border-b border-primary/20"
+                                  : "bg-amber-50 text-amber-900 border-b border-amber-200"
                               }`}
-                              aria-label={role === "driver" ? "أنت السائق في هذه الرحلة" : "حجزت كراكب في هذه الرحلة"}
                             >
-                              {role === "driver" ? "أنت السائق" : "حجزت كراكب"}
-                            </span>
+                              {role === "driver" ? (
+                                <>
+                                  <Car className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>أنت السائق في هذه الرحلة</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Briefcase className="w-3.5 h-3.5" aria-hidden="true" />
+                                  <span>حجزت كراكب في هذه الرحلة</span>
+                                </>
+                              )}
+                            </div>
                           )}
+                          <div className="p-4">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                             {/* Date tile — was previously broken: called
                                 trip.date?.split(" ")[0] / [1] on an ISO
@@ -846,6 +890,7 @@ export default function MyTrips() {
                               <Badge className={config?.color}>{config?.label}</Badge>
                               <span className="text-xl font-bold text-primary">₪{trip.price}</span>
                             </div>
+                          </div>
                           </div>
                         </div>
                       </Link>

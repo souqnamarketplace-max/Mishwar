@@ -432,16 +432,28 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">حسابي</p>
                 {[
                   { icon: User,          label: "إعدادات الملف الشخصي", path: "/account-settings/profile" },
-                  // For 'both' users: a dedicated entry to reach
-                  // /my-trips. The bottom-tab "رحلاتي" slot is
-                  // hijacked into "لوحتي" → /driver for them (so
-                  // they can manage their posted trips quickly), but
-                  // that left no way to reach the passenger booking
-                  // history without typing the URL. Pure passengers
-                  // already have the bottom tab; pure drivers have
-                  // nothing to show there.
-                  ...(user?.account_type === "both"
-                    ? [{ icon: MapPin, label: "حجوزاتي كراكب", path: "/my-trips?role=passenger" }]
+                  // /my-trips access for drivers + both. Without this
+                  // entry, drivers and both users have NO way to reach
+                  // /my-trips from the mobile UI — the bottom-tab
+                  // "رحلاتي" slot is hijacked into "لوحتي" → /driver
+                  // for them (so they can manage their posted trips
+                  // quickly). Pure passengers already have the bottom
+                  // tab and don't need this duplicate entry.
+                  //
+                  // Both users: needed often (they regularly book).
+                  // Pure drivers: needed rarely (occasional booking)
+                  //   but still needed — without this they had no
+                  //   in-app path at all. Worst case it's a one-time
+                  //   visit that confirms "I have no bookings yet"
+                  //   and they ignore the link going forward.
+                  ...(user?.account_type === "driver" || user?.account_type === "both"
+                    ? [{
+                        icon: MapPin,
+                        label: user?.account_type === "both" ? "حجوزاتي كراكب" : "رحلاتي",
+                        path: user?.account_type === "both"
+                          ? "/my-trips?role=passenger"
+                          : "/my-trips",
+                      }]
                     : []
                   ),
                   // Verification entry routes by account_type:
