@@ -11,7 +11,8 @@ import { sanitizeText, getContactViolation } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
 import {
   Search, Send, ArrowLeft, MessageCircle, Lock,
-  MapPin, ChevronLeft, Paperclip, ImageIcon, X, Camera, Loader2
+  MapPin, ChevronLeft, Paperclip, ImageIcon, X, Camera, Loader2,
+  ShieldAlert
 } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
@@ -975,6 +976,15 @@ export default function Messages() {
                   />
                 )}
 
+                {/* Safety notice — Apple App Store §5.1 / Google Play
+                    require anti-fraud disclosure in any P2P messaging
+                    surface. This banner is intentionally non-dismissible
+                    (persistent on every conversation) so we have a
+                    durable compliance answer if the reviewer asks.
+                    Compact one-line on mobile so it doesn't eat scroll
+                    real estate. Click → /help#safety for full guidance. */}
+                <SafetyNotice />
+
                 {/* Messages */}
                 <div
                   className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-muted/10"
@@ -1152,6 +1162,42 @@ function ConversationListItem({ conv, trip, bookingStatus, active, mineEmail, on
         )}
       </div>
     </button>
+  );
+}
+
+// ─── Safety notice (App Store / Play Store compliance) ──────────────
+// Persistent (intentionally non-dismissible) anti-fraud disclosure
+// shown on every conversation. Stores show this is required for
+// P2P messaging surfaces in their content guidelines:
+//   - Apple App Store Guideline 5.1.2 (data collection + safety)
+//   - Google Play harmful-content + scam policies
+//
+// Wording focuses on TWO behaviors that matter for Mishwaro's
+// Palestinian context:
+//   1. Don't pay outside the app (cash exchanges fine — bank
+//      transfers / Reflect / Jawwal Pay before pickup are scam vectors)
+//   2. Don't move to WhatsApp / SMS (loses the in-app safety record)
+//
+// Visually compact: single row on mobile (375px viewport), tap
+// area extends to entire card for "more info" navigation. Uses
+// muted amber so it reads as "info" not "alarm" — the actual
+// danger detection (phone-number patterns) will be a separate
+// component in a later commit.
+function SafetyNotice() {
+  return (
+    <Link
+      to="/safety"
+      className="block bg-amber-50 dark:bg-amber-900/15 border-b border-amber-200/60 dark:border-amber-800/40 px-4 py-2 hover:bg-amber-100/60 dark:hover:bg-amber-900/25 transition-colors"
+      aria-label="نصائح الأمان"
+    >
+      <div className="flex items-start gap-2.5">
+        <ShieldAlert className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" aria-hidden="true" />
+        <p className="text-xs text-amber-900 dark:text-amber-100 leading-snug flex-1">
+          <span className="font-bold">لحمايتك:</span> لا تدفع أو تتواصل خارج التطبيق.
+          <span className="text-amber-700 dark:text-amber-300 mr-1 underline underline-offset-2">مزيد من المعلومات</span>
+        </p>
+      </div>
+    </Link>
   );
 }
 
