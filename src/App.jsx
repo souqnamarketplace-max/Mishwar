@@ -63,6 +63,7 @@ const Home             = lazy(() => import('./pages/Home'));
 const SearchTrips      = lazy(() => import('./pages/SearchTrips'));
 const TripDetails      = lazy(() => import('./pages/TripDetails'));
 const MyTrips          = lazy(() => import('./pages/MyTrips'));
+const RecurringTrips   = lazy(() => import('./pages/RecurringTrips'));
 const Favorites        = lazy(() => import('./pages/Favorites'));
 const Messages         = lazy(() => import('./pages/Messages'));
 const CreateTrip       = lazy(() => import('./pages/CreateTrip'));
@@ -204,6 +205,7 @@ const AuthenticatedApp = () => {
 
         {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />
+        <Route path="/recurring-trips" element={<RecurringTrips />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/create-trip" element={<CreateTrip />} />
@@ -235,8 +237,16 @@ function App() {
     <HelmetProvider>
       <ErrorBoundary><AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
-          <GlobalSearchProvider>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          {/* GlobalSearchProvider MUST be inside <Router> — the modal
+              it renders (<GlobalSearch />) uses useNavigate() from
+              react-router-dom, which requires a Router ancestor in
+              the component tree. Putting the Provider OUTSIDE Router
+              meant the modal rendered as a sibling of Routes (not a
+              child), with no Router context, crashing the whole app
+              on mount with 'useNavigate() may be used only in the
+              context of a <Router> component'. */}
+          <GlobalSearchProvider>
           <ScrollToTop />
             <Routes>
               {/* Public login route — always accessible */}
@@ -244,8 +254,8 @@ function App() {
               {/* All other routes go through auth check */}
               <Route path="/*" element={<AuthenticatedApp />} />
             </Routes>
-          </Router>
           </GlobalSearchProvider>
+          </Router>
           <Toaster />
           {/* SonnerToaster position 'top-right' matches the convention
               used by Gmail, iMessage, WhatsApp Web, Discord, Slack —

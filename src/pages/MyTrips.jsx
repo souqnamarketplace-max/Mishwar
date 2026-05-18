@@ -433,6 +433,20 @@ export default function MyTrips() {
             <span>جميع رحلاتك الحالية والسابقة في مكان واحد</span>
           )}
         </p>
+
+        {/* Recurring trips entry — only shown to drivers (passengers
+            can't create trips). Subtle inline link rather than a
+            prominent CTA — this is a power-feature for regulars,
+            not a first-time-user nudge. */}
+        {isDriver && (
+          <button
+            onClick={() => navigate("/recurring-trips")}
+            className="mt-3 inline-flex items-center gap-1.5 text-xs text-primary hover:underline px-3 py-2 min-h-[44px]"
+          >
+            <Repeat className="w-3.5 h-3.5" aria-hidden="true" />
+            إدارة الرحلات المتكررة
+          </button>
+        )}
       </div>
 
       {/* Filter bar — collapsible, contains free-text search + date range +
