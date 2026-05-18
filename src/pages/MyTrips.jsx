@@ -20,6 +20,7 @@ import {
 import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
 import { MessageCircle } from "lucide-react";
 import MyTripsFilterBar from "@/components/mytrips/MyTripsFilterBar";
+import { getDateTileParts } from "@/lib/relativeDate";
 
 const tabs = [
   { id: "all", label: "الكل", icon: Car },
@@ -575,11 +576,31 @@ export default function MyTrips() {
                       <Link to={`/trip/${trip.id}`}>
                         <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all">
                           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                            <div className="text-center bg-muted/50 rounded-xl px-4 py-3 shrink-0">
-                              <p className="text-xs text-muted-foreground">{trip.date?.split(" ")[0] || "السبت"}</p>
-                              <p className="text-2xl font-bold text-foreground">{trip.date?.split(" ")[1] || "25"}</p>
-                              <p className="text-xs text-muted-foreground">{trip.time || "08:30"}</p>
-                            </div>
+                            {/* Date tile — was previously broken: called
+                                trip.date?.split(" ")[0] / [1] on an ISO
+                                string like "2026-05-16", which returns
+                                the WHOLE string for [0] and undefined
+                                for [1] (no space to split on). Fallbacks
+                                kicked in and users saw stale placeholders.
+                                Now uses getDateTileParts from the shared
+                                relative-date lib so the tile reads:
+                                  - "اليوم" / "غداً" / "بعد غد" for near
+                                  - weekday name for 3-6 days out
+                                  - "DD MonthName" for further out
+                                with the day number and time underneath. */}
+                            {(() => {
+                              const parts = getDateTileParts(trip.date);
+                              const topLabel = parts?.weekday || "—";
+                              const bigNumber = parts?.day != null ? parts.day : "—";
+                              const time = trip.time || "—";
+                              return (
+                                <div className="text-center bg-muted/50 rounded-xl px-4 py-3 shrink-0">
+                                  <p className="text-xs text-muted-foreground">{topLabel}</p>
+                                  <p className="text-2xl font-bold text-foreground">{bigNumber}</p>
+                                  <p className="text-xs text-muted-foreground">{time}</p>
+                                </div>
+                              );
+                            })()}
                             {/* Car thumbnail — only renders when the trip has a
                                 car_image. Reinforces visual identity of the
                                 vehicle and matches what TripCard / TripDetails

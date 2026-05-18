@@ -5,30 +5,14 @@ import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripSched
 import { api } from "@/api/apiClient";
 import { useFavorite } from "@/lib/favorites";
 import { useIsFavoriteDriver } from "@/lib/favoriteDrivers";
+import { formatRelativeDate as fmt } from "@/lib/relativeDate";
 
 // ── Palestinian date formatter ────────────────────────────────────────────────
-const PS_MONTHS = [
-  "كانون الثاني","شباط","آذار","نيسان","أيار","حزيران",
-  "تموز","آب","أيلول","تشرين الأول","تشرين الثاني","كانون الأول"
-];
-function fmt(dateStr) {
-  if (!dateStr) return "";
-  if (/[؀-ۿ]/.test(dateStr) || dateStr.includes("/")) return dateStr;
-  try {
-    const d = new Date(dateStr + "T12:00:00");
-    if (isNaN(d.getTime())) return dateStr;
-    const today = new Date(); today.setHours(0,0,0,0);
-    const target = new Date(d); target.setHours(0,0,0,0);
-    const diff = Math.round((target - today) / 86400000);
-    if (diff === 0) return "اليوم 📅";
-    if (diff === 1) return "غداً";
-    if (diff === 2) return "بعد غد";
-    if (diff === -1) return "أمس";
-    const days = ["الأحد","الإثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
-    if (diff > 2 && diff <= 6) return days[d.getDay()];
-    return `${d.getDate()} ${PS_MONTHS[d.getMonth()]}`;
-  } catch { return dateStr; }
-}
+// Implementation moved to @/lib/relativeDate (formatRelativeDate) so the
+// same logic can be reused by MyTrips, RecurringTrips, and any future
+// surface that needs the "today / tomorrow / weekday" rendering. The
+// `fmt` alias above keeps the in-file references unchanged — zero risk
+// of regression in TripCard's call-sites.
 
 // ── Share ─────────────────────────────────────────────────────────────────────
 // We pass ONLY { title, url } to navigator.share — no `text` field.
