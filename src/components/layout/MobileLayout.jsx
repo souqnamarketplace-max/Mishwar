@@ -15,11 +15,16 @@ import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
 import { toast } from "sonner";
 
 const MOBILE_TABS = [
-  { id: "home",     label: "الرئيسية", icon: Home,          path: "/" },
-  { id: "search",   label: "بحث",      icon: Search,        path: "/search" },
-  { id: "trips",    label: "رحلاتي",   icon: MapPin,        path: "/my-trips" },
-  { id: "messages", label: "الرسائل",  icon: MessageSquare, path: "/messages" },
-  { id: "profile",  label: "الملف",    icon: User,          path: "/profile" },
+  { id: "home",      label: "الرئيسية", icon: Home,          path: "/" },
+  { id: "search",    label: "بحث",      icon: Search,        path: "/search" },
+  { id: "trips",     label: "رحلاتي",   icon: MapPin,        path: "/my-trips" },
+  { id: "messages",  label: "الرسائل",  icon: MessageSquare, path: "/messages" },
+  // Slot #5 swapped from Profile → Favorites (2026-05-18 design pass).
+  // Favorites is daily-frequency for repeat passengers (saved drivers
+  // re-bookings, saved trips for upcoming). Profile is account-management,
+  // accessed once per session at most for most users. Profile moves to
+  // a header avatar with dropdown (matches Instagram/Twitter pattern).
+  { id: "favorites", label: "المفضلة",  icon: Heart,         path: "/favorites" },
 ];
 
 const PAGE_TITLES = {
@@ -82,6 +87,13 @@ export default function MobileLayout({ children, user, showHeader = true, header
   // opens a chooser sheet instead of navigating directly — they can pick
   // between posting a trip (driving) or requesting one (riding).
   const [showFabChooser, setShowFabChooser] = useState(false);
+  // Profile avatar dropdown — replaces the Profile bottom-tab (2026-05-18).
+  // The avatar sits in the mobile header right cluster; tapping it opens
+  // a small panel with account-management actions (profile, settings,
+  // help, feedback, admin if applicable, logout). Mirrors the desktop
+  // Navbar profile dropdown pattern.
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
   // contentRef is the inner scroll container — kept around so sub-components
   // can read the DOM if needed. PTR moved out to the dedicated
   // PullToRefresh wrapper in AppLayout (which finds this element by walking
@@ -113,6 +125,38 @@ export default function MobileLayout({ children, user, showHeader = true, header
   // Hook handles the COUNT query + Supabase realtime subscription.
   // Same hook is used by Navbar.jsx so desktop + mobile stay in sync.
   const unreadCount = useUnreadMessageCount(user?.email);
+
+  // ─── Close profile dropdown on outside click ─────────────────────
+  // Mirrors the desktop Navbar pattern. Listens on mousedown +
+  // touchstart so it works for both pointer types. The dropdown's
+  // own elements are inside profileRef so taps INSIDE the panel
+  // (e.g. selecting a menu item) don't immediately close it before
+  // the click handler runs.
+  useEffect(() => {
+    if (!profileOpen) return;
+    const handler = (e) => {
+      if (profileRef.current && profileRef.current.contains(e.target)) return;
+      setProfileOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [profileOpen]);
+
+  // ─── Logout handler ──────────────────────────────────────────────
+  // Same pattern as Navbar.jsx — awaits the promise so failures
+  // surface as toasts. AuthContext picks up SIGNED_OUT and routes
+  // the user appropriately on success.
+  const handleLogout = async () => {
+    try {
+      await api.auth.logout();
+    } catch {
+      toast.error("فشل تسجيل الخروج. حاول مجدداً.");
+    }
+  };
 
   // ─── Support phone for the emergency CTA (pulled from settings so
   // admin can edit without a deploy; same pattern as Help.jsx and
@@ -215,6 +259,108 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     </span>
                   )}
                 </Link>
+              )}
+              {/* Profile avatar — replaces the bottom-tab Profile.
+                  Tapping opens a small dropdown panel with account-
+                  management actions (profile, settings, help, etc.).
+                  Visually distinct from the icon-button cluster
+                  (rounded-xl, primary-tinted background, content is
+                  an avatar image or initial — not a stroke icon)
+                  so it reads as "me" rather than "another action". */}
+              {user && (
+                <div ref={profileRef} className="relative">
+                  <button
+                    onClick={() => setProfileOpen((v) => !v)}
+                    className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                    aria-label="ملفي الشخصي"
+                    aria-haspopup="menu"
+                    aria-expanded={profileOpen}
+                  >
+                    {user?.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt=""
+                        className="w-full h-full object-cover rounded-xl"
+                      />
+                    ) : (
+                      <span className="font-bold text-sm">
+                        {user?.full_name?.[0] || "م"}
+                      </span>
+                    )}
+                  </button>
+                  {profileOpen && (
+                    // RTL note: right-0 in tailwind anchors the LEFT
+                    // edge of the dropdown to the right edge of the
+                    // button. In RTL mode that's actually the desired
+                    // behavior because the button visually sits at
+                    // the FAR LEFT of the right-cluster — anchoring
+                    // to its right edge keeps the dropdown within
+                    // viewport rather than overflowing.
+                    <div
+                      role="menu"
+                      className="absolute left-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]"
+                    >
+                      <Link
+                        to="/profile"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                        role="menuitem"
+                      >
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">ملفي الشخصي</span>
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                        role="menuitem"
+                      >
+                        <Settings className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">إعدادات الحساب</span>
+                      </Link>
+                      <Link
+                        to="/help"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                        role="menuitem"
+                      >
+                        <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">المساعدة</span>
+                      </Link>
+                      <Link
+                        to="/feedback"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                        role="menuitem"
+                      >
+                        <MessageSquarePlus className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">اقتراحات وشكاوى</span>
+                      </Link>
+                      {/* Admin shortcut — visible only to admins.
+                          Matches the Navbar.jsx dropdown so admins
+                          have the same UX on phone as on desktop. */}
+                      {user?.role === "admin" && (
+                        <Link
+                          to="/dashboard"
+                          onClick={() => setProfileOpen(false)}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border bg-amber-50/50"
+                          role="menuitem"
+                        >
+                          <LayoutDashboard className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm font-medium text-amber-900">لوحة الإدارة</span>
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => { setProfileOpen(false); handleLogout(); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                        role="menuitem"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>تسجيل الخروج</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
