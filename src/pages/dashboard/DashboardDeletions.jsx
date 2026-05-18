@@ -309,9 +309,27 @@ export default function DashboardDeletions() {
                 {list.map((row) => (
                   <tr key={row.id} className="border-b border-border/50 hover:bg-muted/30">
                     <td className="py-2.5 text-foreground">
-                      {row.deleted_at ? new Date(row.deleted_at).toLocaleDateString("ar-EG", {
-                        year: "numeric", month: "short", day: "numeric",
-                      }) : "—"}
+                      <div className="flex items-center gap-2">
+                        <span>
+                          {row.deleted_at ? new Date(row.deleted_at).toLocaleDateString("ar-EG", {
+                            year: "numeric", month: "short", day: "numeric",
+                          }) : "—"}
+                        </span>
+                        {/* Historical-orphan badge — these are deletions
+                            from before mig 035 introduced the soft-delete
+                            pattern. The profile was hard-deleted, so we
+                            have the audit log entry but no reason or
+                            account_type. Surfaced as a small badge so
+                            admin understands why those fields are empty. */}
+                        {row.source === "audit" && (
+                          <span
+                            className="px-1.5 py-0.5 text-[10px] rounded bg-muted text-muted-foreground border border-border"
+                            title="حذف قديم — البيانات التفصيلية غير متوفرة"
+                          >
+                            سجل قديم
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2.5 text-foreground">
                       {ACCOUNT_TYPE_LABELS[row.account_type] || "—"}
