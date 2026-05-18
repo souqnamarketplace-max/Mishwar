@@ -464,6 +464,67 @@ export function phoneWarning() {
   return "🚫 يُمنع مشاركة أرقام الهواتف في المحادثة. يمكنك التواصل عبر التطبيق فقط بعد تأكيد الحجز.";
 }
 
+// ─── SOFT WARNING: Pure-digit fragment (anti-evasion) ────────────────
+//
+// Companion to containsPhoneNumber() which BLOCKS messages with 7+
+// consecutive digits. The blocker doesn't catch the evasion pattern
+// observed on Poparide screenshots — drivers SPLIT a phone number
+// across multiple short messages:
+//
+//     Message 1: "925"
+//     Message 2: "5959"
+//
+// Each message has < 7 digits, so neither is blocked, but together
+// they encode 9255959 (a Palestinian mobile number).
+//
+// We can't track cross-message state cheaply (the chat store is
+// per-conversation and would need a new sliding-window buffer), so
+// instead we use a simpler signal: any message whose ENTIRE content
+// is just digits (with minor separators) deserves a soft warning.
+// Legitimate uses are rare:
+//   - Confirming a room/apartment number ("925") — uncommon
+//   - Sharing a year ("2026") — uncommon
+// Evasion uses are dominant. A WARNING (not block) lets the rare
+// legitimate use through while making the evasion intent obvious
+// to the sender.
+//
+// Returns true if:
+//   - Message has 3-6 digits (7+ is already blocked elsewhere)
+//   - Message contains ONLY digits, optional whitespace, dashes,
+//     plus signs, parens, dots
+//   - NOT a recognizable date/time/price (contains : or $ or ₪)
+//
+// False-positive examples we EXCLUDE intentionally:
+//   "5:30"  → has colon → time, not warned
+//   "₪37"   → has shekel → price, not warned
+//   "37$"   → has dollar → price, not warned
+//   "9255959" → 7+ digits → BLOCKED by containsPhoneNumber (stronger)
+//
+// True-positive examples we WARN:
+//   "925"      → bare 3 digits
+//   "5959"     → bare 4 digits
+//   "925 5959" → 7+ across spaces → already blocked by containsPhoneNumber
+export function looksLikeDigitFragment(text) {
+  if (!text) return false;
+  const trimmed = String(text).trim();
+  if (trimmed.length === 0) return false;
+
+  // Excludes: time (5:30), price (₪37 / $37 / 37₪), explicit URLs
+  if (/[:$₪]|http/i.test(trimmed)) return false;
+
+  // Allowed characters: digits, whitespace, dash, plus, parens, dot
+  // Anything else (letters, Arabic, emoji) disqualifies this as a
+  // "bare number fragment" — it's a real message with context.
+  if (!/^[\d\s\-+().,*_/]+$/.test(trimmed)) return false;
+
+  // Count actual digits
+  const digitCount = (trimmed.match(/\d/g) || []).length;
+
+  // 3-6 digits is the suspicious zone. <3 is too short to be a
+  // useful phone chunk. 7+ is already blocked by containsPhoneNumber.
+  return digitCount >= 3 && digitCount <= 6;
+}
+
 // ─── DATE / NUMBER GUARDS ──────────────────────────────────────────────────
 // Defensive helpers for form inputs.
 //

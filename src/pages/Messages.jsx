@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { sanitizeText, getContactViolation } from "@/lib/validation";
+import { sanitizeText, getContactViolation, looksLikeDigitFragment } from "@/lib/validation";
 import EmptyState from "@/components/shared/EmptyState";
 import {
   Search, Send, ArrowLeft, MessageCircle, Lock,
@@ -673,6 +673,26 @@ export default function Messages() {
         cleaned = sanitizeText(text).slice(0, 5000);
         const violation = getContactViolation(cleaned);
         if (violation) { toast.error(violation, { duration: 5000 }); return; }
+        // ─── ANTI-EVASION: soft warning for bare digit messages ──
+        // Catches the "925" → "5959" split-number pattern observed
+        // on Poparide. getContactViolation() above only blocks at 7+
+        // consecutive digits, so split fragments fall through. This
+        // warning (NOT block) makes the intent visible to the sender
+        // without false-positive-blocking legitimate uses like room
+        // numbers. See lib/validation.js looksLikeDigitFragment() for
+        // the carefully-chosen rules (excludes prices, times, etc).
+        if (looksLikeDigitFragment(cleaned)) {
+          toast("⚠️ هذا يبدو كرقم هاتف. تذكّر أن التواصل آمن داخل التطبيق فقط.", {
+            duration: 4500,
+            // sonner: warning-style toast (amber), not blocking error.
+            // Lets the message send — user can confirm by tapping
+            // send again, since the toast appears after the message
+            // is already on its way. Future iteration: add a
+            // pre-send confirmation modal for repeat offenders.
+            className: "!bg-amber-50 !text-amber-900 !border-amber-200 dark:!bg-amber-900/20 dark:!text-amber-100 dark:!border-amber-800",
+          });
+          // Intentionally no `return` — message still sends.
+        }
       }
       // Per-trip / per-request conversation IDs: a passenger booking 2 different
       // trips with the same driver gets 2 separate threads. Trip-request
