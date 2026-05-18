@@ -87,8 +87,13 @@ CREATE TABLE IF NOT EXISTS public.release_notes (
 );
 
 CREATE INDEX IF NOT EXISTS idx_release_notes_published
-  ON public.release_notes (published_at DESC)
-  WHERE published_at <= NOW();
+  ON public.release_notes (published_at DESC);
+-- Removed `WHERE published_at <= NOW()` partial-index predicate.
+-- Postgres requires partial-index predicates to be IMMUTABLE, and
+-- NOW() is STABLE (its value changes per transaction). The original
+-- intent was to skip indexing future-published notes, but the table
+-- will never grow beyond a few hundred rows (admin-authored
+-- release notes over the app lifetime) so a full index is fine.
 
 -- ─── 2. release_note_reads (per-user read tracking) ─────────────────
 
