@@ -31,7 +31,21 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [editForm, setEditForm] = useState({});
   const [confirmDialog, setConfirmDialog] = useState(null); // { tripId, action: "start"|"complete" }
   const [deleteConfirm, setDeleteConfirm] = useState(null); // tripId to delete
-  const [confirmCancel, setConfirmCancel] = useState(null); // tripId to cancel
+  const [confirmCancel, setConfirmCancel] = useState(null); // { tripId, reason, detail } when active
+  // Canonical cancellation reasons — codes match mig 085's CHECK
+  // constraint exactly. Labels are display-only; changing labels
+  // is safe, changing codes requires a schema migration.
+  const CANCEL_REASONS = [
+    { code: "passenger_requested",   label: "الراكب طلب الإلغاء" },
+    { code: "plans_changed",         label: "خططي تغيّرت" },
+    { code: "sick",                  label: "أنا مريض ولا يمكنني القيادة" },
+    { code: "car_problem",           label: "مشكلة في السيارة" },
+    { code: "out_of_my_way",         label: "نقطة الانطلاق/الوصول بعيدة عن طريقي" },
+    { code: "bad_weather",           label: "الطقس سيء" },
+    { code: "family_emergency",      label: "ظرف عائلي طارئ" },
+    { code: "uneasy_with_passenger", label: "لست مرتاحاً مع هذا الراكب" },
+    { code: "other",                 label: "سبب آخر (يُرجى التوضيح أدناه)" },
+  ];
   // Time-change dialog state. action='change_time' with the current
   // trip object so the modal can pre-fill the time input + show
   // the route header. Sized to ~60 minutes either side so the
@@ -39,8 +53,16 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
   const [timeChangeDialog, setTimeChangeDialog] = useState(null); // { trip, newTime }
 
   const cancelMutation = useMutation({
-    mutationFn: async (tripId) => {
-      await api.entities.Trip.update(tripId, { status: "cancelled" });
+    mutationFn: async ({ tripId, reason, detail }) => {
+      // Patch the trip with status='cancelled' + the reason metadata
+      // in ONE update so the BEFORE-UPDATE trigger (mig 085) sees both
+      // transitions in the same row image and auto-stamps cancelled_at.
+      // The trigger also enforces write-once on cancel_reason.
+      await api.entities.Trip.update(tripId, {
+        status: "cancelled",
+        cancel_reason: reason || null,
+        cancel_reason_detail: (detail || "").trim() || null,
+      });
       // Pull BOTH pending and confirmed bookings on this trip so they
       // all get flipped to cancelled_by_driver. Previously this only
       // pulled confirmed bookings, leaving pending ones stuck — a
@@ -108,9 +130,9 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         )
       );
 
-      return { tripId, affected: affected.length, failedUpdates };
+      return { tripId, affected: affected.length, failedUpdates, reason, detail };
     },
-    onSuccess: ({ tripId, affected, failedUpdates }) => {
+    onSuccess: ({ tripId, affected, failedUpdates, reason, detail }) => {
       // Honest toast — match what actually happened. The previous
       // \"تم إلغاء الرحلة وإعلام الركاب\" claimed success even when
       // notifications were never sent.
@@ -149,6 +171,14 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         driver_email: trip?.driver_email,
         affected_passengers: affected,
         failed_updates: failedUpdates,
+        // Reason added in mig 085. Captured here even though it's
+        // also persisted on the trip row — having it in the audit
+        // log makes admin queries "what reasons did driver X use
+        // in the last 90 days" trivial without joining trips.
+        cancel_reason: reason || null,
+        // detail is intentionally NOT logged here — could be long
+        // free text and audit_log isn't sized for it. Admins can
+        // join `trips` if they need the full detail.
       });
     },
     onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الرحلة")),
@@ -558,7 +588,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                   {trip.status !== "completed" && trip.status !== "cancelled" && (
                     <button
                       className="rounded-lg text-xs text-yellow-700 hover:bg-yellow-500/10 gap-1 flex items-center px-2 py-1.5 border border-yellow-500/30 hover:border-yellow-500/50 transition-colors"
-                      onClick={() => setConfirmCancel(trip.id)}
+                      onClick={() => setConfirmCancel({ tripId: trip.id, reason: "", detail: "" })}
                     >
                       <span>⚠️</span>
                       إلغاء الرحلة
@@ -617,39 +647,114 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         document.body
       )}
       {confirmCancel && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4 bg-black/50" dir="rtl" onClick={(e) => { if (e.target === e.currentTarget) setConfirmCancel(null); }}>
-          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm shadow-2xl">
-            <div className="text-center mb-4">
-              <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">⚠️</span>
+        <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center sm:px-4 bg-black/50" dir="rtl" onClick={(e) => { if (e.target === e.currentTarget) setConfirmCancel(null); }}>
+          {/* Bottom-sheet on mobile (items-end), centered modal on
+              tablet+ (sm:items-center). Max-h with internal scroll so
+              the radio list always fits the viewport on 375px / 667px
+              iPhone SE without clipping the action buttons. */}
+          <div className="bg-card rounded-t-2xl sm:rounded-2xl border border-border w-full sm:max-w-sm shadow-2xl flex flex-col max-h-[88vh]">
+            {/* ── Header ───────────────────────────────────────────── */}
+            <div className="px-6 pt-6 pb-3 shrink-0">
+              <div className="text-center mb-3">
+                <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+                <h3 className="font-bold text-lg text-foreground">إلغاء الرحلة</h3>
+                <p className="text-sm text-muted-foreground mt-1">سبب الإلغاء يساعدنا على تحسين الخدمة وإبلاغ ركابك.</p>
+                {(() => {
+                  const pax = bookings?.filter(b => b.trip_id === confirmCancel.tripId && b.status === "confirmed").length || 0;
+                  return pax > 0 ? (
+                    <div className="mt-2 p-2 bg-yellow-500/10 rounded-lg text-xs text-yellow-700 font-medium">
+                      ⚠️ سيتم إعلام {pax} {pax === 1 ? "راكب محجوز" : "ركاب محجوزون"} وسيُسترد المبلغ المدفوع
+                    </div>
+                  ) : (
+                    <div className="mt-2 p-2 bg-muted/40 rounded-lg text-xs text-muted-foreground">
+                      لا يوجد ركاب محجوزون — سيتم إخفاء الرحلة من نتائج البحث
+                    </div>
+                  );
+                })()}
               </div>
-              <h3 className="font-bold text-lg text-foreground">إلغاء الرحلة</h3>
-              <p className="text-sm text-muted-foreground mt-1">هل أنت متأكد من إلغاء هذه الرحلة؟ لا يمكن التراجع عن هذا الإجراء.</p>
-              {(() => {
-                const trip = trips?.find(t => t.id === confirmCancel);
-                const pax = bookings?.filter(b => b.trip_id === confirmCancel && b.status === "confirmed").length || 0;
-                return pax > 0 ? (
-                  <div className="mt-2 p-2 bg-yellow-500/10 rounded-lg text-xs text-yellow-700 font-medium">
-                    ⚠️ سيتم إعلام {pax} {pax === 1 ? "راكب محجوز" : "ركاب محجوزون"} وسيُسترد المبلغ المدفوع
-                  </div>
-                ) : (
-                  <div className="mt-2 p-2 bg-muted/40 rounded-lg text-xs text-muted-foreground">
-                    لا يوجد ركاب محجوزون — سيتم إخفاء الرحلة من نتائج البحث
-                  </div>
-                );
-              })()}
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setConfirmCancel(null)}>
-                تراجع
-              </Button>
-              <Button
-                className="flex-1 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                onClick={() => { cancelMutation.mutate(confirmCancel); setConfirmCancel(null); }}
-                disabled={cancelMutation.isPending}
-              >
-                {cancelMutation.isPending ? "جاري الإلغاء..." : "نعم، إلغاء الرحلة"}
-              </Button>
+
+            {/* ── Scrollable middle (reasons + detail) ─────────────── */}
+            <div className="flex-1 overflow-y-auto px-6 pb-2">
+              <p className="text-xs font-bold text-foreground mb-2">سبب الإلغاء *</p>
+              <div className="space-y-1.5">
+                {CANCEL_REASONS.map(({ code, label }) => {
+                  const selected = confirmCancel.reason === code;
+                  return (
+                    <label
+                      key={code}
+                      className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-muted/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="cancel-reason"
+                        value={code}
+                        checked={selected}
+                        onChange={(e) => setConfirmCancel({ ...confirmCancel, reason: e.target.value })}
+                        className="shrink-0 accent-primary"
+                      />
+                      <span className="text-sm text-foreground">{label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* Detail textarea — always rendered (drivers can add
+                  context to any reason), REQUIRED only when reason is
+                  'other'. Compact 3-row height so it doesn't dominate
+                  the modal on mobile. */}
+              <div className="mt-3">
+                <label className="text-xs font-bold text-foreground block mb-1">
+                  تفاصيل إضافية {confirmCancel.reason === "other" && <span className="text-destructive">*</span>}
+                </label>
+                <textarea
+                  value={confirmCancel.detail}
+                  onChange={(e) => setConfirmCancel({ ...confirmCancel, detail: e.target.value })}
+                  rows={3}
+                  maxLength={2000}
+                  placeholder={confirmCancel.reason === "other"
+                    ? "اشرح السبب بإيجاز..."
+                    : "اختياري"}
+                  className="w-full bg-muted/40 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary"
+                />
+                <p className={`text-[11px] mt-1 ${(confirmCancel.detail?.length || 0) > 2000 ? "text-destructive" : "text-muted-foreground"}`}>
+                  {confirmCancel.detail?.length || 0}/2000
+                </p>
+              </div>
+            </div>
+
+            {/* ── Footer (sticky action row) ───────────────────────── */}
+            <div className="px-6 py-4 border-t border-border bg-card rounded-b-2xl shrink-0">
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setConfirmCancel(null)}>
+                  تراجع
+                </Button>
+                <Button
+                  className="flex-1 rounded-xl bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                  onClick={() => {
+                    cancelMutation.mutate({
+                      tripId: confirmCancel.tripId,
+                      reason: confirmCancel.reason,
+                      detail: confirmCancel.detail,
+                    });
+                    setConfirmCancel(null);
+                  }}
+                  disabled={
+                    cancelMutation.isPending
+                    || !confirmCancel.reason
+                    || (confirmCancel.reason === "other" && !confirmCancel.detail.trim())
+                    || (confirmCancel.detail?.length || 0) > 2000
+                  }
+                >
+                  {cancelMutation.isPending ? "جاري الإلغاء..." : "نعم، إلغاء الرحلة"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>,
