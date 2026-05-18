@@ -3,6 +3,7 @@ import DateInput from "@/components/shared/DateInput";
 import React, { useState, useEffect, useMemo} from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { isTripExpired, isBookingClosed } from "@/lib/tripScheduling";
+import { normalizeDigits } from "@/lib/validation";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -335,9 +336,15 @@ export default function SearchTrips() {
         <div className="bg-card rounded-2xl border border-border p-4 mb-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1.5">الحد الأقصى للسعر (₪)</label>
-            <input type="number" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
-              placeholder="مثال: 50" min="0"
-              className="w-full h-10 px-3 rounded-xl bg-muted/50 border border-border text-sm" />
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9٠-٩۰-۹]*"
+              value={maxPrice}
+              onChange={e => setMaxPrice(normalizeDigits(e.target.value).replace(/[^\d]/g, ""))}
+              placeholder="مثال: 50"
+              className="w-full h-10 px-3 rounded-xl bg-muted/50 border border-border text-sm"
+            />
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1.5">تفضيل جنس السائق</label>

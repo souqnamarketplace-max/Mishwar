@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { api } from "@/api/apiClient";
 import { friendlyError } from "@/lib/errors";
 import { logAudit } from "@/lib/adminAudit";
+import { normalizeDigits } from "@/lib/validation";
 import { CITY_COORDS } from "@/lib/mapUtils";
 import { toast } from "sonner";
 import { ArrowLeft, MapPin, Calendar, Clock, Users, DollarSign, Info, AlertCircle, ShieldCheck } from "lucide-react";
@@ -413,13 +414,18 @@ export default function RequestTrip() {
             </Label>
             <div className="relative">
               <Input
-                type="number"
+                type="text"
                 inputMode="numeric"
-                min={0}
-                max={1000}
-                step={5}
+                pattern="[0-9٠-٩۰-۹]*"
                 value={form.suggested_price}
-                onChange={(e) => set("suggested_price", parseInt(e.target.value || 0, 10))}
+                onChange={(e) => {
+                  // Accept Arabic-Indic + Persian digits, normalize to ASCII.
+                  // Was type="number" which silently rejected ٠-٩ on mobile.
+                  const ascii = normalizeDigits(e.target.value);
+                  const digits = ascii.replace(/[^\d]/g, "");
+                  set("suggested_price", digits === "" ? 0 : parseInt(digits, 10));
+                }}
+                placeholder="مثال: 50"
                 className="pr-14"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted-foreground">₪</span>

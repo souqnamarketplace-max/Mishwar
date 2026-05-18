@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import RouteMap from "@/components/shared/RouteMap";
-import { sanitizeText, todayISO, isFutureOrToday } from "@/lib/validation";
+import { sanitizeText, todayISO, isFutureOrToday, normalizeDigits } from "@/lib/validation";
 
 import { checkDriverEligibility, daysUntil } from "@/lib/driverEligibility";
 const steps = [
@@ -1050,12 +1050,19 @@ export default function CreateTrip() {
                       placeholder="المكان داخل المدينة (اختياري)"
                     />
                     <Input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9٠-٩۰-۹]*"
                       value={stop.price_from_origin}
-                      onChange={(e) => updateStop(idx, "price_from_origin", e.target.value)}
+                      onChange={(e) => {
+                        // Same Arabic-Indic-aware normalization as the main
+                        // price field. type="text" + inputMode="numeric"
+                        // for mobile keypad while still accepting ٠-٩.
+                        const ascii = normalizeDigits(e.target.value);
+                        updateStop(idx, "price_from_origin", ascii.replace(/[^\d]/g, ""));
+                      }}
                       className="h-10 rounded-xl"
                       placeholder="سعر الراكب من البداية إلى هذه المحطة (₪)"
-                      min="0"
                     />
                   </div>
                 </div>
@@ -1115,12 +1122,26 @@ export default function CreateTrip() {
             <div>
               <Label>السعر للمقعد الواحد (₪)</Label>
               <Input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9٠-٩۰-۹]*"
                 value={form.price}
-                onChange={(e) => updateField("price", parseInt(e.target.value))}
-                min="1"
-                max="1000"
+                onChange={(e) => {
+                  // Normalize Arabic-Indic + Persian digits to ASCII so the
+                  // input accepts ٥٠ exactly like 50. type="text" instead of
+                  // type="number" because HTML5 number fields silently strip
+                  // non-ASCII numerals — users could type ٥٠ and see the
+                  // field clear with no feedback. inputMode="numeric" still
+                  // triggers the numeric keypad on mobile, and the pattern
+                  // attribute hints to the browser this is digits-only.
+                  const ascii = normalizeDigits(e.target.value);
+                  // Strip any remaining non-digit chars (paste protection)
+                  const digits = ascii.replace(/[^\d]/g, "");
+                  const parsed = digits === "" ? "" : parseInt(digits, 10);
+                  updateField("price", parsed);
+                }}
                 className="h-11 rounded-xl mt-1 max-w-xs"
+                placeholder="مثال: 50"
               />
             </div>
             <div className="p-4 bg-primary/5 rounded-xl">

@@ -2,6 +2,35 @@
 // Validation & sanitization utilities for مشوارو
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ─── DIGIT NORMALIZATION ──────────────────────────────────────────────────
+// مشوارو is an Arabic-first app. Users naturally type numbers in Arabic-Indic
+// digits (٠١٢٣٤٥٦٧٨٩) — phones, prices, seats, addresses, anything. The
+// codebase historically treated only ASCII digits as "real numbers", which:
+//   - Rejected valid phone numbers typed in Arabic ("symbols not allowed")
+//   - Silently cleared price inputs (type="number" strips non-ASCII)
+//   - Broke parseInt() on Arabic numerals (returns NaN)
+//
+// This helper converts BOTH Arabic-Indic (U+0660–U+0669) AND Eastern
+// Arabic-Indic / Persian (U+06F0–U+06F9) to ASCII 0-9, leaving every other
+// character untouched. Idempotent — safe to call on already-ASCII strings.
+//
+// Use this BEFORE any regex/parseInt/Number() that expects ASCII digits.
+//
+// Examples:
+//   normalizeDigits("٠٥٠١٢٣٤٥٦٧")          → "0501234567"
+//   normalizeDigits("سعر ٥٠ شيكل")          → "سعر 50 شيكل"
+//   normalizeDigits("0501234567")           → "0501234567"  (no-op)
+//   normalizeDigits("۵۰")                   → "50"          (Persian)
+//   normalizeDigits(null)                   → ""
+export function normalizeDigits(s) {
+  if (s == null) return "";
+  return String(s)
+    // Arabic-Indic 0-9 → ASCII 0-9
+    .replace(/[\u0660-\u0669]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0x0660 + 48))
+    // Eastern Arabic-Indic (Persian) 0-9 → ASCII 0-9
+    .replace(/[\u06F0-\u06F9]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0x06F0 + 48));
+}
+
 // ─── PHONE: accepts any valid international phone number (7–15 digits)
 // Preferred formats for Palestinian users:
 //   Local:         0501234567, 0591234567 (Palestinian)
@@ -9,11 +38,17 @@
 //
 // We intentionally accept any format with 7–15 digits so users from
 // any region (family abroad, international contacts) can register.
+//
+// Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) are accepted and normalized to ASCII
+// via normalizeDigits() before regex matching.
 
 export function isValidPalestinianPhone(phone) {
   if (!phone) return false;
+  // Normalize Arabic-Indic + Persian digits to ASCII so a user typing
+  // ٠٥٠١٢٣٤٥٦٧ is accepted exactly like 0501234567.
+  const normalized = normalizeDigits(phone);
   // Strip spaces, dashes, dots, parentheses, and leading +
-  const cleaned = phone.replace(/[\s\-().+]/g, "");
+  const cleaned = normalized.replace(/[\s\-().+]/g, "");
   // Must be purely digits and between 7–15 digits (ITU-T E.164 range)
   return /^\d{7,15}$/.test(cleaned);
 }
@@ -49,13 +84,19 @@ export function validatePhone(phone) {
     return result;
   }
   result.nonEmpty = true;
-  // Allowed chars: digits, leading +, separators (space/dash/dot/parens)
-  if (/[^\d+\s\-().]/.test(phone)) {
+  // Normalize Arabic-Indic + Persian digits to ASCII before any regex.
+  // Without this, a phone like ٠٥٠١٢٣٤٥٦٧ failed the digitsOnly check
+  // because /\d/ in JavaScript only matches ASCII digits — the Arabic
+  // numerals were classified as "symbols" and the user saw
+  // "الرقم يحتوي على رموز غير مسموحة" for what's actually a valid PS number.
+  const normalized = normalizeDigits(phone);
+  // Allowed chars (post-normalization): digits, leading +, separators
+  if (/[^\d+\s\-().]/.test(normalized)) {
     result.digitsOnly = false;
     result.reason = "الرقم يحتوي على رموز غير مسموحة — استخدم أرقاماً فقط";
     return result;
   }
-  const cleaned = phone.replace(/[\s\-().+]/g, "");
+  const cleaned = normalized.replace(/[\s\-().+]/g, "");
   if (cleaned.length === 0) {
     result.reason = "يرجى إدخال أرقام الهاتف";
     return result;

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useSEO } from "@/hooks/useSEO";
+import { normalizeDigits } from "@/lib/validation";
 import { friendlyError } from "@/lib/errors";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 import EmptyState from "@/components/shared/EmptyState";
@@ -423,9 +424,15 @@ function NewTemplateForm({ onCancel, onCreated }) {
           <div>
             <label className="text-sm font-medium mb-1 block">السعر (₪)</label>
             <Input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9٠-٩۰-۹]*"
               value={form.price}
-              onChange={(e) => set("price", e.target.value)}
+              onChange={(e) => {
+                // Accept Arabic-Indic + Persian digits
+                const ascii = normalizeDigits(e.target.value);
+                set("price", ascii.replace(/[^\d]/g, ""));
+              }}
               placeholder="20"
               className="min-h-[44px]"
             />
@@ -433,11 +440,14 @@ function NewTemplateForm({ onCancel, onCreated }) {
           <div>
             <label className="text-sm font-medium mb-1 block">مقاعد</label>
             <Input
-              type="number"
-              min="1"
-              max="8"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9٠-٩۰-۹]*"
               value={form.available_seats}
-              onChange={(e) => set("available_seats", e.target.value)}
+              onChange={(e) => {
+                const ascii = normalizeDigits(e.target.value);
+                set("available_seats", ascii.replace(/[^\d]/g, ""));
+              }}
               className="min-h-[44px]"
             />
           </div>

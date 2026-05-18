@@ -2,6 +2,7 @@ import { CITIES } from "@/lib/cities";
 import { useSEO } from "@/hooks/useSEO";
 import { getNotifTarget } from "@/lib/notificationRouting";
 import { useNotificationActions } from "@/lib/useNotificationActions";
+import { normalizeDigits } from "@/lib/validation";
 import React, { useState, useEffect, useMemo } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -326,12 +327,12 @@ export default function Notifications() {
               <div className="relative">
                 <DollarSign className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  type="number"
-                  min="0"
-                  max="1000"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9٠-٩۰-۹]*"
                   placeholder="مثال: 80"
                   value={form.max_price}
-                  onChange={(e) => setForm({ ...form, max_price: e.target.value })}
+                  onChange={(e) => setForm({ ...form, max_price: normalizeDigits(e.target.value).replace(/[^\d]/g, "") })}
                   className="pr-10 rounded-xl"
                 />
               </div>

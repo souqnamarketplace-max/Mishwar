@@ -1,6 +1,6 @@
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
-import { todayISO, isFutureOrToday, validatePhone, validatePasswordCompliance, passwordComplianceMessage, isValidEmail } from "@/lib/validation";
+import { todayISO, isFutureOrToday, validatePhone, validatePasswordCompliance, passwordComplianceMessage, isValidEmail, normalizeDigits } from "@/lib/validation";
 import { compressImage } from "@/lib/compressImage";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
@@ -387,7 +387,13 @@ export default function AccountSettings() {
     if (phoneCheck.reason) { toast.error(phoneCheck.reason); return; }
     setPhoneLoading(true);
     try {
-      await api.auth.updateMe({ phone });
+      // Persist the ASCII form so downstream consumers (SMS gateway,
+      // admin search, deduplication) don't have to deal with mixed
+      // Arabic-Indic / ASCII representations of the same number.
+      // The displayed input still shows whatever the user typed —
+      // they'll see the normalized form only on next load.
+      const phoneToSave = normalizeDigits(phone).trim();
+      await api.auth.updateMe({ phone: phoneToSave });
       qc.invalidateQueries({ queryKey: ["me"] });
       toast.success("تم تحديث رقم الهاتف!");
     } catch (err) {
