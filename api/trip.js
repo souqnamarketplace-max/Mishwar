@@ -62,6 +62,37 @@ function setMeta(html, attr, attrVal, contentVal) {
   return html.replace("</head>", `<meta ${attr}="${attrVal}" content="${escaped}" />\n</head>`);
 }
 
+// Specialized helper for the robots meta tag.
+//
+// The static index.html ships with <meta name="robots" content="index, follow" />
+// as the default for marketing pages. When this endpoint detects a missing
+// trip and wants to mark the response noindex, naïvely appending a SECOND
+// <meta name="robots"> leaves both tags in the response:
+//
+//   <meta name="robots" content="index, follow" />
+//   <meta name="robots" content="noindex,nofollow" />
+//
+// Google docs say the most restrictive directive wins, so the page still
+// gets deindexed. But:
+//   - Search Console URL Inspection flags 'multiple robots tags' as a
+//     warning
+//   - Less strict crawlers (some Bing versions, Yandex, smaller crawlers
+//     used by SEO tools) take the FIRST tag and ignore the rest, so
+//     the page would appear indexable to them
+//   - Manual code review is confused by the conflicting signal
+//
+// Fix: regex-replace the existing tag (case-insensitive) BEFORE the
+// insert-before-</head> fallback fires. This guarantees a single
+// <meta name="robots"> tag in the response, with our desired value.
+function setRobotsMeta(html, content) {
+  const escaped = esc(content);
+  const re = /<meta\s+name="robots"[^>]*>/i;
+  if (re.test(html)) {
+    return html.replace(re, `<meta name="robots" content="${escaped}" />`);
+  }
+  return html.replace("</head>", `<meta name="robots" content="${escaped}" />\n</head>`);
+}
+
 export default async function handler(req, res) {
   // Rate limit per-IP. 60 requests/minute is generous for a real
   // user clicking around, but blocks scraper / retry-storm patterns.
@@ -96,10 +127,13 @@ export default async function handler(req, res) {
     // index this as a thin/duplicate page. Returning 200 here caused
     // Google Search Console to flag these as "Soft 404" (HTTP success
     // status but thin content with no real article).
-    const html = getIndexHtml().replace(
-      "</head>",
-      `<meta name="robots" content="noindex,nofollow" />\n</head>`
-    );
+    //
+    // setRobotsMeta REPLACES the existing <meta name="robots"
+    // content="index, follow"> shipped in index.html, rather than
+    // appending a second one. Conflicting robots metas caused
+    // crawler-dependent behavior — most respected the more restrictive
+    // 'noindex' but some indexed anyway.
+    const html = setRobotsMeta(getIndexHtml(), "noindex,nofollow");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Content-Type-Options", "nosniff");
     return res.status(404).send(html);
@@ -216,10 +250,11 @@ export default async function handler(req, res) {
     // index; nofollow stops the crawler from chasing links inside the
     // 'not found' page back into Mishwaro (avoiding crawl-budget waste
     // on dead branches).
-    html = html.replace(
-      "</head>",
-      `<meta name="robots" content="noindex,nofollow" />\n</head>`
-    );
+    //
+    // setRobotsMeta REPLACES the existing index,follow meta rather than
+    // appending — see helper comment for why duplicate robots tags are
+    // a problem despite Google's 'most restrictive wins' policy.
+    html = setRobotsMeta(html, "noindex,nofollow");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Content-Type-Options", "nosniff");
     // Short cache — if the driver re-posts a similar trip with same
