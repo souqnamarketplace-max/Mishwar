@@ -184,6 +184,47 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
     onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الرحلة")),
   });
 
+  // ─── Bookings-open toggle (mig 086) ──────────────────────────────
+  //
+  // Lets a driver pause / resume new bookings on a trip without
+  // cancelling it. Existing pending/confirmed bookings are UNAFFECTED
+  // — only NEW book_seat calls are gated server-side by mig 086's
+  // updated RPC.
+  //
+  // Optimistic update so the toggle's visual state flips instantly;
+  // the actual Supabase round-trip happens in the background. On
+  // failure we roll back via the standard React Query pattern.
+  const bookingsOpenMutation = useMutation({
+    mutationFn: async ({ tripId, open }) => {
+      return api.entities.Trip.update(tripId, { bookings_open: open });
+    },
+    onMutate: async ({ tripId, open }) => {
+      await Promise.all([
+        qc.cancelQueries({ queryKey: ["trips"] }),
+        qc.cancelQueries({ queryKey: ["driver-trips", driverUser?.email] }),
+      ]);
+      const prevTrips       = qc.getQueryData(["trips"]);
+      const prevDriverTrips = qc.getQueryData(["driver-trips", driverUser?.email]);
+      const apply = (old) => old?.map(t => t.id === tripId ? { ...t, bookings_open: open } : t) || [];
+      qc.setQueryData(["trips"], apply);
+      qc.setQueryData(["driver-trips", driverUser?.email], apply);
+      return { prevTrips, prevDriverTrips };
+    },
+    onError: (err, _vars, ctx) => {
+      qc.setQueryData(["trips"], ctx?.prevTrips);
+      qc.setQueryData(["driver-trips", driverUser?.email], ctx?.prevDriverTrips);
+      toast.error(friendlyError(err, "فشل تحديث حالة الحجز"));
+    },
+    onSuccess: (_, { open }) => {
+      toast.success(open
+        ? "✅ فُتحت الرحلة لاستقبال الحجوزات"
+        : "🔒 توقّفت الحجوزات الجديدة على هذه الرحلة (الحجوزات الحالية تبقى سارية)"
+      );
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips", driverUser?.email] });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }) => {
       // Lifecycle transitions go through SECURITY DEFINER RPCs
@@ -592,6 +633,30 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     >
                       <span>⚠️</span>
                       إلغاء الرحلة
+                    </button>
+                  )}
+                  {/* Bookings-open toggle — pause/resume new bookings
+                      without cancelling. Only visible for trips that
+                      are still in a bookable state ('confirmed' — not
+                      in_progress, completed, or cancelled). */}
+                  {trip.status === "confirmed" && (
+                    <button
+                      className={`rounded-lg text-xs gap-1 flex items-center px-2 py-1.5 border transition-colors ${
+                        trip.bookings_open === false
+                          ? "text-amber-700 border-amber-500/40 bg-amber-50 hover:bg-amber-100"
+                          : "text-foreground border-border hover:bg-muted"
+                      }`}
+                      onClick={() => bookingsOpenMutation.mutate({
+                        tripId: trip.id,
+                        open: trip.bookings_open === false,
+                      })}
+                      disabled={bookingsOpenMutation.isPending}
+                      aria-label={trip.bookings_open === false
+                        ? "إعادة فتح الرحلة للحجز"
+                        : "إيقاف الحجوزات الجديدة"}
+                    >
+                      <span>{trip.bookings_open === false ? "🔒" : "🔓"}</span>
+                      {trip.bookings_open === false ? "مغلقة" : "الحجز مفتوح"}
                     </button>
                   )}
                   {trip.status !== "completed" && (

@@ -68,6 +68,10 @@ const KNOWN_PATTERNS = [
   [/new row violates row-level security policy.*messages|messages.*new row violates row-level security/i,
                                                            "لا يمكنك مراسلة هذا المستخدم — أحدكما حظر الآخر"],
   [/not enough seats/i,                                    "لم يتبقَ عدد كافٍ من المقاعد"],
+  // Bookings-closed gate (mig 086) — match BEFORE the generic
+  // "trip not bookable" regex below since both would match this
+  // error otherwise. More specific regex wins.
+  [/driver has closed this trip for new bookings/i,        "أوقف السائق استقبال حجوزات جديدة على هذه الرحلة"],
   [/trip not bookable/i,                                   "الرحلة غير متاحة للحجز حالياً"],
   [/trip is in the past/i,                                 "هذه الرحلة قد انتهت"],
   [/trip not found/i,                                      "الرحلة غير موجودة"],
@@ -138,6 +142,9 @@ const KNOWN_PATTERNS = [
   [/cannot book your own trip/i,                           "لا يمكنك حجز رحلتك أنت"],
   [/not enough seats/i,                                    "لا توجد مقاعد كافية متاحة في هذه الرحلة"],
   [/trip is in the past/i,                                 "هذه الرحلة قد انتهت بالفعل"],
+  // Bookings-closed gate (mig 086) — must precede generic "trip not
+  // bookable" so the more-specific message wins on regex match.
+  [/driver has closed this trip for new bookings/i,        "أوقف السائق استقبال حجوزات جديدة على هذه الرحلة. تواصل معه عبر الرسائل أو ابحث عن رحلة أخرى."],
   [/trip not bookable.*status/i,                           "هذه الرحلة غير متاحة للحجز حالياً"],
   [/trip not found/i,                                      "الرحلة المطلوبة غير موجودة"],
   [/booking blocked due to strikes/i,                      "حسابك معلق مؤقتاً بسبب تجاوزات سابقة — تواصل مع الدعم"],

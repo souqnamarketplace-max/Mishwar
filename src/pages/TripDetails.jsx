@@ -531,6 +531,21 @@ export default function TripDetails() {
                         <Link to="/settings?section=blocked" className="text-primary underline">الإعدادات</Link>.
                       </p>
                     </div>
+                  ) : trip.bookings_open === false ? (
+                    /* Driver paused new bookings (mig 086). Existing
+                       bookings stay valid; new ones are blocked.
+                       Distinct from a cancelled or full trip — passenger
+                       can still see the trip and message the driver,
+                       but the book button is disabled with context. */
+                    <div className="w-full rounded-xl border border-amber-300 bg-amber-50 p-3 text-amber-900 text-sm space-y-1">
+                      <div className="flex items-center gap-2 font-bold">
+                        <span>🔒</span>
+                        <span>أوقف السائق الحجوزات الجديدة</span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-amber-800">
+                        يمكنك التواصل معه عبر الرسائل أو البحث عن رحلة أخرى على نفس المسار.
+                      </p>
+                    </div>
                   ) : (
                     <Button
                       className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
