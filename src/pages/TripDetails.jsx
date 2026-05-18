@@ -361,7 +361,21 @@ export default function TripDetails() {
     },
   } : null;
 
-  useSEO({ title: seoTitle, description: seoDescription, canonical: seoCanonical, jsonLd: tripJsonLd });
+  // SEO meta: when the trip exists, emit rich tags + JSON-LD. When
+  // it doesn't (loading still resolves with null, or fetch errored
+  // out), pass noindex:true so the page is excluded from search.
+  // This pairs with the /api/trip server-side 404 — once Googlebot
+  // visits, the server returns 404 with noindex; if a user with an
+  // existing tab navigates to a deleted trip, the SPA renders the
+  // empty state with noindex via this hook.
+  const isTripMissing = !tripLoading && !trip;
+  useSEO({
+    title: seoTitle,
+    description: seoDescription,
+    canonical: seoCanonical,
+    jsonLd: tripJsonLd,
+    noindex: isTripMissing || tripError,
+  });
 
   // ── Render states ──────────────────────────────────────────
   // The previous code had a single `if (!trip) return <loading>` —

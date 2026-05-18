@@ -92,12 +92,17 @@ export default async function handler(req, res) {
   }
 
   if (!lookupCol || !lookupVal) {
-    // Invalid ID — just serve the SPA shell. The frontend will show a
-    // "trip not found" UI to the user.
-    const html = getIndexHtml();
+    // Invalid ID format — return 404 with noindex meta so Google won't
+    // index this as a thin/duplicate page. Returning 200 here caused
+    // Google Search Console to flag these as "Soft 404" (HTTP success
+    // status but thin content with no real article).
+    const html = getIndexHtml().replace(
+      "</head>",
+      `<meta name="robots" content="noindex,nofollow" />\n</head>`
+    );
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("X-Content-Type-Options", "nosniff");
-    return res.status(200).send(html);
+    return res.status(404).send(html);
   }
 
   // If Supabase env is unset (e.g., a preview deploy missing vars), serve
@@ -183,6 +188,45 @@ export default async function handler(req, res) {
     if (!html.includes('rel="canonical"')) {
       html = html.replace("</head>", `<link rel="canonical" href="${esc(tripUrl)}" />\n</head>`);
     }
+  } else {
+    // Trip not found in DB (deleted, expired, or never existed). This is
+    // THE soft-404 scenario that Google Search Console flagged. Without
+    // proper handling, we'd return:
+    //   - HTTP 200 (suggests success)
+    //   - Generic homepage OG meta (no trip-specific content)
+    //   - The SPA shell that hydrates and shows 'trip not found' state
+    // Google interprets this as 'thin/empty page returned with success
+    // status' = Soft 404.
+    //
+    // The fix has three parts:
+    //   1. Return HTTP 404 — explicit signal that the resource is gone
+    //   2. Add <meta name="robots" content="noindex,nofollow"> so even
+    //      if Google or another crawler reaches this URL, it won't be
+    //      indexed and won't pass link equity to other URLs
+    //   3. Don't enrich OG meta (the generic homepage values would be
+    //      misleading on a trip URL)
+    //
+    // Why 404 not 410 (Gone): 410 implies the resource USED to exist
+    // and is permanently removed. We can't distinguish 'deleted'
+    // from 'never existed' from 'expired' from 'short_code typo'
+    // server-side, so 404 (Not Found, possibly temporary) is the
+    // safer general-purpose response.
+    //
+    // Why noindex+nofollow: noindex prevents the URL from joining the
+    // index; nofollow stops the crawler from chasing links inside the
+    // 'not found' page back into Mishwaro (avoiding crawl-budget waste
+    // on dead branches).
+    html = html.replace(
+      "</head>",
+      `<meta name="robots" content="noindex,nofollow" />\n</head>`
+    );
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Short cache — if the driver re-posts a similar trip with same
+    // short_code (rare but possible), the 404 expires quickly. 5min
+    // is long enough to absorb crawler retry storms.
+    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=600");
+    return res.status(404).send(html);
   }
 
   // Cache: 30s fresh, 60s stale-while-revalidate (lowered from 60/300 so

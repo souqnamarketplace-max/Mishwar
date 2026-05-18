@@ -46,4 +46,4 @@ Disallow: /feedback
 # Be polite to small servers
 Crawl-delay: 2
 
-Sitemap: https://mishwar-nu.vercel.app/sitemap.xml
+Sitemap: https://www.mishwaro.com/sitemap.xml

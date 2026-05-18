@@ -41,7 +41,7 @@ import {
  *     because every render writes the new values, and the next route's
  *     useSEO call overwrites.
  */
-export function useSEO({ title, description, canonical, ogImage, jsonLd }) {
+export function useSEO({ title, description, canonical, ogImage, jsonLd, noindex }) {
   useEffect(() => {
     const fullTitle = title ? `${title} | ${SITE_NAME}` : `${SITE_NAME} — شارك الطريق، وفر أكثر`;
     document.title = fullTitle;
@@ -61,6 +61,42 @@ export function useSEO({ title, description, canonical, ogImage, jsonLd }) {
 
     // Description
     upsertMeta('meta[name="description"]', "name", "description", desc);
+
+    // ─── Robots / indexability control ───────────────────────────────
+    //
+    // When a page renders an error / empty / not-found state and the
+    // calling component knows it shouldn't be indexed, it passes
+    // noindex: true. We then INSERT a <meta name="robots"
+    // content="noindex,nofollow"> tag — and REMOVE it on the next
+    // render that doesn't pass noindex (so navigating from a
+    // not-found state back to a valid page doesn't leave the meta
+    // accidentally stuck).
+    //
+    // This is the SPA-side companion to the /api/trip server-side
+    // 404+noindex fix. /api/trip handles the initial HTML response
+    // (what Googlebot sees on first crawl); useSEO handles in-app
+    // navigation where the user clicks into a page that turns out
+    // to be empty (e.g. a deleted trip, missing profile, expired
+    // request).
+    //
+    // Google policy: noindex,nofollow on a 200 OK page is the second-
+    // best signal after a hard 404/410. Combined with the SPA's
+    // 'trip not found' visible message, it gives Googlebot a clear
+    // dismiss-this-URL signal.
+    let robotsEl = document.querySelector('meta[name="robots"]');
+    if (noindex) {
+      if (!robotsEl) {
+        robotsEl = document.createElement("meta");
+        robotsEl.setAttribute("name", "robots");
+        document.head.appendChild(robotsEl);
+      }
+      robotsEl.setAttribute("content", "noindex,nofollow");
+    } else if (robotsEl) {
+      // Cleanup: drop the meta on pages that ARE indexable. Without
+      // this, a noindex stamped by a previous render would persist
+      // through navigation and silently de-index reachable pages.
+      robotsEl.remove();
+    }
 
     // Canonical — auto-build from pathname if not explicitly passed.
     // Use pathname only (no query, no hash) so /search?from=X and
@@ -108,5 +144,5 @@ export function useSEO({ title, description, canonical, ogImage, jsonLd }) {
     } else if (pageLdEl) {
       pageLdEl.remove();
     }
-  }, [title, description, canonical, ogImage, JSON.stringify(jsonLd)]);
+  }, [title, description, canonical, ogImage, JSON.stringify(jsonLd), noindex]);
 }
