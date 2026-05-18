@@ -546,14 +546,43 @@ export default function Messages() {
   // 2. ?trip= URL param (for new conversations being started)
   // 3. Fallback: I'm passenger → find my booking with this driver
   // 4. Fallback: I'm driver → find this passenger's booking on one of my trips
+  //
+  // CRITICAL EXCEPTION: when the conversation is request-scoped (no
+  // trip context, only a request_id), DO NOT fall back to steps 3/4.
+  // Doing so would resurrect an unrelated old trip with this user and
+  // render its status bar + lockout banner on top of the fresh request
+  // chat — the exact bug shown in the screenshots: driver clicked
+  // 'راسل الراكب' on /passenger-requests/:id, landed on /messages
+  // with paramRequest set, but the page showed 'الرحلة مكتملة' /
+  // 'انتهت الرحلة — المحادثة مغلقة' from a previous unrelated
+  // completed trip with the same passenger.
+  //
+  // A request-scoped chat is by design tripless — it's a contact
+  // about a request the driver hasn't fulfilled yet, with no trip
+  // attached. The TripStatusBar should NOT render at all.
   const getTripIdForConv = (conv) => {
     if (!conv) return null;
+    // Detect request-scoped: either an in-memory new conv keyed only by
+    // request (no paramTrip), or an existing conv where every message
+    // carries a request_id and no trip_id.
+    const isRequestScopedNew = conv.id === "__new__" && !paramTrip && !!paramRequest;
+    const allMsgsHaveRequestNoTrip = conv.messages.length > 0
+      && conv.messages.every(m => !!m.request_id && !m.trip_id);
+    const isRequestScoped = isRequestScopedNew || allMsgsHaveRequestNoTrip;
+
     // 1. Explicit trip_id on a message (most accurate)
     for (let i = conv.messages.length - 1; i >= 0; i--) {
       if (conv.messages[i].trip_id) return conv.messages[i].trip_id;
     }
     // 2. URL param for fresh conversations
     if (conv.id === "__new__" && paramTrip) return paramTrip;
+
+    // Request-scoped chats stop here — no trip exists, no fallback.
+    // Without this guard, steps 3/4 would attach an unrelated old
+    // trip to the request chat and lock the composer with that
+    // trip's status, breaking driver→passenger replies.
+    if (isRequestScoped) return null;
+
     // 3. Fallback: am I a passenger with this driver?
     const myBookingWithThem = (myBookings.asPassenger || []).find(b =>
       b.driver_email === conv.otherEmail || b.created_by === conv.otherEmail

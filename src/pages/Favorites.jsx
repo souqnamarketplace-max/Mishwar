@@ -79,14 +79,23 @@ export default function Favorites() {
   //      a passenger waiting for their favorite driver to post)
   //   2. their upcoming trips (gte today, status='confirmed') so we
   //      can show "next trip" inline on each driver card
+  //
+  // The profiles fetch uses a SECURITY DEFINER RPC (mig 078) rather
+  // than a direct .from('profiles').in('email', ...) query, because
+  // the profiles_select RLS policy correctly hides driver profiles
+  // from arbitrary email lookups (a privacy boundary that prevents
+  // user enumeration). For favorited drivers, the relationship is
+  // documented in favorite_drivers, so the RPC re-permits the read
+  // — but only for drivers the caller has actually favorited (the
+  // RPC joins to favorite_drivers internally via auth.email()).
+  //
+  // Without this RPC, every favorited driver showed as 'orphan' even
+  // when their profile existed — see screenshots in the dev log.
   const { data: favDriverProfiles = [], isLoading: profilesLoading } = useQuery({
     queryKey: ["fav-driver-profiles", favDriverEmails.join(",")],
     queryFn: async () => {
       if (favDriverEmails.length === 0) return [];
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, profile_image, driver_rating, driver_reviews_count, car_model, car_color")
-        .in("email", favDriverEmails);
+      const { data, error } = await supabase.rpc("get_favorite_drivers_display");
       if (error) throw error;
       return data || [];
     },
@@ -372,25 +381,61 @@ export default function Favorites() {
               {/* Orphan favorites — favorited emails that no longer have a
                   profile (driver deleted account, or rare data drift). Give
                   the user a clear path to clean up their list rather than
-                  hiding silently. */}
+                  hiding silently.
+
+                  Privacy: never display the raw driver email in the UI.
+                  Even though it's the favoriting user's own data, leaking
+                  another user's email address into the page DOM is a
+                  privacy regression (it appears in screenshots, browser
+                  back/forward cache, etc.) and feels unprofessional.
+
+                  We instead show a generic placeholder + a short opaque
+                  reference derived from the email so the user can
+                  distinguish multiple orphans visually. The reference
+                  is just the first 4 chars of a hex hash of the email,
+                  presented as 'سائق #XXXX' — opaque to anyone reading
+                  the page, but stable across re-renders for the
+                  favoriting user. */}
               {orphanFavorites.length > 0 && (
                 <div className="mt-2 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl space-y-2">
                   <p className="text-xs font-medium text-yellow-700">
-                    {orphanFavorites.length} سائق لم يعد متاحاً
+                    {orphanFavorites.length === 1
+                      ? "سائق واحد لم يعد متاحاً"
+                      : `${orphanFavorites.length} سائق لم يعد متاحاً`}
                   </p>
-                  {orphanFavorites.map(email => (
-                    <div key={email} className="flex items-center justify-between gap-2 bg-card rounded-xl px-3 py-2">
-                      <button
-                        onClick={() => toggleDriverFavorite(email)}
-                        className="text-xs text-destructive hover:underline"
-                      >
-                        إزالة
-                      </button>
-                      <span className="text-xs text-muted-foreground truncate font-mono" dir="ltr">
-                        {email}
-                      </span>
-                    </div>
-                  ))}
+                  <p className="text-[11px] text-muted-foreground leading-relaxed mb-2">
+                    قد يكون السائق قد حذف حسابه. يمكنك إزالة هذه التفضيلات لتنظيف قائمتك.
+                  </p>
+                  {orphanFavorites.map((email, idx) => {
+                    // Short opaque ref — 4 chars from a simple djb2-ish
+                    // hash of the email. Deterministic per email so the
+                    // same orphan always shows the same ref, but the
+                    // email itself never reaches the DOM. Not cryptographic
+                    // — just enough to distinguish orphans visually.
+                    let h = 5381;
+                    for (let i = 0; i < email.length; i++) {
+                      h = ((h * 33) ^ email.charCodeAt(i)) >>> 0;
+                    }
+                    const ref = h.toString(16).slice(0, 4).toUpperCase();
+                    return (
+                      <div key={email} className="flex items-center justify-between gap-2 bg-card rounded-xl px-3 py-2.5">
+                        <button
+                          onClick={() => toggleDriverFavorite(email)}
+                          className="text-xs text-destructive hover:underline shrink-0"
+                        >
+                          إزالة
+                        </button>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[10px] text-muted-foreground font-mono bg-muted/40 rounded px-1.5 py-0.5 shrink-0">
+                            #{ref}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            سائق غير متاح
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
