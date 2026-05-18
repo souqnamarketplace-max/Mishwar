@@ -166,12 +166,13 @@ export default function Favorites() {
         </div>
       </div>
 
-      {/* Sub-tabs */}
+      {/* Sub-tabs — full-width on mobile so tapping is forgiving;
+          44px min-height satisfies Apple HIG touch target rule. */}
       <div className="flex gap-2 mb-5 border-b border-border">
         <button
           onClick={() => setTab("trips")}
           aria-pressed={tab === "trips"}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors ${
             tab === "trips"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -188,7 +189,7 @@ export default function Favorites() {
         <button
           onClick={() => setTab("drivers")}
           aria-pressed={tab === "drivers"}
-          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+          className={`px-4 py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors ${
             tab === "drivers"
               ? "border-primary text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
@@ -316,10 +317,13 @@ export default function Favorites() {
                           )}
                         </div>
                       </div>
-                      {/* Remove button */}
+                      {/* Remove button — 44x44 hit area satisfies Apple
+                          HIG / WCAG. Visible glyph stays small (16px)
+                          so it doesn't dominate the driver row visually,
+                          but the touch surface is generous. */}
                       <button
                         onClick={() => toggleDriverFavorite(driver.email)}
-                        className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="shrink-0 inline-flex items-center justify-center w-11 h-11 -my-1 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:bg-destructive/20 transition-colors"
                         aria-label="إزالة من المفضلة"
                         title="إزالة من المفضلة"
                       >
@@ -418,10 +422,10 @@ export default function Favorites() {
                     }
                     const ref = h.toString(16).slice(0, 4).toUpperCase();
                     return (
-                      <div key={email} className="flex items-center justify-between gap-2 bg-card rounded-xl px-3 py-2.5">
+                      <div key={email} className="flex items-center justify-between gap-2 bg-card rounded-xl px-3 py-1.5">
                         <button
                           onClick={() => toggleDriverFavorite(email)}
-                          className="text-xs text-destructive hover:underline shrink-0"
+                          className="text-xs text-destructive hover:underline hover:bg-destructive/5 active:bg-destructive/10 rounded-lg px-3 py-2.5 shrink-0 min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors"
                         >
                           إزالة
                         </button>

@@ -236,15 +236,31 @@ function Card({ t, noSeats, urgentSeats }) {
                   onClick={toggleDriverFavorite}
                   aria-label={driverFavorited ? "إلغاء تفضيل السائق" : "إضافة السائق للمفضلة"}
                   title={driverFavorited ? "سائق مفضل — اضغط للإلغاء" : "أضف السائق للمفضلة"}
-                  className={`shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md transition-colors ${
+                  // Visual circle stays small to fit the driver name row,
+                  // but the BUTTON itself is 44px square (Apple HIG / WCAG
+                  // 2.5.5 'Target Size' minimum) with the visible icon
+                  // centered. -my-2.5 negates the extra padding so the
+                  // row height doesn't grow — the touch surface extends
+                  // INTO the gap above and below the visible chip without
+                  // shifting layout. Same pattern as iOS native nav
+                  // buttons where the visible glyph is small but the
+                  // hit area is generous.
+                  className={`shrink-0 inline-flex items-center justify-center w-11 h-11 -my-2.5 rounded-full transition-colors ${
                     driverFavorited
-                      ? "text-rose-500 hover:bg-rose-500/10"
-                      : "text-muted-foreground/50 hover:text-rose-500 hover:bg-rose-500/8"
+                      ? "text-rose-500 hover:bg-rose-500/10 active:bg-rose-500/20"
+                      : "text-muted-foreground/60 hover:text-rose-500 hover:bg-rose-500/8 active:bg-rose-500/15"
                   }`}
                 >
-                  {driverFavorited
-                    ? <UserCheck className="w-3 h-3" aria-hidden="true" />
-                    : <UserPlus  className="w-3 h-3" aria-hidden="true" />}
+                  {/* Visible chip — explicit background ring so the user
+                      perceives it as a clear affordance even though the
+                      actual hit area is much larger. */}
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${
+                    driverFavorited ? "bg-rose-500/10" : "bg-muted/40"
+                  }`}>
+                    {driverFavorited
+                      ? <UserCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                      : <UserPlus  className="w-3.5 h-3.5" aria-hidden="true" />}
+                  </span>
                 </button>
               )}
             </div>

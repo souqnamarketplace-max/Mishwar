@@ -692,15 +692,18 @@ export default function TripDetails() {
                   onClick={toggleDriverFavorite}
                   aria-label={driverFavorited ? "إلغاء تفضيل السائق" : "إضافة السائق للمفضلة"}
                   title={driverFavorited ? "سائق مفضل — اضغط للإلغاء" : "أضف السائق للمفضلة"}
-                  className={`shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl transition-colors mr-1 ${
+                  // 44x44 to satisfy Apple HIG / WCAG 2.5.5 minimum
+                  // touch target. The original 36x36 (w-9 h-9) was a
+                  // borderline fail likely flagged in App Store review.
+                  className={`shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-xl transition-colors mr-1 ${
                     driverFavorited
-                      ? "text-rose-500 hover:bg-rose-500/10 bg-rose-500/5"
-                      : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/8"
+                      ? "text-rose-500 hover:bg-rose-500/10 bg-rose-500/5 active:bg-rose-500/20"
+                      : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/8 active:bg-rose-500/15"
                   }`}
                 >
                   {driverFavorited
-                    ? <UserCheck className="w-4 h-4" aria-hidden="true" />
-                    : <UserPlus  className="w-4 h-4" aria-hidden="true" />}
+                    ? <UserCheck className="w-5 h-5" aria-hidden="true" />
+                    : <UserPlus  className="w-5 h-5" aria-hidden="true" />}
                 </button>
               )}
               {/* Driver profile link uses the canonical UUID path so the

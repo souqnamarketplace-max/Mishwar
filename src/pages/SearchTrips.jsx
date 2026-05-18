@@ -369,25 +369,51 @@ export default function SearchTrips() {
                 - favCount === 0: useless — would empty all results.
                   We still show a hint when the user is logged in but
                   has zero favorites, pointing them to the heart icon
-                  on trip cards. */}
+                  on trip cards.
+              The control is a custom toggle switch (not a native
+              checkbox) — native checkboxes render at OS-default size
+              which is ~16px on iOS and inconsistent with the app's
+              other custom controls, hard to tap on mobile. The label
+              is the WHOLE row so the entire 60px-tall element is
+              tappable, matching the chip/card affordances elsewhere. */}
           {!favLoading && favCount > 0 && (
             <div className="sm:col-span-3">
-              <label className="flex items-center justify-between gap-3 cursor-pointer bg-muted/30 hover:bg-muted/50 border border-border rounded-xl px-4 py-3 transition-colors">
+              <button
+                type="button"
+                onClick={() => setOnlyFavorites(!onlyFavorites)}
+                aria-pressed={onlyFavorites}
+                aria-label="عرض الرحلات من السائقين المفضلين فقط"
+                className={`w-full flex items-center justify-between gap-3 border rounded-xl px-4 py-3 transition-colors text-right ${
+                  onlyFavorites
+                    ? "bg-rose-500/5 border-rose-500/30 hover:bg-rose-500/10"
+                    : "bg-muted/30 border-border hover:bg-muted/50"
+                }`}
+              >
                 <div className="flex items-center gap-2.5">
-                  <UserCheck className={`w-4 h-4 ${onlyFavorites ? "text-rose-500" : "text-muted-foreground"}`} aria-hidden="true" />
-                  <div>
+                  <UserCheck className={`w-5 h-5 ${onlyFavorites ? "text-rose-500" : "text-muted-foreground"}`} aria-hidden="true" />
+                  <div className="text-right">
                     <p className="text-sm font-medium text-foreground">السائقون المفضلون فقط</p>
                     <p className="text-[11px] text-muted-foreground">عرض الرحلات من السائقين الذين أضفتهم للمفضلة ({favCount})</p>
                   </div>
                 </div>
-                <input
-                  type="checkbox"
-                  checked={onlyFavorites}
-                  onChange={(e) => setOnlyFavorites(e.target.checked)}
-                  className="w-5 h-5 accent-primary cursor-pointer"
-                  aria-label="عرض الرحلات من السائقين المفضلين فقط"
-                />
-              </label>
+                {/* Custom toggle switch — visually clearer than a
+                    checkbox at mobile sizes. Knob slides between
+                    two positions. 44px wide × 24px high overall;
+                    container's full row height (60px+) is the
+                    actual hit target. */}
+                <span
+                  className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors shrink-0 ${
+                    onlyFavorites ? "bg-rose-500" : "bg-muted-foreground/30"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+                      onlyFavorites ? "translate-x-0.5" : "translate-x-[1.375rem]"
+                    }`}
+                  />
+                </span>
+              </button>
             </div>
           )}
           {hasAdvancedFilters && (
