@@ -288,7 +288,25 @@ export default function RouteMap({
     return () => {
       cancelled = true;
       if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
+        // Halt any in-flight animations (zoom transitions, pans)
+        // BEFORE removing the map. Without .stop(), a queued
+        // _onZoomTransitionEnd callback can fire AFTER remove()
+        // has torn down the map panes, producing:
+        //   TypeError: Cannot read properties of undefined
+        //   (reading '_leaflet_pos')
+        // The callback runs via setTimeout so React's effect cleanup
+        // doesn't interrupt it — we have to explicitly cancel via
+        // leaflet's own API.
+        try { mapInstanceRef.current.stop(); } catch { /* not animating */ }
+        try { mapInstanceRef.current.remove(); } catch (e) {
+          // Even with .stop(), a rare race in mobile Safari (where
+          // requestAnimationFrame fires asynchronously after stop())
+          // can still throw inside remove(). Swallowing here means
+          // the worst case is a leaked map instance for the lifetime
+          // of the page, which is better than uncaught console noise
+          // that scares users.
+          captureException(e, { msg: 'Map teardown race', tolerable: true });
+        }
         mapInstanceRef.current = null;
       }
     };
