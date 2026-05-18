@@ -2,10 +2,10 @@ import { CITIES } from "@/lib/cities";
 import { useSEO } from "@/hooks/useSEO";
 import { getNotifTarget } from "@/lib/notificationRouting";
 import { useNotificationActions } from "@/lib/useNotificationActions";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft, ToggleRight, Check, AlertTriangle, X as XIcon, Loader2 } from "lucide-react";
+import { Bell, Plus, Trash2, MapPin, ArrowLeft, DollarSign, Calendar, ToggleLeft, ToggleRight, Check, AlertTriangle, X as XIcon, Loader2, MessageCircle, Car, UserCheck, Sparkles, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -24,6 +24,81 @@ const emptyForm = {
   notify_on_date: true,
 };
 
+// ─── Notification type → category mapping ────────────────────────────
+//
+// The notifications table holds 20+ distinct `type` values: booking_*,
+// trip_*, new_message, favorite_driver_new_trip, subscription_*,
+// admin_broadcast, account_verified, password_reset_requested, etc.
+//
+// Surfacing all of them in one flat list overwhelms the user. The
+// categories below group related types so a passenger looking for
+// "did anyone reply to my message?" can filter to messages only,
+// without having to scan through 30 review notifications and
+// admin broadcasts.
+//
+// CATEGORY DESIGN:
+//   - رحلات (trips): everything trip + booking lifecycle
+//   - رسائل (messages): chat-related
+//   - المفضلة (favorites): proactive alerts from saved drivers/routes
+//   - النظام (system): account/admin/billing — everything else
+//
+// 'all' is the implicit default — no filter, show everything in
+// chronological order.
+//
+// New notification types added later: add a mapping here. Anything
+// unmapped falls into 'system' as a safe default — users still see
+// it under "All" and under "System", just not under a more specific
+// category. Better to undercount a category than to silently hide.
+const NOTIFICATION_CATEGORIES = {
+  trips: {
+    label: "رحلات",
+    icon: Car,
+    types: [
+      "booking_created", "booking_confirmed", "booking_rejected",
+      "booking_cancelled", "booking_cancelled_by_passenger",
+      "driver_cancel_confirmed_booking", "driver_confirm_booking",
+      "trip_created", "trip_starting_soon", "trip_completed",
+      "trip_cancelled", "trip_updated", "driver_review_submitted",
+      "passenger_review_submitted",
+    ],
+  },
+  messages: {
+    label: "رسائل",
+    icon: MessageCircle,
+    types: ["new_message", "message_received"],
+  },
+  favorites: {
+    label: "المفضلة",
+    icon: Sparkles,
+    types: ["favorite_driver_new_trip", "trip_preference_match", "route_alert"],
+  },
+  system: {
+    label: "النظام",
+    icon: Settings,
+    types: [
+      "admin_broadcast", "account_verified", "subscription_approved",
+      "subscription_rejected", "subscription_expiring", "subscription_granted",
+      "password_reset_requested", "driver_license_approved",
+      "driver_license_rejected", "passenger_verification_approved",
+      "passenger_verification_rejected", "email_changed",
+    ],
+  },
+};
+
+// Reverse lookup: type → category key. Built once at module load.
+// Anything not in this map falls into 'system' via the helper below.
+const TYPE_TO_CATEGORY = Object.entries(NOTIFICATION_CATEGORIES).reduce(
+  (acc, [catKey, cat]) => {
+    cat.types.forEach((t) => { acc[t] = catKey; });
+    return acc;
+  },
+  {}
+);
+
+function categoryFor(notifType) {
+  return TYPE_TO_CATEGORY[notifType] || "system";
+}
+
 export default function Notifications() {
   useSEO({ title: "الإشعارات", description: "إشعارات حسابك في مشوارو" });
 
@@ -40,6 +115,13 @@ export default function Notifications() {
   // a verification notification would land here and not understand
   // why a route-watcher form was the first thing they saw.
   const [activeTab, setActiveTab] = useState("inbox");
+  // Notification category filter — 'all' (default) shows the full
+  // inbox in chronological order; the other keys filter to a single
+  // category. Persisted only in component state, NOT in URL or
+  // localStorage — the filter is exploratory ('what messages did I
+  // miss?') rather than a saved preference. Resetting on every visit
+  // matches the user's mental model (a fresh look at the inbox).
+  const [activeCategory, setActiveCategory] = useState("all");
   const qc = useQueryClient();
   const navigate = useNavigate();
 
@@ -138,6 +220,28 @@ export default function Notifications() {
   const { markRead, markAllRead, removeNotif } = useNotificationActions(user?.email);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+
+  // Per-category counts (used both for the chip labels and to detect
+  // empty-state cases for a category). Computed in one pass over
+  // notifications so we don't iterate the array 5 times.
+  const categoryCounts = useMemo(() => {
+    const counts = { all: notifications.length, trips: 0, messages: 0, favorites: 0, system: 0 };
+    for (const n of notifications) {
+      const cat = categoryFor(n.type);
+      counts[cat] = (counts[cat] || 0) + 1;
+    }
+    return counts;
+  }, [notifications]);
+
+  // Notifications filtered by the active category. 'all' is the
+  // identity case (no filter applied). Recomputes only when
+  // notifications or activeCategory changes — cheap, but the memo
+  // keeps render references stable so the list doesn't re-mount on
+  // unrelated parent re-renders (e.g. the unread badge refreshing).
+  const filteredNotifications = useMemo(() => {
+    if (activeCategory === "all") return notifications;
+    return notifications.filter((n) => categoryFor(n.type) === activeCategory);
+  }, [notifications, activeCategory]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -377,8 +481,34 @@ export default function Notifications() {
               <p className="text-sm text-muted-foreground">ستصلك إشعارات عند توفر رحلات تناسب تفضيلاتك</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {notifications.map((notif) => (
+            <>
+              {/* Category filter chips — horizontal scroll on mobile.
+                  Counts shown inline so the user knows what's behind
+                  each filter without tapping. Touch targets are 44px
+                  min-height per HIG.
+
+                  Why the chips are HERE (between tab bar and list)
+                  rather than at the top of the page: they only apply
+                  to the inbox tab. Putting them above the tab bar
+                  would be misleading on the Preferences tab. */}
+              <NotificationFilterChips
+                notifications={notifications}
+                activeCategory={activeCategory}
+                onChange={setActiveCategory}
+              />
+              {filteredNotifications.length === 0 ? (
+                <div className="bg-card rounded-2xl border border-border p-12 text-center">
+                  <Bell className="w-12 h-12 text-muted-foreground/20 mx-auto mb-3" />
+                  <p className="font-medium text-foreground mb-1">
+                    لا توجد إشعارات في {NOTIFICATION_CATEGORIES[activeCategory]?.label || "هذا التصنيف"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    جرّب تصنيفاً آخر، أو اضغط "الكل" لرؤية جميع الإشعارات
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredNotifications.map((notif) => (
                 <div
                   key={notif.id}
                   className={`bg-card rounded-2xl border p-4 transition-all cursor-pointer hover:shadow-sm ${!notif.is_read ? "border-primary/30 bg-primary/5" : "border-border"}`}
@@ -439,7 +569,9 @@ export default function Notifications() {
                   </div>
                 </div>
               ))}
-            </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -498,6 +630,93 @@ export default function Notifications() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Filter chips row ───────────────────────────────────────────────
+//
+// Horizontal scrollable row of category buttons. Each chip:
+//   - Shows category label + count
+//   - Highlights when active (primary background, white text)
+//   - 44px min-height for App Store HIG compliance
+//   - Tappable label includes the icon + count, no nested
+//     interactive elements
+//
+// Layout:
+//   - flex-row that overflows horizontally on narrow viewports
+//   - First chip ('All') always present
+//   - Category chips render only if that category has >0 notifications
+//     (no point showing 'Messages (0)' if the user has no message
+//     notifications — clutters the bar and reduces useful tap area)
+//
+// Why a scrollable row not a wrapping flex: chips wrapping creates
+// vertical bulk on small screens and pushes the inbox below the fold.
+// A single scrolling row stays compact and matches the iOS native
+// category picker pattern (Mail, Photos albums, App Store filters).
+function NotificationFilterChips({ notifications, activeCategory, onChange }) {
+  // Compute counts inline — cheap, runs in render. The parent component
+  // also computes these for empty-state purposes; duplicating the work
+  // is fine since the array is bounded at 30 (matches the filter() in
+  // the Notification query above).
+  const counts = { all: notifications.length };
+  for (const key of Object.keys(NOTIFICATION_CATEGORIES)) counts[key] = 0;
+  for (const n of notifications) {
+    const cat = categoryFor(n.type);
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
+
+  // Build chip list — always include 'all', then any category with >0
+  // notifications. Order matches NOTIFICATION_CATEGORIES declaration
+  // order for stability (trips first since most users care about
+  // booking activity first, messages second, favorites third, system
+  // last).
+  const chips = [
+    { key: "all", label: "الكل", icon: Bell, count: counts.all },
+    ...Object.entries(NOTIFICATION_CATEGORIES)
+      .filter(([key]) => counts[key] > 0)
+      .map(([key, def]) => ({
+        key,
+        label: def.label,
+        icon: def.icon,
+        count: counts[key],
+      })),
+  ];
+
+  return (
+    <div
+      className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-1 px-1"
+      // hide scrollbar visually but keep keyboard scroll affordance
+      style={{ scrollbarWidth: "none" }}
+      role="tablist"
+      aria-label="تصفية الإشعارات حسب التصنيف"
+    >
+      {chips.map(({ key, label, icon: Icon, count }) => {
+        const isActive = activeCategory === key;
+        return (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onChange(key)}
+            className={`shrink-0 inline-flex items-center gap-1.5 px-3 min-h-[44px] rounded-full text-sm font-medium border transition-colors ${
+              isActive
+                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                : "bg-card text-foreground border-border hover:bg-muted/50 active:bg-muted"
+            }`}
+          >
+            <Icon className="w-4 h-4" aria-hidden="true" />
+            <span>{label}</span>
+            <span
+              className={`text-xs ${isActive ? "opacity-90" : "text-muted-foreground"}`}
+              aria-label={`${count} إشعار`}
+            >
+              ({count})
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
