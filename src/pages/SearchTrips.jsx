@@ -7,12 +7,13 @@ import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Search, ArrowLeft, Map, SlidersHorizontal, X, ArrowLeftRight } from "lucide-react";
+import { MapPin, Calendar, Search, ArrowLeft, Map, SlidersHorizontal, X, ArrowLeftRight, UserCheck } from "lucide-react";
 import RouteMap from "@/components/shared/RouteMap";
 import SelectDrawer from "@/components/ui/select-drawer";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
 import TripCard from "../components/shared/TripCard";
 import { CITIES, cityMatches } from "@/lib/cities";
+import { useFavoriteDrivers } from "@/lib/favoriteDrivers";
 
 import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
 export default function SearchTrips() {
@@ -36,6 +37,11 @@ export default function SearchTrips() {
   const genderPref = searchParams.get("gender") || "";
   const minSeats   = parseInt(searchParams.get("seats") || "1", 10);
   const sortBy     = searchParams.get("sort")   || "date";
+  // "Only favorite drivers" — URL-persistent so a passenger can bookmark
+  // /search?favs=1 as their "trips from my trusted drivers" view. Hidden
+  // when the user is logged out (no favorites possible) or has zero
+  // favorites (the toggle would just hide all results — useless).
+  const onlyFavorites = searchParams.get("favs") === "1";
 
   const _updateFilter = (key, value) => {
     const next = new URLSearchParams(searchParams);
@@ -46,10 +52,11 @@ export default function SearchTrips() {
     }
     setSearchParamsW(next, { replace: true });
   };
-  const setMaxPrice   = v => _updateFilter("price",  v);
-  const setGenderPref = v => _updateFilter("gender", v);
-  const setMinSeats   = v => _updateFilter("seats",  v);
-  const setSortBy     = v => _updateFilter("sort",   v);
+  const setMaxPrice      = v => _updateFilter("price",  v);
+  const setGenderPref    = v => _updateFilter("gender", v);
+  const setMinSeats      = v => _updateFilter("seats",  v);
+  const setSortBy        = v => _updateFilter("sort",   v);
+  const setOnlyFavorites = v => _updateFilter("favs",   v ? "1" : "");
 
   const qc = useQueryClient();
   const { data: trips_unfiltered = [], isLoading, error } = useQuery({
@@ -110,6 +117,11 @@ export default function SearchTrips() {
     () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email"),
     [trips_unfiltered, blockedSet]
   );
+  // Favorite-driver filter set. Always queried (cheap, 5-min stale time)
+  // but only USED when onlyFavorites is on. Loading state lets us hide
+  // the toggle until favorites are known so the UI doesn't render a
+  // toggle that would immediately empty the list.
+  const { favoriteSet, count: favCount, isLoading: favLoading } = useFavoriteDrivers();
 
 
   useEffect(() => {
@@ -164,6 +176,15 @@ export default function SearchTrips() {
       }
       if (maxPrice && t.price > parseFloat(maxPrice)) return false;
       if (genderPref && t.driver_gender !== genderPref) return false;
+      // "Only favorite drivers" filter — hides any trip whose driver_email
+      // isn't in the favoriteSet. Applied last among the data-driven
+      // filters because the Set lookup is O(1) and there's no point
+      // doing it if the trip would already have been filtered out by
+      // route/date/etc above. Empty favoriteSet (newcomer user) → no
+      // trips match, intentional: the UI hides the toggle when count=0
+      // so this shouldn't be reachable with empty set, but it's
+      // defensive in case the cache races.
+      if (onlyFavorites && !favoriteSet.has(t.driver_email)) return false;
       // Only filter by seats when the trip has an explicit numeric value.
       // Older trips may have null available_seats — treat those as "unknown,
       // don't hide" rather than silently excluding them from results.
@@ -188,7 +209,7 @@ export default function SearchTrips() {
     });
 
   const cityOptions = CITIES.map(c => ({ value: c, label: c }));
-  const hasAdvancedFilters = maxPrice || genderPref || minSeats > 1 || sortBy !== "date";
+  const hasAdvancedFilters = maxPrice || genderPref || minSeats > 1 || sortBy !== "date" || onlyFavorites;
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8" dir="rtl">
@@ -341,9 +362,37 @@ export default function SearchTrips() {
                 className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center font-bold text-lg hover:bg-muted/80">+</button>
             </div>
           </div>
+          {/* Only favorite drivers — full-width toggle row spanning all 3 cols.
+              Hidden when:
+                - favLoading: don't render until we know the count, else
+                  flicker on first paint
+                - favCount === 0: useless — would empty all results.
+                  We still show a hint when the user is logged in but
+                  has zero favorites, pointing them to the heart icon
+                  on trip cards. */}
+          {!favLoading && favCount > 0 && (
+            <div className="sm:col-span-3">
+              <label className="flex items-center justify-between gap-3 cursor-pointer bg-muted/30 hover:bg-muted/50 border border-border rounded-xl px-4 py-3 transition-colors">
+                <div className="flex items-center gap-2.5">
+                  <UserCheck className={`w-4 h-4 ${onlyFavorites ? "text-rose-500" : "text-muted-foreground"}`} aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">السائقون المفضلون فقط</p>
+                    <p className="text-[11px] text-muted-foreground">عرض الرحلات من السائقين الذين أضفتهم للمفضلة ({favCount})</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={onlyFavorites}
+                  onChange={(e) => setOnlyFavorites(e.target.checked)}
+                  className="w-5 h-5 accent-primary cursor-pointer"
+                  aria-label="عرض الرحلات من السائقين المفضلين فقط"
+                />
+              </label>
+            </div>
+          )}
           {hasAdvancedFilters && (
             <div className="sm:col-span-3 flex justify-end">
-              <button onClick={() => { setMaxPrice(""); setGenderPref(""); setMinSeats(1); setSortBy("date"); }}
+              <button onClick={() => { setMaxPrice(""); setGenderPref(""); setMinSeats(1); setSortBy("date"); setOnlyFavorites(false); }}
                 className="text-sm text-destructive hover:underline flex items-center gap-1">
                 <X className="w-3.5 h-3.5" /> مسح الفلاتر
               </button>

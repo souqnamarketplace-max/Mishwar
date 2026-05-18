@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart } from "lucide-react";
+import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart, UserPlus, UserCheck } from "lucide-react";
 import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
 import { api } from "@/api/apiClient";
 import { useFavorite } from "@/lib/favorites";
+import { useIsFavoriteDriver } from "@/lib/favoriteDrivers";
 
 // ── Palestinian date formatter ────────────────────────────────────────────────
 const PS_MONTHS = [
@@ -61,6 +62,12 @@ function Card({ t, noSeats, urgentSeats }) {
   // + e.stopPropagation so a heart-tap doesn't bubble up to the wrapping
   // Link and navigate away from the list.
   const [favorited, toggleFavorite] = useFavorite(t.id);
+  // Separately: favorite-DRIVER (not trip). Stored server-side because
+  // SearchTrips uses the list to do an .in('driver_email', favs) filter
+  // for the "only my favorite drivers" toggle. The icon (UserCheck vs
+  // UserPlus) visually distinguishes this from the trip-heart so users
+  // don't confuse the two affordances.
+  const [driverFavorited, toggleDriverFavorite] = useIsFavoriteDriver(t.driver_email);
 
   // Theme colours
   const theme = isFemale
@@ -210,9 +217,37 @@ function Card({ t, noSeats, urgentSeats }) {
 
           {/* Driver info */}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-foreground leading-tight truncate">
-              {t.driver_name || "سائق"}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold text-foreground leading-tight truncate">
+                {t.driver_name || "سائق"}
+              </p>
+              {/* Driver-favorite chip — small icon next to the name so
+                  it's visually anchored to "this driver" rather than
+                  "this trip" (which is the role the trip-heart on the
+                  right plays). Tap toggles via Supabase. Hidden when
+                  driver_email is missing (anonymous legacy rows).
+                  Hidden also when this is a female-driver card the user
+                  shouldn't be free to "save" if they're male; the
+                  gender preference matching is handled higher up by
+                  the existing block list / gender filter, so we don't
+                  duplicate it here. */}
+              {t.driver_email && (
+                <button
+                  onClick={toggleDriverFavorite}
+                  aria-label={driverFavorited ? "إلغاء تفضيل السائق" : "إضافة السائق للمفضلة"}
+                  title={driverFavorited ? "سائق مفضل — اضغط للإلغاء" : "أضف السائق للمفضلة"}
+                  className={`shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md transition-colors ${
+                    driverFavorited
+                      ? "text-rose-500 hover:bg-rose-500/10"
+                      : "text-muted-foreground/50 hover:text-rose-500 hover:bg-rose-500/8"
+                  }`}
+                >
+                  {driverFavorited
+                    ? <UserCheck className="w-3 h-3" aria-hidden="true" />
+                    : <UserPlus  className="w-3 h-3" aria-hidden="true" />}
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 flex-wrap">
               {t.driver_rating > 0 ? (
                 <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground">
