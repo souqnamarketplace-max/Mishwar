@@ -94,6 +94,14 @@ export default function DashboardCities() {
   const PAGE_SIZE = 25;
   const [approveModal, setApproveModal] = useState(null); // { row } when open
   const [rejectModal,  setRejectModal]  = useState(null); // { row } when open
+  // Add-city modal — separate state from approveModal so the modal can
+  // serve both flows simultaneously without conflict. When this is true,
+  // ApproveModal renders with row=null which puts it in "add new" mode
+  // (see component header comment). User-requested feature: admins want
+  // to seed cities directly without waiting for a user to suggest the
+  // same name first. Common scenario: launching in a new governorate
+  // where there are no users yet to make suggestions.
+  const [showAddCity, setShowAddCity] = useState(false);
 
   const setViewAndReset = (v) => { setView(v); setPage(1); };
 
@@ -200,6 +208,80 @@ export default function DashboardCities() {
     },
   });
 
+  // Direct admin city addition (no user suggestion). Distinct from
+  // approveMut because:
+  //   - approveMut goes through the approve_city_suggestion RPC which
+  //     mutates BOTH city_suggestions (marks approved) AND admin_cities
+  //     (inserts row), then links them via approved_city_id
+  //   - addCityMut just inserts into admin_cities; no suggestion to link.
+  //
+  // RLS already permits this: the "admins manage cities" policy on
+  // admin_cities allows authenticated users with role='admin' to INSERT.
+  // Verified in migration 015 lines 169-183. So no new server-side RPC
+  // is needed; a direct supabase.from('admin_cities').insert() suffices.
+  //
+  // The created_by column captures the admin's email so the audit log
+  // can show who added which city. Matches the pattern used when the
+  // approve RPC fills it from auth.email() server-side.
+  const addCityMut = useMutation({
+    mutationFn: async ({ canonicalName, lat, lng, governorate }) => {
+      // Get the admin's email for created_by attribution. Same lookup
+      // pattern as logAdminAction in lib/adminAudit.js.
+      const { data: { session } } = await supabase.auth.getSession();
+      const adminEmail = session?.user?.email || null;
+
+      const { data, error } = await supabase
+        .from("admin_cities")
+        .insert({
+          name: canonicalName,
+          lat,
+          lng,
+          governorate: governorate || null,
+          created_by: adminEmail,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+
+      // Audit log entry — distinct action from city_suggestion_approved
+      // so activity log readers can distinguish 'admin added directly'
+      // from 'admin approved a user suggestion'. Both flow through the
+      // same _compose_audit_text WHEN clauses (migration 050 + 073)
+      // and the actor will show as the admin's name thanks to the
+      // role='admin' branch added in migration 073.
+      await logAdminAction("city_added_directly", "admin_city", data.id, {
+        canonical_name: canonicalName,
+        lat,
+        lng,
+        governorate: governorate || null,
+      });
+      return data.id;
+    },
+    onSuccess: () => {
+      // Same invalidation set as approveMut — the autocomplete consumes
+      // admin-cities-list and admin-approved-cities. We don't touch
+      // city-suggestions queries because no suggestion row was created
+      // or mutated in this flow.
+      qc.invalidateQueries({ queryKey: ["admin-cities-list"] });
+      qc.invalidateQueries({ queryKey: ["admin-approved-cities"] });
+      setShowAddCity(false);
+      toast.success("تمت إضافة المدينة ✓");
+    },
+    onError: (err) => {
+      const msg = err?.message || "";
+      // Same error mapping as approveMut. The two error families are
+      // identical (unique-name violation, lat/lng bounds CHECK fails)
+      // because both end up at the same INSERT INTO admin_cities row.
+      if (/admin_cities_name_key|duplicate key/i.test(msg)) {
+        toast.error("هذه المدينة موجودة بالفعل في القائمة");
+      } else if (/lat_bounds|lng_bounds/i.test(msg)) {
+        toast.error("الإحداثيات خارج النطاق المسموح به");
+      } else {
+        toast.error(friendlyError(err, "فشلت الإضافة"));
+      }
+    },
+  });
+
   const rejectMut = useMutation({
     mutationFn: async ({ id, reason }) => {
       const { error } = await supabase.rpc("reject_city_suggestion", {
@@ -233,14 +315,30 @@ export default function DashboardCities() {
 
   return (
     <div dir="rtl" className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <MapPin className="w-6 h-6 text-primary" />
-          المدن المقترحة
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          راجع المدن والقرى التي اقترحها المستخدمون وأضف إحداثياتها لتظهر في قائمة المدن لجميع المستخدمين.
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <MapPin className="w-6 h-6 text-primary" />
+            المدن المقترحة
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            راجع المدن والقرى التي اقترحها المستخدمون وأضف إحداثياتها لتظهر في قائمة المدن لجميع المستخدمين.
+          </p>
+        </div>
+        {/* Direct add button — bypasses the user-suggestion flow. Useful
+            for seeding cities at launch in a new governorate, or fixing
+            spelling/coordinate issues by adding the correct version
+            (the wrong one can be deleted separately). Highlighted with
+            primary fill since "add a city" is the primary CTA on this
+            page when there are no pending suggestions to review. */}
+        <Button
+          onClick={() => setShowAddCity(true)}
+          className="bg-primary text-primary-foreground rounded-xl gap-2 shrink-0"
+          aria-label="إضافة مدينة جديدة مباشرة"
+        >
+          <Plus className="w-4 h-4" aria-hidden="true" />
+          إضافة مدينة جديدة
+        </Button>
       </div>
 
       {/* Stat cards */}
@@ -341,6 +439,19 @@ export default function DashboardCities() {
           onClose={() => setApproveModal(null)}
           onSubmit={(data) => approveMut.mutate({ id: approveModal.row.id, ...data })}
           submitting={approveMut.isPending}
+        />
+      )}
+      {/* Direct add modal — reuses ApproveModal in 'add new' mode (row=null).
+          The modal internally branches on whether row is null to change
+          its title, helper text, and submit button label. Submitting
+          calls addCityMut which goes straight to admin_cities INSERT
+          (no suggestion linkage). */}
+      {showAddCity && (
+        <ApproveModal
+          row={null}
+          onClose={() => setShowAddCity(false)}
+          onSubmit={(data) => addCityMut.mutate(data)}
+          submitting={addCityMut.isPending}
         />
       )}
       {rejectModal && (
@@ -447,7 +558,17 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
   // call creates its own dialog state so rendering both within the same
   // tree is safe (no shared ref / conflict).
   const { confirm, dialog: confirmDialog } = useConfirm();
-  const [canonicalName, setCanonicalName] = useState(row.name);
+  // Add-new mode when row is null. Distinguishes the two flows the modal
+  // can serve:
+  //   - row != null  → approving a user suggestion (existing flow)
+  //   - row == null  → admin adding a city directly (new flow,
+  //                    user-requested gap from session feedback —
+  //                    admins want to seed cities without waiting for
+  //                    a user to suggest them).
+  // The form fields are identical in both modes; only the title,
+  // helper text, and parent mutation differ.
+  const isAddMode = row == null;
+  const [canonicalName, setCanonicalName] = useState(isAddMode ? "" : row.name);
   const [mapsUrl, setMapsUrl] = useState("");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
@@ -510,8 +631,8 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
       <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-primary" />
-            موافقة على الاقتراح
+            {isAddMode ? <Plus className="w-5 h-5 text-primary" /> : <CheckCircle2 className="w-5 h-5 text-primary" />}
+            {isAddMode ? "إضافة مدينة جديدة" : "موافقة على الاقتراح"}
           </h3>
           <button onClick={onClose} className="p-1 hover:bg-muted rounded-lg" aria-label="إغلاق">
             <X className="w-4 h-4" />
@@ -534,11 +655,17 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
             value={canonicalName}
             onChange={(e) => setCanonicalName(e.target.value)}
             maxLength={100}
+            placeholder={isAddMode ? "مثال: رام الله، نابلس..." : undefined}
             className="w-full bg-muted/40 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-primary"
           />
-          <span className="text-[11px] text-muted-foreground mt-1 block">
-            يمكنك تعديل الكتابة لتطابق الإملاء الرسمي (المستخدم اقترح: "{row.name}")
-          </span>
+          {/* Suggestion-context helper only relevant in approve mode.
+              In add mode the admin is picking the name from scratch
+              so the "user suggested" reference doesn't apply. */}
+          {!isAddMode && (
+            <span className="text-[11px] text-muted-foreground mt-1 block">
+              يمكنك تعديل الكتابة لتطابق الإملاء الرسمي (المستخدم اقترح: "{row.name}")
+            </span>
+          )}
         </label>
 
         <label className="block mb-3">
@@ -598,7 +725,9 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
             إلغاء
           </Button>
           <Button onClick={handleSubmit} disabled={submitting || !lat || !lng} className="flex-1 bg-primary text-primary-foreground rounded-xl">
-            {submitting ? "جاري الإضافة..." : "موافقة وإضافة"}
+            {submitting
+              ? (isAddMode ? "جاري الإضافة..." : "جاري الإضافة...")
+              : (isAddMode ? "إضافة المدينة" : "موافقة وإضافة")}
           </Button>
         </div>
       </div>
