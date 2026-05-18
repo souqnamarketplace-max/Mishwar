@@ -29,12 +29,20 @@
 
 BEGIN;
 
+-- For driver_rating + driver_reviews_count, those columns live on
+-- public.trips (denormalized when a trip is posted), NOT on profiles.
+-- We surface them by joining to the driver's most recent trip — the
+-- most recently-updated value reflects the latest rating computation.
+-- Falls back to NULL when the driver has no trips yet (newly-signed-up
+-- driver who hasn't posted) — the UI handles that with the 'جديد ✨'
+-- badge.
+
 CREATE OR REPLACE FUNCTION public.get_favorite_drivers_display()
 RETURNS TABLE (
   email                  TEXT,
   id                     UUID,
   full_name              TEXT,
-  profile_image          TEXT,
+  avatar_url             TEXT,
   driver_rating          NUMERIC,
   driver_reviews_count   INTEGER,
   car_model              TEXT,
@@ -49,9 +57,18 @@ AS $$
     p.email,
     p.id,
     p.full_name,
-    p.profile_image,
-    p.driver_rating,
-    p.driver_reviews_count,
+    p.avatar_url,
+    -- Latest known rating from any trip the driver posted. Trips
+    -- carry a denormalized driver_rating + driver_reviews_count
+    -- that gets refreshed each time a review lands. We take the
+    -- highest non-null value across trips as a defensive default;
+    -- in practice all rows have the same value so MAX is equivalent
+    -- to "any row" but cheaper than ORDER BY ... LIMIT 1 for a
+    -- correlated subquery.
+    (SELECT MAX(t.driver_rating)
+       FROM public.trips t WHERE t.driver_email = p.email)        AS driver_rating,
+    (SELECT MAX(t.driver_reviews_count)
+       FROM public.trips t WHERE t.driver_email = p.email)        AS driver_reviews_count,
     p.car_model,
     p.car_color
   FROM public.profiles p

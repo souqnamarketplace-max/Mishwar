@@ -287,8 +287,8 @@ export default function Favorites() {
                     <div className="flex items-start gap-3">
                       {/* Avatar */}
                       <div className="w-12 h-12 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center shrink-0">
-                        {driver.profile_image
-                          ? <img src={driver.profile_image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        {driver.avatar_url
+                          ? <img src={driver.avatar_url} alt="" className="w-full h-full object-cover" loading="lazy" />
                           : <span className="text-base font-bold text-primary">{(driver.full_name || "س")[0]}</span>}
                       </div>
                       {/* Info */}
