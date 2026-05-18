@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard, Sparkles } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard, Sparkles, HelpCircle, MessageSquarePlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/apiClient";
@@ -14,14 +14,20 @@ import { useUnreadReleaseNotes } from "@/hooks/useUnreadReleaseNotes";
 const LOGO_URL = "/logo.png";
 
 const getNavLinks = (user) => {
+  // Slimmed nav (2026-05-18): removed 4 secondary links — كيف تعمل؟,
+  // مجتمع مشوارو, المساعدة, اقتراحات — to reduce navbar visual density.
+  // All four remain accessible via the Footer (already linked there).
+  // المساعدة and اقتراحات also surface in the profile dropdown so
+  // logged-in users don't have to scroll to the footer to reach support.
+  //
+  // Kept here: only routes a user visits MULTIPLE TIMES per session.
+  // Home, My Trips, Favorites are daily-frequency. Driver Dashboard
+  // is daily for drivers. Everything else is once-per-week-at-most
+  // and belongs in secondary navigation surfaces.
   const links = [
     { label: "الرئيسية", path: "/" },
     { label: "رحلاتي", path: "/my-trips" },
     { label: "المفضلة", path: "/favorites" },
-    { label: "كيف تعمل؟", path: "/how-it-works" },
-    { label: "مجتمع مشوارو", path: "/community" },
-    { label: "المساعدة", path: "/help" },
-    { label: "اقتراحات", path: "/feedback" },
   ];
   if (user?.account_type === "driver" || user?.account_type === "both") {
     links.splice(1, 0, { label: "لوحة السائق", path: "/driver" });
@@ -297,6 +303,30 @@ export default function Navbar() {
                   >
                     <Settings className="w-4 h-4 text-muted-foreground" />
                     <span className="text-sm font-medium">إعدادات الحساب</span>
+                  </Link>
+                  {/* Help + Feedback moved here from the top-level nav
+                      bar in the "slim navbar" cleanup (2026-05-18).
+                      Same routes (/help, /feedback) — just relocated
+                      to keep daily-use links visible up top and push
+                      support entry points into the profile menu where
+                      users instinctively look for them. Also still
+                      accessible from the footer for power-users who
+                      land via direct URL or scroll to the bottom. */}
+                  <Link
+                    to="/help"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                  >
+                    <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">المساعدة</span>
+                  </Link>
+                  <Link
+                    to="/feedback"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                  >
+                    <MessageSquarePlus className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">اقتراحات وشكاوى</span>
                   </Link>
                   {/* Admin panel entry — only visible to admins. Without this,
                       admins landing on / had no in-app path to /dashboard
