@@ -450,6 +450,44 @@ export default function MyTrips() {
         )}
       </div>
 
+      {/* Active-bookings banner — discovery aid for passengers who
+          have confirmed/pending bookings they may want to cancel.
+          Without this banner, the cancel buttons live at the bottom
+          of each card and are easy to miss on mobile. Users who
+          tried to delete their account and got blocked specifically
+          for active bookings need to land here and immediately
+          know "where do I cancel these?". The banner is dismissible
+          (data-driven from the count, not localStorage) and links
+          to the القادمة tab where active bookings live. */}
+      {(() => {
+        const cancellableCount = (passengerBookings || []).filter(
+          b => b.status === "confirmed" || b.status === "pending"
+        ).length;
+        if (cancellableCount === 0) return null;
+        if (activeTab === "confirmed") return null; // already filtered to them
+        return (
+          <div className="mb-4 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3 flex items-start gap-3" dir="rtl">
+            <div className="shrink-0 w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center">
+              <span className="text-lg" aria-hidden="true">ℹ️</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-amber-900">
+                لديك {cancellableCount} {cancellableCount === 1 ? "حجز نشط" : "حجوزات نشطة"}
+              </p>
+              <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                لإلغاء أي حجز، افتحه أدناه واضغط زر «إلغاء الحجز» الأحمر في أسفل البطاقة.
+              </p>
+              <button
+                onClick={() => setActiveTab("confirmed")}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 active:bg-amber-300 border border-amber-300 rounded-lg px-3 py-2 min-h-[36px] transition-colors"
+              >
+                اعرض الحجوزات النشطة فقط
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Filter bar — collapsible, contains free-text search + date range +
           route from/to. Renders above the status tabs so users filter
           BEFORE picking a status. Filter changes auto-reset pagination

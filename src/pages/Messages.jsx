@@ -8,6 +8,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { sanitizeText, getContactViolation, looksLikeDigitFragment } from "@/lib/validation";
+import { normalizeArabic } from "@/lib/cities";
 import EmptyState from "@/components/shared/EmptyState";
 import {
   Search, Send, ArrowLeft, MessageCircle, Lock,
@@ -328,12 +329,34 @@ export default function Messages() {
   }, [conversations, blockedSet]);
 
   // ─── Filter ───
-  const filtered = search.trim()
-    ? blockHidden.filter(c =>
-        c.otherName?.toLowerCase().includes(search.toLowerCase()) ||
-        c.otherEmail?.toLowerCase().includes(search.toLowerCase())
-      )
-    : blockHidden;
+  //
+  // BUG FIX: the previous filter used `.toLowerCase().includes(...)`
+  // which works for English but is a NO-OP for Arabic (Arabic has no
+  // case). Worse, Arabic has multiple visually-identical character
+  // variants that get stored differently — أحمد vs احمد look identical
+  // to humans but are different codepoint sequences, so a user typing
+  // "احمد" never matched a stored "أحمد".
+  //
+  // Fix: pipe both the search term AND the candidate name/email through
+  // normalizeArabic (already used by CityAutocomplete with the same
+  // matching characteristics). It:
+  //   - Collapses alef variants (أإآٱ → ا)
+  //   - Collapses ta marbuta + ha (ة → ه)
+  //   - Collapses alef maqsura + ya (ى → ي)
+  //   - Strips diacritics (fatha/kasra/damma/sukun/shadda + dagger alef)
+  //   - Collapses repeated whitespace
+  // Then we lowercase BOTH sides — harmless on Arabic, fixes the English
+  // case-sensitivity, and emails normalize correctly either way.
+  const filtered = (() => {
+    const q = search.trim();
+    if (!q) return blockHidden;
+    const normQ = normalizeArabic(q).toLowerCase();
+    return blockHidden.filter((c) => {
+      const name  = normalizeArabic(c.otherName  || "").toLowerCase();
+      const email = normalizeArabic(c.otherEmail || "").toLowerCase();
+      return name.includes(normQ) || email.includes(normQ);
+    });
+  })();
 
   // ─── Active conversation (existing OR new pending) ───
   const activeConv = useMemo(() => {
