@@ -538,6 +538,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
               <div className="py-2">
                 <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">معلومات</p>
                 {[
+                  { icon: Sparkles,          label: "ما الجديد",          path: "/whats-new" },
                   { icon: BookOpen,        label: "كيف يعمل مشوارو",    path: "/how-it-works" },
                 { icon: Users,             label: "مجتمع مشواروو",      path: "/community" },
                 { icon: Bell,           label: "إشعاراتي ومساراتي",  path: "/notifications" },

@@ -8,7 +8,7 @@ import {
   // bundle ballooned to 759KB (every lucide icon, ~700 of them).
   // Explicit imports keep WhatsNew chunk under 50KB while still
   // letting admin pick from a sensible variety.
-  Sparkles, Pin, Loader2,
+  Sparkles, Loader2,
   Repeat, Heart, Bell, Car, MessageCircle, UserCheck, MapPin,
   Calendar, Clock, Star, Settings, ShieldCheck, Zap, Gift,
   TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search,
@@ -166,12 +166,14 @@ export default function WhatsNew() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-foreground">{note.title}</h3>
-                      {note.is_pinned && (
-                        <span className="inline-flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-700 px-1.5 py-0.5 rounded-full">
-                          <Pin className="w-3 h-3" aria-hidden="true" />
-                          مثبَّت
-                        </span>
-                      )}
+                      {/* Pin badge ("مثبَّت") removed per UX request.
+                          The is_pinned column still drives the sort
+                          order (pinned entries appear first via the
+                          orderBy in the query above), but we no longer
+                          show a visual indicator that distinguishes
+                          pinned vs not. Cleaner card without the
+                          amber chip; users still get the benefit of
+                          important entries floating to the top. */}
                       {isUnread && (
                         <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full font-medium">
                           جديد
