@@ -4,13 +4,14 @@ import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, MapPin, ArrowLeft, CheckCircle, XCircle, MessageCircle } from "lucide-react";
+import { Users, MapPin, ArrowLeft, CheckCircle, XCircle, MessageCircle, CheckCheck, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { DollarSign } from "lucide-react";
+import { useConfirm } from "@/hooks/useConfirm";
 
 const statusConfig = {
   pending: { label: "معلق", className: "bg-yellow-500/10 text-yellow-600" },
@@ -180,7 +181,101 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
     },
   });
 
-  // Driver marks a confirmed booking as paid (cash received in person).
+  // ─── Bulk approve — confirm all pending bookings for current trip ────
+  //
+  // Scale-audit P1 #5: a driver who gets 5-10 booking requests in an
+  // hour shouldn't have to tap 'قبول' on each one individually. This
+  // mutation walks the pending bookings sequentially (NOT in parallel
+  // — see below) and calls the same underlying Booking.update path
+  // that the single-row 'قبول' button uses.
+  //
+  // WHY SEQUENTIAL not Promise.all:
+  //   - Each confirm fires a notifyUser() push to the passenger. Bursting
+  //     5 pushes in <100ms can trigger FCM/APNS rate limiting and silently
+  //     drop some of them.
+  //   - Audit log entries land with predictable timestamps in the order
+  //     the admin saw them in the UI, instead of a confusing interleave.
+  //   - If one approval fails (e.g. trip ran out of seats during the
+  //     bulk operation), the others still go through, and we can show
+  //     a precise 'X confirmed, 1 failed' message.
+  //
+  // WHY direct Booking.update not bulk SQL:
+  //   - Booking.update goes through PostgREST which applies the
+  //     same RLS as the single-row path. Bypassing it via a server-side
+  //     RPC would need a new SECURITY DEFINER function with manual
+  //     auth checks — more surface area, no real win at 5-10 rows.
+  //   - 5-10 sequential HTTP round-trips on a wifi connection is ~500ms
+  //     total — felt as a single 'loading' state to the driver.
+  //
+  // useConfirm gates the action because batch-confirming is harder to
+  // undo than batch-cancelling (no atomic 'un-confirm all' button —
+  // driver would have to cancel each individually).
+  const bulkApprove = useMutation({
+    mutationFn: async ({ bookings: pendingBookings }) => {
+      let confirmed = 0;
+      const failures = [];
+      // Sequential walk — see WHY block above for rationale.
+      for (const booking of pendingBookings) {
+        try {
+          await api.entities.Booking.update(booking.id, { status: "confirmed" });
+          confirmed++;
+          // Best-effort notification — failures here shouldn't block
+          // the next booking. Wrapped separately so a notify error
+          // doesn't roll back the booking confirm.
+          if (booking.passenger_email) {
+            try {
+              await notifyUser({
+                user_email: booking.passenger_email,
+                title: "تم قبول حجزك ✅",
+                message: `تهانينا! تم قبول حجزك. المبلغ المستحق: ₪${booking.total_price}. تحقق من تفاصيل الدفع في صفحة تأكيد الحجز.`,
+                type: "system",
+                trip_id: booking.trip_id,
+                link: "/my-trips?tab=confirmed",
+              });
+              logAudit("driver_confirm_booking", "booking", booking.id, {
+                passenger_email: booking.passenger_email,
+                bulk: true,  // flag for activity-log readers to know
+                             // this confirm was part of a bulk operation
+              });
+            } catch (notifyErr) {
+              // Non-fatal — log to console but keep going. The booking
+              // IS confirmed; the passenger just didn't get pinged this
+              // second (they'll see it on next /my-trips refresh).
+              // eslint-disable-next-line no-console
+              console.warn("Bulk confirm: notify failed for", booking.id, notifyErr);
+            }
+          }
+        } catch (err) {
+          failures.push({ id: booking.id, name: booking.passenger_name || "راكب", error: err });
+        }
+      }
+      return { confirmed, failures, total: pendingBookings.length };
+    },
+    onSuccess: ({ confirmed, failures, total }) => {
+      qc.invalidateQueries({ queryKey: ["driver-bookings"] });
+      qc.invalidateQueries({ queryKey: ["bookings"] });
+      if (failures.length === 0) {
+        toast.success(`تم قبول ${confirmed} حجز بنجاح ✅`);
+      } else if (confirmed === 0) {
+        toast.error(`فشل قبول كل الحجوزات (${total})`);
+      } else {
+        // Partial-success path — surface both numbers so the driver
+        // knows exactly what landed and what didn't. The failed
+        // bookings stay in 'pending' status so the driver can retry
+        // each one individually.
+        toast.warning(`تم قبول ${confirmed} من ${total}. فشل ${failures.length} (يمكنك إعادة المحاولة فردياً)`);
+      }
+    },
+    onError: (err) => {
+      toast.error(friendlyError(err, "فشلت العملية الجماعية"));
+    },
+  });
+
+  // useConfirm dialog for the bulk-approve confirmation prompt. Local
+  // to this component since DriverPassengers doesn't share confirms
+  // with siblings. The dialog renders at the JSX root so it overlays
+  // the trip selector + passenger list regardless of which one had focus.
+  const { confirm: confirmBulk, dialog: bulkConfirmDialog } = useConfirm();
   // Until this session, payment_status was a dead column that never moved
   // off "pending". This is the missing write path on the driver side —
   // the matching admin-side write lives in DashboardPayments.
@@ -280,6 +375,62 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
               </h3>
               <Badge className="bg-primary/10 text-primary text-xs">{activeBookings.length} راكب</Badge>
             </div>
+
+            {/* Bulk-approve strip — appears only when 2+ pending bookings
+                exist for the current trip. One pending booking doesn't
+                merit a bulk affordance; the single-row 'قبول' is faster.
+                Threshold is intentionally 2 (not 3+) because even 2
+                bookings benefit from one-tap workflows on mobile where
+                tapping individual buttons across separate cards is
+                slower than the bulk action.
+
+                The button is disabled while the mutation runs to
+                prevent double-firing (which would attempt to confirm
+                already-confirmed bookings and surface errors). */}
+            {(() => {
+              const pendingForTrip = tripBookings.filter(b => b.status === "pending");
+              if (pendingForTrip.length < 2) return null;
+              return (
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-3 mb-4 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2 text-sm">
+                    <CheckCheck className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+                    <span className="font-medium text-foreground">
+                      لديك {pendingForTrip.length} حجوزات معلّقة
+                    </span>
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
+                      — اقبلها جميعاً بضغطة واحدة
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      // Show passenger names in the confirm so the
+                      // driver knows EXACTLY who they're approving.
+                      // Most useful at 2-4 pending; with 10+ the list
+                      // gets long but still scannable.
+                      const names = pendingForTrip
+                        .map(b => b.passenger_name || b.passenger_email || "راكب")
+                        .join("، ");
+                      const ok = await confirmBulk({
+                        title: `قبول ${pendingForTrip.length} حجوزات`,
+                        message: `سيتم قبول حجوزات: ${names}. سيصل الركاب إشعار بالقبول. لا يمكن التراجع تلقائياً — ستحتاج لإلغاء كل حجز فردياً للتراجع.`,
+                        confirmLabel: `قبول الـ ${pendingForTrip.length}`,
+                      });
+                      if (ok) bulkApprove.mutate({ bookings: pendingForTrip });
+                    }}
+                    disabled={bulkApprove.isPending}
+                    className="rounded-xl gap-1.5 bg-primary text-primary-foreground"
+                  >
+                    {bulkApprove.isPending ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <CheckCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                    )}
+                    {bulkApprove.isPending ? "جاري القبول..." : `قبول الجميع (${pendingForTrip.length})`}
+                  </Button>
+                </div>
+              );
+            })()}
 
             {tripBookings.length === 0 ? (
               <div className="bg-card rounded-2xl border border-border p-10 text-center">
@@ -390,6 +541,11 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
           </div>
         )}
       </div>
+      {/* useConfirm dialog for bulk-approve. Renders nothing until
+          confirm() is awaited. Placed at the outer grid level so it
+          overlays both the trip-selector column and the passenger
+          column. */}
+      {bulkConfirmDialog}
     </div>
   );
 }
