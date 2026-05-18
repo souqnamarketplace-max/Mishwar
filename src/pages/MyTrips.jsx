@@ -59,6 +59,24 @@ export default function MyTrips() {
   const [activeTab, setActiveTab] = useState(
     _validTabIds.includes(_paramTab) ? _paramTab : "all"
   );
+  // Role filter — only meaningful when the user is "both" (account_type
+  // 'both' means they post AS DRIVER and book AS PASSENGER). Mixing
+  // both kinds of trips in a single list was confusing per user
+  // feedback: "this page is confusing when the user has driver and
+  // passenger". Now we offer:
+  //   - "all":       both kinds shown together, split into two sections
+  //   - "driver":    only trips the user is driving
+  //   - "passenger": only trips the user has booked as a passenger
+  // For pure passengers / pure drivers, this state is silently
+  // ignored (the toggle UI is not rendered, no filter is applied).
+  // Persisted in URL as ?role= so cross-app deep-links can target
+  // a specific role view, e.g. /my-trips?role=passenger from the
+  // account-deletion blocker banner.
+  const _paramRole = searchParams.get("role");
+  const _validRoleIds = ["all", "driver", "passenger"];
+  const [roleFilter, setRoleFilter] = useState(
+    _validRoleIds.includes(_paramRole) ? _paramRole : "all"
+  );
   const [wizardTrip, setWizardTrip] = useState(null); // trip object for PassengerReviewWizard
 
   // ── Filter state (lifted from MyTripsFilterBar) ─────────────────────
@@ -189,6 +207,10 @@ export default function MyTrips() {
 
   // Role detection — passengers don't have driver trips, drivers may not have bookings
   const isDriver = user?.account_type === "driver" || user?.account_type === "both";
+  // 'both' specifically — drives whether we render the role-filter toggle.
+  // Pure drivers / pure passengers don't see it (the filter would be a
+  // no-op for them since they only ever have one kind of row).
+  const isBoth = user?.account_type === "both";
 
   // Page size for both driver-trips and passenger-bookings pagination.
   // 25 hits the sweet spot for mobile: small enough to render fast,
@@ -391,7 +413,29 @@ export default function MyTrips() {
     if (driverTrips.find(dt => dt.id === t.id)) return t.status;
     return bookingByTripId.get(t.id)?.status || t.status;
   };
-  const filtered = activeTab === "all" ? trips : trips.filter((t) => effectiveStatus(t) === activeTab);
+  // Trip-role classifier — drives the per-card badge AND the role
+  // filter. driverTrips IDs are the authoritative "user is the
+  // driver" signal; everything else with a booking is a passenger
+  // ride. The book_seat RPC refuses driver-books-own-trip so these
+  // are mutually exclusive in practice.
+  const driverTripIdSet = useMemo(() => new Set(driverTrips.map(t => t.id)), [driverTrips]);
+  const tripRole = (t) => (driverTripIdSet.has(t.id) ? "driver" : "passenger");
+
+  // Filter pipeline:
+  //   1. Role filter (only active when user is 'both' AND chose
+  //      something other than 'all') — drops the opposite-role rows
+  //   2. Status filter (existing tabs) — drops rows not matching
+  //      the selected status
+  //
+  // The order matters for the per-tab counts shown in the empty
+  // state ("you have rows in OTHER tabs"): we want to count within
+  // the current role view, not across both roles.
+  const roleFiltered = (isBoth && roleFilter !== "all")
+    ? trips.filter(t => tripRole(t) === roleFilter)
+    : trips;
+  const filtered = activeTab === "all"
+    ? roleFiltered
+    : roleFiltered.filter((t) => effectiveStatus(t) === activeTab);
   const { data: myReviews = [] } = useQuery({
     queryKey: ["my-reviews", user?.email],
     queryFn: () => api.entities.Review.filter({ reviewer_email: user?.email, review_type: "passenger_rates_driver" }),
@@ -500,6 +544,52 @@ export default function MyTrips() {
         routeTo={routeTo}         setRouteTo={setRouteTo}
       />
 
+      {/* Role toggle — ONLY for users with account_type='both'. Pure
+          drivers and pure passengers never have a mixed list, so the
+          toggle would just be visual noise.
+          User feedback: "this page is confusing when the user has
+          driver and passenger". The fix is to give the user explicit
+          control over WHICH role's activity they're looking at,
+          rather than auto-merging both into one list.
+          Stacks ABOVE the status tabs so the visual hierarchy reads
+          "first pick the role, then narrow by status" — most users
+          care more about role separation than about cancelled vs
+          completed. */}
+      {isBoth && (
+        <div className="mb-4">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-xs text-muted-foreground font-medium">عرض النشاط:</span>
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            {[
+              { id: "all",       label: "الكل",      count: driverTotal + passengerTotal },
+              { id: "driver",    label: "كسائق",     count: driverTotal },
+              { id: "passenger", label: "كراكب",     count: passengerTotal },
+            ].map((opt) => {
+              const isActive = roleFilter === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setRoleFilter(opt.id)}
+                  className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold min-h-[44px] transition-all ${
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-md"
+                      : "bg-card border border-border text-foreground hover:bg-muted"
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  <span>{opt.label}</span>
+                  <span className={`text-xs ${isActive ? "opacity-80" : "text-muted-foreground"}`}>
+                    ({opt.count})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex flex-wrap justify-center gap-2 mb-8">
         {tabs.map((tab) => (
@@ -601,7 +691,18 @@ export default function MyTrips() {
                   <span className="text-sm font-normal text-muted-foreground">({statusTrips.length})</span>
                 </h3>
                 <div className="space-y-3">
-                  {statusTrips.map((trip) => (
+                  {statusTrips.map((trip) => {
+                    // Role classification — drives the colored left
+                    // border + corner badge. Border colors mirror the
+                    // role-toggle conventions:
+                    //   driver    → primary (forest green) accent
+                    //   passenger → amber (warm) accent
+                    // ONLY shown for 'both' users; pure drivers /
+                    // passengers don't need the visual differentiator
+                    // (the whole list is one role).
+                    const role = tripRole(trip);
+                    const showRoleBadge = isBoth;
+                    return (
                     <div
                       key={trip.id}
                       ref={trip.id === highlightTripId ? highlightRef : null}
@@ -612,7 +713,29 @@ export default function MyTrips() {
                       }`}
                     >
                       <Link to={`/trip/${trip.id}`}>
-                        <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all">
+                        <div className={`bg-card rounded-2xl border p-4 hover:shadow-md transition-all relative ${
+                          showRoleBadge
+                            ? role === "driver"
+                              ? "border-r-4 border-r-primary border-y border-l border-border"
+                              : "border-r-4 border-r-amber-500 border-y border-l border-border"
+                            : "border-border"
+                        }`}>
+                          {/* Role badge — top-left corner pill, only
+                              shown for 'both' users so they can tell
+                              at a glance which role this card belongs
+                              to without reading. */}
+                          {showRoleBadge && (
+                            <span
+                              className={`absolute top-3 left-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                role === "driver"
+                                  ? "bg-primary/10 text-primary border border-primary/20"
+                                  : "bg-amber-100 text-amber-800 border border-amber-200"
+                              }`}
+                              aria-label={role === "driver" ? "أنت السائق في هذه الرحلة" : "حجزت كراكب في هذه الرحلة"}
+                            >
+                              {role === "driver" ? "أنت السائق" : "حجزت كراكب"}
+                            </span>
+                          )}
                           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                             {/* Date tile — was previously broken: called
                                 trip.date?.split(" ")[0] / [1] on an ISO
@@ -924,7 +1047,8 @@ export default function MyTrips() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             );

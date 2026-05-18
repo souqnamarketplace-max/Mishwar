@@ -474,6 +474,22 @@ export default function DriverDashboard() {
         </Link>
       </div>
 
+      {/* Quick cross-role link for 'both' users — without this they
+          couldn't easily reach /my-trips on mobile (bottom-tab is
+          swapped to لوحتي → /driver for them). This is the second
+          discoverability path alongside the drawer entry. Pure
+          drivers don't see this since /my-trips is irrelevant for
+          them. */}
+      {user?.account_type === "both" && (
+        <Link
+          to="/my-trips?role=passenger"
+          className="mb-4 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 hover:bg-amber-100 active:bg-amber-200 transition-colors text-xs font-bold text-amber-900 min-h-[44px]"
+        >
+          <span aria-hidden="true">🧳</span>
+          <span>عرض حجوزاتي كراكب ←</span>
+        </Link>
+      )}
+
       {/* ── Stats grid: 2×2 on mobile, 4 columns on lg ── */}
       <DriverStats
         totalEarnings={totalEarnings}

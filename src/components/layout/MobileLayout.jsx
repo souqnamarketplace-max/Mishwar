@@ -432,6 +432,18 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <p className="px-4 pt-2 pb-1 text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">حسابي</p>
                 {[
                   { icon: User,          label: "إعدادات الملف الشخصي", path: "/account-settings/profile" },
+                  // For 'both' users: a dedicated entry to reach
+                  // /my-trips. The bottom-tab "رحلاتي" slot is
+                  // hijacked into "لوحتي" → /driver for them (so
+                  // they can manage their posted trips quickly), but
+                  // that left no way to reach the passenger booking
+                  // history without typing the URL. Pure passengers
+                  // already have the bottom tab; pure drivers have
+                  // nothing to show there.
+                  ...(user?.account_type === "both"
+                    ? [{ icon: MapPin, label: "حجوزاتي كراكب", path: "/my-trips?role=passenger" }]
+                    : []
+                  ),
                   // Verification entry routes by account_type:
                   //   - passenger / no account → /verify-passenger (ID verification gate for trip-requests)
                   //   - driver / both          → /account-settings?section=verification (driver license docs)
