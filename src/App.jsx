@@ -52,6 +52,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'r
 import { HelmetProvider } from 'react-helmet-async';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { GlobalSearchProvider } from '@/lib/GlobalSearchContext';
 
 import AppLayout from './components/layout/AppLayout';
 import { lazy, Suspense, useState } from 'react';
@@ -234,6 +235,7 @@ function App() {
     <HelmetProvider>
       <ErrorBoundary><AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
+          <GlobalSearchProvider>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <ScrollToTop />
             <Routes>
@@ -243,6 +245,7 @@ function App() {
               <Route path="/*" element={<AuthenticatedApp />} />
             </Routes>
           </Router>
+          </GlobalSearchProvider>
           <Toaster />
           {/* SonnerToaster position 'top-right' matches the convention
               used by Gmail, iMessage, WhatsApp Web, Discord, Slack —

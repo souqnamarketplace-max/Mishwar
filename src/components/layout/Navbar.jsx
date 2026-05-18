@@ -8,6 +8,7 @@ import { api } from "@/api/apiClient";
 import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
 import { toast } from "sonner";
 import NotificationBell from "../notifications/NotificationBell";
+import { useGlobalSearch } from "@/lib/GlobalSearchContext";
 
 const LOGO_URL = "/logo.png";
 
@@ -32,6 +33,7 @@ export default function Navbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
   const location = useLocation();
+  const { open: openGlobalSearch } = useGlobalSearch();
 
   const { data: user } = useQuery({
     queryKey: ["me"],
@@ -159,6 +161,14 @@ export default function Navbar() {
                 </Link>
               </>
             )}
+            <button
+              onClick={openGlobalSearch}
+              className="relative p-2 rounded-lg hover:bg-muted transition-colors hidden sm:inline-flex items-center justify-center w-11 h-11"
+              aria-label="بحث شامل (Cmd-K)"
+              title="بحث شامل · ⌘K"
+            >
+              <Search className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+            </button>
             <Link to="/messages" className="relative p-2 rounded-lg hover:bg-muted transition-colors" aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}>
               <MessageSquare className="w-5 h-5 text-muted-foreground" />
               {/* Real badge tied to the unread-messages hook. Was
