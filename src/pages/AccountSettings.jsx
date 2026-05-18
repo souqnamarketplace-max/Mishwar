@@ -226,12 +226,99 @@ export default function AccountSettings() {
       // the user clicks it, the email change isn't applied. Communicate
       // this clearly instead of saying "تم تحديث" which suggests it's
       // already done.
-      toast.success("تم إرسال رسالة تأكيد إلى البريد الجديد. اضغط الرابط لإكمال التغيير", { duration: 8000 });
+      //
+      // CRITICAL: after the user clicks the confirmation link in their
+      // new inbox, auth.users.email flips — but ALL OTHER TABLES (trips,
+      // bookings, favorite_drivers, notifications, messages, etc.) still
+      // carry the OLD email. Without the cascade RPC (mig 079), the user
+      // would lose access to their own data because RLS uses auth.email()
+      // for new identity but the data is keyed by old email.
+      //
+      // The cascade fires from the useEffect below that detects the
+      // mismatch on next mount/focus — so the user doesn't have to do
+      // anything beyond clicking the confirmation link. We just need
+      // to set expectation in the toast: 'click the link, come back,
+      // we'll handle the rest'.
+      toast.success(
+        "تم إرسال رسالة تأكيد إلى بريدك الجديد. اضغط الرابط في البريد، ثم ارجع لهنا — سنحدّث بياناتك تلقائياً.",
+        { duration: 10000 }
+      );
     } catch (err) {
       toast.error(friendlyError(err, "تعذر تحديث البريد الإلكتروني"));
     }
     setEmailLoading(false);
   };
+
+  // ── Email-cascade auto-detect ─────────────────────────────────────
+  //
+  // After the user completes Supabase's email-change confirmation flow
+  // (by clicking the link in their new inbox), auth.users.email holds
+  // the NEW value but every public.* table still has the OLD value.
+  // This effect detects the mismatch — by comparing the auth-side
+  // identity (api.auth.me() returns auth.users.email) with what's
+  // stored in profiles — and fires the cascade RPC to backfill.
+  //
+  // Why an effect rather than firing in updateEmail itself: the email
+  // change is a TWO-STEP flow that spans an unpredictable gap (user
+  // opens their inbox app, finds the email, taps the link, comes
+  // back). We can't await the confirmation, so we react to it
+  // whenever it materializes. The effect re-runs whenever `user`
+  // changes — which happens on the page mount after the confirmation
+  // redirect, and on any subsequent revisit.
+  //
+  // The RPC is idempotent: if profiles.email already matches
+  // auth.users.email (cascade already ran), it returns 'no cascade
+  // needed' and we move on silently. So this effect firing on every
+  // mount is cheap — at most one round-trip when in sync.
+  useEffect(() => {
+    if (!user?.email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        // Direct profiles lookup — bypassing api.auth.me which may be
+        // serving cached auth.users values that haven't reconciled yet.
+        const { data: prof, error } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", user.id || user.user_id)
+          .maybeSingle();
+        if (cancelled || error || !prof) return;
+
+        // Only cascade when there's a genuine mismatch. Lower-cased
+        // compare to match the RPC's lower(...) normalization.
+        if (prof.email && prof.email.toLowerCase() !== user.email.toLowerCase()) {
+          const { data, error: rpcErr } = await supabase.rpc(
+            "update_my_email",
+            { p_new_email: user.email }
+          );
+          if (cancelled) return;
+          if (rpcErr) {
+            // Don't toast on every page mount if the RPC is missing
+            // (e.g. mig 079 not applied yet) — just log silently.
+            console.warn("[email-cascade] RPC failed:", rpcErr.message);
+            return;
+          }
+          if (data?.success && data?.rows_updated) {
+            // Count total rows touched for a friendly summary
+            const totalRows = Object.values(data.rows_updated)
+              .reduce((s, n) => s + (typeof n === "number" ? n : 0), 0);
+            toast.success(
+              `تم تحديث بريدك الإلكتروني وحفظ ${totalRows} سجل مرتبط بحسابك ✓`,
+              { duration: 6000 }
+            );
+            qc.invalidateQueries(); // refresh all caches with new identity
+          }
+        }
+      } catch (err) {
+        // Silent — the user shouldn't see a scary error if cascade is
+        // unavailable. Their old-email data is still intact; they just
+        // won't see it under the new identity until cascade runs.
+        // eslint-disable-next-line no-console
+        console.warn("[email-cascade] unexpected error:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.email, user?.id, qc]);
 
   const updatePassword = async () => {
     if (!passwordForm.current || !passwordForm.new || !passwordForm.confirm) {
