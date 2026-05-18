@@ -68,6 +68,7 @@ const SearchTrips      = lazy(() => import('./pages/SearchTrips'));
 const TripDetails      = lazy(() => import('./pages/TripDetails'));
 const MyTrips          = lazy(() => import('./pages/MyTrips'));
 const RecurringTrips   = lazy(() => import('./pages/RecurringTrips'));
+const WhatsNew         = lazy(() => import('./pages/WhatsNew'));
 const Favorites        = lazy(() => import('./pages/Favorites'));
 const Messages         = lazy(() => import('./pages/Messages'));
 const CreateTrip       = lazy(() => import('./pages/CreateTrip'));
@@ -210,6 +211,7 @@ const AuthenticatedApp = () => {
         {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />
         <Route path="/recurring-trips" element={<RecurringTrips />} />
+        <Route path="/whats-new" element={<WhatsNew />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/create-trip" element={<CreateTrip />} />
