@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Eye, EyeOff, Car, Mail, Lock, User, Phone, X, ArrowRight, Calendar } from 'lucide-react';
 import { supabase, setRememberMe, getRememberMe } from '@/lib/supabase';
 import { signInWithGoogle } from '@/lib/googleAuth';
+import { signInWithApple } from '@/lib/appleAuth';
 import { Checkbox } from '@/components/ui/checkbox';
 import LegalSheet from '@/components/legal/LegalSheet';
 import { TERMS_LAST_UPDATED } from '@/lib/legalContent';
@@ -45,6 +46,11 @@ export default function Login() {
   // backgrounds the app during consent, etc.) the user can still try
   // the email/password path without a full page reload.
   const [googleLoading, setGoogleLoading] = useState(false);
+  // Same independence rationale as googleLoading — the Apple sheet on
+  // iOS can be dismissed mid-flow, and the user shouldn't be locked
+  // out of the email/password path while we wait for a callback that
+  // may never arrive.
+  const [appleLoading, setAppleLoading] = useState(false);
   // Drives the inline Terms / Privacy sheet on the login screen. One
   // state for both so opening one closes the other automatically.
   // Pass "terms" / "privacy" / null. See components/legal/LegalSheet.jsx.
@@ -156,6 +162,42 @@ export default function Login() {
     // navigates away before the user could click again, and clearing
     // briefly would flash the button into a "ready" state during the
     // OAuth redirect. The state resets naturally on component unmount.
+  };
+
+  // Apple sign-in handler. Mirrors handleGoogleSignIn except for one
+  // wrinkle: on iOS the user can dismiss the native sheet with no
+  // identity token, which the plugin surfaces as either error code
+  // "1001" or an error whose message contains "canceled". That's not
+  // a real failure — it's the user changing their mind — so we swallow
+  // it silently instead of toasting "تعذر تسجيل الدخول". Any other
+  // error (network, Supabase JWT rejection, etc.) still toasts.
+  const handleAppleSignIn = async () => {
+    if (appleLoading) return;
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+    } catch (err) {
+      const message = String(err?.message || "");
+      const userCancelled =
+        err?.code === "1001" ||
+        err?.code === "ERR_CANCELED" ||
+        /cancel/i.test(message) ||
+        /no identity token/i.test(message);
+      if (userCancelled) {
+        setAppleLoading(false);
+        return;
+      }
+      console.warn("[Login] Apple sign-in failed:", err);
+      toast.error(
+        friendlyError(
+          err,
+          "تعذر تسجيل الدخول عبر Apple. حاول مجدداً أو استخدم البريد الإلكتروني."
+        )
+      );
+      setAppleLoading(false);
+    }
+    // Same as Google: don't clear on success — AuthContext will
+    // unmount us when the session lands.
   };
 
   const handleLogin = async (e) => {
@@ -640,6 +682,46 @@ export default function Login() {
                   </svg>
                 )}
                 <span>{googleLoading ? "جاري التحويل..." : "متابعة عبر Google"}</span>
+              </button>
+
+              {/* Sign in with Apple — required by App Store Guideline 4.8
+                  whenever a third-party social login (Google here) is
+                  offered. Style matches Apple's HIG: solid black in
+                  light mode, white-with-border in dark, white logo +
+                  text. Same width/height as Google so neither button
+                  reads as "primary" over the other — Apple's review
+                  rejects layouts where Sign in with Apple is visibly
+                  de-emphasized. mt-3 instead of a margin on the wrapper
+                  so the two social buttons stack tight and the "أو"
+                  divider sits below them both. */}
+              <button
+                type="button"
+                onClick={handleAppleSignIn}
+                disabled={appleLoading || googleLoading || loading}
+                className="w-full mt-3 flex items-center justify-center gap-3 bg-black dark:bg-white text-white dark:text-black rounded-xl py-2.5 text-sm font-medium hover:opacity-90 active:opacity-80 disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+                aria-label="تسجيل الدخول عبر Apple"
+              >
+                {appleLoading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 dark:border-black/30 border-t-white dark:border-t-black rounded-full animate-spin" />
+                ) : (
+                  // Apple logo path — official mark from Apple's HIG
+                  // resources. viewBox 0 0 384 512 is the canonical
+                  // Apple-logo bounding box; do not "fix" the aspect
+                  // ratio — Apple's brand guidelines require the
+                  // glyph render unchanged.
+                  <svg
+                    width="16"
+                    height="18"
+                    viewBox="0 0 384 512"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z" />
+                  </svg>
+                )}
+                <span>
+                  {appleLoading ? "جاري التحويل..." : "متابعة عبر Apple"}
+                </span>
               </button>
 
               <div className="flex items-center gap-3 my-4">
