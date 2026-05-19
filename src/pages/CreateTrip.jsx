@@ -88,12 +88,12 @@ export default function CreateTrip() {
 
 
   const { data: licenses = [] } = useQuery({
-    queryKey: ["driver-licenses-all", user?.email],
+    queryKey: ["driver-licenses-all", user?.id],
     queryFn: () =>
-      user?.email
-        ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
+      user?.id
+        ? api.entities.DriverLicense.filter({ user_id: user.id }, "-created_date", 10)
         : [],
-    enabled: !!user?.email,
+    enabled: !!user?.id,
   });
 
   // Subscription gate — when the kill switch is on, drivers must have an

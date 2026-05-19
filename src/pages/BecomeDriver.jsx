@@ -85,12 +85,17 @@ export default function BecomeDriver() {
   }, [user, navigate]);
 
   // Pull existing license row so we can resume from a previous attempt.
+  // Keyed on user.id (auth user UUID), NOT user.email — two auth users
+  // can share an email (Sign in with Apple, future OAuth providers),
+  // and an email-based filter would leak the other user's approved
+  // license into this session and ghost-grant driver status. See
+  // migration 091 for the schema fix that added user_id.
   const { data: licenses = [] } = useQuery({
-    queryKey: ["driver-license", user?.email],
-    queryFn: () => user?.email
-      ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+    queryKey: ["driver-license", user?.id],
+    queryFn: () => user?.id
+      ? api.entities.DriverLicense.filter({ user_id: user.id }, "-created_date", 1)
       : [],
-    enabled: !!user?.email,
+    enabled: !!user?.id,
   });
   const existingLicense = licenses[0] || null;
 
@@ -239,7 +244,11 @@ export default function BecomeDriver() {
       if (existingLicense) {
         await api.entities.DriverLicense.update(existingLicense.id, licensePayload);
       } else {
+        // user_id is the new primary lookup key (see migration 091);
+        // driver_email stays as a denormalized cache referenced by
+        // older RLS policies and trip-list joins.
         await api.entities.DriverLicense.create({
+          user_id: user.id,
           driver_email: user.email,
           driver_name: user.full_name,
           ...licensePayload,
@@ -255,7 +264,7 @@ export default function BecomeDriver() {
       // 3) Invalidate queries so home page / navbar / hub all reflect the
       //    new state without a hard reload
       qc.invalidateQueries({ queryKey: ["me"] });
-      qc.invalidateQueries({ queryKey: ["driver-license", user.email] });
+      qc.invalidateQueries({ queryKey: ["driver-license", user.id] });
       if (typeof refreshUser === "function") {
         await refreshUser();
       }

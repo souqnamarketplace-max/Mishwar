@@ -50,12 +50,12 @@ export default function AccountSettings() {
   // Sync form with user data
   // Driver License query
   const { data: license } = useQuery({
-    queryKey: ["driver-license", user?.email],
+    queryKey: ["driver-license", user?.id],
     queryFn: () =>
-      user?.email
-        ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 1)
+      user?.id
+        ? api.entities.DriverLicense.filter({ user_id: user.id }, "-created_date", 1)
         : [],
-    enabled: !!user?.email,
+    enabled: !!user?.id,
   });
 
   const driverLicense = license?.[0];

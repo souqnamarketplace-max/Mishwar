@@ -10,13 +10,18 @@ import { Button } from "@/components/ui/button";
 export default function VerificationStatusSection() {
   const { user } = useAuth();
 
+  // Filter by user.id (auth UUID) — see migration 091 + BecomeDriver.jsx
+  // comment. Email-based filtering leaked approvals across two auth users
+  // that share an email (Sign in with Apple creates a second user when
+  // the original account isn't auto-linkable), ghost-granting verified
+  // status on the new account.
   const { data: licenses = [], isLoading } = useQuery({
-    queryKey: ["driver-licenses-all", user?.email],
+    queryKey: ["driver-licenses-all", user?.id],
     queryFn: () =>
-      user?.email
-        ? api.entities.DriverLicense.filter({ driver_email: user.email }, "-created_date", 10)
+      user?.id
+        ? api.entities.DriverLicense.filter({ user_id: user.id }, "-created_date", 10)
         : [],
-    enabled: !!user?.email,
+    enabled: !!user?.id,
   });
 
   if (isLoading) {
