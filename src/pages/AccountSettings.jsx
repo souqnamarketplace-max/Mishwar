@@ -1235,52 +1235,99 @@ export default function AccountSettings() {
           </div>
         </div>
 
-        {/* Password Section */}
-        <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
-          <h3 className="font-bold text-foreground flex items-center gap-2">
-            <Lock className="w-4 h-4 text-primary" />
-            تغيير كلمة المرور
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <Label>كلمة المرور الحالية</Label>
-              <Input
-                type="password"
-                value={passwordForm.current}
-                onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
-                placeholder="أدخل كلمة المرور الحالية"
-                className="rounded-xl h-10 mt-1"
-              />
+        {/* Password Section — branches on whether the user has an
+            email/password identity. Apple-only and Google-only users have
+            user.has_password === false: showing the standard change-
+            password form to them creates a frustrating "current password
+            wrong" loop, because they literally don't have one. We instead
+            offer a one-click "Set a password" CTA that triggers the
+            standard reset-password email flow — the user clicks the link,
+            picks a password, and from then on can sign in either way.
+            providers[] is surfaced so the notice reads "you signed in
+            with Apple" not just a generic "social login". */}
+        {user?.has_password ? (
+          <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+            <h3 className="font-bold text-foreground flex items-center gap-2">
+              <Lock className="w-4 h-4 text-primary" />
+              تغيير كلمة المرور
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <Label>كلمة المرور الحالية</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.current}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                  placeholder="أدخل كلمة المرور الحالية"
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <div>
+                <Label>كلمة المرور الجديدة</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.new}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
+                  placeholder="أدخل كلمة مرور جديدة (8+ أحرف)"
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <div>
+                <Label>تأكيد كلمة المرور</Label>
+                <Input
+                  type="password"
+                  value={passwordForm.confirm}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                  placeholder="أدخل كلمة المرور مرة أخرى"
+                  className="rounded-xl h-10 mt-1"
+                />
+              </div>
+              <Button
+                onClick={updatePassword}
+                disabled={passwordLoading}
+                className="w-full bg-primary text-primary-foreground rounded-xl"
+              >
+                {passwordLoading ? "جاري التحديث..." : "تحديث كلمة المرور"}
+              </Button>
             </div>
-            <div>
-              <Label>كلمة المرور الجديدة</Label>
-              <Input
-                type="password"
-                value={passwordForm.new}
-                onChange={(e) => setPasswordForm({ ...passwordForm, new: e.target.value })}
-                placeholder="أدخل كلمة مرور جديدة (8+ أحرف)"
-                className="rounded-xl h-10 mt-1"
-              />
-            </div>
-            <div>
-              <Label>تأكيد كلمة المرور</Label>
-              <Input
-                type="password"
-                value={passwordForm.confirm}
-                onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
-                placeholder="أدخل كلمة المرور مرة أخرى"
-                className="rounded-xl h-10 mt-1"
-              />
-            </div>
+          </div>
+        ) : (
+          <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+            <h3 className="font-bold text-foreground flex items-center gap-2">
+              <Lock className="w-4 h-4 text-primary" />
+              كلمة المرور
+            </h3>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {user?.providers?.includes("apple")
+                ? "تسجّل دخولك حالياً عبر Apple، فلا تحتاج إلى كلمة مرور. يمكنك اختياريّاً ضبط كلمة مرور لاستخدامها كطريقة دخول إضافية."
+                : user?.providers?.includes("google")
+                  ? "تسجّل دخولك حالياً عبر Google، فلا تحتاج إلى كلمة مرور. يمكنك اختياريّاً ضبط كلمة مرور لاستخدامها كطريقة دخول إضافية."
+                  : "لم يتم ضبط كلمة مرور لحسابك بعد. يمكنك إنشاء واحدة لتسجيل الدخول بالبريد الإلكتروني."}
+            </p>
             <Button
-              onClick={updatePassword}
+              onClick={async () => {
+                if (!user?.email) return;
+                setPasswordLoading(true);
+                try {
+                  const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+                    redirectTo: `${window.location.origin}/login`,
+                  });
+                  if (error) throw error;
+                  toast.success("تم إرسال رابط ضبط كلمة المرور إلى بريدك الإلكتروني");
+                } catch (err) {
+                  toast.error(friendlyError(err, "تعذر إرسال رابط ضبط كلمة المرور"));
+                } finally {
+                  setPasswordLoading(false);
+                }
+              }}
               disabled={passwordLoading}
-              className="w-full bg-primary text-primary-foreground rounded-xl"
+              variant="outline"
+              className="w-full rounded-xl"
             >
-              {passwordLoading ? "جاري التحديث..." : "تحديث كلمة المرور"}
+              {passwordLoading ? "جاري الإرسال..." : "ضبط كلمة مرور"}
             </Button>
           </div>
-        </div>
+        )}
 
         {/* Driver License Section */}
         {/* PASSENGER ONLY: Slim entry point pointing to the dedicated

@@ -273,17 +273,30 @@ function buildDeletionConfirmedHtml(opts: { name: string; reason: string | null 
   return { subject: "تم حذف حسابك في مشوارو", html };
 }
 
+// ─── CORS ────────────────────────────────────────────────────────────────
+// Browser preflight from www.mishwaro.com (and any future origin) needs
+// these headers, or the OPTIONS request 404s and the actual POST never
+// fires. Same pattern as send-notification-email and send-push-notification.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 // ─── Main handler ───────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "method_not_allowed" }), {
-      status: 405, headers: { "Content-Type": "application/json" },
+      status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
   if (!RESEND_API_KEY) {
     return new Response(JSON.stringify({ error: "missing_env_RESEND_API_KEY" }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -292,7 +305,7 @@ Deno.serve(async (req: Request) => {
   const jwt  = auth.replace(/^Bearer\s+/i, "");
   if (!jwt) {
     return new Response(JSON.stringify({ error: "missing_jwt" }), {
-      status: 401, headers: { "Content-Type": "application/json" },
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -300,7 +313,7 @@ Deno.serve(async (req: Request) => {
   let body: any = {};
   try { body = await req.json(); } catch {
     return new Response(JSON.stringify({ error: "invalid_json" }), {
-      status: 400, headers: { "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
   const kind   = String(body.kind || "").trim();
@@ -308,7 +321,7 @@ Deno.serve(async (req: Request) => {
 
   if (kind !== "data_export" && kind !== "deletion_confirmed") {
     return new Response(JSON.stringify({ error: "invalid_kind", got: kind }), {
-      status: 400, headers: { "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -320,12 +333,12 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     console.error("[send-account-email] profile fetch failed:", String(e));
     return new Response(JSON.stringify({ error: "profile_fetch_failed", details: String(e) }), {
-      status: 500, headers: { "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
   if (!profile?.email) {
     return new Response(JSON.stringify({ error: "no_email_on_profile" }), {
-      status: 400, headers: { "Content-Type": "application/json" },
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -384,7 +397,7 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     console.error("[send-account-email] resend unreachable:", String(e));
     return new Response(JSON.stringify({ error: "resend_unreachable", details: String(e) }), {
-      status: 502, headers: { "Content-Type": "application/json" },
+      status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
@@ -392,12 +405,12 @@ Deno.serve(async (req: Request) => {
     const t = await resendRes.text();
     console.error(`[send-account-email] resend ${resendRes.status}:`, t);
     return new Response(JSON.stringify({ error: "resend_error", status: resendRes.status, details: t.slice(0, 500) }), {
-      status: 502, headers: { "Content-Type": "application/json" },
+      status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
   const resendData = await resendRes.json();
   return new Response(JSON.stringify({ sent: true, kind, resend_id: resendData?.id || null }), {
-    status: 200, headers: { "Content-Type": "application/json" },
+    status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });

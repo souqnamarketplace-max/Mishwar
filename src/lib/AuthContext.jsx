@@ -252,6 +252,16 @@ export const AuthProvider = ({ children }) => {
         avatar_url: profile?.avatar_url ?? null,
         role: profile?.role ?? 'user',
         account_type: profile?.account_type ?? 'passenger',
+        // Identity-provider awareness. authUser.identities is an array of
+        // {provider, identity_data, ...} entries — one per linked sign-in
+        // method. "email" provider means the user has a password set in
+        // auth.users.encrypted_password; "apple"/"google" mean they signed
+        // in via that OAuth provider. A user can have multiple (e.g. used
+        // forgot-password to add email/password on top of Apple). We
+        // surface two derived flags so consumers don't have to grovel
+        // through the identities array themselves.
+        providers: (authUser.identities || []).map(i => i.provider),
+        has_password: (authUser.identities || []).some(i => i.provider === 'email'),
         phone: profile?.phone ?? null,
         gender: profile?.gender ?? null,
         bio: profile?.bio ?? null,
