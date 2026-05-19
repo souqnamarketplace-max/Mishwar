@@ -37,9 +37,12 @@ WHERE dl.user_id IS NULL
   AND lower(u.email) = lower(dl.driver_email);
 
 -- Index for the new BecomeDriver / VerificationStatusSection query path.
--- The "user_id, created_date DESC" composite mirrors the client's filter
--- + sort: WHERE user_id = $1 ORDER BY created_date DESC LIMIT 1/10.
-CREATE INDEX IF NOT EXISTS idx_driver_licenses_user_id_created_date
-  ON public.driver_licenses (user_id, created_date DESC);
+-- The "user_id, created_at DESC" composite mirrors the client's filter
+-- + sort: WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1/10.
+-- (Client code sorts by "-created_date", but apiClient.js translates
+-- that to created_at before the SQL hits Postgres — the underlying
+-- column has always been created_at.)
+CREATE INDEX IF NOT EXISTS idx_driver_licenses_user_id_created_at
+  ON public.driver_licenses (user_id, created_at DESC);
 
 COMMIT;
