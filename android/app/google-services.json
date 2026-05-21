@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "412924448949",
+    "project_id": "mishwaro",
+    "storage_bucket": "mishwaro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:412924448949:android:c87702eda4226748642efc",
+        "android_client_info": {
+          "package_name": "com.mishwaro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDniUbX2K1wAAClXRhb_hXauVNIu1-xAos"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

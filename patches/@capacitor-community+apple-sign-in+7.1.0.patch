@@ -1,0 +1,32 @@
+diff --git a/node_modules/@capacitor-community/apple-sign-in/Package.swift b/node_modules/@capacitor-community/apple-sign-in/Package.swift
+index 94246df..7c8943f 100644
+--- a/node_modules/@capacitor-community/apple-sign-in/Package.swift
++++ b/node_modules/@capacitor-community/apple-sign-in/Package.swift
+@@ -7,22 +7,19 @@ let package = Package(
+     products: [
+         .library(
+             name: "CapacitorCommunityAppleSignIn",
+-            targets: ["SignInWithApple"])
++            targets: ["AppleSignInPlugin"])
+     ],
+     dependencies: [
+-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
++        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0")
+     ],
+     targets: [
+         .target(
+-            name: "SignInWithApple",
++            name: "AppleSignInPlugin",
+             dependencies: [
+                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
+                 .product(name: "Cordova", package: "capacitor-swift-pm")
+             ],
+-            path: "ios/Sources/SignInWithApple"),
+-        .testTarget(
+-            name: "SignInWithAppleTests",
+-            dependencies: ["SignInWithApple"],
+-            path: "ios/Tests/SignInWithAppleTests")
++            path: "ios/Plugin",
++            exclude: ["Info.plist"])
+     ]
+ )

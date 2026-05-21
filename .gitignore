@@ -71,3 +71,4 @@ android/app/src/main/assets/public/
 
 # Supabase CLI working files — never commit
 supabase/.temp/
+secrets/
