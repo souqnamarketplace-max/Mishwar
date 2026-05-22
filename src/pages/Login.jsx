@@ -372,7 +372,23 @@ export default function Login() {
       setResentAt(Date.now()); // start the cooldown — first email was just sent
       setForm(p => ({ ...p, password: '', confirmPassword: '' }));
     } catch (err) {
-      toast.error(friendlyError(err, "فشل إنشاء الحساب"));
+      // Specifically handle the duplicate-email case so we can guide the
+      // user into the sign-in flow instead of leaving them confused at a
+      // generic toast. The error code is set in AuthContext.register()
+      // when Supabase signUp returns an empty identities array
+      // (Supabase's documented signal for "this email already has an
+      // account"). Switching to login mode + pre-filling the email is
+      // far more useful than the toast alone.
+      if (err?.code === 'EMAIL_ALREADY_REGISTERED') {
+        toast.error("هذا البريد مسجّل بالفعل — يرجى تسجيل الدخول", { duration: 5000 });
+        setMode('login');
+        setForm((p) => ({ ...p, password: '', confirmPassword: '' }));
+        // Keep email/full_name pre-filled so they can immediately enter
+        // password and log in. The mode switch re-renders into the
+        // login form which uses the same `form.email` state.
+      } else {
+        toast.error(friendlyError(err, "فشل إنشاء الحساب"));
+      }
     } finally { setLoading(false); }
   };
 

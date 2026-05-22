@@ -521,6 +521,34 @@ export const AuthProvider = ({ children }) => {
       },
     });
     if (error) throw error;
+
+    // ── Duplicate-email detection ──────────────────────────────────────
+    // Supabase Auth deliberately does NOT throw an error when signup hits
+    // an existing confirmed email (this is the documented anti-enumeration
+    // behavior — preventing attackers from probing which emails are
+    // registered). Instead it returns success silently with an empty
+    // `identities` array on the user object.
+    //
+    // Without this check, the UI would proceed to the "check your email"
+    // panel for an existing account — no confirmation email arrives
+    // (Supabase didn't send one), the user is stuck, and our support
+    // burden goes up. Worse, an App Store reviewer testing edge cases
+    // would see a silent failure and mark it as a bug.
+    //
+    // The throw is intentionally worded so the existing friendlyError
+    // regex in src/lib/errors.js ("user already registered") maps it
+    // to the Arabic message "هذا البريد مسجل بالفعل — جرب تسجيل الدخول"
+    // without us having to edit the error mapper.
+    //
+    // We attach a discriminator on the error so the Login form can
+    // detect this exact case and switch the user into login mode with
+    // their email pre-filled (better UX than just a toast).
+    if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      const dupErr = new Error('User already registered');
+      dupErr.code = 'EMAIL_ALREADY_REGISTERED';
+      throw dupErr;
+    }
+
     return data;
   };
 
