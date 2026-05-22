@@ -290,6 +290,32 @@ export default function CreateTrip() {
     }
   }, [user, formInitialized, searchParams]);
 
+  // ── Car-info race-condition patch ──────────────────────────────────
+  // The init effect above runs exactly once (gated by !formInitialized).
+  // But AuthContext can deliver `user` in two phases: a fast cached
+  // version (often missing car_model/year/color/plate) followed by the
+  // fresh Supabase profile load. If the init effect fired on the cached
+  // user, the form is locked with empty car_* fields even after the
+  // real profile arrives — drivers then see "please enter car type"
+  // until they refresh or retry. That bug surfaced for multiple users
+  // and is the reason retry "magically" worked.
+  //
+  // This second effect re-syncs car_* fields from user → form, but
+  // ONLY when the form's value for that field is empty. That way we
+  // patch the race without ever clobbering a value the driver has
+  // intentionally typed or edited.
+  useEffect(() => {
+    if (!user) return;
+    setForm((prev) => {
+      const patch = {};
+      if (!prev.car_model && user.car_model)  patch.car_model  = user.car_model;
+      if (!prev.car_year  && user.car_year)   patch.car_year   = user.car_year;
+      if (!prev.car_color && user.car_color)  patch.car_color  = user.car_color;
+      if (!prev.car_plate && user.car_plate)  patch.car_plate  = user.car_plate;
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+  }, [user?.car_model, user?.car_year, user?.car_color, user?.car_plate]);
+
   // ── Real-time driver-conflict pre-flight check ─────────────────────
   // Mig 087 relaxed the same-day rule to a 1-hour-overlap rule. To give
   // drivers immediate feedback (instead of letting them complete the
