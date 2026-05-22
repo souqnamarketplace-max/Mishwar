@@ -55,6 +55,7 @@
 
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
+import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "@/lib/supabase";
 import { captureException } from "@/lib/sentry";
 
@@ -187,17 +188,16 @@ export function showIncomingNotification(notif, { onClick, userPrefs } = {}) {
 // NATIVE PATH (Capacitor — iOS APNS + Android FCM)
 // ════════════════════════════════════════════════════════════════════
 
-// Lazy-import the plugin only when we're on a native platform. Avoids
-// shipping the plugin's stub to the web bundle (small win, but cleaner).
-async function getPushPlugin() {
+// Return the push plugin on native platforms, null on web.
+// Previously used dynamic import() to lazy-load the plugin, but Vite
+// failed to generate a chunk for it (the only reference was inside an
+// isNativePlatform() guard, so the bundler optimized it away). The
+// dynamic import's promise hung forever → "جاري الطلب..." stuck on
+// both iOS and Android. The JS stub is ~3 KB — not worth the
+// complexity of a dynamic import that breaks in production.
+function getPushPlugin() {
   if (!Capacitor.isNativePlatform()) return null;
-  try {
-    const mod = await import("@capacitor/push-notifications");
-    return mod.PushNotifications;
-  } catch (e) {
-    captureException(e, { msg: "Failed to import @capacitor/push-notifications" });
-    return null;
-  }
+  return PushNotifications;
 }
 
 /**
