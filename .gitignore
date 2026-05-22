@@ -72,3 +72,10 @@ android/app/src/main/assets/public/
 # Supabase CLI working files — never commit
 supabase/.temp/
 secrets/
+
+# Android signing — NEVER commit these
+android/mishwaro-release.jks
+android/keystore.properties
+android/*.jks
+android/*.keystore
+android/keystore.properties
