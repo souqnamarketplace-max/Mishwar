@@ -713,12 +713,15 @@ export default function AccountSettings() {
           toast.success("تم إرسال نسخة من بياناتك إلى بريدك الإلكتروني 📧");
         } catch (e) {
           captureException?.(e);
+          // Data export email failed — warn but DON'T block deletion.
+          // The user can still download their data via the separate
+          // "تنزيل بياناتي (JSON)" button. Blocking deletion because
+          // of an email send failure is a worse UX than proceeding
+          // without the email.
           toast.error(
-            "تعذر إرسال نسخة من بياناتك. ألغ هذا الخيار أو حاول لاحقاً قبل المتابعة.",
+            "تعذر إرسال نسخة البيانات بالبريد، لكن سيتم متابعة حذف الحساب. يمكنك تنزيل بياناتك يدوياً من صفحة الإعدادات.",
             { duration: 7000 },
           );
-          setDeletionLoading(false);
-          return;
         }
       }
 
