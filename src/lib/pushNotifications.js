@@ -59,6 +59,9 @@ import { PushNotifications } from "@capacitor/push-notifications";
 import { supabase } from "@/lib/supabase";
 import { captureException } from "@/lib/sentry";
 
+// Module-level debug — fires when pushNotifications.js first loads
+console.error("[PUSH DEBUG] pushNotifications.js module loaded, PushNotifications:", typeof PushNotifications);
+
 const PERMISSION_ASK_KEY = "mishwar:push:asked";
 const PERMISSION_OK_KEY  = "mishwar:push:granted";
 const LAST_TOKEN_KEY     = "mishwar:push:last_token";
@@ -196,7 +199,10 @@ export function showIncomingNotification(notif, { onClick, userPrefs } = {}) {
 // both iOS and Android. The JS stub is ~3 KB — not worth the
 // complexity of a dynamic import that breaks in production.
 function getPushPlugin() {
-  if (!Capacitor.isNativePlatform()) return null;
+  const isNative = Capacitor.isNativePlatform();
+  console.error("[PUSH DEBUG] getPushPlugin called, isNativePlatform:", isNative);
+  console.error("[PUSH DEBUG] PushNotifications object:", typeof PushNotifications, PushNotifications ? Object.keys(PushNotifications).join(",") : "null");
+  if (!isNative) return null;
   return PushNotifications;
 }
 
@@ -206,12 +212,15 @@ function getPushPlugin() {
  * "unsupported".
  */
 export async function getNativePermission() {
-  const Push = await getPushPlugin();
+  console.error("[PUSH DEBUG] getNativePermission called");
+  const Push = getPushPlugin();
   if (!Push) return "unsupported";
   try {
     const result = await Push.checkPermissions();
+    console.error("[PUSH DEBUG] checkPermissions result:", JSON.stringify(result));
     return result.receive || "prompt";
-  } catch {
+  } catch (e) {
+    console.error("[PUSH DEBUG] checkPermissions error:", e?.message || e);
     return "unsupported";
   }
 }
@@ -237,12 +246,16 @@ let cachedRegisteredToken = null;
  * (Android) are in place — both verified.
  */
 export async function registerNativePush() {
-  const Push = await getPushPlugin();
+  console.error("[PUSH DEBUG] registerNativePush called");
+  const Push = getPushPlugin();
+  console.error("[PUSH DEBUG] Push plugin:", Push ? "found" : "null");
   if (!Push) return;  // web platform — no-op
 
   try {
     // 1. Check / request permission.
+    console.error("[PUSH DEBUG] calling checkPermissions...");
     let perm = await Push.checkPermissions();
+    console.error("[PUSH DEBUG] checkPermissions result:", JSON.stringify(perm));
     if (perm.receive === "prompt" || perm.receive === "prompt-with-rationale") {
       perm = await Push.requestPermissions();
     }
