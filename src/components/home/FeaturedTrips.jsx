@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo} from "react";
 import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
+import { useAuth } from "@/lib/AuthContext";
 import { isTripExpired } from "@/lib/tripScheduling";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -199,10 +200,12 @@ export default function FeaturedTrips() {
   });
 
   const blockedSet = useBlockedEmails();
+  const { user } = useAuth();
   const trips = useMemo(
     () => {
       const filtered = filterByBlocks(trips_unfiltered, blockedSet, "driver_email")
-        .filter((t) => !isTripExpired(t));
+        .filter((t) => !isTripExpired(t))
+        .filter((t) => !user?.email || t.driver_email !== user.email);
 
       // De-dup by (from_city, to_city, date). Live data has shown a single
       // driver posting the same route 6+ times for the same day, which used

@@ -609,7 +609,7 @@ export default function TripDetails() {
               <span>{trip.date}</span>
               <span>•</span>
               <Clock className="w-4 h-4" />
-              <span>{trip.time} صباحاً</span>
+              <span>{trip.time} {parseInt(trip.time) >= 12 ? "مساءً" : "صباحاً"}</span>
             </div>
 
             {/* Map */}
@@ -670,7 +670,7 @@ export default function TripDetails() {
             <h3 className="font-bold text-foreground mb-4">تفاصيل الرحلة</h3>
             <div className="space-y-3 text-sm">
               {[
-                { icon: Calendar, label: `${trip.date} • ${trip.time} صباحاً` },
+                { icon: Calendar, label: `${trip.date} • ${trip.time} ${parseInt(trip.time) >= 12 ? "مساءً" : "صباحاً"}` },
                 trip.from_location && { icon: MapPin, label: `${trip.from_city} – ${trip.from_location}` },
                 trip.to_location && { icon: MapPin, label: `${trip.to_city} – ${trip.to_location}` },
                 { icon: Users, label: `عدد المقاعد المتاحة: ${trip.available_seats || 3}` },

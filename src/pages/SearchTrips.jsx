@@ -17,6 +17,7 @@ import { CITIES, cityMatches } from "@/lib/cities";
 import { useFavoriteDrivers } from "@/lib/favoriteDrivers";
 
 import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
+import { useAuth } from "@/lib/AuthContext";
 export default function SearchTrips() {
   useSEO({ title: "البحث عن رحلة", description: "ابحث عن رحلات بين المدن الفلسطينية واحجز مقعدك بسهولة" });
 
@@ -114,9 +115,11 @@ export default function SearchTrips() {
   });
 
   const blockedSet = useBlockedEmails();
+  const { user } = useAuth();
   const trips = useMemo(
-    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email"),
-    [trips_unfiltered, blockedSet]
+    () => filterByBlocks(trips_unfiltered, blockedSet, "driver_email")
+      .filter((t) => !user?.email || t.driver_email !== user.email),
+    [trips_unfiltered, blockedSet, user?.email]
   );
   // Favorite-driver filter set. Always queried (cheap, 5-min stale time)
   // but only USED when onlyFavorites is on. Loading state lets us hide
