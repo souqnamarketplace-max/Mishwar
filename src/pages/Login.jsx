@@ -1111,8 +1111,11 @@ export default function Login() {
             {forgotSent ? (
               <div className="text-center py-4">
                 <div className="text-5xl mb-3">📧</div>
-                <p className="font-medium mb-1">تم إرسال الرابط!</p>
-                <p className="text-sm text-slate-500">تحقق من بريدك الإلكتروني واتبع الرابط لإعادة تعيين كلمة المرور</p>
+                <p className="font-medium mb-1">تحقق من بريدك الإلكتروني</p>
+                <p className="text-sm text-slate-500">
+                  إذا كان البريد <span dir="ltr" className="inline-block font-mono">{forgotEmail}</span> مسجلاً لدينا،
+                  فستصلك رسالة بها رابط لإعادة تعيين كلمة المرور خلال دقائق. تحقق أيضاً من مجلد الرسائل غير المرغوب فيها.
+                </p>
                 <button onClick={() => { setShowForgot(false); setForgotSent(false); }}
                   className="mt-4 text-sm text-primary hover:underline">إغلاق</button>
               </div>
