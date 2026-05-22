@@ -2,7 +2,7 @@
  * DriverPaymentSetup — complete payout method configuration for drivers.
  * Supports: Bank Transfer, Reflect, Jawwal Pay, Card (info only)
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,33 +51,43 @@ export default function DriverPaymentSetup({ user }) {
     card_last_four:   user?.card_last_four   || "",
   });
 
-  // Sync state from user when it FIRST arrives. useState initializers
-  // only run on the very first render — if the parent passes user=undefined
-  // (auth still loading) and user resolves later, all four state objects
-  // stay at their initial empty values. The driver would then see empty
-  // fields, fill in some, click save, and the PATCH would send
-  // `{ bank_iban: "", ... }` OVERWRITING the previously-saved IBAN with
-  // empty string. Real data-loss bug.
+  // Sync state from user. Two-phase patch (June 2026):
   //
-  // The hydratedRef ensures we only do this once per user.email — so a
-  // background re-fetch of `me` (triggered by some other action) doesn't
-  // clobber the driver's in-progress edits.
-  const hydratedRef = useRef(null);
+  // The previous hydratedRef-keyed-on-email approach had a race:
+  // user.email arrives in the first React tick (cached session) while
+  // bank_*/reflect_*/jawwal_*/card_* fields arrive in a later tick
+  // (fresh profile). The ref locked on email=present and the state
+  // stayed empty. Drivers opened payment setup, saw blank fields,
+  // saved "to refresh" → empty values wiped real bank/payout details.
+  //
+  // The fix: merge from user into local state ONLY for fields the
+  // local state doesn't already have a value for. Never clobber a
+  // driver's in-progress edits, and never reset to empty.
   useEffect(() => {
     if (!user?.email) return;
-    if (hydratedRef.current === user.email) return;
-    hydratedRef.current = user.email;
-    setBank({
-      bank_name:           user.bank_name           || "",
-      bank_account_name:   user.bank_account_name   || "",
-      bank_account_number: user.bank_account_number || "",
-      bank_iban:           user.bank_iban           || "",
+    setBank((prev) => {
+      const patch = {};
+      if (!prev.bank_name           && user.bank_name)           patch.bank_name           = user.bank_name;
+      if (!prev.bank_account_name   && user.bank_account_name)   patch.bank_account_name   = user.bank_account_name;
+      if (!prev.bank_account_number && user.bank_account_number) patch.bank_account_number = user.bank_account_number;
+      if (!prev.bank_iban           && user.bank_iban)           patch.bank_iban           = user.bank_iban;
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
-    setReflect({ reflect_number:    user.reflect_number    || "" });
-    setJawwal({  jawwal_pay_number: user.jawwal_pay_number || "" });
-    setCard({
-      card_holder_name: user.card_holder_name || "",
-      card_last_four:   user.card_last_four   || "",
+    setReflect((prev) =>
+      !prev.reflect_number && user.reflect_number
+        ? { reflect_number: user.reflect_number }
+        : prev
+    );
+    setJawwal((prev) =>
+      !prev.jawwal_pay_number && user.jawwal_pay_number
+        ? { jawwal_pay_number: user.jawwal_pay_number }
+        : prev
+    );
+    setCard((prev) => {
+      const patch = {};
+      if (!prev.card_holder_name && user.card_holder_name) patch.card_holder_name = user.card_holder_name;
+      if (!prev.card_last_four   && user.card_last_four)   patch.card_last_four   = user.card_last_four;
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
   }, [user?.email, user?.bank_name, user?.bank_account_name, user?.bank_account_number,
       user?.bank_iban, user?.reflect_number, user?.jawwal_pay_number,

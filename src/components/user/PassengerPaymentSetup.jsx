@@ -1,7 +1,7 @@
 /**
  * PassengerPaymentSetup — preferred payment method for passengers.
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Wallet, Building2, Smartphone, CreditCard, AlertCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -35,20 +35,27 @@ export default function PassengerPaymentSetup({ user }) {
   const [preferred, setPreferred] = useState(normalizeLegacy(user?.preferred_payment) || "cash");
   const qc = useQueryClient();
 
-  // Same async-user hydration pattern as DriverPaymentSetup (batch 6)
-  // and DriverVehicleEditor (batch 7). useState initializer only runs
-  // on first render — if user=undefined on first mount (auth loading)
-  // and resolves later with preferred_payment='bank_transfer', the
-  // local state stays at 'cash' default. User clicks save → PATCH
-  // sends 'cash' → wipes their actual saved preference. hydratedRef
-  // ensures we sync ONCE per user.email so background me re-fetches
-  // don't clobber in-progress tile selections.
-  const hydratedRef = useRef(null);
+  // Sync preferred_payment from user. Two-phase patch (June 2026):
+  //
+  // The previous hydratedRef-keyed-on-email pattern had a race: if
+  // user.email arrived in the first React tick (cached session) but
+  // user.preferred_payment arrived later (fresh profile), the ref
+  // locked on email=present and local state stayed at "cash" default.
+  // Passenger clicked save → PATCH sent "cash" → real preference wiped.
+  //
+  // Fix: only adopt user.preferred_payment when local state is still
+  // at the default "cash" AND user has a non-default preference.
+  // That way:
+  //   - A real saved preference flows in once it arrives, regardless
+  //     of whether email or preference field landed first
+  //   - A passenger who actively clicked "cash" or stayed on default
+  //     isn't disrupted (their selection persists)
+  //   - Re-fetches of `me` don't clobber in-progress tile selections
   useEffect(() => {
     if (!user?.email) return;
-    if (hydratedRef.current === user.email) return;
-    hydratedRef.current = user.email;
-    setPreferred(normalizeLegacy(user.preferred_payment) || "cash");
+    const fromUser = normalizeLegacy(user.preferred_payment);
+    if (!fromUser || fromUser === "cash") return;
+    setPreferred((prev) => (prev === "cash" ? fromUser : prev));
   }, [user?.email, user?.preferred_payment]);
 
   const save = useMutation({

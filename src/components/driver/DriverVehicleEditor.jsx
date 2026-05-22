@@ -27,26 +27,30 @@ export default function DriverVehicleEditor() {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Hydrate form from user when it first arrives. Same fix as
-  // DriverPaymentSetup batch 6: useState initializer only runs on
-  // first render, so if user=undefined (auth still loading), the
-  // form starts with EMPTY_FORM and stays there if the driver
-  // types BEFORE user resolves. Saving then wipes the driver's
-  // car_model / car_year / etc with empty strings.
-  // hydratedRef ensures we only do this once per user.email so a
-  // background re-fetch of 'me' doesn't clobber in-progress edits.
-  const hydratedRef = useRef(null);
+  // Hydrate form from user. Two-phase patch (June 2026):
+  //
+  // The previous hydratedRef-keyed-on-email approach had a race: when
+  // user.email arrives in the first React tick (cached session) but
+  // car_model / car_year / etc arrive in a later tick (fresh profile),
+  // the ref locked on email=present and the form stayed at EMPTY_FORM
+  // forever. Drivers opened the editor, saw blank fields, hit save
+  // "to refresh" → empty values wiped the real car data in DB.
+  //
+  // The fix: merge from user into form ONLY for fields the form
+  // doesn't already have a value for. Never clobber driver edits.
+  // Runs on every dep change, but is idempotent — no patch is built
+  // when every relevant field is already populated.
   useEffect(() => {
     if (!user?.email) return;
-    if (hydratedRef.current === user.email) return;
-    hydratedRef.current = user.email;
-    setForm({
-      car_model:   user.car_model   || "",
-      car_year:    user.car_year    || "",
-      car_color:   user.car_color   || "",
-      car_plate:   user.car_plate   || "",
-      car_image:   user.car_image   || "",
-      driver_note: user.driver_note || "",
+    setForm((prev) => {
+      const patch = {};
+      if (!prev.car_model   && user.car_model)   patch.car_model   = user.car_model;
+      if (!prev.car_year    && user.car_year)    patch.car_year    = user.car_year;
+      if (!prev.car_color   && user.car_color)   patch.car_color   = user.car_color;
+      if (!prev.car_plate   && user.car_plate)   patch.car_plate   = user.car_plate;
+      if (!prev.car_image   && user.car_image)   patch.car_image   = user.car_image;
+      if (!prev.driver_note && user.driver_note) patch.driver_note = user.driver_note;
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
   }, [user?.email, user?.car_model, user?.car_year, user?.car_color,
       user?.car_plate, user?.car_image, user?.driver_note]);

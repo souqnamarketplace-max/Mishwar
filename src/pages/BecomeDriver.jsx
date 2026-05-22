@@ -121,24 +121,34 @@ export default function BecomeDriver() {
     selfie_2_url: "",
   });
 
-  // Hydrate form from server state once it arrives
-  const [hydrated, setHydrated] = useState(false);
+  // Hydrate form from existingLicense. Two-phase patch (June 2026):
+  //
+  // The previous `hydrated` boolean flag had a race: if existingLicense
+  // arrived in two phases (cached partial → fresh full), the form
+  // locked on the first one and never picked up the rest. A driver
+  // resuming a partial submission could see fields that should have
+  // been pre-populated appear blank.
+  //
+  // Fix: merge from existingLicense into form ONLY for fields the
+  // form doesn't already have a value for. Idempotent — no patch is
+  // built when every field is already populated. Never clobbers
+  // edits the user has made in this session.
   useEffect(() => {
-    if (existingLicense && !hydrated) {
-      setForm({
-        license_number: existingLicense.license_number || "",
-        expiry_date: existingLicense.expiry_date || "",
-        car_registration_expiry_date: existingLicense.car_registration_expiry_date || "",
-        insurance_expiry_date: existingLicense.insurance_expiry_date || "",
-        license_image_url: existingLicense.license_image_url || "",
-        car_registration_url: existingLicense.car_registration_url || "",
-        insurance_url: existingLicense.insurance_url || "",
-        selfie_1_url: existingLicense.selfie_1_url || "",
-        selfie_2_url: existingLicense.selfie_2_url || "",
-      });
-      setHydrated(true);
-    }
-  }, [existingLicense, hydrated]);
+    if (!existingLicense) return;
+    setForm((prev) => {
+      const patch = {};
+      if (!prev.license_number               && existingLicense.license_number)               patch.license_number               = existingLicense.license_number;
+      if (!prev.expiry_date                  && existingLicense.expiry_date)                  patch.expiry_date                  = existingLicense.expiry_date;
+      if (!prev.car_registration_expiry_date && existingLicense.car_registration_expiry_date) patch.car_registration_expiry_date = existingLicense.car_registration_expiry_date;
+      if (!prev.insurance_expiry_date        && existingLicense.insurance_expiry_date)        patch.insurance_expiry_date        = existingLicense.insurance_expiry_date;
+      if (!prev.license_image_url            && existingLicense.license_image_url)            patch.license_image_url            = existingLicense.license_image_url;
+      if (!prev.car_registration_url         && existingLicense.car_registration_url)         patch.car_registration_url         = existingLicense.car_registration_url;
+      if (!prev.insurance_url                && existingLicense.insurance_url)                patch.insurance_url                = existingLicense.insurance_url;
+      if (!prev.selfie_1_url                 && existingLicense.selfie_1_url)                 patch.selfie_1_url                 = existingLicense.selfie_1_url;
+      if (!prev.selfie_2_url                 && existingLicense.selfie_2_url)                 patch.selfie_2_url                 = existingLicense.selfie_2_url;
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+  }, [existingLicense]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
