@@ -204,6 +204,40 @@ export default function TripDetails() {
     select: (data) => data?.[0] || null,
   });
 
+  // Fetch driver's trips to calculate real stats (acceptance rate, completed trips)
+  const { data: driverTrips = [] } = useQuery({
+    queryKey: ["driver-trips-stats", tripData?.driver_email],
+    queryFn: async () => {
+      if (!tripData?.driver_email) return [];
+      const { data, error } = await supabase
+        .from("trips")
+        .select("status")
+        .eq("driver_email", tripData.driver_email);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!tripData?.driver_email,
+    staleTime: 60_000,
+  });
+
+  // Calculate real driver stats
+  const driverStats = (() => {
+    const completed = driverTrips.filter(t => t.status === "completed").length;
+    const cancelled = driverTrips.filter(t => t.status === "cancelled").length;
+    const settled = completed + cancelled;
+    
+    // Only show acceptance rate if driver has at least 5 settled trips
+    const acceptanceRate = settled >= 5 
+      ? Math.round((completed / settled) * 100)
+      : null;
+
+    return {
+      completedTrips: completed,
+      acceptanceRate,
+      hasEnoughData: settled >= 5
+    };
+  })();
+
   // ─── Block check ─────────────────────────────────────────────────────
   // True if the current user has blocked the trip's driver, OR the
   // driver has blocked the current user. Used both:
@@ -763,20 +797,19 @@ export default function TripDetails() {
               )}
             </div>
 
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              <div className="text-center p-2 bg-muted/50 rounded-lg">
-                <p className="text-base font-bold text-primary">92%</p>
-                <p className="text-xs text-muted-foreground">معدل القبول</p>
+            {/* Real driver stats - only show if driver has enough data */}
+            {driverStats.hasEnoughData && (
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="text-center p-2 bg-muted/50 rounded-lg">
+                  <p className="text-base font-bold text-primary">{driverStats.acceptanceRate}%</p>
+                  <p className="text-xs text-muted-foreground">معدل الإتمام</p>
+                </div>
+                <div className="text-center p-2 bg-muted/50 rounded-lg">
+                  <p className="text-base font-bold text-primary">{driverStats.completedTrips}</p>
+                  <p className="text-xs text-muted-foreground">رحلة مكتملة</p>
+                </div>
               </div>
-              <div className="text-center p-2 bg-muted/50 rounded-lg">
-                <p className="text-base font-bold text-primary">150+</p>
-                <p className="text-xs text-muted-foreground">رحلة مكتملة</p>
-              </div>
-              <div className="text-center p-2 bg-muted/50 rounded-lg">
-                <p className="text-base font-bold text-primary">سنتان</p>
-                <p className="text-xs text-muted-foreground">خبرة في سيرتنا</p>
-              </div>
-            </div>
+            )}
 
             {/* Car */}
             <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">

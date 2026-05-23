@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart, UserPlus, UserCheck } from "lucide-react";
+import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart, UserPlus, UserCheck, Eye } from "lucide-react";
 import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
 import { api } from "@/api/apiClient";
 import { useFavorite } from "@/lib/favorites";
@@ -87,7 +87,7 @@ function Card({ t, noSeats, urgentSeats }) {
       <div className="pr-4 pl-3 pt-3 pb-3">
 
         {/* ── Badge row — inline, never overlapping ── */}
-        {(urgentSeats || isFemale || isLastChance(t) || isBookingClosed(t)) && (
+        {(urgentSeats || isFemale || isLastChance(t) || isBookingClosed(t) || (t.view_count > 0)) && (
           <div className="flex flex-wrap gap-1.5 mb-2.5">
             {isFemale && (
               <span className="text-[10px] font-bold bg-rose-500 text-white px-2 py-0.5 rounded-full">
@@ -97,6 +97,11 @@ function Card({ t, noSeats, urgentSeats }) {
             {urgentSeats && !noSeats && (
               <span className="flex items-center gap-1 bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
                 <Zap className="w-2.5 h-2.5" />{t.available_seats} مقعد فقط!
+              </span>
+            )}
+            {t.view_count > 0 && (
+              <span className="flex items-center gap-1 bg-blue-500/10 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                <Eye className="w-2.5 h-2.5" />{t.view_count}
               </span>
             )}
             {isBookingClosed(t) ? (
