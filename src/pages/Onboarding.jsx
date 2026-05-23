@@ -226,6 +226,24 @@ export default function Onboarding() {
     },
   });
 
+  // Delete account mutation for users who don't want to complete onboarding
+  // Apple 5.1.1 compliance - must allow account deletion without barriers
+  const deleteAccount = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("delete_account");
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      toast.success("تم حذف حسابك بنجاح");
+      // Sign out and redirect to home
+      await supabase.auth.signOut();
+      navigate("/", { replace: true });
+    },
+    onError: (err) => {
+      toast.error(friendlyError(err, "فشل حذف الحساب"));
+    },
+  });
+
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -805,6 +823,21 @@ export default function Onboarding() {
               <>إنهاء الإعداد <CheckCircle className="w-4 h-4" /></>
             )}
           </Button>
+        </div>
+
+        {/* Delete Account Option - Apple 5.1.1 Compliance */}
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => {
+              if (confirm("هل أنت متأكد من حذف حسابك؟ هذا الإجراء نهائي ولا يمكن التراجع عنه.")) {
+                deleteAccount.mutate();
+              }
+            }}
+            disabled={deleteAccount.isPending}
+            className="text-xs text-muted-foreground hover:text-destructive transition-colors underline disabled:opacity-50"
+          >
+            {deleteAccount.isPending ? "جاري الحذف..." : "لا أرغب في إكمال الإعداد - حذف حسابي"}
+          </button>
         </div>
       </div>
     </div>
