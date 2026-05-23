@@ -27,6 +27,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Check, Image as ImageIcon, Upload, AlertCircle, Sparkles, Car, Shield, IdCard, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { Capacitor } from "@capacitor/core";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -673,6 +675,43 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
   // preview img. Reverts to null while resolving (or on resolve failure),
   // matching the "no value yet" branch below.
   const previewUrl = usePreviewUrl(value);
+  
+  const isSelfie = fieldId?.includes("selfie");
+  const isNative = Capacitor.isNativePlatform();
+
+  // Camera handler for selfies on native platforms
+  const handleCameraCapture = async () => {
+    if (!isNative || !isSelfie) {
+      document.getElementById(fieldId).click();
+      return;
+    }
+    try {
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Camera, // Force camera, skip picker
+      });
+      // Convert webPath to File
+      const response = await fetch(photo.webPath);
+      const blob = await response.blob();
+      const file = new File([blob], `selfie-${Date.now()}.jpg`, { type: "image/jpeg" });
+      onUpload(file);
+    } catch (err) {
+      if (err.message === "User cancelled photos app") return; // User closed camera
+      console.error("Camera capture failed:", err);
+      toast.error("فشل فتح الكاميرا. جرّب مرة أخرى.");
+    }
+  };
+
+  const handleButtonClick = () => {
+    if (isNative && isSelfie) {
+      handleCameraCapture();
+    } else {
+      document.getElementById(fieldId).click();
+    }
+  };
+
   return (
     <div>
       <Label className="text-sm">{label} <span className="text-destructive">*</span></Label>
@@ -697,7 +736,7 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
               <Check className="w-3 h-3" /> تم الرفع
             </p>
             <button
-              onClick={() => document.getElementById(fieldId).click()}
+              onClick={handleButtonClick}
               disabled={uploading}
               className="text-[11px] text-muted-foreground hover:text-foreground underline"
             >
@@ -708,7 +747,7 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
       ) : (
         <button
           type="button"
-          onClick={() => document.getElementById(fieldId).click()}
+          onClick={handleButtonClick}
           disabled={uploading}
           className={`w-full mt-1.5 border-2 border-dashed rounded-xl py-6 text-center transition-colors disabled:opacity-60 ${
             uploading
@@ -725,7 +764,7 @@ function UploadField({ label, value, onUpload, uploading, fieldId, hint }) {
           ) : (
             <>
               <Upload className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
-              <p className="text-sm text-muted-foreground">اضغط لرفع صورة</p>
+              <p className="text-sm text-muted-foreground">{isNative && isSelfie ? "اضغط لفتح الكاميرا" : "اضغط لرفع صورة"}</p>
               <p className="text-[10px] text-muted-foreground/70 mt-0.5">صورة أو PDF — حتى 12 ميجابايت</p>
             </>
           )}
