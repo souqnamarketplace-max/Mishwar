@@ -273,7 +273,16 @@ function App() {
               browsers flip 'right' to the visual left, which is also
               the convention in Arabic UI (away from the user's reading
               flow, anchored at the page corner). */}
-          <SonnerToaster position="top-right" richColors />
+          <SonnerToaster 
+            position="top-right" 
+            richColors 
+            offset="max(env(safe-area-inset-top, 0px), 16px)"
+            toastOptions={{
+              style: {
+                marginTop: 'env(safe-area-inset-top, 0px)'
+              }
+            }}
+          />
         </QueryClientProvider>
       </AuthProvider></ErrorBoundary>
     </HelmetProvider>
