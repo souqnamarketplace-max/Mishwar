@@ -163,11 +163,11 @@ export default function Navbar() {
               // to keep the bell + burger reachable. Login route uses
               // ?signup=1 to land directly on the signup tab.
               <>
-                <Link to="/login" className="hidden sm:inline-flex text-sm font-medium text-muted-foreground hover:text-foreground px-2 py-1.5 rounded-lg transition-colors">
+                <Link to="/login" className="hidden sm:inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground px-3 py-2 rounded-lg transition-colors h-9">
                   تسجيل الدخول
                 </Link>
                 <Link to="/login?signup=1">
-                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl px-3 sm:px-4">
+                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl px-4 h-9">
                     إنشاء حساب
                   </Button>
                 </Link>
