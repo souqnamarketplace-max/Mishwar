@@ -118,6 +118,24 @@ export default function RequestTrip() {
     staleTime: 30_000,
   });
 
+  // ─── "Both" users: gate passenger features on driver license approval
+  // If account_type="both", their driver documents serve as ID verification
+  // for BOTH roles. No duplicate verification — one approval unlocks both.
+  const { data: driverLicense, isLoading: licenseLoading } = useQuery({
+    queryKey: ["driver-license-status", user?.email],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("driver_licenses")
+        .select("status")
+        .eq("driver_email", user.email)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.email && user?.account_type === "both",
+    staleTime: 30_000,
+  });
+
   // NOTE: Auth gate is enforced AFTER all hooks below via the
   // useEffect at the end of this hook list. Doing it inline here as
   // `if (!isAuthenticated) { navigate(...); return null; }` (where it
@@ -213,6 +231,96 @@ export default function RequestTrip() {
         <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // ─── "Both" users with pending driver license: block passenger features
+  // until license approved. Their driver documents verify identity for
+  // BOTH roles — no need to verify twice. Show pending status + link to
+  // check verification progress.
+  if (user?.account_type === "both" && !licenseLoading) {
+    if (!driverLicense || driverLicense.status === "pending") {
+      return (
+        <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+            <ArrowLeft className="w-4 h-4 rotate-180" />
+            رجوع
+          </Link>
+
+          <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-6 mb-5">
+            <div className="flex items-center gap-3 mb-3">
+              <Clock className="w-7 h-7" />
+              <h1 className="text-2xl font-bold">في انتظار توثيق وثائقك</h1>
+            </div>
+            <p className="text-sm leading-relaxed opacity-95">
+              بما أنك قمت بالتسجيل كراكب وسائق معاً، نحتاج أولاً أن نوثق رخصة قيادتك
+              ووثائق سيارتك. بعد الموافقة، ستتمكن من طلب رحلات كراكب ونشر رحلات
+              كسائق — دون الحاجة لتوثيق إضافي.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+            <h3 className="font-bold text-foreground">ماذا بعد؟</h3>
+            <ul className="space-y-2 text-sm text-foreground/80">
+              <li className="flex items-start gap-2">
+                <span className="text-primary shrink-0">✓</span>
+                ستتم مراجعة وثائقك خلال 24 ساعة
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary shrink-0">✓</span>
+                ستصلك إشعارات فورية عند الموافقة
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary shrink-0">✓</span>
+                بعد الموافقة، تستطيع طلب ونشر الرحلات مباشرة
+              </li>
+            </ul>
+            <p className="text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/60">
+              💡 وثائقك تخدم كتوثيق هوية لكلا الخدمتين — لن تحتاج لتوثيق منفصل كراكب.
+            </p>
+            <Link to="/settings?section=verification">
+              <Button className="w-full h-12 text-base font-bold gap-2">
+                <ShieldCheck className="w-5 h-5" />
+                تحقق من حالة التوثيق
+              </Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
+    if (driverLicense.status === "rejected") {
+      return (
+        <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
+          <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+            <ArrowLeft className="w-4 h-4 rotate-180" />
+            رجوع
+          </Link>
+
+          <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl p-6 mb-5">
+            <div className="flex items-center gap-3 mb-3">
+              <AlertCircle className="w-7 h-7" />
+              <h1 className="text-2xl font-bold">تم رفض وثائق القيادة</h1>
+            </div>
+            <p className="text-sm leading-relaxed opacity-95">
+              لم يتم الموافقة على رخصة القيادة أو وثائق السيارة. يرجى مراجعة
+              ملاحظات الإدارة وإعادة تقديم وثائق صحيحة للموافقة.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+            <p className="text-sm text-foreground/80">
+              بعد إعادة تقديم وثائق صحيحة والموافقة عليها، ستتمكن من استخدام
+              التطبيق كراكب وسائق معاً.
+            </p>
+            <Link to="/settings?section=verification">
+              <Button className="w-full h-12 text-base font-bold gap-2" variant="destructive">
+                <ShieldCheck className="w-5 h-5" />
+                مراجعة الوثائق وإعادة التقديم
+              </Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
   }
 
   // ─── ID verification gate (rendered AFTER all hooks to keep hook
