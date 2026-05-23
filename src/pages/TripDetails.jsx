@@ -35,13 +35,6 @@ const amenityIcons = {
   "wifi": Shield,
 };
 
-const whyChoose = [
-  "سائق موثوق ومشهور عالٍ",
-  "أقل سعر متوفر في هذا الوقت",
-  "رحلة مباشرة بدون توقف",
-  "تقييمات ممتازة من الركاب",
-];
-
 export default function TripDetails() {
   // The :id param can be either:
   //   1. A canonical UUID  /trip/e30e8388-4207-...
@@ -892,21 +885,6 @@ export default function TripDetails() {
 
         {/* ===== RIGHT SIDEBAR ===== */}
         <div className="space-y-4">
-          {/* Why choose */}
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h3 className="font-bold text-foreground mb-3">لماذا تختار هذه الرحلة؟</h3>
-            <div className="space-y-2">
-              {whyChoose.map((reason) => (
-                <div key={reason} className="flex items-center gap-2 text-sm">
-                  <div className="w-4 h-4 rounded-full bg-accent/20 flex items-center justify-center shrink-0">
-                    <Check className="w-2.5 h-2.5 text-accent" />
-                  </div>
-                  <span>{reason}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Driver note (right column) */}
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="font-bold text-foreground mb-3">ملاحظة من السائق</h3>
