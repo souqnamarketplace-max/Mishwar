@@ -94,8 +94,8 @@ export default function DashboardLicenses() {
         .eq("id", licenseId);
       if (updErr) throw updErr;
       // Notify driver — use supabase direct (admin RLS path) so the bell
-      // entry gets written and tappable. Includes link straight to driver
-      // dashboard so the driver can immediately start posting trips.
+      // entry gets written and tappable. Link to settings where driver can
+      // see their verified status and access driver features.
       const { error: notifErr } = await supabase
         .from("notifications")
         .insert({
@@ -104,7 +104,7 @@ export default function DashboardLicenses() {
           message: "تم التحقق من جميع وثائقك. يمكنك الآن نشر الرحلات بصفة سائق موثّق.",
           type: "license_approved",
           is_read: false,
-          link: "/driver",
+          link: "/settings?section=verification",
         });
       if (notifErr) console.warn("notif insert error:", notifErr); // non-fatal
     },
