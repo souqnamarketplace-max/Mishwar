@@ -16,7 +16,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
   Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy, Repeat,
-  Briefcase, LayoutDashboard, Trash2
+  Briefcase, LayoutDashboard, Trash2, Eye
 } from "lucide-react";
 import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
 import { MessageCircle } from "lucide-react";
@@ -1022,6 +1022,12 @@ export default function MyTrips() {
                             </div>
                             <div className="flex items-center gap-3">
                               <Badge className={config?.color}>{config?.label}</Badge>
+                              {trip.view_count > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Eye className="w-3.5 h-3.5" />
+                                  <span>{trip.view_count}</span>
+                                </div>
+                              )}
                               <span className="text-xl font-bold text-primary">₪{trip.price}</span>
                             </div>
                           </div>

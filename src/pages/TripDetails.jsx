@@ -140,6 +140,24 @@ export default function TripDetails() {
   // Pre-fetch: from URL when URL is UUID. Post-fetch: from tripData.id.
   const id = preFetchId || tripData?.id || null;
 
+  // Increment view count when trip loads (fire-and-forget)
+  useEffect(() => {
+    if (!id || !tripData) return;
+    // Don't increment for driver viewing their own trip
+    if (user?.email === tripData.driver_email) return;
+    // Don't increment multiple times on re-renders
+    const hasIncremented = sessionStorage.getItem(`trip_viewed_${id}`);
+    if (hasIncremented) return;
+    
+    supabase.rpc("increment_trip_view", { p_trip_id: id })
+      .then(() => {
+        sessionStorage.setItem(`trip_viewed_${id}`, "1");
+      })
+      .catch(() => {
+        // Silent fail - view count is not critical
+      });
+  }, [id, tripData, user?.email]);
+
   // ── 4. Existing booking check (depends on user + resolved trip) ──
   // Fetch ALL bookings this user has made for this trip — newest first.
   // Filter to active (non-cancelled) on the client so a stale cancelled
