@@ -685,11 +685,10 @@ export default function AccountSettings() {
       setActiveSubscription(detectedSub);
 
       // ── Send the user a copy of their data BEFORE we anonymize ─────
-      // Defaults to true; the user can uncheck in the modal. If sending
-      // fails (Resend down, no email on profile, etc.) we surface the
-      // error and ABORT the deletion — the user shouldn't lose their
-      // account AND not get their data. They can retry or untick the
-      // checkbox to proceed without the export.
+      // TEMPORARILY DISABLED: Edge Function failing with 500 error
+      // Re-enable post-launch after fixing send-account-email function
+      // The user can still download their data manually via JSON export button
+      /*
       if (requestDataExport) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -713,17 +712,13 @@ export default function AccountSettings() {
           toast.success("تم إرسال نسخة من بياناتك إلى بريدك الإلكتروني 📧");
         } catch (e) {
           captureException?.(e);
-          // Data export email failed — warn but DON'T block deletion.
-          // The user can still download their data via the separate
-          // "تنزيل بياناتي (JSON)" button. Blocking deletion because
-          // of an email send failure is a worse UX than proceeding
-          // without the email.
           toast.error(
             "تعذر إرسال نسخة البيانات بالبريد، لكن سيتم متابعة حذف الحساب. يمكنك تنزيل بياناتك يدوياً من صفحة الإعدادات.",
             { duration: 7000 },
           );
         }
       }
+      */
 
       // Record intent BEFORE we touch the row, so even if the next step
       // silently fails (e.g. expired session vs RLS), the admin team sees
@@ -893,6 +888,7 @@ export default function AccountSettings() {
       // this BEFORE rotating the email on auth.users (the deletion
       // RPC already ran) but the email field on the JWT-derived
       // profile is still cached client-side, so the call works.
+      /* TEMPORARILY DISABLED: Edge Function failing with 500 error
       try {
         const { data: { session } } = await supabase.auth.getSession();
         const jwt = session?.access_token;
@@ -914,6 +910,7 @@ export default function AccountSettings() {
       } catch (e) {
         captureException?.(e);
       }
+      */
 
       try {
         await api.auth.deleteMe?.();
