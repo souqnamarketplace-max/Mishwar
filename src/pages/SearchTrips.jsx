@@ -102,6 +102,7 @@ export default function SearchTrips() {
           "car_image",
           "distance",
           "payment_methods",
+          "view_count",
         ].join(","))
         .in("status", ["confirmed", "in_progress"])
         .gte("date", today)
