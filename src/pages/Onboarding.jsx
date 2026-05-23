@@ -169,6 +169,7 @@ export default function Onboarding() {
           insurance_expiry_date:        form.insurance_expiry || null,
           insurance_url:                form.insurance_url    || null,
           selfie_1_url:                 form.selfie_url       || null,
+          selfie_2_url:                 null,  // Not collected in current onboarding flow
           status: "pending",
           submitted_at: new Date().toISOString(),
         });
