@@ -671,7 +671,7 @@ export default function AccountSettings() {
       try {
         const { data: subs, error: subErr } = await supabase
           .from("driver_subscriptions")
-          .select("id, period_end, plan_name, status")
+          .select("id, period_end, status")
           .eq("driver_email", user.email)
           .in("status", ["active", "pending"])
           .order("period_end", { ascending: false })
@@ -1727,7 +1727,7 @@ export default function AccountSettings() {
                     try {
                       const { data: subs } = await supabase
                         .from("driver_subscriptions")
-                        .select("id, period_end, plan_name, status")
+                        .select("id, period_end, status")
                         .eq("driver_email", user.email)
                         .in("status", ["active", "pending"])
                         .order("period_end", { ascending: false })
