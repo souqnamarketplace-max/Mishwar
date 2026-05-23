@@ -100,7 +100,7 @@ function Card({ t, noSeats, urgentSeats }) {
               </span>
             )}
             {t.view_count > 0 && (
-              <span className="flex items-center gap-1 bg-blue-500/10 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+              <span className="flex items-center gap-1 bg-slate-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                 <Eye className="w-2.5 h-2.5" />{t.view_count}
               </span>
             )}

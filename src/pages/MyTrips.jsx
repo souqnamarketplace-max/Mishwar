@@ -1023,7 +1023,7 @@ export default function MyTrips() {
                             <div className="flex items-center gap-3">
                               <Badge className={config?.color}>{config?.label}</Badge>
                               {trip.view_count > 0 && (
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1 text-xs font-semibold text-slate-600">
                                   <Eye className="w-3.5 h-3.5" />
                                   <span>{trip.view_count}</span>
                                 </div>

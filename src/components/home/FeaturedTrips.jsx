@@ -116,7 +116,7 @@ function FeaturedCard({ trip, index }) {
 
             {/* View count badge */}
             {trip.view_count > 0 && (
-              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-blue-500/20 text-blue-700 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-slate-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
                 <Eye className="w-2.5 h-2.5" />{trip.view_count}
               </div>
             )}
