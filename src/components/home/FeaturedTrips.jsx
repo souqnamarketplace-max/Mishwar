@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { isTripExpired } from "@/lib/tripScheduling";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2 } from "lucide-react";
+import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -113,6 +113,13 @@ function FeaturedCard({ trip, index }) {
                 </div>
               : null
             }
+
+            {/* View count badge */}
+            {trip.view_count > 0 && (
+              <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-blue-500/20 text-blue-700 text-[9px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm">
+                <Eye className="w-2.5 h-2.5" />{trip.view_count}
+              </div>
+            )}
           </div>
 
           {/* ── Card body ── */}
