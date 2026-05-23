@@ -16,7 +16,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Car, MapPin, Clock, Star, Users, ArrowLeft, Download,
   Search, CheckCircle, AlertCircle, XCircle, Navigation, Loader2, Copy, Repeat,
-  Briefcase, LayoutDashboard
+  Briefcase, LayoutDashboard, Trash2
 } from "lucide-react";
 import PassengerReviewWizard from "../components/reviews/PassengerReviewWizard";
 import { MessageCircle } from "lucide-react";
@@ -49,6 +49,29 @@ export default function MyTrips() {
 
   const navigate = useNavigate();
   const [confirmCancel, setConfirmCancel] = useState({ open: false, bookingId: null, reason: "" });
+  const [selectedTrips, setSelectedTrips] = useState(new Set()); // For bulk delete
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, tripId: null, isBulk: false });
+
+  // Helper functions for trip selection
+  const toggleTripSelection = (tripId) => {
+    setSelectedTrips(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tripId)) {
+        newSet.delete(tripId);
+      } else {
+        newSet.add(tripId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllCancelled = (cancelledTrips) => {
+    setSelectedTrips(new Set(cancelledTrips.map(t => t.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedTrips(new Set());
+  };
   const [searchParams] = useSearchParams();
   // Read the tab from the URL on initial render so deep-links from
   // notifications work: '/my-trips?tab=confirmed' lands on the upcoming
@@ -202,6 +225,50 @@ export default function MyTrips() {
       } catch (e) { console.warn("[Notif] booking_cancelled:", e?.message); }
     },
     onError: (err) => toast.error(friendlyError(err, "فشل إلغاء الحجز")),
+  });
+
+  // Delete cancelled trips mutation
+  const deleteTripMutation = useMutation({
+    mutationFn: async (tripIds) => {
+      // Accept single trip ID or array of IDs for bulk delete
+      const ids = Array.isArray(tripIds) ? tripIds : [tripIds];
+      const results = await Promise.allSettled(
+        ids.map(id => supabase.rpc("delete_cancelled_trip", { p_trip_id: id }))
+      );
+      
+      const failures = results.filter(r => r.status === "rejected");
+      if (failures.length > 0 && failures.length === ids.length) {
+        // All failed
+        throw new Error(failures[0].reason?.message || "فشل حذف الرحلات");
+      }
+      
+      return { 
+        success: results.filter(r => r.status === "fulfilled").length,
+        failed: failures.length,
+        total: ids.length
+      };
+    },
+    onSuccess: (result) => {
+      // Invalidate trip caches
+      qc.invalidateQueries({ queryKey: ["my-booked-trips"] });
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      qc.invalidateQueries({ queryKey: ["driver-trips"] });
+      
+      // Clear selection
+      setSelectedTrips(new Set());
+      setDeleteConfirm({ open: false, tripId: null, isBulk: false });
+      
+      // Success message
+      if (result.failed > 0) {
+        toast.success(`تم حذف ${result.success} من ${result.total} رحلة`);
+      } else {
+        toast.success(result.total === 1 ? "تم حذف الرحلة" : `تم حذف ${result.total} رحلات`);
+      }
+    },
+    onError: (err) => {
+      toast.error(friendlyError(err, "فشل حذف الرحلة"));
+      setDeleteConfirm({ open: false, tripId: null, isBulk: false });
+    },
   });
 
   const { user } = useAuth();
@@ -432,8 +499,8 @@ export default function MyTrips() {
   // state ("you have rows in OTHER tabs"): we want to count within
   // the current role view, not across both roles.
   const roleFiltered = (isBoth && roleFilter !== "all")
-    ? trips.filter(t => tripRole(t) === roleFilter)
-    : trips;
+    ? trips.filter(t => tripRole(t) === roleFilter && !t.deleted_at)
+    : trips.filter(t => !t.deleted_at);
   const filtered = activeTab === "all"
     ? roleFiltered
     : roleFiltered.filter((t) => effectiveStatus(t) === activeTab);
@@ -724,10 +791,48 @@ export default function MyTrips() {
             const config = statusConfig[status];
             return (
               <div key={status}>
-                <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                  {config?.label || status}
-                  <span className="text-sm font-normal text-muted-foreground">({statusTrips.length})</span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-foreground flex items-center gap-2">
+                    {config?.label || status}
+                    <span className="text-sm font-normal text-muted-foreground">({statusTrips.length})</span>
+                  </h3>
+                  
+                  {/* Bulk delete controls for cancelled trips */}
+                  {status === "cancelled" && statusTrips.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      {selectedTrips.size > 0 ? (
+                        <>
+                          <span className="text-sm text-muted-foreground">
+                            {selectedTrips.size} محددة
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={clearSelection}
+                          >
+                            إلغاء التحديد
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => setDeleteConfirm({ open: true, tripId: null, isBulk: true })}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            حذف المحددة
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => selectAllCancelled(statusTrips)}
+                        >
+                          تحديد الكل
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-3">
                   {statusTrips.map((trip) => {
                     // Role classification — drives the top-strip color
@@ -741,6 +846,9 @@ export default function MyTrips() {
                     // categories ("Inbox" / "Spam" / "Promotions").
                     const role = tripRole(trip);
                     const showRoleStrip = isBoth;
+                    const isCancelled = status === "cancelled";
+                    const isSelected = selectedTrips.has(trip.id);
+                    
                     return (
                     <div
                       key={trip.id}
@@ -751,6 +859,32 @@ export default function MyTrips() {
                           : ""
                       }`}
                     >
+                      {/* Delete controls for cancelled trips */}
+                      {isCancelled && (
+                        <div className="flex items-center justify-between mb-2 px-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleTripSelection(trip.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm text-muted-foreground">تحديد</span>
+                          </label>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setDeleteConfirm({ open: true, tripId: trip.id, isBulk: false });
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            حذف
+                          </Button>
+                        </div>
+                      )}
                       <Link to={`/trip/${trip.id}`}>
                         <div className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-md transition-all">
                           {/* Top role strip — clear, prominent role
@@ -1241,6 +1375,48 @@ export default function MyTrips() {
               disabled={cancelBookingMutation.isPending}
             >
               نعم، ألغِ الحجز
+            </button>
+          </div>
+        </div>
+      </div>
+      </ModalPortal>
+    )}
+
+    {/* Delete confirmation modal */}
+    {deleteConfirm.open && (
+      <ModalPortal>
+      <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4" onClick={() => setDeleteConfirm({ open: false, tripId: null, isBulk: false })}>
+        <div onClick={e => e.stopPropagation()} className="bg-card rounded-2xl p-6 max-w-sm w-full shadow-2xl" dir="rtl">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center mb-4">
+            <Trash2 className="w-6 h-6 text-red-600" />
+          </div>
+          <h3 className="text-lg font-bold text-foreground mb-2">
+            {deleteConfirm.isBulk ? 'حذف الرحلات المحددة؟' : 'حذف هذه الرحلة؟'}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            {deleteConfirm.isBulk 
+              ? `سيتم حذف ${selectedTrips.size} رحلة من سجلك. هذا الإجراء لا يمكن التراجع عنه.`
+              : 'سيتم حذف هذه الرحلة من سجلك. هذا الإجراء لا يمكن التراجع عنه.'
+            }
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setDeleteConfirm({ open: false, tripId: null, isBulk: false })}
+              className="flex-1 px-4 py-2.5 bg-secondary text-secondary-foreground rounded-xl font-bold text-sm"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={() => {
+                const idsToDelete = deleteConfirm.isBulk 
+                  ? Array.from(selectedTrips)
+                  : [deleteConfirm.tripId];
+                deleteTripMutation.mutate(idsToDelete);
+              }}
+              className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700"
+              disabled={deleteTripMutation.isPending}
+            >
+              {deleteTripMutation.isPending ? 'جاري الحذف...' : 'نعم، احذف'}
             </button>
           </div>
         </div>
