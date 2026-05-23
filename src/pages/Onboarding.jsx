@@ -158,6 +158,7 @@ export default function Onboarding() {
       // Create driver license for drivers (validation moved above)
       if (accountType === "driver" || accountType === "both") {
         await api.entities.DriverLicense.create({
+          user_id:                      user?.id,         // Required FK to auth.users
           driver_email:                 user?.email,
           driver_name:                  user?.full_name,
           license_number:               form.license_number,
