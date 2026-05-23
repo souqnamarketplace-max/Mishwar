@@ -756,11 +756,11 @@ export default function Onboarding() {
                   }} />
                 </div>
 
-                {/* Amber warning — only shown after license image is uploaded */}
+                {/* Info box — shown after license image is uploaded */}
                 {form.license_image_url && (
-                  <div className="p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-                    <p className="text-sm text-yellow-700 font-medium">⏳ في انتظار التحقق</p>
-                    <p className="text-xs text-yellow-600 mt-1">سيتم مراجعة وثائقك من قِبل الفريق خلال 24 ساعة. لن تتمكن من نشر رحلات قبل الموافقة.</p>
+                  <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                    <p className="text-sm text-blue-700 font-medium">📋 أكمل الخطوات المتبقية</p>
+                    <p className="text-xs text-blue-600 mt-1">بعد إنهاء جميع الخطوات، سيتم إرسال وثائقك للمراجعة خلال 24 ساعة.</p>
                   </div>
                 )}
               </div>
