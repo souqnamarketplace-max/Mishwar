@@ -1,4 +1,5 @@
 import { CITIES } from "@/lib/cities";
+import { CAR_BRANDS } from "@/lib/carModels";
 import { captureException } from "@/lib/sentry";
 import { todayISO } from "@/lib/validation";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
@@ -86,10 +87,12 @@ export default function Onboarding() {
   const { refreshUser } = useAuth();
   const [step, setStep] = useState(0);
   const [accountType, setAccountType] = useState(null); // "passenger" | "driver" | "both"
+  const [customCarModel, setCustomCarModel] = useState(false); // Toggle for custom car model input
   const [form, setForm] = useState({ 
     phone: "", 
     city: "", 
-    bio: "", 
+    bio: "",
+    gender: "", // Required for all users at step 1
     car_model: "", 
     car_year: "", 
     car_color: "", 
@@ -265,10 +268,24 @@ export default function Onboarding() {
     }
     if (step === 2 && isDriver) {
       if (!form.car_model) { toast.error("يرجى إدخال موديل السيارة ⚠️"); return false; }
+      if (!form.car_year) { toast.error("يرجى إدخال سنة الصنع ⚠️"); return false; }
+      // Validate car year is numeric and reasonable
+      const yearNum = parseInt(form.car_year);
+      const currentYear = new Date().getFullYear();
+      if (isNaN(yearNum) || yearNum < 1950 || yearNum > currentYear) {
+        toast.error(`سنة الصنع يجب أن تكون بين 1950 و ${currentYear} ⚠️`);
+        return false;
+      }
+      if (!form.car_color) { toast.error("يرجى إدخال لون السيارة ⚠️"); return false; }
       if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
     }
     if (step === 3 && isDriver) {
       if (!form.license_number) { toast.error("يرجى إدخال رقم الرخصة ⚠️"); return false; }
+      // Validate license is alphanumeric (letters + numbers, no special chars except dash/space)
+      if (!/^[a-zA-Z0-9\s\-]+$/.test(form.license_number)) {
+        toast.error("رقم الرخصة يجب أن يحتوي على أحرف وأرقام فقط ⚠️");
+        return false;
+      }
       if (!form.license_expiry) { toast.error("يرجى تحديد تاريخ انتهاء الرخصة ⚠️"); return false; }
       if (!form.license_image_url) { toast.error("يرجى رفع صورة الرخصة ⚠️"); return false; }
     }
@@ -508,16 +525,61 @@ export default function Onboarding() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-sm font-medium mb-1 block">موديل السيارة <span className="text-destructive">*</span></label>
-                      <Input placeholder="مثال: كيا سبورتاج" value={form.car_model} onChange={(e) => setForm({ ...form, car_model: e.target.value })} className="rounded-xl" />
+                      {!customCarModel ? (
+                        <select 
+                          value={form.car_model} 
+                          onChange={(e) => {
+                            if (e.target.value === "غير مدرج (اكتب يدوياً)") {
+                              setCustomCarModel(true);
+                              setForm({ ...form, car_model: "" });
+                            } else {
+                              setForm({ ...form, car_model: e.target.value });
+                            }
+                          }}
+                          className="w-full h-10 px-3 rounded-xl border border-input bg-background text-sm"
+                        >
+                          <option value="">اختر الموديل</option>
+                          {CAR_BRANDS.map(brand => (
+                            <option key={brand} value={brand}>{brand}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="relative">
+                          <Input 
+                            placeholder="اكتب موديل السيارة" 
+                            value={form.car_model} 
+                            onChange={(e) => setForm({ ...form, car_model: e.target.value })} 
+                            className="rounded-xl" 
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomCarModel(false);
+                              setForm({ ...form, car_model: "" });
+                            }}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-primary hover:underline"
+                          >
+                            عودة للقائمة
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1 block">سنة الصنع</label>
-                      <Input placeholder="مثال: 2020" value={form.car_year} onChange={(e) => setForm({ ...form, car_year: e.target.value })} className="rounded-xl" />
+                      <label className="text-sm font-medium mb-1 block">سنة الصنع <span className="text-destructive">*</span></label>
+                      <Input 
+                        type="number" 
+                        placeholder="مثال: 2020" 
+                        value={form.car_year} 
+                        onChange={(e) => setForm({ ...form, car_year: e.target.value })} 
+                        className="rounded-xl"
+                        min="1950"
+                        max={new Date().getFullYear()}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium mb-1 block">لون السيارة</label>
+                      <label className="text-sm font-medium mb-1 block">لون السيارة <span className="text-destructive">*</span></label>
                       <Input placeholder="مثال: فضي" value={form.car_color} onChange={(e) => setForm({ ...form, car_color: e.target.value })} className="rounded-xl" />
                     </div>
                     <div>
