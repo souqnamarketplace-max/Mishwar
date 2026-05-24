@@ -1,5 +1,11 @@
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useCanSeeDebugDetails } from '@/hooks/useCanSeeDebugDetails';
+import { inject } from '@vercel/analytics';
+
+// Initialize Vercel Analytics for page view + route change tracking.
+// inject() is idempotent and attaches listeners for SPA route changes,
+// so it only needs to be called once at module load.
+inject();
 
 // Per-page error fallback (smaller than full-page).
 // `error` and `componentStack` are injected by ErrorBoundary via cloneElement

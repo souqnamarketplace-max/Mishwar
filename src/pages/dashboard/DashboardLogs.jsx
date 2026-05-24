@@ -33,6 +33,113 @@ const TYPE_FILTERS = [
   { id: "report",   label: "البلاغات" },
 ];
 
+// Arabic labels for every audit `action` code logged by the app. Source
+// codes are canonical snake_case English so server-side search/grep
+// stays sane — but admins see them in Arabic. New action codes that
+// aren't in this map fall through to a prettified version of the raw
+// code (snake_case → "Title Case"), so adding new actions doesn't
+// require a code change to keep the log readable. The raw code is also
+// preserved in parentheses in the expanded detail view so anyone
+// debugging can still grep / search by the original identifier.
+//
+// Keep this list synced with every logAdminAction() / logAudit() call
+// site. Search the repo for those calls to find the full set.
+const ACTION_LABELS = {
+  // Bookings
+  booking_created:                "إنشاء حجز",
+  booking_confirmed:              "تأكيد حجز",
+  booking_cancelled_by_passenger: "إلغاء حجز من الراكب",
+  driver_confirm_booking:         "تأكيد السائق للحجز",
+  driver_reject_booking:          "رفض السائق للحجز",
+  driver_cancel_confirmed_booking:"إلغاء السائق لحجز مؤكد",
+  admin_update_booking_status:    "تحديث حالة حجز (إداري)",
+
+  // Trips
+  trip_created:                   "إنشاء رحلة",
+  trip_request_created:           "طلب رحلة من راكب",
+  driver_start_trip:              "بدء الرحلة",
+  driver_complete_trip:           "إتمام الرحلة",
+  driver_cancel_trip:             "إلغاء السائق للرحلة",
+  driver_change_trip_time:        "تعديل توقيت الرحلة",
+  driver_delete_trip:             "حذف رحلة من السائق",
+  delete_trip:                    "حذف رحلة",
+  admin_delete_trip:              "حذف رحلة (إداري)",
+  admin_cancel_trip_request:      "إلغاء طلب رحلة (إداري)",
+
+  // Reviews
+  driver_review_submitted:        "تقييم سائق",
+  passenger_review_submitted:     "تقييم راكب",
+
+  // Licenses / verifications
+  driver_license_approved:        "قبول رخصة سائق",
+  driver_license_rejected:        "رفض رخصة سائق",
+  passenger_verification_submitted:"طلب توثيق راكب",
+
+  // Subscriptions / payments
+  subscription_requested:         "طلب اشتراك",
+  subscription_approved:          "قبول اشتراك",
+  subscription_rejected:          "رفض اشتراك",
+  subscription_granted:           "منح اشتراك",
+  subscription_bulk_granted:      "منح اشتراكات جماعي",
+  admin_mark_payment:             "تأكيد دفعة (إداري)",
+
+  // Cities
+  city_suggested:                 "اقتراح مدينة",
+  city_suggestion_approved:       "قبول اقتراح مدينة",
+  city_suggestion_rejected:       "رفض اقتراح مدينة",
+  city_added_directly:            "إضافة مدينة مباشرة",
+
+  // Users / moderation
+  user_block:                     "حظر مستخدم",
+  admin_clear_strikes:            "مسح المخالفات (إداري)",
+  admin_update_user:              "تحديث بيانات مستخدم (إداري)",
+  onboarding_completed:           "إكمال التسجيل",
+
+  // Reports / feedback
+  report_filed:                   "تقديم بلاغ",
+  feedback_submitted:             "إرسال شكوى/اقتراح",
+};
+
+// Arabic labels for the `target_type` shown in the expanded detail row
+// (covers types that appear there as raw strings: trip, booking, user,
+// review, report, feedback, city, license, subscription, payment,
+// system). Keeps the existing typeConfig.label mapping in sync.
+const TARGET_TYPE_LABELS = {
+  booking:      "حجز",
+  trip:         "رحلة",
+  review:       "تقييم",
+  user:         "مستخدم",
+  feedback:     "اقتراح/شكوى",
+  report:       "بلاغ",
+  payment:      "دفعة",
+  system:       "نظام",
+  city:         "مدينة",
+  license:      "رخصة",
+  subscription: "اشتراك",
+};
+
+// Best-effort fallback for an action code we haven't translated yet:
+// turn `admin_clear_strikes` into "Admin Clear Strikes". Better than
+// nothing while we incrementally fill the dict. The raw code remains
+// available in the expanded detail panel for debugging.
+function prettifyActionCode(code) {
+  if (!code) return "—";
+  return String(code)
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function formatAction(action) {
+  if (!action) return "—";
+  return ACTION_LABELS[action] || prettifyActionCode(action);
+}
+
+function formatTargetType(t) {
+  if (!t) return "—";
+  return TARGET_TYPE_LABELS[t] || t;
+}
+
 // Audit-only type chips — these target_type values only appear in the
 // admin-trail RPC, never in the user-activity feed. They were already
 // recognised by typeConfig for icon/colour rendering, but couldn't be
@@ -410,7 +517,7 @@ export default function DashboardLogs() {
                       <Icon className="w-3.5 h-3.5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-foreground font-medium truncate">{log.action}</p>
+                      <p className="text-xs text-foreground font-medium truncate">{formatAction(log.action)}</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         {log.admin_email} · {new Date(log.created_at).toLocaleString("ar", { dateStyle: "short", timeStyle: "short" })}
                       </p>
@@ -422,8 +529,18 @@ export default function DashboardLogs() {
                   {open && (
                     <div className="px-3 pb-3 bg-muted/20 border-t border-border">
                       <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 mt-2 text-[11px]">
-                        <div><dt className="text-muted-foreground inline">الإجراء: </dt><dd className="inline font-medium">{log.action}</dd></div>
-                        <div><dt className="text-muted-foreground inline">المستهدف: </dt><dd className="inline">{log.target_type || "—"} {log.target_id ? `· ${log.target_id}` : ""}</dd></div>
+                        <div>
+                          <dt className="text-muted-foreground inline">الإجراء: </dt>
+                          <dd className="inline font-medium">
+                            {formatAction(log.action)}
+                            {ACTION_LABELS[log.action] && (
+                              <span className="text-muted-foreground font-normal ml-1" dir="ltr">
+                                ({log.action})
+                              </span>
+                            )}
+                          </dd>
+                        </div>
+                        <div><dt className="text-muted-foreground inline">المستهدف: </dt><dd className="inline">{formatTargetType(log.target_type)} {log.target_id ? `· ${log.target_id}` : ""}</dd></div>
                         <div><dt className="text-muted-foreground inline">المسؤول: </dt><dd className="inline">{log.admin_email}</dd></div>
                         <div><dt className="text-muted-foreground inline">التوقيت: </dt><dd className="inline">{new Date(log.created_at).toLocaleString("ar")}</dd></div>
                       </dl>
@@ -461,7 +578,7 @@ export default function DashboardLogs() {
                     onClick={() => { setSearchText(a.action); resetPage(); }}
                     className="px-2 py-1 rounded-lg bg-muted/40 hover:bg-muted text-[11px]"
                   >
-                    {a.action} <span className="text-muted-foreground">({a.count})</span>
+                    {formatAction(a.action)} <span className="text-muted-foreground">({a.count})</span>
                   </button>
                 ))}
               </div>
