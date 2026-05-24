@@ -73,15 +73,17 @@ export default function DateInput({ value, onChange, className = "", min, max, p
         onChange={onChange}
         min={min}
         max={max}
-        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+        className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
         style={{ colorScheme: "light" }}
       />
 
       {/* Visual display layer */}
-      <Calendar className="w-4 h-4 text-muted-foreground shrink-0 mr-2 ml-1" />
-      <span className={`text-sm select-none ${value ? "text-foreground font-medium" : "text-muted-foreground"}`}>
-        {formatted || placeholder}
-      </span>
+      <div className="relative z-0 flex items-center w-full pointer-events-none">
+        <Calendar className="w-4 h-4 text-muted-foreground shrink-0 mr-2 ml-1" />
+        <span className={`text-sm select-none ${value ? "text-foreground font-medium" : "text-muted-foreground"}`}>
+          {formatted || placeholder}
+        </span>
+      </div>
     </div>
   );
 }
