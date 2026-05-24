@@ -48,6 +48,31 @@ export default function AccountSettings() {
   const [avatar, setAvatar] = useState(user?.avatar_url || "");
   const [avatarLoading, setAvatarLoading] = useState(false);
 
+  // Scroll to URL hash anchor on mount (e.g. /account-settings/profile#license
+  // from the vehicle re-verification banner). Uses a small delay so the
+  // license section has mounted before we try to scroll to it. Otherwise
+  // the element doesn't exist yet and the browser silently no-ops.
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (!hash) return;
+    const targetId = hash.slice(1); // strip "#"
+    
+    // Try multiple times with backoff — the license card is gated behind
+    // a query that may not have resolved on first paint.
+    let attempts = 0;
+    const tryScroll = () => {
+      const el = document.getElementById(targetId);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (attempts++ < 10) {
+        setTimeout(tryScroll, 200);
+      }
+    };
+    setTimeout(tryScroll, 100);
+  }, []);
+
   // Sync form with user data
   // Driver License query
   const { data: license } = useQuery({
@@ -1354,7 +1379,29 @@ export default function AccountSettings() {
         )}
 
         {user?.account_type && (user.account_type === "driver" || user.account_type === "both") && (
-          <div className="bg-card rounded-2xl border border-border p-6 space-y-4">
+          <div id="license" className="bg-card rounded-2xl border border-border p-6 space-y-4 scroll-mt-24">
+            {/* Re-verification alert when driver changed vehicle */}
+            {user.verification_pending && (
+              <div className="bg-red-500/10 border-2 border-red-500/40 rounded-xl p-4 flex items-start gap-3 animate-pulse">
+                <span className="text-2xl shrink-0" aria-hidden="true">⚠️</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-red-900 dark:text-red-200 mb-1">
+                    مطلوب: تحديث وثائق المركبة الجديدة
+                  </p>
+                  <p className="text-xs text-red-800/85 dark:text-red-300/85 leading-relaxed">
+                    قمت بتغيير بيانات مركبتك. تم مسح وثائق التأمين والترخيص القديمة (لأنها للمركبة السابقة). يرجى:
+                    <br />
+                    1️⃣ رفع <strong>صورة ترخيص المركبة الجديدة</strong>
+                    <br />
+                    2️⃣ رفع <strong>صورة التأمين الجديد</strong>
+                    <br />
+                    3️⃣ تحديث <strong>تاريخ انتهاء التسجيل والتأمين</strong>
+                    <br />
+                    4️⃣ الضغط على "حفظ وإرسال للمراجعة" في الأسفل
+                  </p>
+                </div>
+              </div>
+            )}
             <h3 className="font-bold text-foreground flex items-center gap-2">
               <Shield className="w-4 h-4 text-primary" />
               توثيق السائق

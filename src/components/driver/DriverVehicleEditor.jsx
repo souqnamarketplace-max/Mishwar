@@ -92,6 +92,49 @@ export default function DriverVehicleEditor() {
       
       // Send notifications when vehicle changes (requires re-verification)
       if (vehicleChanged && user?.email) {
+        // CLEAR old vehicle-specific documents from driver_licenses.
+        // This is critical: the old "approved" license was for the OLD car.
+        // For the NEW car, driver must re-upload registration + insurance
+        // (license_image_url + selfies stay - they're about the person, not the car).
+        //
+        // We also reset status to "pending" so:
+        // 1. The eligibility check blocks trip creation (defense in depth)
+        // 2. The verification card shows "قيد المراجعة" instead of "موثّق"
+        // 3. The license row reappears in the admin approval queue
+        try {
+          // Find the latest license row for this user
+          const { data: existingLicenses, error: fetchErr } = await supabase
+            .from("driver_licenses")
+            .select("id")
+            .eq("driver_email", user.email)
+            .order("created_date", { ascending: false })
+            .limit(1);
+          
+          if (fetchErr) throw fetchErr;
+          
+          if (existingLicenses && existingLicenses.length > 0) {
+            const licenseId = existingLicenses[0].id;
+            const { error: updateErr } = await supabase
+              .from("driver_licenses")
+              .update({
+                status: "incomplete", // Forces driver to complete + resubmit
+                car_registration_image_url: null,
+                insurance_image_url: null,
+                car_registration_expiry_date: null,
+                insurance_expiry_date: null,
+                approved_at: null,
+                approved_by: null,
+                rejection_reason: "تم تغيير بيانات المركبة — يجب رفع وثائق التأمين والترخيص الجديدة",
+              })
+              .eq("id", licenseId);
+            
+            if (updateErr) console.warn("license clear error:", updateErr);
+          }
+        } catch (e) {
+          console.warn("failed to clear old vehicle docs:", e);
+          // Non-fatal - verification_pending flag still blocks trip posting
+        }
+        
         // Notification to driver: in-app bell entry as a persistent record
         // (the toast is transient - this stays in their notifications list)
         const { error: notifErr } = await supabase
@@ -122,6 +165,8 @@ export default function DriverVehicleEditor() {
       }
       
       await qc.invalidateQueries({ queryKey: ["me"] });
+      await qc.invalidateQueries({ queryKey: ["driver-license"] });
+      await qc.invalidateQueries({ queryKey: ["licenses"] });
       // Force wait for user data to refresh before showing toast
       await new Promise(resolve => setTimeout(resolve, 300));
       
