@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import AccountHubItem from "./AccountHubItem";
 import PreferencesSection from "./PreferencesSection";
-import VehicleDetailsSection from "./VehicleDetailsSection";
 import NotificationPrefsSection from "./NotificationPrefsSection";
 import VerificationStatusSection from "./VerificationStatusSection";
 import PassengerPaymentsSection from "./PassengerPaymentsSection";
@@ -52,7 +51,6 @@ export default function AccountHub() {
   if (section) {
     const titles = {
       preferences:  "التفضيلات",
-      vehicle:      "تفاصيل السيارة",
       notifications:"إعدادات الإشعارات",
       verification: "التحقق من الهوية",
       payments:     "سجل المدفوعات",
@@ -74,7 +72,6 @@ export default function AccountHub() {
 
         <div className="bg-card border border-border rounded-2xl p-5">
           {section === "preferences"  && <PreferencesSection user={user} onSaved={refreshUser} />}
-          {section === "vehicle"      && <VehicleDetailsSection user={user} onSaved={refreshUser} />}
           {section === "notifications"&& <NotificationPrefsSection user={user} onSaved={refreshUser} />}
           {section === "verification" && <VerificationStatusSection user={user} />}
           {section === "payments"     && <PassengerPaymentsSection user={user} />}
@@ -155,10 +152,6 @@ export default function AccountHub() {
 
         <AccountHubItem icon={Bell} label="إعدادات الإشعارات" sublabel="Push، SMS، البريد، التسويق" onClick={() => setSection("notifications")} />
         <AccountHubItem icon={Sparkles} label="التفضيلات" sublabel="التدخين، المحادثة، الحيوانات الأليفة" onClick={() => setSection("preferences")} />
-
-        {isDriver && (
-          <AccountHubItem icon={Car} label="تفاصيل السيارة" sublabel="حجم الأمتعة، المقعد الخلفي" onClick={() => setSection("vehicle")} />
-        )}
 
         <AccountHubItem icon={CreditCard} label="سجل المدفوعات" sublabel="حجوزاتك السابقة والمدفوعة" onClick={() => setSection("payments")} />
 

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Car, Save, Camera, Loader2 } from "lucide-react";
+import { Car, Save, Camera, Loader2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ const COLORS = ["أبيض", "أسود", "فضي", "رمادي", "أحمر", "أ�
 const EMPTY_FORM = {
   car_model: "", car_year: "", car_color: "",
   car_plate: "", car_image: "", driver_note: "",
+  vehicle_capacity: null, vehicle_luggage: "m",
 };
 
 export default function DriverVehicleEditor() {
@@ -50,19 +51,50 @@ export default function DriverVehicleEditor() {
       if (!prev.car_plate   && user.car_plate)   patch.car_plate   = user.car_plate;
       if (!prev.car_image   && user.car_image)   patch.car_image   = user.car_image;
       if (!prev.driver_note && user.driver_note) patch.driver_note = user.driver_note;
+      if (prev.vehicle_capacity === null && user.vehicle_capacity) patch.vehicle_capacity = user.vehicle_capacity;
+      if (!prev.vehicle_luggage && user.vehicle_luggage) patch.vehicle_luggage = user.vehicle_luggage;
       return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
   }, [user?.email, user?.car_model, user?.car_year, user?.car_color,
-      user?.car_plate, user?.car_image, user?.driver_note]);
+      user?.car_plate, user?.car_image, user?.driver_note, 
+      user?.vehicle_capacity, user?.vehicle_luggage]);
 
   const set = (key, val) => setForm((prev) => ({ ...prev, [key]: val }));
 
   const handleSave = async () => {
+    // Validation: capacity is required
+    if (!form.vehicle_capacity) {
+      toast.error("يرجى اختيار عدد المقاعد الكلي");
+      return;
+    }
+    
     setSaving(true);
     try {
-      await api.auth.updateMe(form);
+      // Check if vehicle identity changed (new car = need re-verification)
+      const vehicleChanged = 
+        (user?.car_model && user.car_model !== form.car_model) ||
+        (user?.car_year && user.car_year !== form.car_year) ||
+        (user?.car_plate && user.car_plate !== form.car_plate);
+      
+      // If vehicle changed, require new insurance + registration verification
+      const payload = { ...form };
+      if (vehicleChanged) {
+        payload.verification_pending = true;
+        payload.vehicle_insurance = null; // Clear old vehicle's insurance
+        payload.vehicle_registration = null; // Clear old vehicle's registration
+        // Keep driver_license - it stays with the person, not the vehicle
+      }
+      
+      await api.auth.updateMe(payload);
       qc.invalidateQueries({ queryKey: ["me"] });
-      toast.success("تم حفظ بيانات المركبة بنجاح ✅");
+      
+      if (vehicleChanged) {
+        toast.success("تم حفظ بيانات المركبة بنجاح ✅\n\nملاحظة: يجب رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من تبويب \"التحقق\"", {
+          duration: 6000,
+        });
+      } else {
+        toast.success("تم حفظ بيانات المركبة بنجاح ✅");
+      }
     } catch (err) {
       // Was: try/finally with NO catch — errors silently swallowed,
       // user got no feedback, clicked save again. Now surfaces.
@@ -183,6 +215,57 @@ export default function DriverVehicleEditor() {
           onChange={(e) => set("driver_note", e.target.value)}
           className="w-full px-3 py-2 rounded-xl border border-input bg-transparent text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
         />
+      </div>
+
+      {/* Vehicle Capacity & Luggage */}
+      <div className="bg-card rounded-2xl border border-border p-5 space-y-6">
+        <div>
+          <h3 className="font-bold text-foreground mb-1 flex items-center gap-2">
+            <Car className="w-4 h-4 text-primary" />
+            عدد المقاعد الكلي
+          </h3>
+          <p className="text-xs text-amber-600 mb-3 font-medium">⚠️ اختر إجمالي المقاعد في سيارتك (شامل السائق). لا يمكن إنشاء رحلة بمقاعد أكثر من هذا العدد.</p>
+          <div className="grid grid-cols-4 gap-2">
+            {[2, 3, 4, 5, 6, 7, 8, 9].map(num => (
+              <button
+                key={num}
+                onClick={() => set("vehicle_capacity", num)}
+                className={`flex items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                  form.vehicle_capacity === num
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border text-muted-foreground"
+                }`}
+              >
+                <span className="text-lg font-bold">{num}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="font-bold text-sm text-foreground mb-3">حجم الأمتعة المسموح</h4>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { id: "none", label: "بدون أمتعة" },
+              { id: "s",    label: "صغيرة (S)" },
+              { id: "m",    label: "متوسطة (M)" },
+              { id: "l",    label: "كبيرة (L)" },
+            ].map(opt => (
+              <button
+                key={opt.id}
+                onClick={() => set("vehicle_luggage", opt.id)}
+                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                  form.vehicle_luggage === opt.id
+                    ? "bg-primary/10 border-primary text-primary"
+                    : "bg-card border-border text-muted-foreground"
+                }`}
+              >
+                <Briefcase className="w-5 h-5" />
+                <span className="text-[10px] font-medium leading-tight">{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <Button
