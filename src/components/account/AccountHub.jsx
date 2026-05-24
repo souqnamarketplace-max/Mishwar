@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import {
   ArrowLeft, ChevronLeft, User, ShieldCheck, Bell, CreditCard,
-  Sparkles, Car, Settings as SettingsIcon, Shield, Flag, Wallet
+  Sparkles, Settings as SettingsIcon, Shield, Flag, Wallet
 } from "lucide-react";
 import AccountHubItem from "./AccountHubItem";
 import PreferencesSection from "./PreferencesSection";

@@ -798,6 +798,7 @@ export default function AccountSettings() {
             pref_pets: null,
             vehicle_luggage: null,
             vehicle_back_row: null,
+            vehicle_capacity: null,
             car_model: null,
             car_year: null,
             car_color: null,

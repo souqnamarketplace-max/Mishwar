@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
+import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Car, Save, Camera, Loader2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,38 @@ export default function DriverVehicleEditor() {
       }
       
       await api.auth.updateMe(payload);
+      
+      // Send notifications when vehicle changes (requires re-verification)
+      if (vehicleChanged && user?.email) {
+        // Notification to driver: in-app bell entry as a persistent record
+        // (the toast is transient - this stays in their notifications list)
+        const { error: notifErr } = await supabase
+          .from("notifications")
+          .insert({
+            user_email: user.email,
+            title: "⚠️ مطلوب: تحديث وثائق المركبة",
+            message: `قمت بتغيير بيانات مركبتك (${form.car_model || ""}). يجب رفع وثائق التأمين والترخيص الجديدة وانتظار الموافقة قبل نشر رحلات جديدة.`,
+            type: "vehicle_change_pending",
+            is_read: false,
+            link: "/account-settings/profile#license",
+          });
+        if (notifErr) console.warn("driver notif error:", notifErr); // non-fatal
+        
+        // Notification to admins (broadcast to admin role via notifications
+        // table — admin dashboard polls this for verification queue alerts)
+        const { error: adminNotifErr } = await supabase
+          .from("notifications")
+          .insert({
+            user_email: "souqnamarketplace@gmail.com", // admin email
+            title: "🚗 سائق غيّر بيانات مركبته",
+            message: `${user.full_name || user.email} قام بتغيير بيانات مركبته ويحتاج إلى موافقة على الوثائق الجديدة.`,
+            type: "admin_vehicle_change",
+            is_read: false,
+            link: "/dashboard/licenses",
+          });
+        if (adminNotifErr) console.warn("admin notif error:", adminNotifErr); // non-fatal
+      }
+      
       await qc.invalidateQueries({ queryKey: ["me"] });
       // Force wait for user data to refresh before showing toast
       await new Promise(resolve => setTimeout(resolve, 300));

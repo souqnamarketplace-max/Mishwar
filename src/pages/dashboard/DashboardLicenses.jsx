@@ -93,6 +93,16 @@ export default function DashboardLicenses() {
         })
         .eq("id", licenseId);
       if (updErr) throw updErr;
+      
+      // Clear verification_pending flag on driver's profile (set when they
+      // change vehicle and need re-verification). Approval clears this gate
+      // so they can post trips again with the new vehicle.
+      const { error: profErr } = await supabase
+        .from("profiles")
+        .update({ verification_pending: false })
+        .eq("email", license.driver_email);
+      if (profErr) console.warn("verification_pending reset error:", profErr); // non-fatal
+      
       // Notify driver — use supabase direct (admin RLS path) so the bell
       // entry gets written and tappable. Link to settings where driver can
       // see their verified status and access driver features.

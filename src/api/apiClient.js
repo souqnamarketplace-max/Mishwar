@@ -488,6 +488,7 @@ const auth = {
       pref_pets:       profile?.pref_pets       ?? null,
       vehicle_luggage: profile?.vehicle_luggage ?? null,
       vehicle_back_row: profile?.vehicle_back_row ?? null,
+      vehicle_capacity: profile?.vehicle_capacity ?? null,
       // ── Payment fields (via get_my_payment_info RPC) ──
       bank_name:           payment?.bank_name           ?? null,
       bank_account_name:   payment?.bank_account_name   ?? null,
