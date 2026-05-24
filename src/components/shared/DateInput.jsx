@@ -34,16 +34,13 @@ export default function DateInput({ value, onChange, className = "", min, max, p
   const formatted = value ? formatArabicDate(value + "T00:00:00") : null;
 
   const handleWrapperClick = (e) => {
-    // If the click landed directly on the native input (because the
-    // opacity-0 layer covers the whole div), the browser will open
-    // the picker on its own. Stop here to avoid the double-trigger
-    // that causes Chrome's NotAllowedError.
-    if (e.target === inputRef.current) return;
-
-    // Otherwise (click on the calendar icon or visual text layer):
-    // try showPicker first, fall back to .click() if rejected.
-    // try/catch handles both the gesture-context rejection AND any
-    // browser that doesn't implement showPicker (older Safari).
+    // CRITICAL FIX: Always attempt to open the picker programmatically.
+    // Previously we returned early if the click landed on the native input
+    // (e.target === inputRef.current), assuming the browser would open the
+    // picker automatically. But in Chrome desktop this doesn't always happen
+    // — the input receives focus but the calendar doesn't appear. Now we
+    // ALWAYS call showPicker() or click() regardless of target, ensuring the
+    // calendar opens on every click.
     const el = inputRef.current;
     if (!el) return;
     try {
