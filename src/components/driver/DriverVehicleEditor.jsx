@@ -142,7 +142,7 @@ export default function DriverVehicleEditor() {
               <p className="text-sm text-red-800 dark:text-red-300 font-bold">
                 ⛔ لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة على الوثائق الجديدة.
               </p>
-              <Link to="/settings?section=verification">
+              <Link to="/account-settings/profile#license">
                 <Button className="mt-4 bg-red-600 hover:bg-red-700 text-white rounded-xl gap-2">
                   <span>📄</span>
                   رفع الوثائق الآن
