@@ -27,6 +27,7 @@ export default function DriverVehicleEditor() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showVerificationWarning, setShowVerificationWarning] = useState(false);
   const fileInputRef = useRef(null);
 
   // Hydrate form from user. Two-phase patch (June 2026):
@@ -87,13 +88,16 @@ export default function DriverVehicleEditor() {
       }
       
       await api.auth.updateMe(payload);
-      qc.invalidateQueries({ queryKey: ["me"] });
+      await qc.invalidateQueries({ queryKey: ["me"] });
+      // Force wait for user data to refresh before showing toast
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       if (vehicleChanged) {
+        setShowVerificationWarning(true); // Show banner immediately
         toast.success("تم حفظ بيانات المركبة بنجاح ✅", {
           duration: 8000,
         });
-        toast.warning("⚠️ تنبيه هام: قمت بتغيير بيانات المركبة\n\nيجب عليك رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من تبويب \"التحقق\" في لوحة السائق، وإلا لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة.", {
+        toast.warning("⚠️ تنبيه هام: قمت بتغيير بيانات المركبة\n\nيجب عليك رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من تبويب \"التحقق\" في الحساب، وإلا لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة.", {
           duration: 12000,
         });
       } else {
@@ -124,7 +128,7 @@ export default function DriverVehicleEditor() {
   return (
     <div className="max-w-2xl space-y-6">
       {/* Re-verification warning banner */}
-      {user?.verification_pending && (
+      {(user?.verification_pending || showVerificationWarning) && (
         <div className="bg-red-500/10 border-2 border-red-500/40 rounded-2xl p-5 animate-pulse">
           <div className="flex items-start gap-3">
             <span className="text-3xl shrink-0">⚠️</span>
@@ -138,7 +142,7 @@ export default function DriverVehicleEditor() {
               <p className="text-sm text-red-800 dark:text-red-300 font-bold">
                 ⛔ لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة على الوثائق الجديدة.
               </p>
-              <Link to="/driver?tab=verification">
+              <Link to="/account?section=verification">
                 <Button className="mt-4 bg-red-600 hover:bg-red-700 text-white rounded-xl gap-2">
                   <span>📄</span>
                   رفع الوثائق الآن

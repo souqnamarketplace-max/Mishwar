@@ -154,6 +154,11 @@ export default function CreateTrip() {
   // The capacity determines the max value for available_seats selector.
   const needsCapacity = !user?.vehicle_capacity;
   const maxSeats = user?.vehicle_capacity || 4; // Default 4 if not set
+  
+  // Verification pending blocks trip creation when driver changes vehicle.
+  // Must re-upload insurance + registration for new vehicle before posting trips.
+  const needsVerification = user?.verification_pending === true;
+  
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
     from_city: "",
@@ -471,6 +476,14 @@ export default function CreateTrip() {
       // drivers could publish trips with more seats than their vehicle has.
       if (needsCapacity) {
         toast.error("يرجى تحديد عدد المقاعد في سيارتك من إعدادات المركبة قبل نشر الرحلة ⚠️");
+        return false;
+      }
+      
+      // VERIFICATION PREFLIGHT GATE.
+      // If driver changed vehicle (model/year/plate), they must re-upload
+      // insurance + registration docs and get admin approval before posting trips.
+      if (needsVerification) {
+        toast.error("يرجى رفع وثائق التأمين والترخيص الجديدة للمركبة من تبويب \"التحقق\" وانتظار الموافقة ⚠️");
         return false;
       }
       
@@ -1023,6 +1036,31 @@ export default function CreateTrip() {
                     <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-2 h-9">
                       <span aria-hidden="true">⚙️</span>
                       ضبط عدد المقاعد
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
+            {/* Verification pending banner. Driver changed vehicle and must
+                re-upload insurance + registration docs before posting trips. */}
+            {!needsCarInfo && !needsCapacity && needsVerification && (
+              <div
+                className="bg-red-500/10 border-2 border-red-500/40 rounded-xl p-4 flex items-start gap-3 mt-4 animate-pulse"
+                role="alert"
+              >
+                <span className="text-2xl shrink-0" aria-hidden="true">⚠️</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-red-900 dark:text-red-200 mb-1">
+                    مطلوب: تحديث وثائق المركبة
+                  </p>
+                  <p className="text-xs text-red-800/85 dark:text-red-300/85 leading-relaxed mb-3">
+                    قمت بتغيير بيانات مركبتك. يجب رفع وثائق <strong>التأمين والترخيص الجديدة</strong> للمركبة الجديدة وانتظار موافقة الإدارة قبل نشر رحلات جديدة.
+                  </p>
+                  <Link to="/account?section=verification">
+                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg gap-2 h-9">
+                      <span aria-hidden="true">📄</span>
+                      رفع الوثائق الآن
                     </Button>
                   </Link>
                 </div>
