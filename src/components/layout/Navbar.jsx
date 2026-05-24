@@ -181,49 +181,55 @@ export default function Navbar() {
             >
               <Search className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
             </button>
-            {/* What's new — entry point for /whats-new. The sparkle
-                icon is recognized by users as "new/highlights" across
-                most apps. Red badge mirrors the unread-messages
-                pattern so the visual grammar is consistent across
-                all three indicators (messages, notifications, whats-new). */}
-            <Link
-              to="/whats-new"
-              className="relative p-2 rounded-lg hover:bg-muted transition-colors hidden sm:inline-flex items-center justify-center w-11 h-11"
-              aria-label={unreadReleaseNotes > 0 ? `ما الجديد (${unreadReleaseNotes} غير مقروء)` : "ما الجديد"}
-              title="ما الجديد"
-            >
-              <Sparkles className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
-              {unreadReleaseNotes > 0 && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
-                  aria-hidden="true"
+            
+            {/* Authenticated user icons - only show when logged in */}
+            {user && (
+              <>
+                {/* What's new — entry point for /whats-new. The sparkle
+                    icon is recognized by users as "new/highlights" across
+                    most apps. Red badge mirrors the unread-messages
+                    pattern so the visual grammar is consistent across
+                    all three indicators (messages, notifications, whats-new). */}
+                <Link
+                  to="/whats-new"
+                  className="relative p-2 rounded-lg hover:bg-muted transition-colors hidden sm:inline-flex items-center justify-center w-11 h-11"
+                  aria-label={unreadReleaseNotes > 0 ? `ما الجديد (${unreadReleaseNotes} غير مقروء)` : "ما الجديد"}
+                  title="ما الجديد"
                 >
-                  {unreadReleaseNotes > 9 ? "9+" : unreadReleaseNotes}
-                </span>
-              )}
-            </Link>
-            <Link
-              to="/messages"
-              className="relative rounded-lg hover:bg-muted transition-colors inline-flex items-center justify-center w-11 h-11"
-              aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}
-            >
-              <MessageSquare className="w-5 h-5 text-muted-foreground" />
-              {/* Real badge tied to the unread-messages hook. Was
-                  previously a static dot that always appeared, even
-                  with zero unread messages — defeating the whole
-                  point. Style matches the mobile bottom-tabs badge
-                  (red bg, white text, ring + pulse) for consistency
-                  across the two surfaces. */}
-              {unreadMessages > 0 && (
-                <span
-                  className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
-                  aria-hidden="true"
+                  <Sparkles className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+                  {unreadReleaseNotes > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
+                      aria-hidden="true"
+                    >
+                      {unreadReleaseNotes > 9 ? "9+" : unreadReleaseNotes}
+                    </span>
+                  )}
+                </Link>
+                <Link
+                  to="/messages"
+                  className="relative rounded-lg hover:bg-muted transition-colors inline-flex items-center justify-center w-11 h-11"
+                  aria-label={unreadMessages > 0 ? `الرسائل (${unreadMessages} غير مقروءة)` : "الرسائل"}
                 >
-                  {unreadMessages > 9 ? "9+" : unreadMessages}
-                </span>
-              )}
-            </Link>
-            <NotificationBell userEmail={user?.email} />
+                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                  {/* Real badge tied to the unread-messages hook. Was
+                      previously a static dot that always appeared, even
+                      with zero unread messages — defeating the whole
+                      point. Style matches the mobile bottom-tabs badge
+                      (red bg, white text, ring + pulse) for consistency
+                      across the two surfaces. */}
+                  {unreadMessages > 0 && (
+                    <span
+                      className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md ring-2 ring-card animate-pulse"
+                      aria-hidden="true"
+                    >
+                      {unreadMessages > 9 ? "9+" : unreadMessages}
+                    </span>
+                  )}
+                </Link>
+                <NotificationBell userEmail={user?.email} />
+              </>
+            )}
             
             {/* Profile Menu - only show when authenticated */}
             {user && (
