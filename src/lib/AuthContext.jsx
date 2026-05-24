@@ -336,14 +336,22 @@ export const AuthProvider = ({ children }) => {
       registerNativePush();
     } catch (err) {
       captureException(err, { msg: 'Profile load error:' });
-      // Even on error, set the user as authenticated with basic info
+      // Even on error, set the user as authenticated with basic info.
+      // CRITICAL: assume onboarding_completed = true (not false) so transient
+      // profile-fetch errors during password changes, token refreshes, or
+      // network blips don't bounce existing users back to /onboarding.
+      // Matches the checkUserAuth() optimistic assumption (line 391) and
+      // prevents the "account went back to onboarding status" bug where
+      // a signInWithPassword() re-auth during password reset would trigger
+      // loadUserProfile() which could hit a network timeout and reset
+      // onboarding_completed to false, redirecting the user mid-flow.
       setUser({
         id: authUser.id,
         email: authUser.email,
         full_name: authUser.user_metadata?.full_name ?? '',
         role: 'user',
         account_type: 'passenger',
-        onboarding_completed: false,
+        onboarding_completed: true,
       });
       setIsAuthenticated(true);
       setAuthError(null);
