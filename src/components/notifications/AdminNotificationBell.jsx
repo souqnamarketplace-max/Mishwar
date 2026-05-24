@@ -37,13 +37,22 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatArabicDate } from "@/lib/validation";
 
-// Where each notification should navigate when clicked. For admin this
-// is mostly the dashboard tab that lists the relevant entity.
+// Where each notification should navigate when clicked. Prefer the explicit
+// `link` field on the notification row (set by the inserter — most reliable).
+// Fall back to title-based routing for legacy notifications that don't have
+// a link set.
 function getAdminNotifTarget(notif) {
+  // Explicit link wins — newer notifications (vehicle change, license
+  // pending, etc.) set this. Title-keyword matching can miss new types.
+  if (notif.link) return notif.link;
+  
   const t = notif.title || "";
   if (t.includes("اشتراك"))     return "/dashboard?tab=subscriptions";
   if (t.includes("بلاغ"))        return "/dashboard?tab=reports";
-  if (t.includes("رخصة"))        return "/dashboard?tab=licenses";
+  if (t.includes("رخصة") ||
+      t.includes("وثائق") ||
+      t.includes("مركبة") ||
+      t.includes("توثيق"))       return "/dashboard?tab=licenses";
   if (t.includes("مدينة"))       return "/dashboard?tab=cities";
   if (t.includes("شكوى") ||
       t.includes("اقتراح") ||

@@ -35,10 +35,15 @@ export default function DashboardLicenses() {
   // resolveDocumentUrls handles both transparently and caches signed
   // URLs for ~50s so re-renders don't re-sign.
   const [resolvedUrls, setResolvedUrls] = useState({});
+  // Driver's profile (for vehicle info shown in the review modal).
+  // Critical for re-verification: admin must see WHICH car the driver claims
+  // to have now (car_model/year/color/plate) to confirm docs match.
+  const [driverProfile, setDriverProfile] = useState(null);
 
   useEffect(() => {
     if (!selectedLicense) {
       setResolvedUrls({});
+      setDriverProfile(null);
       return;
     }
     let cancelled = false;
@@ -49,6 +54,15 @@ export default function DashboardLicenses() {
       selfie_1_url:         selectedLicense.selfie_1_url,
       selfie_2_url:         selectedLicense.selfie_2_url,
     }).then(urls => { if (!cancelled) setResolvedUrls(urls); });
+    
+    // Fetch driver's profile to show car info in modal
+    supabase
+      .from("profiles")
+      .select("car_model, car_year, car_color, car_plate, car_image, vehicle_capacity, vehicle_luggage, verification_pending")
+      .eq("email", selectedLicense.driver_email)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setDriverProfile(data); });
+    
     return () => { cancelled = true; };
   }, [selectedLicense?.id]);
   // CRITICAL: must use supabase client directly here, NOT api.entities.DriverLicense.paginate.
@@ -322,6 +336,66 @@ export default function DashboardLicenses() {
                   <p className="text-sm font-medium">{new Date(selectedLicense.submitted_at).toLocaleDateString("ar-EG")}</p>
                 </div>
               </div>
+
+              {/* Driver's vehicle info — CRITICAL for re-verification.
+                  Admin must confirm the registration + insurance docs match
+                  the car the driver registered. If driver changed vehicles,
+                  the profile shows the NEW car; docs should be for that car. */}
+              {driverProfile && (driverProfile.car_model || driverProfile.car_plate) && (
+                <div className={`p-3 rounded-lg border ${
+                  driverProfile.verification_pending 
+                    ? "bg-amber-500/10 border-amber-500/30" 
+                    : "bg-muted/30 border-border"
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                      🚗 المركبة المسجلة
+                    </p>
+                    {driverProfile.verification_pending && (
+                      <Badge className="bg-amber-500/20 text-amber-700 text-[10px]">
+                        تغيير مركبة — يتطلب إعادة تحقق
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {driverProfile.car_model && (
+                      <div>
+                        <span className="text-muted-foreground">الموديل: </span>
+                        <span className="font-medium">{driverProfile.car_model}</span>
+                      </div>
+                    )}
+                    {driverProfile.car_year && (
+                      <div>
+                        <span className="text-muted-foreground">السنة: </span>
+                        <span className="font-medium">{driverProfile.car_year}</span>
+                      </div>
+                    )}
+                    {driverProfile.car_color && (
+                      <div>
+                        <span className="text-muted-foreground">اللون: </span>
+                        <span className="font-medium">{driverProfile.car_color}</span>
+                      </div>
+                    )}
+                    {driverProfile.car_plate && (
+                      <div>
+                        <span className="text-muted-foreground">اللوحة: </span>
+                        <span className="font-mono font-bold">{driverProfile.car_plate}</span>
+                      </div>
+                    )}
+                    {driverProfile.vehicle_capacity && (
+                      <div>
+                        <span className="text-muted-foreground">المقاعد: </span>
+                        <span className="font-medium">{driverProfile.vehicle_capacity}</span>
+                      </div>
+                    )}
+                  </div>
+                  {driverProfile.verification_pending && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-2 leading-relaxed">
+                      ⚠️ السائق غيّر مركبته. تأكد أن وثائق التسجيل والتأمين مطابقة للمركبة أعلاه قبل الموافقة.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* All 5 verification documents */}
               <div className="space-y-3">
