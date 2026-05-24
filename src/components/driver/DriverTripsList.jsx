@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import DriverReviewWizard from "@/components/reviews/DriverReviewWizard";
 import GPSTripTracker from "@/components/driver/GPSTripTracker";
+import DateInput from "@/components/shared/DateInput";
 import { createPortal } from "react-dom";
 import { logAudit } from "@/lib/adminAudit";
 import { api } from "@/api/apiClient";
@@ -1094,7 +1095,12 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">التاريخ</label>
-                      <Input type="date" min={todayISO()} value={editForm.date ?? ""} onChange={e => setEditForm(f => ({...f, date: e.target.value}))} className="mt-1 h-10 rounded-xl" />
+                      <DateInput 
+                        value={editForm.date ?? ""} 
+                        onChange={e => setEditForm(f => ({...f, date: e.target.value}))} 
+                        min={todayISO()}
+                        className="mt-1 h-10 rounded-xl bg-background border border-input px-3"
+                      />
                     </div>
                   </div>
 

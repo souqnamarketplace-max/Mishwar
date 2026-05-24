@@ -3,6 +3,7 @@ import { CAR_BRANDS } from "@/lib/carModels";
 import { captureException } from "@/lib/sentry";
 import { todayISO } from "@/lib/validation";
 import CityAutocomplete from "@/components/shared/CityAutocomplete";
+import DateInput from "@/components/shared/DateInput";
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import { readSessionUserId } from "@/lib/session";
@@ -640,7 +641,12 @@ export default function Onboarding() {
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground mb-1 block">تاريخ الانتهاء *</label>
-                      <Input type="date" min={todayISO()} value={form.license_expiry} onChange={(e) => setForm({ ...form, license_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                      <DateInput 
+                        value={form.license_expiry} 
+                        onChange={(e) => setForm({ ...form, license_expiry: e.target.value })} 
+                        min={todayISO()}
+                        className="rounded-xl h-10 bg-background border border-input px-3"
+                      />
                     </div>
                   </div>
                   <div>
@@ -672,7 +678,13 @@ export default function Onboarding() {
                   <p className="text-sm font-bold flex items-center gap-2">🚗 استمارة السيارة</p>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">تاريخ انتهاء الاستمارة</label>
-                    <Input type="date" min={todayISO()} value={form.car_reg_expiry} onChange={(e) => setForm({ ...form, car_reg_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                    <DateInput 
+                      value={form.car_reg_expiry} 
+                      onChange={(e) => setForm({ ...form, car_reg_expiry: e.target.value })} 
+                      min={todayISO()}
+                      className="rounded-xl h-10 bg-background border border-input px-3"
+                      placeholder="اختياري"
+                    />
                   </div>
                   <div>
                     <Button
@@ -702,7 +714,13 @@ export default function Onboarding() {
                   <p className="text-sm font-bold flex items-center gap-2">🛡️ وثيقة التأمين</p>
                   <div>
                     <label className="text-xs text-muted-foreground mb-1 block">تاريخ انتهاء التأمين</label>
-                    <Input type="date" min={todayISO()} value={form.insurance_expiry} onChange={(e) => setForm({ ...form, insurance_expiry: e.target.value })} className="rounded-xl h-10 text-sm" />
+                    <DateInput 
+                      value={form.insurance_expiry} 
+                      onChange={(e) => setForm({ ...form, insurance_expiry: e.target.value })} 
+                      min={todayISO()}
+                      className="rounded-xl h-10 bg-background border border-input px-3"
+                      placeholder="اختياري"
+                    />
                   </div>
                   <div>
                     <Button

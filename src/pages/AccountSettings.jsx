@@ -4,6 +4,7 @@ import { todayISO, isFutureOrToday, validatePhone, validatePasswordCompliance, p
 import { compressImage } from "@/lib/compressImage";
 import DriverPaymentSetup from "@/components/driver/DriverPaymentSetup";
 import PassengerPaymentSetup from "@/components/user/PassengerPaymentSetup";
+import DateInput from "@/components/shared/DateInput";
 import { captureException } from "@/lib/sentry";
 import { logAdminAction } from "@/lib/adminAudit";
 import { notifyAdmin } from "@/lib/notifyAdmin";
@@ -1426,32 +1427,29 @@ export default function AccountSettings() {
               </div>
               <div>
                 <Label>تاريخ انتهاء الرخصة</Label>
-                <Input
-                  type="date"
+                <DateInput
                   min={todayISO()}
                   value={licenseExpiry}
                   onChange={(e) => setLicenseExpiry(e.target.value)}
-                  className="rounded-xl h-10 mt-1"
+                  className="rounded-xl h-10 mt-1 bg-background border border-input px-3"
                 />
               </div>
               <div>
                 <Label>تاريخ انتهاء تسجيل المركبة</Label>
-                <Input
-                  type="date"
+                <DateInput
                   min={todayISO()}
                   value={carRegistrationExpiry}
                   onChange={(e) => setCarRegistrationExpiry(e.target.value)}
-                  className="rounded-xl h-10 mt-1"
+                  className="rounded-xl h-10 mt-1 bg-background border border-input px-3"
                 />
               </div>
               <div>
                 <Label>تاريخ انتهاء التأمين</Label>
-                <Input
-                  type="date"
+                <DateInput
                   min={todayISO()}
                   value={insuranceExpiry}
                   onChange={(e) => setInsuranceExpiry(e.target.value)}
-                  className="rounded-xl h-10 mt-1"
+                  className="rounded-xl h-10 mt-1 bg-background border border-input px-3"
                 />
               </div>
 
