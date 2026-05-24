@@ -114,29 +114,43 @@ export default function DriverVehicleEditor() {
         // 2. The verification card shows "قيد المراجعة" instead of "موثّق"
         // 3. The license row reappears in the admin approval queue
         try {
-          // Find the latest license row for this user
+          // Find the latest license row for this user.
+          // NOTE: using raw supabase (not api client), so we use the actual
+          // column name 'created_at' — the api client translates 'created_date'
+          // → 'created_at' but raw queries do not.
           const { data: existingLicenses, error: fetchErr } = await supabase
             .from("driver_licenses")
             .select("id")
             .eq("driver_email", user.email)
-            .order("created_date", { ascending: false })
+            .order("created_at", { ascending: false })
             .limit(1);
           
           if (fetchErr) throw fetchErr;
           
           if (existingLicenses && existingLicenses.length > 0) {
             const licenseId = existingLicenses[0].id;
+            // CRITICAL: Do NOT change license.status to 'incomplete' here.
+            // Doing so causes the eligibility check (driverEligibility.js) to
+            // fall through to "expired_no_pending" → CreateTrip shows a
+            // full-page error BEFORE our verification banner can render.
+            //
+            // Instead, we:
+            // 1. Keep status='approved' so eligibility.allowed=true
+            // 2. Clear vehicle URLs (NOT NULL columns, use "" not null)
+            // 3. Clear expiry dates (nullable)
+            // 4. Rely on profiles.verification_pending=true as the SOLE
+            //    blocker for trip creation (our needsVerification gate)
+            //
+            // When driver re-uploads via updateLicense(), the row is
+            // UPDATED with new docs + status='pending' (handled by
+            // existing flow in AccountSettings.jsx).
             const { error: updateErr } = await supabase
               .from("driver_licenses")
               .update({
-                status: "incomplete", // Forces driver to complete + resubmit
-                car_registration_image_url: null,
-                insurance_image_url: null,
-                car_registration_expiry_date: null,
-                insurance_expiry_date: null,
-                approved_at: null,
-                approved_by: null,
-                rejection_reason: "تم تغيير بيانات المركبة — يجب رفع وثائق التأمين والترخيص الجديدة",
+                car_registration_url: "",       // NOT NULL — clear with ""
+                insurance_url: "",              // NOT NULL — clear with ""
+                car_registration_expiry_date: null, // nullable
+                insurance_expiry_date: null,    // nullable
               })
               .eq("id", licenseId);
             
@@ -217,8 +231,12 @@ export default function DriverVehicleEditor() {
 
   // Banner state machine:
   // - verification_pending=false → No banner (driver approved or never re-verified)
-  // - verification_pending=true + license.status=pending → YELLOW "under review"
-  // - verification_pending=true + license.status=incomplete/null → RED "must upload"
+  // - verification_pending=true + status=pending → YELLOW "under review"
+  // - verification_pending=true + cleared docs (no urls) → RED "must upload"
+  // - verification_pending=true + status=approved + urls present → already submitted somehow
+  //
+  // We detect "must upload" by status=pending check first (driver submitted),
+  // otherwise default to RED (driver hasn't submitted yet).
   const isPending = user?.verification_pending || showVerificationWarning;
   const isUnderReview = latestLicense?.status === "pending";
   const showRedBanner = isPending && !isUnderReview;

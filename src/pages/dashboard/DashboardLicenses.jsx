@@ -153,7 +153,7 @@ export default function DashboardLicenses() {
           message: `لم يتم التحقق من وثائقك. السبب: ${reason}. يمكنك إعادة الرفع من صفحة الإعدادات.`,
           type: "license_rejected",
           is_read: false,
-          link: "/account-settings?section=verification",
+          link: "/account-settings/profile#license",
         });
       if (notifErr) console.warn("notif insert error:", notifErr); // non-fatal
     },
