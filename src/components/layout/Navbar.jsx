@@ -225,134 +225,136 @@ export default function Navbar() {
             </Link>
             <NotificationBell userEmail={user?.email} />
             
-            {/* Profile Menu */}
-            <div ref={profileRef} className="relative hidden lg:block">
-              <button
-                onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
-                title="ملفي الشخصي"
-              >
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt="" className="w-full h-full object-cover rounded-xl" />
-                ) : (
-                  <span className="font-bold text-sm">{user?.full_name?.[0] || "م"}</span>
+            {/* Profile Menu - only show when authenticated */}
+            {user && (
+              <div ref={profileRef} className="relative hidden lg:block">
+                <button
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                  title="ملفي الشخصي"
+                >
+                  {user?.avatar_url ? (
+                    <img src={user.avatar_url} alt="" className="w-full h-full object-cover rounded-xl" />
+                  ) : (
+                    <span className="font-bold text-sm">{user?.full_name?.[0] || "م"}</span>
+                  )}
+                </button>
+                
+                {profileOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]">
+                    <Link
+                      to="/profile"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <Settings className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">ملفي الشخصي</span>
+                    </Link>
+
+                    {/* Trip-requests entries — primary actions for any user.
+                        Drivers (and "both") also see these because they may
+                        occasionally need a ride themselves. */}
+                    {(user?.account_type !== "driver") && (
+                      <Link
+                        to="/request-trip"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                      >
+                        <Plus className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-medium">اطلب رحلة</span>
+                      </Link>
+                    )}
+                    <Link
+                      to="/my-requests"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <Inbox className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">طلباتي</span>
+                    </Link>
+                    {(user?.account_type === "driver" || user?.account_type === "both") && (
+                      <Link
+                        to="/passenger-requests"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                      >
+                        <Inbox className="w-4 h-4 text-accent" />
+                        <span className="text-sm font-medium">طلبات الركاب</span>
+                      </Link>
+                    )}
+
+                    {/* Verification entry — passengers and "both" need this
+                        before they can post requests. Drivers don't (they
+                        don't post passenger requests). */}
+                    {(user?.account_type !== "driver") && (
+                      <Link
+                        to="/verify-passenger"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">توثيق الهوية</span>
+                      </Link>
+                    )}
+
+                    <Link
+                      to="/settings"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <Settings className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">إعدادات الحساب</span>
+                    </Link>
+                    {/* Help + Feedback moved here from the top-level nav
+                        bar in the "slim navbar" cleanup (2026-05-18).
+                        Same routes (/help, /feedback) — just relocated
+                        to keep daily-use links visible up top and push
+                        support entry points into the profile menu where
+                        users instinctively look for them. Also still
+                        accessible from the footer for power-users who
+                        land via direct URL or scroll to the bottom. */}
+                    <Link
+                      to="/help"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">المساعدة</span>
+                    </Link>
+                    <Link
+                      to="/feedback"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <MessageSquarePlus className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">اقتراحات وشكاوى</span>
+                    </Link>
+                    {/* Admin panel entry — only visible to admins. Without this,
+                        admins landing on / had no in-app path to /dashboard
+                        and had to type the URL by hand. Placed just above
+                        logout so it's always reachable regardless of how
+                        many other entries appear above. */}
+                    {user?.role === "admin" && (
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setProfileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border bg-amber-50/50"
+                      >
+                        <LayoutDashboard className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm font-medium text-amber-900">لوحة الإدارة</span>
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => { setProfileOpen(false); handleLogout(); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>تسجيل الخروج</span>
+                    </button>
+                  </div>
                 )}
-              </button>
-              
-              {profileOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-card rounded-xl border border-border shadow-xl overflow-hidden z-[999]">
-                  <Link
-                    to="/profile"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                  >
-                    <Settings className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">ملفي الشخصي</span>
-                  </Link>
-
-                  {/* Trip-requests entries — primary actions for any user.
-                      Drivers (and "both") also see these because they may
-                      occasionally need a ride themselves. */}
-                  {(user?.account_type !== "driver") && (
-                    <Link
-                      to="/request-trip"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                    >
-                      <Plus className="w-4 h-4 text-primary" />
-                      <span className="text-sm font-medium">اطلب رحلة</span>
-                    </Link>
-                  )}
-                  <Link
-                    to="/my-requests"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                  >
-                    <Inbox className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">طلباتي</span>
-                  </Link>
-                  {(user?.account_type === "driver" || user?.account_type === "both") && (
-                    <Link
-                      to="/passenger-requests"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                    >
-                      <Inbox className="w-4 h-4 text-accent" />
-                      <span className="text-sm font-medium">طلبات الركاب</span>
-                    </Link>
-                  )}
-
-                  {/* Verification entry — passengers and "both" need this
-                      before they can post requests. Drivers don't (they
-                      don't post passenger requests). */}
-                  {(user?.account_type !== "driver") && (
-                    <Link
-                      to="/verify-passenger"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                    >
-                      <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">توثيق الهوية</span>
-                    </Link>
-                  )}
-
-                  <Link
-                    to="/settings"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                  >
-                    <Settings className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">إعدادات الحساب</span>
-                  </Link>
-                  {/* Help + Feedback moved here from the top-level nav
-                      bar in the "slim navbar" cleanup (2026-05-18).
-                      Same routes (/help, /feedback) — just relocated
-                      to keep daily-use links visible up top and push
-                      support entry points into the profile menu where
-                      users instinctively look for them. Also still
-                      accessible from the footer for power-users who
-                      land via direct URL or scroll to the bottom. */}
-                  <Link
-                    to="/help"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                  >
-                    <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">المساعدة</span>
-                  </Link>
-                  <Link
-                    to="/feedback"
-                    onClick={() => setProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
-                  >
-                    <MessageSquarePlus className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">اقتراحات وشكاوى</span>
-                  </Link>
-                  {/* Admin panel entry — only visible to admins. Without this,
-                      admins landing on / had no in-app path to /dashboard
-                      and had to type the URL by hand. Placed just above
-                      logout so it's always reachable regardless of how
-                      many other entries appear above. */}
-                  {user?.role === "admin" && (
-                    <Link
-                      to="/dashboard"
-                      onClick={() => setProfileOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border bg-amber-50/50"
-                    >
-                      <LayoutDashboard className="w-4 h-4 text-amber-600" />
-                      <span className="text-sm font-medium text-amber-900">لوحة الإدارة</span>
-                    </Link>
-                  )}
-                  <button
-                    onClick={() => { setProfileOpen(false); handleLogout(); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>تسجيل الخروج</span>
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
             <button
               className="lg:hidden p-2 rounded-lg hover:bg-muted"
               onClick={() => setMobileOpen(!mobileOpen)}
