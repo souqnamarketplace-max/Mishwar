@@ -500,6 +500,8 @@ export default function AccountSettings() {
     if (!isFutureOrToday(insuranceExpiry))      { toast.error("تاريخ انتهاء التأمين لا يمكن أن يكون في الماضي ⚠️"); return; }
     setLicenseLoading(true);
     try {
+      const isReverification = user?.verification_pending === true;
+      
       if (driverLicense) {
         await api.entities.DriverLicense.update(driverLicense.id, {
           license_number: licenseNumber,
@@ -536,7 +538,46 @@ export default function AccountSettings() {
         });
         toast.success("تم إرسال جميع المستندات للمراجعة ✓");
       }
+      
+      // Notify admin that new documents need review.
+      // This is critical for re-verification flow: when a driver changes their
+      // vehicle and uploads new docs, the admin needs an explicit alert in
+      // their notifications inbox + dashboard. Without this, the admin might
+      // miss the pending review and the driver waits indefinitely.
+      const adminTitle = isReverification 
+        ? "🚗 سائق رفع وثائق المركبة الجديدة"
+        : "📄 وثائق سائق جديدة بانتظار المراجعة";
+      const adminMessage = isReverification
+        ? `${user?.full_name || user?.email} قام بتحديث وثائق مركبته الجديدة (التأمين + الترخيص). يرجى مراجعتها والموافقة.`
+        : `${user?.full_name || user?.email} قام برفع وثائق التحقق من السائق. يرجى مراجعتها والموافقة.`;
+      
+      const { error: adminNotifErr } = await supabase
+        .from("notifications")
+        .insert({
+          user_email: "souqnamarketplace@gmail.com",
+          title: adminTitle,
+          message: adminMessage,
+          type: isReverification ? "admin_vehicle_change" : "admin_license_pending",
+          is_read: false,
+          link: "/dashboard?tab=licenses",
+        });
+      if (adminNotifErr) console.warn("admin notif error:", adminNotifErr); // non-fatal
+      
+      // Also notify the driver: confirmation that docs were received
+      const { error: driverNotifErr } = await supabase
+        .from("notifications")
+        .insert({
+          user_email: user?.email,
+          title: "⏳ وثائقك قيد المراجعة",
+          message: "تم استلام وثائقك بنجاح وهي قيد المراجعة. سيتم إشعارك خلال 1-3 أيام عمل بنتيجة المراجعة.",
+          type: "license_submitted",
+          is_read: false,
+          link: "/settings?section=verification",
+        });
+      if (driverNotifErr) console.warn("driver notif error:", driverNotifErr); // non-fatal
+      
       qc.invalidateQueries({ queryKey: ["driver-license", user?.email] });
+      qc.invalidateQueries({ queryKey: ["driver-license", user?.id] });
     } catch (err) {
       captureException(err, { msg: "License update error:" });
       toast.error(friendlyError(err, "تعذر تحديث المستندات"));
@@ -1380,8 +1421,11 @@ export default function AccountSettings() {
 
         {user?.account_type && (user.account_type === "driver" || user.account_type === "both") && (
           <div id="license" className="bg-card rounded-2xl border border-border p-6 space-y-4 scroll-mt-24">
-            {/* Re-verification alert when driver changed vehicle */}
-            {user.verification_pending && (
+            {/* Re-verification alert when driver changed vehicle.
+                Shows different state based on whether docs were already submitted:
+                - status='incomplete' or null → RED "must upload"
+                - status='pending' → YELLOW "under review" (don't need to re-upload) */}
+            {user.verification_pending && driverLicense?.status !== "pending" && (
               <div className="bg-red-500/10 border-2 border-red-500/40 rounded-xl p-4 flex items-start gap-3 animate-pulse">
                 <span className="text-2xl shrink-0" aria-hidden="true">⚠️</span>
                 <div className="flex-1 min-w-0">
@@ -1398,6 +1442,21 @@ export default function AccountSettings() {
                     3️⃣ تحديث <strong>تاريخ انتهاء التسجيل والتأمين</strong>
                     <br />
                     4️⃣ الضغط على "حفظ وإرسال للمراجعة" في الأسفل
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {/* Already submitted - show under review banner */}
+            {user.verification_pending && driverLicense?.status === "pending" && (
+              <div className="bg-yellow-500/10 border-2 border-yellow-500/40 rounded-xl p-4 flex items-start gap-3">
+                <span className="text-2xl shrink-0" aria-hidden="true">⏳</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-yellow-900 dark:text-yellow-200 mb-1">
+                    وثائقك قيد المراجعة
+                  </p>
+                  <p className="text-xs text-yellow-800/85 dark:text-yellow-300/85 leading-relaxed">
+                    تم استلام وثائق المركبة الجديدة بنجاح. الإدارة تراجع وثائقك الآن (1-3 أيام عمل). ستتمكن من نشر رحلات جديدة فور الموافقة، وسنرسل لك إشعاراً.
                   </p>
                 </div>
               </div>

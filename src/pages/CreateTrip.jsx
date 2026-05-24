@@ -157,7 +157,10 @@ export default function CreateTrip() {
   
   // Verification pending blocks trip creation when driver changes vehicle.
   // Must re-upload insurance + registration for new vehicle before posting trips.
+  // State distinguishes between "must upload" (red) vs "under review" (yellow).
   const needsVerification = user?.verification_pending === true;
+  const isUnderReview = needsVerification && driverLicense?.status === "pending";
+  const needsUpload = needsVerification && !isUnderReview;
   
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
@@ -483,7 +486,11 @@ export default function CreateTrip() {
       // If driver changed vehicle (model/year/plate), they must re-upload
       // insurance + registration docs and get admin approval before posting trips.
       if (needsVerification) {
-        toast.error("يرجى رفع وثائق التأمين والترخيص الجديدة للمركبة من تبويب \"التحقق\" وانتظار الموافقة ⚠️");
+        if (isUnderReview) {
+          toast.error("وثائقك قيد المراجعة. ستتمكن من نشر رحلات جديدة فور موافقة الإدارة ⏳");
+        } else {
+          toast.error("يرجى رفع وثائق التأمين والترخيص الجديدة للمركبة من صفحة الإعدادات وانتظار الموافقة ⚠️");
+        }
         return false;
       }
       
@@ -1044,7 +1051,7 @@ export default function CreateTrip() {
 
             {/* Verification pending banner. Driver changed vehicle and must
                 re-upload insurance + registration docs before posting trips. */}
-            {!needsCarInfo && !needsCapacity && needsVerification && (
+            {!needsCarInfo && !needsCapacity && needsUpload && (
               <div
                 className="bg-red-500/10 border-2 border-red-500/40 rounded-xl p-4 flex items-start gap-3 mt-4 animate-pulse"
                 role="alert"
@@ -1063,6 +1070,24 @@ export default function CreateTrip() {
                       رفع الوثائق الآن
                     </Button>
                   </Link>
+                </div>
+              </div>
+            )}
+            
+            {/* Yellow "under review" banner when docs uploaded but not approved yet */}
+            {!needsCarInfo && !needsCapacity && isUnderReview && (
+              <div
+                className="bg-yellow-500/10 border-2 border-yellow-500/40 rounded-xl p-4 flex items-start gap-3 mt-4"
+                role="alert"
+              >
+                <span className="text-2xl shrink-0" aria-hidden="true">⏳</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-yellow-900 dark:text-yellow-200 mb-1">
+                    وثائقك قيد المراجعة
+                  </p>
+                  <p className="text-xs text-yellow-800/85 dark:text-yellow-300/85 leading-relaxed">
+                    تم استلام وثائق المركبة الجديدة. الإدارة تراجع وثائقك الآن (1-3 أيام عمل). لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة. سنرسل لك إشعاراً.
+                  </p>
                 </div>
               </div>
             )}

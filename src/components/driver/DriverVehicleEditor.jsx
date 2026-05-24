@@ -25,6 +25,18 @@ export default function DriverVehicleEditor() {
     queryFn: () => api.auth.me(),
   });
 
+  // Fetch latest driver license to know review status.
+  // This drives the banner state: red "must upload" vs yellow "under review".
+  const { data: license } = useQuery({
+    queryKey: ["driver-license", user?.id],
+    queryFn: () =>
+      user?.id
+        ? api.entities.DriverLicense.filter({ user_id: user.id }, "-created_date", 1)
+        : [],
+    enabled: !!user?.id,
+  });
+  const latestLicense = license?.[0];
+
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -203,10 +215,19 @@ export default function DriverVehicleEditor() {
     }
   };
 
+  // Banner state machine:
+  // - verification_pending=false → No banner (driver approved or never re-verified)
+  // - verification_pending=true + license.status=pending → YELLOW "under review"
+  // - verification_pending=true + license.status=incomplete/null → RED "must upload"
+  const isPending = user?.verification_pending || showVerificationWarning;
+  const isUnderReview = latestLicense?.status === "pending";
+  const showRedBanner = isPending && !isUnderReview;
+  const showYellowBanner = isPending && isUnderReview;
+
   return (
     <div className="max-w-2xl space-y-6">
-      {/* Re-verification warning banner */}
-      {(user?.verification_pending || showVerificationWarning) && (
+      {/* RED banner: docs not uploaded yet, driver MUST upload */}
+      {showRedBanner && (
         <div className="bg-red-500/10 border-2 border-red-500/40 rounded-2xl p-5 animate-pulse">
           <div className="flex items-start gap-3">
             <span className="text-3xl shrink-0">⚠️</span>
@@ -215,7 +236,7 @@ export default function DriverVehicleEditor() {
                 مطلوب: تحديث وثائق المركبة
               </h3>
               <p className="text-sm text-red-800 dark:text-red-300 mb-3 leading-relaxed">
-                قمت بتغيير بيانات المركبة (الموديل، السنة، أو اللوحة). يجب عليك رفع وثائق <strong>التأمين والترخيص الجديدة</strong> للمركبة الجديدة من تبويب "التحقق" وانتظار موافقة الإدارة.
+                قمت بتغيير بيانات المركبة (الموديل، السنة، أو اللوحة). يجب عليك رفع وثائق <strong>التأمين والترخيص الجديدة</strong> للمركبة الجديدة وانتظار موافقة الإدارة.
               </p>
               <p className="text-sm text-red-800 dark:text-red-300 font-bold">
                 ⛔ لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة على الوثائق الجديدة.
@@ -226,6 +247,26 @@ export default function DriverVehicleEditor() {
                   رفع الوثائق الآن
                 </Button>
               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* YELLOW banner: docs uploaded, awaiting admin review */}
+      {showYellowBanner && (
+        <div className="bg-yellow-500/10 border-2 border-yellow-500/40 rounded-2xl p-5">
+          <div className="flex items-start gap-3">
+            <span className="text-3xl shrink-0">⏳</span>
+            <div>
+              <h3 className="font-bold text-yellow-900 dark:text-yellow-200 text-lg mb-2">
+                وثائقك قيد المراجعة
+              </h3>
+              <p className="text-sm text-yellow-800 dark:text-yellow-300 mb-2 leading-relaxed">
+                تم استلام وثائق المركبة الجديدة بنجاح. الإدارة تراجع وثائقك الآن — عادة خلال <strong>1-3 أيام عمل</strong>.
+              </p>
+              <p className="text-sm text-yellow-800 dark:text-yellow-300">
+                ℹ️ ستتمكن من نشر رحلات جديدة فور الموافقة. سنرسل لك إشعاراً.
+              </p>
             </div>
           </div>
         </div>
