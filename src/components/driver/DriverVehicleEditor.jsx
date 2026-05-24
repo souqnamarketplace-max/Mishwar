@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Car, Save, Camera, Loader2, Briefcase } from "lucide-react";
@@ -76,28 +77,29 @@ export default function DriverVehicleEditor() {
         (user?.car_year && user.car_year !== form.car_year) ||
         (user?.car_plate && user.car_plate !== form.car_plate);
       
-      // If vehicle changed, require new insurance + registration verification
+      // If vehicle changed, require re-verification
       const payload = { ...form };
       if (vehicleChanged) {
         payload.verification_pending = true;
-        payload.vehicle_insurance = null; // Clear old vehicle's insurance
-        payload.vehicle_registration = null; // Clear old vehicle's registration
-        // Keep driver_license - it stays with the person, not the vehicle
+        // Note: vehicle_insurance/registration are in driver_licenses table, 
+        // not profiles, so we just set verification_pending flag here.
+        // Admin will need to approve new vehicle documents.
       }
       
       await api.auth.updateMe(payload);
       qc.invalidateQueries({ queryKey: ["me"] });
       
       if (vehicleChanged) {
-        toast.success("تم حفظ بيانات المركبة بنجاح ✅\n\nملاحظة: يجب رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من تبويب \"التحقق\"", {
-          duration: 6000,
+        toast.success("تم حفظ بيانات المركبة بنجاح ✅", {
+          duration: 8000,
+        });
+        toast.warning("⚠️ تنبيه هام: قمت بتغيير بيانات المركبة\n\nيجب عليك رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من تبويب \"التحقق\" في لوحة السائق، وإلا لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة.", {
+          duration: 12000,
         });
       } else {
         toast.success("تم حفظ بيانات المركبة بنجاح ✅");
       }
     } catch (err) {
-      // Was: try/finally with NO catch — errors silently swallowed,
-      // user got no feedback, clicked save again. Now surfaces.
       toast.error(friendlyError(err, "فشل حفظ بيانات المركبة — حاول مجدداً"));
     } finally {
       setSaving(false);
@@ -121,6 +123,32 @@ export default function DriverVehicleEditor() {
 
   return (
     <div className="max-w-2xl space-y-6">
+      {/* Re-verification warning banner */}
+      {user?.verification_pending && (
+        <div className="bg-red-500/10 border-2 border-red-500/40 rounded-2xl p-5 animate-pulse">
+          <div className="flex items-start gap-3">
+            <span className="text-3xl shrink-0">⚠️</span>
+            <div>
+              <h3 className="font-bold text-red-900 dark:text-red-200 text-lg mb-2">
+                مطلوب: تحديث وثائق المركبة
+              </h3>
+              <p className="text-sm text-red-800 dark:text-red-300 mb-3 leading-relaxed">
+                قمت بتغيير بيانات المركبة (الموديل، السنة، أو اللوحة). يجب عليك رفع وثائق <strong>التأمين والترخيص الجديدة</strong> للمركبة الجديدة من تبويب "التحقق" وانتظار موافقة الإدارة.
+              </p>
+              <p className="text-sm text-red-800 dark:text-red-300 font-bold">
+                ⛔ لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة على الوثائق الجديدة.
+              </p>
+              <Link to="/driver?tab=verification">
+                <Button className="mt-4 bg-red-600 hover:bg-red-700 text-white rounded-xl gap-2">
+                  <span>📄</span>
+                  رفع الوثائق الآن
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Car preview */}
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
         <div className="relative h-44 bg-muted flex items-center justify-center">
