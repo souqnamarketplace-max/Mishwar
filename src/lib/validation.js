@@ -611,7 +611,7 @@ export function isStrictlyFuture(dateStr) {
 // users' expectations and matches how dates appear elsewhere in the app
 // (Blog.jsx already used ar-EG).
 
-export function formatArabicDate(input, options = { day: "numeric", month: "long", year: "numeric" }) {
+export function formatArabicDate(input, options = { day: "2-digit", month: "2-digit", year: "numeric" }) {
   if (!input) return "";
   const d = input instanceof Date ? input : new Date(input);
   if (isNaN(d.getTime())) return "";
@@ -630,3 +630,30 @@ export function formatArabicDateNumeric(input) {
 export function formatArabicWeekday(input) {
   return formatArabicDate(input, { weekday: "long" });
 }
+
+/**
+ * formatArabicTime — Convert 24-hour time (HH:mm) to 12-hour Arabic format
+ * Examples:
+ *   "15:30" → "٣:٣٠ م"  (3:30 PM)
+ *   "09:00" → "٩:٠٠ ص"  (9:00 AM)
+ *   "00:00" → "١٢:٠٠ ص" (12:00 AM)
+ *   "12:00" → "١٢:٠٠ م" (12:00 PM)
+ */
+export function formatArabicTime(time24) {
+  if (!time24 || typeof time24 !== 'string') return "";
+  
+  const [hours, minutes] = time24.split(':').map(Number);
+  if (isNaN(hours) || isNaN(minutes)) return time24;
+  
+  // Convert to 12-hour format
+  const period = hours >= 12 ? 'م' : 'ص'; // م = PM, ص = AM
+  let hours12 = hours % 12;
+  if (hours12 === 0) hours12 = 12; // Midnight (0) and Noon (12) should show as 12
+  
+  // Format with Arabic numerals
+  const arabicHours = String(hours12).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  const arabicMinutes = String(minutes).padStart(2, '0').replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+  
+  return `${arabicHours}:${arabicMinutes} ${period}`;
+}
+

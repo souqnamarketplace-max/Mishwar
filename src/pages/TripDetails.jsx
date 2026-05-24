@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import RouteMap from "@/components/shared/RouteMap";
 import { isBookingClosed, isLastChance, minutesUntilTrip, isTripExpired } from "@/lib/tripScheduling";
+import { formatArabicTime } from "@/lib/validation";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
@@ -654,7 +655,7 @@ export default function TripDetails() {
               <span>{trip.date}</span>
               <span>•</span>
               <Clock className="w-4 h-4" />
-              <span>{trip.time} {parseInt(trip.time) >= 12 ? "مساءً" : "صباحاً"}</span>
+              <span>{formatArabicTime(trip.time)}</span>
             </div>
 
             {/* Map */}
@@ -715,7 +716,7 @@ export default function TripDetails() {
             <h3 className="font-bold text-foreground mb-4">تفاصيل الرحلة</h3>
             <div className="space-y-3 text-sm">
               {[
-                { icon: Calendar, label: `${trip.date} • ${trip.time} ${parseInt(trip.time) >= 12 ? "مساءً" : "صباحاً"}` },
+                { icon: Calendar, label: `${trip.date} • ${formatArabicTime(trip.time)}` },
                 trip.from_location && { icon: MapPin, label: `${trip.from_city} – ${trip.from_location}` },
                 trip.to_location && { icon: MapPin, label: `${trip.to_city} – ${trip.to_location}` },
                 { icon: Users, label: `عدد المقاعد المتاحة: ${trip.available_seats || 3}` },
@@ -1183,7 +1184,7 @@ export default function TripDetails() {
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>📅 {trip.date}</span>
-                <span>🕐 {trip.time}</span>
+                <span>🕐 {formatArabicTime(trip.time)}</span>
                 <span>👤 {trip.driver_name}</span>
               </div>
             </div>

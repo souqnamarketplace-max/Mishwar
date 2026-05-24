@@ -2,6 +2,7 @@ import React, { useEffect, useMemo} from "react";
 import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
 import { useAuth } from "@/lib/AuthContext";
 import { isTripExpired } from "@/lib/tripScheduling";
+import { formatArabicTime } from "@/lib/validation";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2, Eye } from "lucide-react";
@@ -152,7 +153,7 @@ function FeaturedCard({ trip, index }) {
               <div className="flex items-center gap-1.5 shrink-0">
                 <div className="text-right hidden sm:block">
                   <div className="flex items-center gap-1 text-muted-foreground justify-end">
-                    <span className="text-[10px]">{trip.time}</span>
+                    <span className="text-[10px]">{formatArabicTime(trip.time)}</span>
                     <Clock className="w-2.5 h-2.5" />
                   </div>
                   <div className="flex items-center gap-1 text-muted-foreground justify-end">
@@ -165,7 +166,7 @@ function FeaturedCard({ trip, index }) {
                     pieces of info without the desktop two-line stack taking
                     too much horizontal room on a narrow screen. */}
                 <div className="sm:hidden flex flex-col items-end gap-0.5">
-                  <span className="text-[10px] text-muted-foreground">{trip.time}</span>
+                  <span className="text-[10px] text-muted-foreground">{formatArabicTime(trip.time)}</span>
                   <span className="text-[10px] text-muted-foreground">{trip.available_seats} مقاعد</span>
                 </div>
 

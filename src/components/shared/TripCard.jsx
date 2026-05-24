@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart, UserPlus, UserCheck, Eye } from "lucide-react";
 import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
+import { formatArabicTime } from "@/lib/validation";
 import { api } from "@/api/apiClient";
 import { useFavorite } from "@/lib/favorites";
 import { useIsFavoriteDriver } from "@/lib/favoriteDrivers";
@@ -174,7 +175,7 @@ function Card({ t, noSeats, urgentSeats }) {
             📅 {fmt(t.date)}
           </span>
           <span className="flex items-center gap-1 bg-muted/60 rounded-full px-2.5 py-1 text-[11px] font-medium text-foreground">
-            <Clock className="w-3 h-3" /> {t.time}
+            <Clock className="w-3 h-3" /> {formatArabicTime(t.time)}
           </span>
           {t.distance && (
             <span className="bg-muted/60 rounded-full px-2.5 py-1 text-[11px] text-muted-foreground">
