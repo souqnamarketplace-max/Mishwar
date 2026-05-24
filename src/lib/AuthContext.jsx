@@ -283,6 +283,7 @@ export const AuthProvider = ({ children }) => {
         pref_pets:       profile?.pref_pets       ?? null,
         vehicle_luggage: profile?.vehicle_luggage ?? null,
         vehicle_back_row: profile?.vehicle_back_row ?? null,
+        vehicle_capacity: profile?.vehicle_capacity ?? null,
         // ── Notification preferences (used by /account → notifications) ──
         // CRITICAL: these MUST be projected here. NotificationPrefsSection
         // reads them via the user prop and renders the toggles based on

@@ -7,27 +7,37 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 
 /**
- * VehicleDetailsSection — luggage size + back row seating.
- * Saves to profiles: vehicle_luggage, vehicle_back_row
+ * VehicleDetailsSection — total seats + luggage size + back row seating.
+ * Saves to profiles: vehicle_capacity, vehicle_luggage, vehicle_back_row
  */
 export default function VehicleDetailsSection({ user, onSaved }) {
   const qc = useQueryClient();
+  const [capacity, setCapacity] = useState(user?.vehicle_capacity || null);
   const [luggage, setLuggage] = useState(user?.vehicle_luggage || "m");
   const [backRow, setBackRow] = useState(user?.vehicle_back_row || 3);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setCapacity(user?.vehicle_capacity || null);
     setLuggage(user?.vehicle_luggage || "m");
     setBackRow(user?.vehicle_back_row || 3);
-  }, [user?.vehicle_luggage, user?.vehicle_back_row]);
+  }, [user?.vehicle_capacity, user?.vehicle_luggage, user?.vehicle_back_row]);
 
   const save = async () => {
     if (!user?.email) return;
+    if (!capacity) {
+      toast.error("يرجى اختيار عدد المقاعد الكلي");
+      return;
+    }
     setSaving(true);
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ vehicle_luggage: luggage, vehicle_back_row: backRow })
+        .update({ 
+          vehicle_capacity: capacity,
+          vehicle_luggage: luggage, 
+          vehicle_back_row: backRow 
+        })
         .eq("email", user.email);
       if (error) throw error;
       toast.success("تم حفظ تفاصيل السيارة ✅");
@@ -40,6 +50,17 @@ export default function VehicleDetailsSection({ user, onSaved }) {
     }
   };
 
+  const capacityOpts = [
+    { value: 2, label: "2" },
+    { value: 3, label: "3" },
+    { value: 4, label: "4" },
+    { value: 5, label: "5" },
+    { value: 6, label: "6" },
+    { value: 7, label: "7" },
+    { value: 8, label: "8" },
+    { value: 9, label: "9" },
+  ];
+
   const luggageOpts = [
     { id: "none", label: "بدون أمتعة" },
     { id: "s",    label: "صغيرة (S)" },
@@ -50,6 +71,27 @@ export default function VehicleDetailsSection({ user, onSaved }) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">إعدادات السيارة الإضافية تساعد الركاب على اختيار الرحلة المناسبة</p>
+
+      {/* NEW: Total vehicle capacity */}
+      <div>
+        <h4 className="font-bold text-sm text-foreground mb-1">عدد المقاعد الكلي</h4>
+        <p className="text-xs text-amber-600 mb-3 font-medium">⚠️ اختر إجمالي المقاعد في سيارتك (شامل السائق). لا يمكن إنشاء رحلة بمقاعد أكثر من هذا العدد.</p>
+        <div className="grid grid-cols-4 gap-2">
+          {capacityOpts.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setCapacity(opt.value)}
+              className={`flex items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                capacity === opt.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border text-muted-foreground"
+              }`}
+            >
+              <span className="text-lg font-bold">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div>
         <h4 className="font-bold text-sm text-foreground mb-3">حجم الأمتعة المسموح</h4>

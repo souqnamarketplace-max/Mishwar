@@ -148,6 +148,12 @@ export default function CreateTrip() {
   // the plate isn't user-facing — keep gate gentle and only check the
   // visible-to-passenger fields.
   const needsCarInfo = !user?.car_model || !user?.car_year || !user?.car_color;
+  
+  // Vehicle capacity is REQUIRED to enforce seat limits. Without it,
+  // drivers could publish trips with more seats than their vehicle has.
+  // The capacity determines the max value for available_seats selector.
+  const needsCapacity = !user?.vehicle_capacity;
+  const maxSeats = user?.vehicle_capacity || 4; // Default 4 if not set
   const [formInitialized, setFormInitialized] = React.useState(false);
   const [form, setForm] = useState({
     from_city: "",
@@ -459,6 +465,15 @@ export default function CreateTrip() {
         toast.error("يرجى إضافة بيانات سيارتك (الموديل واللوحة) من لوحة السائق قبل نشر الرحلة ⚠️");
         return false;
       }
+      
+      // CAPACITY PREFLIGHT GATE.
+      // Vehicle capacity must be set to enforce seat limits. Without it,
+      // drivers could publish trips with more seats than their vehicle has.
+      if (needsCapacity) {
+        toast.error("يرجى تحديد عدد المقاعد في سيارتك من إعدادات المركبة قبل نشر الرحلة ⚠️");
+        return false;
+      }
+      
       if (!form.from_city) { toast.error("يرجى اختيار مدينة الانطلاق ⚠️"); return false; }
       if (!form.to_city) { toast.error("يرجى اختيار مدينة الوصول ⚠️"); return false; }
       if (form.from_city === form.to_city) { toast.error("مدينة الانطلاق والوصول لا يمكن أن تكونا نفس المدينة ⚠️"); return false; }
@@ -480,7 +495,19 @@ export default function CreateTrip() {
       // submit zero/negative prices, zero seats, or empty values.
       const seats = parseInt(form.available_seats, 10);
       if (isNaN(seats) || seats < 1) { toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️"); return false; }
-      if (seats > 8) { toast.error("الحد الأقصى للمقاعد هو 8 ⚠️"); return false; }
+      
+      // Validate seats against vehicle capacity
+      if (user?.vehicle_capacity && seats > user.vehicle_capacity) { 
+        toast.error(`عدد المقاعد لا يمكن أن يتجاوز ${user.vehicle_capacity} (سعة سيارتك) ⚠️`); 
+        return false; 
+      }
+      
+      // Fallback max for drivers who haven't set capacity yet (shouldn't happen with step 1 gate)
+      if (!user?.vehicle_capacity && seats > 8) { 
+        toast.error("الحد الأقصى للمقاعد هو 8 ⚠️"); 
+        return false; 
+      }
+      
       const price = parseFloat(form.price);
       if (isNaN(price) || price <= 0) { toast.error("السعر يجب أن يكون أكبر من صفر ⚠️"); return false; }
       if (price > 1000) { toast.error("السعر مرتفع جداً — تحقق من المبلغ ⚠️"); return false; }
@@ -975,6 +1002,33 @@ export default function CreateTrip() {
               </div>
             )}
 
+            {/* Vehicle capacity preflight banner. Without capacity set,
+                we can't enforce seat limits. Driver must set it once in
+                vehicle settings, then the trip form will limit available_seats
+                to that maximum. */}
+            {!needsCarInfo && needsCapacity && (
+              <div
+                className="bg-blue-500/10 border border-blue-500/40 rounded-xl p-4 flex items-start gap-3 mt-4"
+                role="alert"
+              >
+                <span className="text-2xl shrink-0" aria-hidden="true">🪑</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-blue-900 dark:text-blue-200 mb-1">
+                    حدد عدد المقاعد في سيارتك
+                  </p>
+                  <p className="text-xs text-blue-800/85 dark:text-blue-300/85 leading-relaxed mb-3">
+                    يجب تحديد العدد الإجمالي للمقاعد في سيارتك لضمان عدم نشر رحلة بمقاعد أكثر من السعة الفعلية. اضبطها مرة واحدة وستُطبق على كل رحلاتك.
+                  </p>
+                  <Link to="/driver?tab=vehicle">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg gap-2 h-9">
+                      <span aria-hidden="true">⚙️</span>
+                      ضبط عدد المقاعد
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>من <span className="text-destructive">*</span></Label>
@@ -1140,10 +1194,15 @@ export default function CreateTrip() {
                 </Button>
                 <span className="text-2xl font-bold w-10 text-center">{form.available_seats}</span>
                 <Button variant="outline" size="icon" className="rounded-xl"
-                  onClick={() => updateField("available_seats", Math.min(6, form.available_seats + 1))}>
+                  onClick={() => updateField("available_seats", Math.min(maxSeats, form.available_seats + 1))}>
                   +
                 </Button>
               </div>
+              {user?.vehicle_capacity && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  الحد الأقصى: {maxSeats} مقاعد (حسب سعة سيارتك)
+                </p>
+              )}
             </div>
             <div>
               <Label>السعر للمقعد الواحد (₪)</Label>
