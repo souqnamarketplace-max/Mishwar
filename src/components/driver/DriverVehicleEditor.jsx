@@ -97,7 +97,7 @@ export default function DriverVehicleEditor() {
         toast.success("تم حفظ بيانات المركبة بنجاح ✅", {
           duration: 8000,
         });
-        toast.warning("⚠️ تنبيه هام: قمت بتغيير بيانات المركبة\n\nيجب عليك رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من تبويب \"التحقق\" في الحساب، وإلا لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة.", {
+        toast.warning("⚠️ تنبيه هام: قمت بتغيير بيانات المركبة\n\nيجب عليك رفع وثائق التأمين والترخيص الجديدة للمركبة الجديدة من صفحة \"الإعدادات\" ← \"التحقق من الهوية\"، وإلا لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة.", {
           duration: 12000,
         });
       } else {
@@ -142,7 +142,7 @@ export default function DriverVehicleEditor() {
               <p className="text-sm text-red-800 dark:text-red-300 font-bold">
                 ⛔ لن تتمكن من نشر رحلات جديدة حتى تتم الموافقة على الوثائق الجديدة.
               </p>
-              <Link to="/account?section=verification">
+              <Link to="/settings?section=verification">
                 <Button className="mt-4 bg-red-600 hover:bg-red-700 text-white rounded-xl gap-2">
                   <span>📄</span>
                   رفع الوثائق الآن

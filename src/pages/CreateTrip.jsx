@@ -1057,7 +1057,7 @@ export default function CreateTrip() {
                   <p className="text-xs text-red-800/85 dark:text-red-300/85 leading-relaxed mb-3">
                     قمت بتغيير بيانات مركبتك. يجب رفع وثائق <strong>التأمين والترخيص الجديدة</strong> للمركبة الجديدة وانتظار موافقة الإدارة قبل نشر رحلات جديدة.
                   </p>
-                  <Link to="/account?section=verification">
+                  <Link to="/settings?section=verification">
                     <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white rounded-lg gap-2 h-9">
                       <span aria-hidden="true">📄</span>
                       رفع الوثائق الآن
