@@ -64,7 +64,10 @@ export default function Footer() {
               <img src="/logo.png" alt="مشوارو" className="h-14 w-14 rounded-2xl object-cover shadow-lg shrink-0" />
               <div>
                 <h2 className="text-xl font-black">مشوارو</h2>
-                <p className="text-xs text-primary-foreground/60">🇵🇸 منصة فلسطينية</p>
+                <p className="text-xs text-primary-foreground/60 flex items-center gap-1">
+                  <svg viewBox="0 0 1200 600" className="w-5 h-2.5 rounded-sm inline-block" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="200" fill="#000"/><rect y="200" width="1200" height="200" fill="#fff"/><rect y="400" width="1200" height="200" fill="#007a3d"/><polygon points="0,0 600,300 0,600" fill="#ce1126"/></svg>
+                  منصة فلسطينية
+                </p>
               </div>
             </div>
             <p className="text-sm text-primary-foreground/70 mb-5 leading-relaxed">
@@ -170,7 +173,10 @@ export default function Footer() {
                 <MapPin className="w-4 h-4 mt-0.5 text-accent shrink-0" />
                 <div>
                   <p className="text-xs text-primary-foreground/50 mb-0.5">المقر</p>
-                  <p className="text-sm text-primary-foreground/75">رام الله، فلسطين 🇵🇸</p>
+                  <p className="text-sm text-primary-foreground/75 flex items-center gap-1">
+                    رام الله، فلسطين
+                    <svg viewBox="0 0 1200 600" className="w-5 h-2.5 rounded-sm inline-block" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="200" fill="#000"/><rect y="200" width="1200" height="200" fill="#fff"/><rect y="400" width="1200" height="200" fill="#007a3d"/><polygon points="0,0 600,300 0,600" fill="#ce1126"/></svg>
+                  </p>
                 </div>
               </div>
               <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/10">
@@ -184,7 +190,7 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-white/15 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-primary-foreground/40">
-          <p>© {new Date().getFullYear()} مشوارو — جميع الحقوق محفوظة 🇵🇸</p>
+          <p className="flex items-center gap-1.5">© {new Date().getFullYear()} مشوارو — جميع الحقوق محفوظة <svg viewBox="0 0 1200 600" className="w-5 h-2.5 rounded-sm inline-block" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="200" fill="#000"/><rect y="200" width="1200" height="200" fill="#fff"/><rect y="400" width="1200" height="200" fill="#007a3d"/><polygon points="0,0 600,300 0,600" fill="#ce1126"/></svg></p>
           <div className="flex gap-4">
             <Link to="/privacy" className="hover:text-primary-foreground/80 transition-colors">سياسة الخصوصية</Link>
             <Link to="/terms"   className="hover:text-primary-foreground/80 transition-colors">شروط الاستخدام</Link>

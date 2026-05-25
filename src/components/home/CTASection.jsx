@@ -25,7 +25,16 @@ export default function CTASection() {
           </div>
 
           <div className="relative px-6 py-14 md:py-16 text-center">
-            <div className="text-5xl mb-4">🇵🇸</div>
+            {/* Palestine flag — emoji fallback shows "PS" on Windows/Chrome,
+                so we use an inline SVG that renders identically everywhere */}
+            <div className="flex justify-center mb-4">
+              <svg viewBox="0 0 1200 600" className="w-16 h-8 rounded shadow-md" xmlns="http://www.w3.org/2000/svg">
+                <rect width="1200" height="200" fill="#000"/>
+                <rect y="200" width="1200" height="200" fill="#fff"/>
+                <rect y="400" width="1200" height="200" fill="#007a3d"/>
+                <polygon points="0,0 600,300 0,600" fill="#ce1126"/>
+              </svg>
+            </div>
             <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
               رحلتك القادمة تنتظرك!
             </h2>
