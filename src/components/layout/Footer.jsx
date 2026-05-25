@@ -10,6 +10,7 @@ const quickLinks = [
   { label: "أنشر رحلة",     path: "/create-trip" },
   { label: "كيف تعمل؟",    path: "/how-it-works" },
   { label: "المجتمع",       path: "/community" },
+  { label: "المدونة",       path: "/blog" },
   { label: "المفضلة",       path: "/favorites" },
 ];
 

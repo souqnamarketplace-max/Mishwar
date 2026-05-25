@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
-import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet, Inbox, LayoutDashboard } from "lucide-react";
+import { Home, Search, MapPin, MessageSquare, User, ArrowLeft, ArrowRight, Menu, X, Settings, HelpCircle, LogOut, Shield, Info, FileText, MessageSquarePlus, Plus, Heart, BookOpen, Bell, ShieldCheck, Sparkles, Car, CreditCard, Users, Flag, Wallet, Inbox, LayoutDashboard, Newspaper } from "lucide-react";
 import { Link as RouterLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { api } from "@/api/apiClient";
@@ -570,6 +570,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   { icon: Sparkles,          label: "ما الجديد",          path: "/whats-new" },
                   { icon: BookOpen,        label: "كيف يعمل مشوارو",    path: "/how-it-works" },
                 { icon: Users,             label: "مجتمع مشواروو",      path: "/community" },
+                { icon: Newspaper,         label: "المدونة",             path: "/blog" },
                 { icon: Bell,           label: "إشعاراتي ومساراتي",  path: "/notifications" },
                 { icon: MessageSquarePlus, label: "اقتراحات وشكاوى", path: "/feedback" },
                 { icon: HelpCircle,     label: "المساعدة",            path: "/help" },
@@ -680,6 +681,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                       { icon: Search,   label: "بحث عن رحلة",     path: "/search" },
                       { icon: BookOpen, label: "كيف يعمل مشوارو", path: "/how-it-works" },
                       { icon: Users,    label: "مجتمع مشوارو",    path: "/community" },
+                      { icon: Newspaper, label: "المدونة",          path: "/blog" },
                     ].map(({ icon: Icon, label, path }) => (
                       <Link
                         key={path}

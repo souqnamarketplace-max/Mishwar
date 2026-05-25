@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard, Sparkles, HelpCircle, MessageSquarePlus } from "lucide-react";
+import { Bell, MessageSquare, Menu, X, Search, LogOut, Settings, Inbox, ShieldCheck, Plus, LayoutDashboard, Sparkles, HelpCircle, MessageSquarePlus, Newspaper } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/apiClient";
@@ -326,6 +326,14 @@ export default function Navbar() {
                     >
                       <HelpCircle className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm font-medium">المساعدة</span>
+                    </Link>
+                    <Link
+                      to="/blog"
+                      onClick={() => setProfileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
+                    >
+                      <Newspaper className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">المدونة</span>
                     </Link>
                     <Link
                       to="/feedback"
