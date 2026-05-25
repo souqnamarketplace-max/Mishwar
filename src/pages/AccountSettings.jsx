@@ -8,6 +8,7 @@ import DateInput from "@/components/shared/DateInput";
 import { captureException } from "@/lib/sentry";
 import { logAdminAction } from "@/lib/adminAudit";
 import { notifyAdmin } from "@/lib/notifyAdmin";
+import { notifyUser } from "@/lib/notifyUser";
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { api } from "@/api/apiClient";
@@ -551,30 +552,27 @@ export default function AccountSettings() {
         ? `${user?.full_name || user?.email} قام بتحديث وثائق مركبته الجديدة (التأمين + الترخيص). يرجى مراجعتها والموافقة.`
         : `${user?.full_name || user?.email} قام برفع وثائق التحقق من السائق. يرجى مراجعتها والموافقة.`;
       
-      const { error: adminNotifErr } = await supabase
-        .from("notifications")
-        .insert({
-          user_email: "souqnamarketplace@gmail.com",
-          title: adminTitle,
-          message: adminMessage,
-          type: isReverification ? "admin_vehicle_change" : "admin_license_pending",
-          is_read: false,
-          link: "/dashboard?tab=licenses",
-        });
-      if (adminNotifErr) console.warn("admin notif error:", adminNotifErr); // non-fatal
+      // Notify admin via notifyAdmin RPC.
+      // CRITICAL: was previously using direct supabase.from("notifications").insert
+      // which the RLS policy silently rejected (drivers can't write to other
+      // users' notification rows). notifyAdmin uses Rule C of create_notification
+      // (any authenticated user can ping admins), so this actually delivers.
+      await notifyAdmin({
+        title: adminTitle,
+        message: adminMessage,
+        link: "/dashboard?tab=licenses",
+        type: isReverification ? "admin_vehicle_change" : "admin_license_pending",
+      });
       
-      // Also notify the driver: confirmation that docs were received
-      const { error: driverNotifErr } = await supabase
-        .from("notifications")
-        .insert({
-          user_email: user?.email,
-          title: "⏳ وثائقك قيد المراجعة",
-          message: "تم استلام وثائقك بنجاح وهي قيد المراجعة. سيتم إشعارك خلال 1-3 أيام عمل بنتيجة المراجعة.",
-          type: "license_submitted",
-          is_read: false,
-          link: "/settings?section=verification",
-        });
-      if (driverNotifErr) console.warn("driver notif error:", driverNotifErr); // non-fatal
+      // Notify the driver: confirmation that docs were received.
+      // Self-targeted notifications work via Rule A of create_notification.
+      await notifyUser({
+        user_email: user?.email,
+        title: "⏳ وثائقك قيد المراجعة",
+        message: "تم استلام وثائقك بنجاح وهي قيد المراجعة. سيتم إشعارك خلال 1-3 أيام عمل بنتيجة المراجعة.",
+        type: "license_submitted",
+        link: "/settings?section=verification",
+      });
       
       qc.invalidateQueries({ queryKey: ["driver-license", user?.email] });
       qc.invalidateQueries({ queryKey: ["driver-license", user?.id] });

@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
+import { notifyUser } from "@/lib/notifyUser";
+import { notifyAdmin } from "@/lib/notifyAdmin";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Car, Save, Camera, Loader2, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -162,32 +164,28 @@ export default function DriverVehicleEditor() {
         }
         
         // Notification to driver: in-app bell entry as a persistent record
-        // (the toast is transient - this stays in their notifications list)
-        const { error: notifErr } = await supabase
-          .from("notifications")
-          .insert({
-            user_email: user.email,
-            title: "⚠️ مطلوب: تحديث وثائق المركبة",
-            message: `قمت بتغيير بيانات مركبتك (${form.car_model || ""}). يجب رفع وثائق التأمين والترخيص الجديدة وانتظار الموافقة قبل نشر رحلات جديدة.`,
-            type: "vehicle_change_pending",
-            is_read: false,
-            link: "/account-settings/profile#license",
-          });
-        if (notifErr) console.warn("driver notif error:", notifErr); // non-fatal
+        // (the toast is transient — this stays in their notifications list).
+        // Use notifyUser RPC so RLS doesn't silently drop the insert.
+        await notifyUser({
+          user_email: user.email,
+          title: "⚠️ مطلوب: تحديث وثائق المركبة",
+          message: `قمت بتغيير بيانات مركبتك (${form.car_model || ""}). يجب رفع وثائق التأمين والترخيص الجديدة وانتظار الموافقة قبل نشر رحلات جديدة.`,
+          type: "vehicle_change_pending",
+          link: "/account-settings/profile#license",
+        });
         
-        // Notification to admins (broadcast to admin role via notifications
-        // table — admin dashboard polls this for verification queue alerts)
-        const { error: adminNotifErr } = await supabase
-          .from("notifications")
-          .insert({
-            user_email: "souqnamarketplace@gmail.com", // admin email
-            title: "🚗 سائق غيّر بيانات مركبته",
-            message: `${user.full_name || user.email} قام بتغيير بيانات مركبته ويحتاج إلى موافقة على الوثائق الجديدة.`,
-            type: "admin_vehicle_change",
-            is_read: false,
-            link: "/dashboard/licenses",
-          });
-        if (adminNotifErr) console.warn("admin notif error:", adminNotifErr); // non-fatal
+        // Notification to admin via notifyAdmin RPC.
+        // CRITICAL: was previously using direct supabase.from("notifications").insert
+        // which the notifications_insert RLS policy silently rejected (drivers
+        // can't write to other users' notification rows). Admin never got
+        // pinged about vehicle changes. notifyAdmin uses Rule C of the
+        // create_notification RPC (any authenticated user can ping admins),
+        // so this now actually delivers.
+        await notifyAdmin({
+          title: "🚗 سائق غيّر بيانات مركبته",
+          message: `${user.full_name || user.email} قام بتغيير بيانات مركبته ويحتاج إلى موافقة على الوثائق الجديدة.`,
+          link: "/dashboard?tab=licenses",
+        });
       }
       
       await qc.invalidateQueries({ queryKey: ["me"] });

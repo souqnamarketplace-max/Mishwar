@@ -7,6 +7,7 @@ import { Settings, Save, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { useConfirm } from "@/hooks/useConfirm";
+import { logAdminAction } from "@/lib/adminAudit";
 
 const defaultSettings = {
   // Commission default is 0% — the launch posture is "drivers keep
@@ -109,6 +110,26 @@ export default function DashboardSettings() {
         const { error } = await supabase.from("app_settings").insert(payload);
         if (error) throw error;
       }
+      
+      // Audit-log the change. Compute diff vs existing settings so the log
+      // shows which keys actually changed rather than dumping the full
+      // settings blob each time. app_settings changes are high-impact
+      // (subscription kill switch, commission rate, etc.) so they need
+      // a trail for accountability.
+      const changes = {};
+      if (existingSettings) {
+        for (const key of Object.keys(payload)) {
+          if (existingSettings[key] !== payload[key]) {
+            changes[key] = { from: existingSettings[key], to: payload[key] };
+          }
+        }
+      }
+      logAdminAction(
+        "app_settings_updated",
+        "app_settings",
+        existingSettings?.id || "new",
+        Object.keys(changes).length > 0 ? changes : payload
+      );
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["app_settings"] });

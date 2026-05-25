@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import ModalPortal from "@/components/shared/ModalPortal";
 import Pagination from "@/components/dashboard/Pagination";
 import { logAdminAction } from "@/lib/adminAudit";
+import { notifyUser } from "@/lib/notifyUser";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { resolveDocumentUrls } from "@/lib/licenseUrls";
@@ -117,20 +118,17 @@ export default function DashboardLicenses() {
         .eq("email", license.driver_email);
       if (profErr) console.warn("verification_pending reset error:", profErr); // non-fatal
       
-      // Notify driver — use supabase direct (admin RLS path) so the bell
-      // entry gets written and tappable. Link to settings where driver can
-      // see their verified status and access driver features.
-      const { error: notifErr } = await supabase
-        .from("notifications")
-        .insert({
-          user_email: license.driver_email,
-          title: "تم توثيق حسابك ✓",
-          message: "تم التحقق من جميع وثائقك. يمكنك الآن نشر الرحلات بصفة سائق موثّق.",
-          type: "license_approved",
-          is_read: false,
-          link: "/settings?section=verification",
-        });
-      if (notifErr) console.warn("notif insert error:", notifErr); // non-fatal
+      // Notify driver via notifyUser RPC.
+      // Admin has direct-insert permission via Rule B, but using the RPC is
+      // safer (consistent error handling, server-side authorization checks,
+      // protection against future RLS tightening).
+      await notifyUser({
+        user_email: license.driver_email,
+        title: "تم توثيق حسابك ✓",
+        message: "تم التحقق من جميع وثائقك. يمكنك الآن نشر الرحلات بصفة سائق موثّق.",
+        type: "license_approved",
+        link: "/settings?section=verification",
+      });
     },
     onSuccess: (_, licenseId) => {
       qc.invalidateQueries({ queryKey: ["licenses"] });
@@ -158,18 +156,14 @@ export default function DashboardLicenses() {
         })
         .eq("id", licenseId);
       if (updErr) throw updErr;
-      // Notify driver — direct supabase write
-      const { error: notifErr } = await supabase
-        .from("notifications")
-        .insert({
-          user_email: license.driver_email,
-          title: "لم يتم توثيق حسابك ✗",
-          message: `لم يتم التحقق من وثائقك. السبب: ${reason}. يمكنك إعادة الرفع من صفحة الإعدادات.`,
-          type: "license_rejected",
-          is_read: false,
-          link: "/account-settings/profile#license",
-        });
-      if (notifErr) console.warn("notif insert error:", notifErr); // non-fatal
+      // Notify driver via notifyUser RPC (consistent error handling).
+      await notifyUser({
+        user_email: license.driver_email,
+        title: "لم يتم توثيق حسابك ✗",
+        message: `لم يتم التحقق من وثائقك. السبب: ${reason}. يمكنك إعادة الرفع من صفحة الإعدادات.`,
+        type: "license_rejected",
+        link: "/account-settings/profile#license",
+      });
     },
     onSuccess: (_, licenseId) => {
       qc.invalidateQueries({ queryKey: ["licenses"] });
