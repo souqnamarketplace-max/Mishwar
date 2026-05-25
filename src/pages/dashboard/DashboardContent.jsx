@@ -589,6 +589,11 @@ function TeamMemberEditor({ value, onChange, onSave, onCancel, saving }) {
 // Blog
 // ============================================================================
 function nowISO() { return new Date().toISOString(); }
+function toSlug(title) {
+  const base = (title || "").trim().toLowerCase()
+    .replace(/\s+/g, "-").replace(/[^a-z0-9\u0600-\u06FF-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
+  return (base || "post") + "-" + Date.now();
+}
 const EMPTY_POST = {
   title: "", slug: "", excerpt: "", body: "", emoji: "📝",
   category: "", cover_url: "", author_name: "",
@@ -627,6 +632,9 @@ function BlogTab() {
       // If publishing for the first time and no published_at set, stamp it
       const out = { ...form };
       if (out.is_published && !out.published_at) out.published_at = nowISO();
+      // slug UNIQUE constraint — empty string collides across multiple posts.
+      // Auto-generate from title when blank so every post gets a unique slug.
+      if (!out.slug || out.slug.trim() === "") out.slug = toSlug(out.title);
       if (out.id) {
         const { id, ...patch } = out;
         const { error } = await supabase.from("blog_posts").update(patch).eq("id", id);
