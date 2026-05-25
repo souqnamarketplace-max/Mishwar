@@ -246,7 +246,23 @@ export default function FeaturedTrips() {
         emitted.add(key);
         deduped.push(seen.get(key));
       }
-      return deduped.slice(0, 6);
+      // Cap at 1 trip per driver so a driver who posts recurring daily trips
+      // cannot fill all homepage slots with the same route. Keep the soonest
+      // upcoming trip for each driver (deduped is already date-sorted via
+      // the newest-first fetch → isTripExpired filter keeps future trips).
+      const perDriver = new Set();
+      const diverse = deduped.filter(t => {
+        if (perDriver.has(t.driver_email)) return false;
+        perDriver.add(t.driver_email);
+        return true;
+      });
+      // Prefer trips whose from_city matches the user's saved city so the
+      // section title "رحلات قريبة منك" is accurate. Falls back to all
+      // trips when the user has no city set or no nearby trips exist.
+      const userCity = user?.city || "";
+      const nearby = userCity ? diverse.filter(t => t.from_city === userCity) : [];
+      const result = nearby.length >= 2 ? nearby : diverse;
+      return result.slice(0, 6);
     },
     [trips_unfiltered, blockedSet]
   );
