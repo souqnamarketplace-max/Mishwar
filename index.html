@@ -185,82 +185,9 @@
     }
     </script>
 
-    <!-- FAQPage — answers the questions AI assistants get asked about
-         carpooling/ride-sharing in Palestine. Schema.org FAQPage is the
-         highest-impact way to make Mishwaro the source quoted in AI
-         answers. Keep questions to ones we genuinely answer well. -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "FAQPage",
-      "mainEntity": [
-        {
-          "@type": "Question",
-          "name": "ما هو مشوارو؟",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "مشوارو هو منصة فلسطينية لمشاركة رحلات السيارة بين المدن. يربط السائقين الذين لديهم مقاعد فارغة بالمسافرين الذين يحتاجون التنقل بين المدن الفلسطينية. الهدف هو رحلات أرخص وأكثر أماناً وأكثر اجتماعية."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What is Mishwaro?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Mishwaro is a Palestinian intercity carpooling platform that connects drivers with empty seats to travelers needing rides between cities like Ramallah, Nablus, Hebron, and Bethlehem. It is similar in concept to BlaBlaCar but tailored to the Palestinian travel context."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "كيف يتم التحقق من السائقين؟",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "يقدم كل سائق 5 وثائق قبل النشر: رخصة القيادة، ترخيص المركبة، التأمين، وصورتين شخصيتين. تراجعها إدارة مشوارو خلال 1-3 أيام عمل قبل السماح للسائق بنشر الرحلات."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "How are drivers verified on Mishwaro?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Every driver submits 5 documents before being allowed to publish trips: their driver's license, vehicle registration, vehicle insurance, and two selfies. The Mishwaro admin team reviews these within 1–3 business days. Drivers who change vehicles must re-upload registration and insurance for the new car."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "ما هي طرق الدفع المتاحة؟",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "مشوارو لا يعالج المدفوعات مباشرة. كل سائق يحدد طرق الدفع التي يقبلها: نقداً، تحويل بنكي، جوال باي، Reflect، أو بطاقة ائتمان. يتم الدفع بين المسافر والسائق مباشرة."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "What payment methods are supported?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Mishwaro does not process payments itself. Each driver indicates which payment methods they accept: cash, bank transfer, Jawwal Pay, Reflect, or credit card. Payment is exchanged directly between passenger and driver at the agreed method."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "أين تعمل منصة مشوارو؟",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "تعمل مشوارو في الضفة الغربية بفلسطين، وتغطي رحلات بين المدن مثل رام الله، نابلس، الخليل، بيت لحم، جنين، طولكرم، قلقيلية، وأريحا."
-          }
-        },
-        {
-          "@type": "Question",
-          "name": "Where does Mishwaro operate?",
-          "acceptedAnswer": {
-            "@type": "Answer",
-            "text": "Mishwaro operates in the West Bank, Palestine. Routes covered include Ramallah, Nablus, Hebron (al-Khalil), Bethlehem, Jenin, Tulkarm, Qalqilya, and Jericho, with new cities added based on demand."
-          }
-        }
-      ]
-    }
-    </script>
+    <!-- FAQPage JSON-LD lives in Help.jsx (via useSEO) so it is only
+         injected on /help — not on every route. Having it here AND there
+         caused Google to report "2 invalid unnamed items" on /help. -->
 
     <script type="application/ld+json">
     {
