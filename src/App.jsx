@@ -94,6 +94,7 @@ const Onboarding       = lazy(() => import('./pages/Onboarding'));
 const BecomeDriver     = lazy(() => import('./pages/BecomeDriver'));
 const AboutUs          = lazy(() => import('./pages/AboutUs'));
 const Blog             = lazy(() => import('./pages/Blog'));
+const BlogPostPage     = lazy(() => import('./pages/BlogPostPage'));
 const Safety           = lazy(() => import('./pages/Safety'));
 const AccountSettings  = lazy(() => import('./pages/AccountSettings'));
 const AccountHub       = lazy(() => import('./components/account/AccountHub'));
@@ -198,6 +199,7 @@ const AuthenticatedApp = () => {
         <Route path="/about" element={<AboutUs />} />
         <Route path="/about-us" element={<AboutUs />} />
         <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
         <Route path="/safety" element={<Safety />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />

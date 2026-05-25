@@ -61,7 +61,7 @@ export default function Blog() {
       {posts.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {posts.map((post) => (
-            <div key={post.id} className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-md transition-all">
+            <Link key={post.id} to={`/blog/${post.slug || post.id}`} className="bg-card rounded-2xl border border-border overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all block">
               {post.cover_url
                 ? <div className="h-28 overflow-hidden">
                     <img loading="lazy" decoding="async" src={post.cover_url} alt="" className="w-full h-full object-cover" />
@@ -94,7 +94,7 @@ export default function Blog() {
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
