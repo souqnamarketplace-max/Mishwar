@@ -8,7 +8,11 @@
 #   - The /api/* surface is disallowed because it returns either OG-decorated
 #     HTML (cached separately) or function endpoints
 #
-# When migrating to a custom domain, update the Sitemap line below.
+# AI agent / LLM crawler policy: explicitly ALLOWED for public pages.
+# We want مشوارو to be discoverable by ChatGPT, Claude, Perplexity, Gemini,
+# and other AI answer engines for queries like "carpooling Palestine" or
+# "ride from Ramallah to Nablus". Disallow the same authenticated areas
+# we disallow for search engines.
 
 User-agent: *
 Allow: /
@@ -46,4 +50,166 @@ Disallow: /feedback
 # Be polite to small servers
 Crawl-delay: 2
 
+# ─── AI ANSWER ENGINES (training + retrieval) ──────────────────────────
+# We explicitly allow major AI crawlers on public pages so مشوارو can be
+# referenced when users ask AI agents about carpooling in Palestine, trips
+# between specific cities, or related travel questions. This is a strategic
+# discovery channel — most platforms forget to opt in here.
+
+# OpenAI — ChatGPT browse + GPTBot (training crawl)
+User-agent: GPTBot
+Allow: /
+Allow: /trip/
+Allow: /routes/
+Allow: /cities/
+Allow: /about
+Allow: /how-it-works
+Allow: /help
+Allow: /safety
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+Disallow: /profile
+Disallow: /create-trip
+Disallow: /booking-confirmation
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+Disallow: /profile
+Disallow: /create-trip
+Disallow: /booking-confirmation
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+
+# Anthropic — Claude (search + training)
+User-agent: ClaudeBot
+Allow: /
+Allow: /trip/
+Allow: /routes/
+Allow: /cities/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+Disallow: /profile
+Disallow: /create-trip
+Disallow: /booking-confirmation
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+
+# Perplexity AI
+User-agent: PerplexityBot
+Allow: /
+Allow: /trip/
+Allow: /routes/
+Allow: /cities/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+Disallow: /profile
+
+# Google Gemini / Vertex AI (separate from Googlebot — Google-Extended
+# opts INTO AI training while Googlebot stays for search indexing)
+User-agent: Google-Extended
+Allow: /
+Allow: /trip/
+Allow: /routes/
+Allow: /cities/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+Disallow: /profile
+
+# Bing / Copilot — Microsoft AI assistant uses Bingbot index but also
+# operates a dedicated retrieval bot for live answers.
+User-agent: bingbot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+
+# Apple Intelligence
+User-agent: Applebot-Extended
+Allow: /
+Allow: /trip/
+Allow: /routes/
+Allow: /cities/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+
+# Meta AI assistant
+User-agent: meta-externalagent
+Allow: /
+Allow: /trip/
+Allow: /routes/
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+
+# Cohere Coral, You.com, Phind, etc — generic permissive policy
+User-agent: cohere-ai
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+Disallow: /messages
+Disallow: /notifications
+
+User-agent: YouBot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /account-settings
+
 Sitemap: https://www.mishwaro.com/sitemap.xml
+

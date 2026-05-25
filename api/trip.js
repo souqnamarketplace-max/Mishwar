@@ -222,6 +222,78 @@ export default async function handler(req, res) {
     if (!html.includes('rel="canonical"')) {
       html = html.replace("</head>", `<link rel="canonical" href="${esc(tripUrl)}" />\n</head>`);
     }
+
+    // Per-trip JSON-LD. Three blocks injected:
+    //   1. TouristTrip — Schema.org type that maps well to a published ride
+    //   2. BreadcrumbList — Home > Cities > {from_city} > Trip
+    //   3. Offer — price per seat, in Israeli new shekel
+    //
+    // These give AI agents (ChatGPT browse, Claude, Perplexity, Gemini) a
+    // structured object to extract: route, date, price, driver name,
+    // available seats. When a user asks an AI "find me a ride from
+    // Ramallah to Nablus on Friday", the agent can quote our trip pages
+    // directly with accurate data instead of vague summaries.
+    const tripLd = {
+      "@context": "https://schema.org",
+      "@type": "TouristTrip",
+      "name": title,
+      "description": desc,
+      "url": tripUrl,
+      "image": ogImage,
+      "touristType": "Carpooling passengers",
+      "itinerary": {
+        "@type": "ItemList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "item": { "@type": "Place", "name": from, "addressCountry": "PS" }
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "item": { "@type": "Place", "name": to, "addressCountry": "PS" }
+          }
+        ]
+      },
+      "offers": {
+        "@type": "Offer",
+        "price": String(price || ""),
+        "priceCurrency": "ILS",
+        "availability": seats > 0 ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
+        "validFrom": trip.date || undefined,
+        "url": tripUrl
+      },
+      "provider": {
+        "@type": "Organization",
+        "name": "مشوارو",
+        "url": APP_URL
+      }
+    };
+    if (trip.date) tripLd.startDate = trip.date;
+    if (rating && trip.driver_rating) {
+      tripLd.aggregateRating = {
+        "@type": "AggregateRating",
+        "ratingValue": Number(trip.driver_rating).toFixed(1),
+        "bestRating": "5",
+        "ratingCount": "1"
+      };
+    }
+
+    const breadcrumbLd = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "الرئيسية", "item": APP_URL },
+        { "@type": "ListItem", "position": 2, "name": from, "item": `${APP_URL}/cities/${encodeURIComponent(from)}` },
+        { "@type": "ListItem", "position": 3, "name": `${from} → ${to}`, "item": tripUrl }
+      ]
+    };
+
+    const ldHtml =
+      `<script type="application/ld+json">${JSON.stringify(tripLd)}</script>\n` +
+      `<script type="application/ld+json">${JSON.stringify(breadcrumbLd)}</script>\n`;
+    html = html.replace("</head>", `${ldHtml}</head>`);
   } else {
     // Trip not found in DB (deleted, expired, or never existed). This is
     // THE soft-404 scenario that Google Search Console flagged. Without

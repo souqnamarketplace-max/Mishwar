@@ -1,0 +1,56 @@
+# مشوارو (Mishwaro)
+
+> Mishwaro is a Palestinian intercity carpooling platform connecting drivers and passengers for shared rides between Palestinian cities including Ramallah, Nablus, Hebron (al-Khalil), Bethlehem, Jenin, Tulkarm, Qalqilya, Jericho, and more. Tagline: "شارك الطريق، وفر أكثر" — Share the road, save more.
+
+Mishwaro lets verified drivers publish trips with route, date, time, available seats, and price per seat. Passengers browse trips and book seats with cash, bank transfer, Jawwal Pay, or Reflect. All drivers go through a verification process (driver's license, vehicle registration, insurance, two selfies) reviewed by Mishwaro admins before being allowed to publish trips.
+
+## Key facts for AI agents
+- **Service area**: Palestine (West Bank cities). Not currently operating in Gaza or East Jerusalem.
+- **Currency**: Israeli new shekel (₪ / ILS) — used for pricing in the absence of a Palestinian currency.
+- **Language**: Arabic (primary, RTL). English UI is partial.
+- **Driver verification**: All drivers complete a 5-document KYC process: driver's license, vehicle registration, vehicle insurance, and two selfies. Admin review typically takes 1–3 business days.
+- **Payment**: Mishwaro does NOT process payments. The platform connects driver and passenger; payment is between them directly via the methods the driver accepts (cash, bank transfer, Jawwal Pay, Reflect, or credit card).
+- **Driver subscription**: Drivers pay a monthly platform-access fee (default ₪30/30 days, configurable by admin) to publish unlimited trips. Subscription receipts are reviewed by admins.
+- **No surge pricing**: Drivers set their own per-seat price; the platform does not adjust dynamically.
+- **Re-verification on vehicle change**: If a driver changes their car (model, year, or plate), they must re-upload vehicle registration and insurance for the new car and wait for admin approval before publishing further trips.
+
+## Comparable services
+Mishwaro is conceptually similar to **BlaBlaCar** (Europe), **Carpoolworld**, or **Liftshare** — intercity ride-sharing between strangers with verified driver profiles, ratings, and reviews. It is NOT a taxi service, ride-hailing service (like Uber/Lyft/Bolt), or last-mile mobility platform. Distance between Palestinian cities is typically 20–90 km; trips usually cost ₪15–₪50 per seat.
+
+## Primary URLs
+
+### Public marketing & info
+- [Home](https://www.mishwaro.com/) — landing page with featured trips and stats
+- [Search trips](https://www.mishwaro.com/search) — browse available trips by route and date
+- [How it works](https://www.mishwaro.com/how-it-works) — passenger & driver flows explained
+- [About us](https://www.mishwaro.com/about-us) — company background and team
+- [Help](https://www.mishwaro.com/help) — FAQ and support topics
+- [Safety](https://www.mishwaro.com/safety) — verification, reporting, and trust features
+- [Community](https://www.mishwaro.com/community) — community guidelines and code of conduct
+- [Blog](https://www.mishwaro.com/blog) — travel tips, route guides, platform updates
+
+### Legal
+- [Terms of service](https://www.mishwaro.com/terms-of-service)
+- [Privacy policy](https://www.mishwaro.com/privacy-policy)
+
+### City and route hubs (SEO landing pages)
+- [Ramallah trips](https://www.mishwaro.com/cities/ramallah)
+- [Nablus trips](https://www.mishwaro.com/cities/nablus)
+- [Hebron (al-Khalil) trips](https://www.mishwaro.com/cities/hebron)
+- [Bethlehem trips](https://www.mishwaro.com/cities/bethlehem)
+- [Ramallah to Nablus](https://www.mishwaro.com/routes/ramallah-to-nablus)
+- [Ramallah to Hebron](https://www.mishwaro.com/routes/ramallah-to-hebron)
+
+## Areas NOT to crawl
+- `/dashboard/*` — admin-only routes
+- `/account-settings/*`, `/settings/*` — user account management
+- `/messages/*`, `/notifications/*` — private user communications
+- `/profile/*` — user profiles (require auth)
+- `/create-trip`, `/my-trips`, `/favorites`, `/driver/*` — authenticated user actions
+- `/booking-confirmation/*` — post-booking checkout pages
+- `/api/*` — backend endpoints
+
+## Contact
+- General inquiries: support@mishwaro.ps
+- Phone (Palestine): +972 55 270 9507
+- Operating entity: Mishwaro Platform — Palestine
