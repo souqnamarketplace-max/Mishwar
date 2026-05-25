@@ -198,11 +198,19 @@ export default function TripDetails() {
     setFavorited(!favorited);
   };
 
+  // Fetch driver's profile to enrich the trip's denormalized fields
+  // with the LATEST profile data (avatar, bio, car image, etc.).
+  //
+  // CRITICAL: trips.driver_id is the auth user UUID; profiles.id IS the
+  // same UUID (FK to auth.users). The old query used filter({ created_by:
+  // tripData.driver_id }) which is WRONG — created_by is email text, not
+  // UUID. The lookup silently failed (no rows returned), driverProfile
+  // was always null, and the "عرض الملف" link was permanently disabled.
+  // Use .get(driver_id) to look up by primary key.
   const { data: driverProfile } = useQuery({
     queryKey: ["driver-profile", tripData?.driver_id],
-    queryFn: () => api.entities.Profile.filter({ created_by: tripData.driver_id }, "-created_at", 1),
+    queryFn: () => api.entities.Profile.get(tripData.driver_id),
     enabled: !!tripData?.driver_id,
-    select: (data) => data?.[0] || null,
   });
 
   // Fetch driver's trips to calculate real stats (acceptance rate, completed trips)
@@ -220,6 +228,32 @@ export default function TripDetails() {
     enabled: !!tripData?.driver_email,
     staleTime: 60_000,
   });
+
+  // Fetch driver's license to surface their verification status to passengers.
+  // The "موثق" badge MUST reflect reality — previously it was hardcoded TRUE
+  // for every driver, which is misleading for passengers comparing trips
+  // and a trust issue (a non-verified driver looked identical to a verified
+  // one). Now: badge only renders when latest license is approved AND profile
+  // has no pending re-verification (vehicle change resets to pending).
+  const { data: driverLicense } = useQuery({
+    queryKey: ["driver-license-status", tripData?.driver_email],
+    queryFn: async () => {
+      if (!tripData?.driver_email) return null;
+      const { data, error } = await supabase
+        .from("driver_licenses")
+        .select("status")
+        .eq("driver_email", tripData.driver_email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return null; // non-fatal — badge just won't show
+      return data;
+    },
+    enabled: !!tripData?.driver_email,
+    staleTime: 300_000, // 5min — verification doesn't change often
+  });
+  const isDriverVerified = driverLicense?.status === "approved" 
+    && !driverProfile?.verification_pending;
 
   // Calculate real driver stats
   const driverStats = (() => {
@@ -732,45 +766,54 @@ export default function TripDetails() {
           {/* Driver */}
           <div className="bg-card rounded-2xl border border-border p-5">
             <h3 className="font-bold text-foreground mb-4">عن السائق</h3>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary shrink-0 overflow-hidden">
+            
+            {/* Top row: avatar, name+rating, favorite button.
+                Profile link moved to its own row BELOW for cleaner
+                mobile layout (the old layout had 4 items competing for
+                horizontal space — avatar, name, fav-btn, profile-link —
+                which wrapped badly on narrow screens, see uploaded
+                screenshot showing 3-line name and tiny profile link). */}
+            <div className="flex items-center gap-3 mb-3">
+              <Link
+                to={driverProfile?.id ? `/profile/${driverProfile.id}` : "#"}
+                className={`w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary shrink-0 overflow-hidden ${
+                  driverProfile?.id ? "cursor-pointer hover:ring-2 hover:ring-primary/30 transition" : ""
+                }`}
+                aria-label="عرض ملف السائق"
+              >
                 {trip.driver_avatar ? (
                   <img loading="lazy" decoding="async" src={trip.driver_avatar} alt="" className="w-full h-full object-cover" />
                 ) : (
                   trip.driver_name?.[0] || "م"
                 )}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-bold">{trip.driver_name || "السائق"}</h4>
-                  <Badge className="bg-accent/10 text-accent text-xs">موثق</Badge>
+              </Link>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-bold truncate">{trip.driver_name || "السائق"}</h4>
+                  {/* "موثق" badge ONLY when verification is actually confirmed.
+                      Previously was shown unconditionally — misleading for
+                      drivers who hadn't completed verification yet, and
+                      undermines trust when an unverified driver wears the
+                      same badge as a verified one. */}
+                  {isDriverVerified && (
+                    <Badge className="bg-accent/10 text-accent text-xs">موثق ✓</Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
                   <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
                   <span className="text-sm font-medium">{trip.driver_rating ? trip.driver_rating.toFixed(1) : "جديد"}</span>
-                  <span className="text-xs text-muted-foreground">{trip.driver_reviews_count ? `(${trip.driver_reviews_count} تقييم)` : "(لا يوجد تقييم بعد)"}</span>
+                  <span className="text-xs text-muted-foreground">{trip.driver_reviews_count ? `(${trip.driver_reviews_count} تقييم)` : "(لا توجد تقييمات بعد)"}</span>
                 </div>
               </div>
-              {/* Driver-favorite button — server-side, syncs with the
-                  list-view UserPlus icons via shared react-query cache.
-                  Only shown when:
-                    - Viewer is logged in (anonymous viewers can't favorite)
-                    - Viewer isn't the driver themselves (no self-favoriting;
-                      enforced by mig 076 CHECK constraint too, but hiding
-                      the UI avoids a confusing toast on tap)
-                    - Driver email is known (legacy rows without driver_email
-                      shouldn't even render — match the TripCard guard)
-                  Positioned BEFORE "عرض الملف ←" so it doesn't push the
-                  profile link off the row on narrow screens. */}
+              {/* Driver-favorite button — server-side, syncs with list-view
+                  hearts via shared react-query cache. 44x44 for Apple HIG /
+                  WCAG 2.5.5 minimum touch target. */}
               {user?.email && !isOwnTrip && trip?.driver_email && (
                 <button
                   onClick={toggleDriverFavorite}
                   aria-label={driverFavorited ? "إلغاء تفضيل السائق" : "إضافة السائق للمفضلة"}
                   title={driverFavorited ? "سائق مفضل — اضغط للإلغاء" : "أضف السائق للمفضلة"}
-                  // 44x44 to satisfy Apple HIG / WCAG 2.5.5 minimum
-                  // touch target. The original 36x36 (w-9 h-9) was a
-                  // borderline fail likely flagged in App Store review.
-                  className={`shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-xl transition-colors mr-1 ${
+                  className={`shrink-0 inline-flex items-center justify-center w-11 h-11 rounded-xl transition-colors ${
                     driverFavorited
                       ? "text-rose-500 hover:bg-rose-500/10 bg-rose-500/5 active:bg-rose-500/20"
                       : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/8 active:bg-rose-500/15"
@@ -781,22 +824,21 @@ export default function TripDetails() {
                     : <UserPlus  className="w-5 h-5" aria-hidden="true" />}
                 </button>
               )}
-              {/* Driver profile link uses the canonical UUID path so the
-                  driver's email doesn't leak into browser history, referer
-                  headers, or analytics logs. driverProfile is fetched
-                  above; if it's not loaded yet (rare — same render frame)
-                  the link is disabled rather than falling back to email.
-                  Note: api.entities.Profile.filter() returns an ARRAY, not
-                  a single row — even with limit=1 — so we index [0] both
-                  here and on the carImage line further down. */}
-              {driverProfile?.[0]?.id ? (
-                <Link to={`/profile/${driverProfile[0].id}`} className="text-xs text-primary hover:underline">
-                  عرض الملف ←
-                </Link>
-              ) : (
-                <span className="text-xs text-muted-foreground">عرض الملف ←</span>
-              )}
             </div>
+
+            {/* Profile link as its own row — full-width button so it's
+                always tappable. Disabled state when profile hasn't loaded
+                yet (rare) or when this is the user's own trip. The link
+                uses driverProfile.id (canonical UUID) so email doesn't
+                leak into URLs, referer headers, or analytics logs. */}
+            {driverProfile?.id && !isOwnTrip ? (
+              <Link
+                to={`/profile/${driverProfile.id}`}
+                className="flex items-center justify-center gap-1.5 w-full mb-4 py-2 rounded-xl border border-border bg-muted/30 hover:bg-muted/60 text-sm font-medium text-primary transition-colors"
+              >
+                عرض الملف الكامل ←
+              </Link>
+            ) : null}
 
             {/* Real driver stats - only show if driver has enough data */}
             {driverStats.hasEnoughData && (
@@ -812,21 +854,27 @@ export default function TripDetails() {
               </div>
             )}
 
-            {/* Car */}
-            <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
-              <div className="w-20 h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                {carImage ? (
-                  <img loading="lazy" decoding="async" src={carImage} alt="سيارة السائق" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">🚗</div>
-                )}
+            {/* Car details. Show ONLY real data — never fake placeholder
+                model/color/plate values. Drivers see "كيا سيراتو 2020" as
+                their car in the preview even when they uploaded a different
+                car, because the JSX coalesced to a hardcoded string.
+                Now: if no car data, hide the row entirely. */}
+            {(trip.car_model || trip.car_color || trip.car_plate || carImage) && (
+              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
+                <div className="w-20 h-14 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                  {carImage ? (
+                    <img loading="lazy" decoding="async" src={carImage} alt="سيارة السائق" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">🚗</div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  {trip.car_model && <p className="font-bold text-sm truncate">{trip.car_model}</p>}
+                  {trip.car_color && <p className="text-xs text-muted-foreground">لون {trip.car_color}</p>}
+                  {trip.car_plate && <p className="text-xs text-muted-foreground font-mono">🔢 {trip.car_plate}</p>}
+                </div>
               </div>
-              <div>
-                <p className="font-bold text-sm">{trip.car_model || "كيا سيراتو 2020"}</p>
-                <p className="text-xs text-muted-foreground">لون {trip.car_color || "فضي"}</p>
-                <p className="text-xs text-muted-foreground">🔢 {trip.car_plate || "6-1234-95"}</p>
-              </div>
-            </div>
+            )}
 
             {/* Driver preferences chips — sibling row below the car so it sits
                 on its own line, not as a flex item of the car block.
@@ -880,53 +928,48 @@ export default function TripDetails() {
               );
             })()}
 
-            {/* Payment Methods. Must show ALL methods the driver
-                enabled. Previously the display only listed cash,
-                bank_transfer, and 'card' — missing jawwal_pay and
-                reflect entirely (drivers enabling them wouldn't see
-                them advertised here), and using 'card' as the id
-                while CreateTrip emits 'credit_card' (so even cards
-                wouldn't appear). Aligned with the canonical set
-                used in PassengerPaymentSetup. */}
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-2">طرق الدفع المقبولة</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: "cash",          label: "نقداً",       icon: "💵" },
-                  { id: "bank_transfer", label: "تحويل بنكي",  icon: "🏦" },
-                  { id: "jawwal_pay",    label: "جوال باي",     icon: "📱" },
-                  { id: "reflect",       label: "Reflect",      icon: "💳" },
-                  { id: "credit_card",   label: "بطاقة ائتمان", icon: "💳" },
-                ].map((m) => (
-                  (trip.payment_methods?.includes(m.id) || (trip.payment_methods?.length === 0 && m.id === "cash")) && (
-                    <span key={m.id} className="flex items-center gap-1 text-xs bg-accent/10 text-accent px-2 py-1 rounded-lg">
-                      <span>{m.icon}</span>
-                      {m.label}
-                    </span>
-                  )
-                ))}
+            {/* Payment Methods — only show if driver enabled at least one
+                method on this trip. Previously had a fallback that showed
+                "نقداً" for trips with no payment_methods set, which was
+                misleading (looked like the driver had explicitly enabled
+                cash). Now: empty array → hide the whole section. */}
+            {Array.isArray(trip.payment_methods) && trip.payment_methods.length > 0 && (
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground mb-2">طرق الدفع المقبولة</p>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: "cash",          label: "نقداً",       icon: "💵" },
+                    { id: "bank_transfer", label: "تحويل بنكي",  icon: "🏦" },
+                    { id: "jawwal_pay",    label: "جوال باي",     icon: "📱" },
+                    { id: "reflect",       label: "Reflect",      icon: "💳" },
+                    { id: "credit_card",   label: "بطاقة ائتمان", icon: "💳" },
+                  ].map((m) => (
+                    trip.payment_methods.includes(m.id) && (
+                      <span key={m.id} className="flex items-center gap-1 text-xs bg-accent/10 text-accent px-2 py-1 rounded-lg">
+                        <span>{m.icon}</span>
+                        {m.label}
+                      </span>
+                    )
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Driver note */}
-            <div className="mt-3 p-3 bg-primary/5 rounded-xl">
-              <p className="text-sm">
-                😊 {trip.driver_note || "مرحباً بالجميع الرحلة مريحة وآمنة إن شاء الله، يرجى التواصل معي في أي استفسار."}
-              </p>
-            </div>
+            {/* Driver note — ONLY show if driver actually wrote one.
+                Previously had a hardcoded fallback string that made every
+                trip look like it had a personal note from the driver. */}
+            {trip.driver_note && trip.driver_note.trim() && (
+              <div className="mt-3 p-3 bg-primary/5 rounded-xl">
+                <p className="text-sm leading-relaxed">
+                  😊 {trip.driver_note}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ===== RIGHT SIDEBAR ===== */}
         <div className="space-y-4">
-          {/* Driver note (right column) */}
-          <div className="bg-card rounded-2xl border border-border p-5">
-            <h3 className="font-bold text-foreground mb-3">ملاحظة من السائق</h3>
-            <p className="text-sm text-muted-foreground">
-              😊 {trip.driver_note || "مرحباً بالجميع الرحلة مريحة وآمنة إن شاء الله. يرجى التواصل معي في أي استفسار."}
-            </p>
-          </div>
-
           {/* Contact */}
           <div className="bg-card rounded-2xl border border-border p-5">
             <div className="flex items-center justify-between mb-3">
