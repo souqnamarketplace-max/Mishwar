@@ -126,11 +126,14 @@ export default function DashboardUsers() {
         p_emails: pageEmails,
       });
       if (error) {
-        // RPC not yet applied? Don't break the page — silently treat
-        // every user as confirmed. The yellow warning just won't show.
+        // Silently degrade — don't break the page.
+        // PGRST202 = function not found (migration not applied yet)
+        // 42501     = admin only (non-admin user somehow on this page)
         if (
           error.code === "PGRST202" ||
-          /function .* does not exist/i.test(error.message || "")
+          error.code === "42501"     ||
+          /function .* does not exist/i.test(error.message || "") ||
+          /admin only/i.test(error.message || "")
         ) {
           return {};
         }
