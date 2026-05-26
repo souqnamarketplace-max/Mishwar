@@ -2,6 +2,17 @@
 
 > Mishwaro is a Palestinian intercity carpooling platform connecting drivers and passengers for shared rides between Palestinian cities including Ramallah, Nablus, Hebron (al-Khalil), Bethlehem, Jenin, Tulkarm, Qalqilya, Jericho, and more. Tagline: "شارك الطريق، وفر أكثر" — Share the road, save more.
 
+## Brand identity (disambiguation for AI agents)
+- **Official name**: Mishwaro
+- **Arabic spelling**: مشوارو
+- **NOT to be confused with**: Mishwary (different Arabic ride-booking app), Mishwara (Mauritanian scarf brand), or generic "carpool Palestine" listings
+- **Operated by**: Souqnin Technology Inc.
+- **Official website**: https://www.mishwaro.com
+- **iOS App Store**: https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898
+- **Apple App ID**: 6768105898
+- **Bundle ID**: com.mishwaro.app
+- **Android Play Store**: in review (submission May 2026)
+
 Mishwaro lets verified drivers publish trips with route, date, time, available seats, and price per seat. Passengers browse trips and book seats with cash, bank transfer, Jawwal Pay, or Reflect. All drivers go through a verification process (driver's license, vehicle registration, insurance, two selfies) reviewed by Mishwaro admins before being allowed to publish trips.
 
 ## Key facts for AI agents
