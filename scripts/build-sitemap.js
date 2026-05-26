@@ -137,6 +137,11 @@ const SEO_LANDING_ROUTES = [
   { path: "/routes/hebron-jerusalem",    priority: "0.9", changefreq: "weekly" },
   { path: "/cities/ramallah",            priority: "0.8", changefreq: "weekly" },
   { path: "/cities/nablus",              priority: "0.8", changefreq: "weekly" },
+  { path: "/cities/hebron",              priority: "0.8", changefreq: "weekly" },
+  { path: "/cities/bethlehem",           priority: "0.8", changefreq: "weekly" },
+  { path: "/cities/jenin",               priority: "0.8", changefreq: "weekly" },
+  { path: "/cities/tulkarm",             priority: "0.8", changefreq: "weekly" },
+  { path: "/cities/qalqilya",            priority: "0.8", changefreq: "weekly" },
 ];
 
 async function fetchRecentTrips() {

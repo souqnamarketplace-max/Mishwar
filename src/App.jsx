@@ -113,6 +113,11 @@ const RouteJerusalemBethlehem = lazy(() => import('./pages/seo/RouteJerusalemBet
 const RouteHebronJerusalem    = lazy(() => import('./pages/seo/RouteHebronJerusalem'));
 const CityRamallah            = lazy(() => import('./pages/seo/CityRamallah'));
 const CityNablus              = lazy(() => import('./pages/seo/CityNablus'));
+const CityHebron              = lazy(() => import('./pages/seo/CityHebron'));
+const CityBethlehem           = lazy(() => import('./pages/seo/CityBethlehem'));
+const CityJenin               = lazy(() => import('./pages/seo/CityJenin'));
+const CityTulkarm             = lazy(() => import('./pages/seo/CityTulkarm'));
+const CityQalqilya            = lazy(() => import('./pages/seo/CityQalqilya'));
 
 // Page-level loading fallback
 const PageFallback = () => (
@@ -215,6 +220,11 @@ const AuthenticatedApp = () => {
         <Route path="/routes/hebron-jerusalem"    element={<RouteHebronJerusalem />} />
         <Route path="/cities/ramallah"            element={<CityRamallah />} />
         <Route path="/cities/nablus"              element={<CityNablus />} />
+        <Route path="/cities/hebron"              element={<CityHebron />} />
+        <Route path="/cities/bethlehem"           element={<CityBethlehem />} />
+        <Route path="/cities/jenin"               element={<CityJenin />} />
+        <Route path="/cities/tulkarm"             element={<CityTulkarm />} />
+        <Route path="/cities/qalqilya"            element={<CityQalqilya />} />
 
         {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />

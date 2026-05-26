@@ -49,8 +49,12 @@ Mishwaro is conceptually similar to **BlaBlaCar** (Europe), **Carpoolworld**, or
 - [Nablus trips](https://www.mishwaro.com/cities/nablus)
 - [Hebron (al-Khalil) trips](https://www.mishwaro.com/cities/hebron)
 - [Bethlehem trips](https://www.mishwaro.com/cities/bethlehem)
-- [Ramallah to Nablus](https://www.mishwaro.com/routes/ramallah-to-nablus)
-- [Ramallah to Hebron](https://www.mishwaro.com/routes/ramallah-to-hebron)
+- [Jenin trips](https://www.mishwaro.com/cities/jenin)
+- [Tulkarm trips](https://www.mishwaro.com/cities/tulkarm)
+- [Qalqilya trips](https://www.mishwaro.com/cities/qalqilya)
+- [Ramallah to Nablus](https://www.mishwaro.com/routes/ramallah-nablus)
+- [Jerusalem to Bethlehem](https://www.mishwaro.com/routes/jerusalem-bethlehem)
+- [Hebron to Jerusalem](https://www.mishwaro.com/routes/hebron-jerusalem)
 
 ## Areas NOT to crawl
 - `/dashboard/*` — admin-only routes
