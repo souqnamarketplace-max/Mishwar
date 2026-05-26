@@ -25,7 +25,7 @@ import { toast } from "sonner";
 export default function AccountSettings() {
   useSEO({ title: "الإعدادات", description: "إعدادات حسابك" });
 
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const qc = useQueryClient();
 
   // Email
@@ -222,6 +222,7 @@ export default function AccountSettings() {
     try {
       await api.auth.updateMe({ city: city || undefined });
       qc.invalidateQueries({ queryKey: ["me"] });
+      await refreshUser();
       toast.success("تم تحديث المدينة ✅");
     } catch (err) {
       toast.error(friendlyError(err, "فشل التحديث"));

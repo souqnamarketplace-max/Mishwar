@@ -265,6 +265,7 @@ export const AuthProvider = ({ children }) => {
         phone: profile?.phone ?? null,
         gender: profile?.gender ?? null,
         bio: profile?.bio ?? null,
+        city: profile?.city ?? null,
         car_model: profile?.car_model ?? null,
         car_year: profile?.car_year ?? null,
         car_color: profile?.car_color ?? null,
