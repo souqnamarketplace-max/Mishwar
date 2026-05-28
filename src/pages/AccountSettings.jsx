@@ -1281,25 +1281,49 @@ export default function AccountSettings() {
             <Mail className="w-4 h-4 text-primary" />
             البريد الإلكتروني
           </h3>
-          <div>
-            <Label>عنوان البريد</Label>
-            <div className="flex gap-2 mt-1">
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl h-10"
-              />
-              <Button
-                onClick={updateEmail}
-                disabled={emailLoading || email === user?.email}
-                className="bg-primary text-primary-foreground rounded-xl"
-              >
-                {emailLoading ? "جاري..." : "حفظ"}
-              </Button>
+          {user?.has_password ? (
+            <div>
+              <Label>عنوان البريد</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="rounded-xl h-10"
+                />
+                <Button
+                  onClick={updateEmail}
+                  disabled={emailLoading || email === user?.email}
+                  className="bg-primary text-primary-foreground rounded-xl"
+                >
+                  {emailLoading ? "جاري..." : "حفظ"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">سيتم إرسال تأكيد إلى البريد الجديد</p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">سيتم إرسال تأكيد إلى البريد الجديد</p>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex gap-2 mt-1">
+                <Input
+                  type="email"
+                  value={email}
+                  readOnly
+                  className="rounded-xl h-10 bg-muted text-muted-foreground cursor-not-allowed"
+                />
+              </div>
+              <div className="flex items-start gap-2 bg-muted/50 rounded-xl p-3 text-xs text-muted-foreground">
+                <span className="mt-0.5 text-base">
+                  {user?.providers?.includes("apple") ? "🍎" : "🔵"}
+                </span>
+                <p className="leading-relaxed">
+                  {user?.providers?.includes("apple")
+                    ? "بريدك الإلكتروني مرتبط بحساب Apple ويُدار من هناك. لا يمكن تغييره من هنا. إذا أردت استخدام بريد مختلف، ضبط كلمة مرور أولاً من القسم أدناه ثم سجّل دخولك بالطريقتين."
+                    : "بريدك الإلكتروني مرتبط بحساب Google ويُدار من هناك. لا يمكن تغييره من هنا. إذا أردت استخدام بريد مختلف، ضبط كلمة مرور أولاً من القسم أدناه ثم سجّل دخولك بالطريقتين."
+                  }
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Password Section — branches on whether the user has an
