@@ -18,7 +18,7 @@ import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Trash2, Edit2, Check, X, Megaphone, MessageSquare, Users, Newspaper, MapPin, Sparkles } from "lucide-react";
+import { FileText, Plus, Trash2, Edit2, Check, X, Megaphone, MessageSquare, Users, Newspaper, MapPin, Sparkles, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -30,6 +30,7 @@ const TABS = [
   { id: "team",          label: "الفريق",      icon: Users },
   { id: "blog",          label: "المدونة",     icon: Newspaper },
   { id: "cities",        label: "المدن",       icon: MapPin },
+  { id: "seo-pages",     label: "صفحات SEO",  icon: Globe },
 ];
 
 export default function DashboardContent() {
@@ -65,6 +66,7 @@ export default function DashboardContent() {
       {tab === "team"          && <TeamTab />}
       {tab === "blog"          && <BlogTab />}
       {tab === "cities"        && <CitiesTab />}
+      {tab === "seo-pages"     && <SeoPagesTab />}
     </div>
   );
 }
@@ -1119,6 +1121,413 @@ function ReleaseNoteEditor({ value, onChange, onSave, onCancel, saving }) {
             {value.id ? "حفظ التغييرات" : "نشر الإعلان"}
           </Button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// SEO Pages CMS — manage /cities/* and /routes/* content from the dashboard
+// without code deploys. Backed by the seo_pages table (migration 099).
+// ============================================================================
+
+const EMPTY_SEO_PAGE = {
+  slug: "",
+  page_type: "city",
+  title: "",
+  subtitle: "",
+  intro: "",
+  sections: [],          // [{ heading, body }]
+  faq: [],               // [{ q, a }]
+  related_links: [],     // [{ label, path }]
+  breadcrumbs: [],       // [{ name, path }]
+  keywords: [],
+  meta_description: "",
+  search_link: "",
+  is_published: true,
+};
+
+function SeoPagesTab() {
+  const qc = useQueryClient();
+  const { confirm, dialog: confirmDialog } = useConfirm();
+  const [editing, setEditing] = useState(null);
+  const [filter, setFilter]   = useState("all");
+
+  const { data: pages = [], isLoading } = useQuery({
+    queryKey: ["seo-pages-admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("seo_pages")
+        .select("*")
+        .order("page_type", { ascending: true })
+        .order("slug",      { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 30 * 1000,
+  });
+
+  const save = useMutation({
+    mutationFn: async (form) => {
+      const out = { ...form };
+      // Trim and validate slug
+      out.slug = (out.slug || "").trim().toLowerCase();
+      if (!out.slug) throw new Error("المعرّف (slug) مطلوب");
+      if (!/^[a-z0-9-]+$/.test(out.slug)) throw new Error("المعرّف يحتوي على رموز غير مسموحة (أحرف لاتينية صغيرة وأرقام و- فقط)");
+      if (out.id) {
+        const { id, created_at, updated_at, ...patch } = out;
+        const { error } = await supabase.from("seo_pages").update(patch).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { id, created_at, updated_at, ...insert } = out;
+        const { error } = await supabase.from("seo_pages").insert(insert);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["seo-pages-admin"] });
+      qc.invalidateQueries({ queryKey: ["seo-page"] }); // invalidate the public-facing cache too
+      toast.success("تم الحفظ");
+      setEditing(null);
+    },
+    onError: (err) => toast.error(friendlyError(err, "فشل الحفظ")),
+  });
+
+  const remove = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from("seo_pages").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["seo-pages-admin"] });
+      qc.invalidateQueries({ queryKey: ["seo-page"] });
+      toast.success("تم الحذف");
+    },
+    onError: (err) => toast.error(friendlyError(err, "فشل الحذف")),
+  });
+
+  const visible = filter === "all" ? pages : pages.filter(p => p.page_type === filter);
+
+  return (
+    <div className="space-y-3">
+      {confirmDialog}
+
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-1 bg-card border border-border rounded-lg p-1">
+          {[["all","الكل"],["city","المدن"],["route","المسارات"],["other","أخرى"]].map(([k,l]) => (
+            <button
+              key={k}
+              onClick={() => setFilter(k)}
+              className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
+                filter === k ? "bg-primary text-primary-foreground font-bold" : "text-muted-foreground hover:bg-muted/50"
+              }`}
+            >{l}</button>
+          ))}
+        </div>
+        <Button size="sm" className="gap-1 rounded-lg" onClick={() => setEditing({ ...EMPTY_SEO_PAGE })}>
+          <Plus className="w-4 h-4" />
+          صفحة جديدة
+        </Button>
+      </div>
+
+      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-xs text-yellow-900">
+        ⚠️ تغييراتك هنا تنعكس فورياً على الصفحات الحية على mishwaro.com. هذه الصفحات مفهرسة في Google — تجنب الحذف العشوائي.
+      </div>
+
+      {editing && (
+        <SeoPageEditor
+          value={editing}
+          onChange={setEditing}
+          onSave={() => save.mutate(editing)}
+          onCancel={() => setEditing(null)}
+          saving={save.isPending}
+        />
+      )}
+
+      {isLoading && <p className="text-sm text-muted-foreground p-4">جاري التحميل...</p>}
+
+      <div className="grid gap-2">
+        {visible.map((p) => (
+          <div key={p.id} className="bg-card border border-border rounded-xl p-3 flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                  p.page_type === "city" ? "bg-blue-100 text-blue-800" :
+                  p.page_type === "route" ? "bg-green-100 text-green-800" :
+                  "bg-gray-100 text-gray-800"
+                }`}>{p.page_type}</span>
+                <span className="font-bold text-sm">{p.title}</span>
+                {!p.is_published && <span className="text-[10px] bg-red-100 text-red-800 px-1.5 py-0.5 rounded">غير منشور</span>}
+              </div>
+              <a
+                href={p.page_type === "city" ? `/cities/${p.slug}` : p.page_type === "route" ? `/routes/${p.slug}` : `/${p.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline truncate block"
+              >
+                /{p.page_type === "city" ? "cities" : p.page_type === "route" ? "routes" : ""}/{p.slug}
+              </a>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {p.faq?.length || 0} سؤال · {p.sections?.length || 0} قسم · آخر تعديل: {p.updated_at ? new Date(p.updated_at).toLocaleDateString("ar-EG") : "—"}
+              </p>
+            </div>
+            <div className="flex gap-1 shrink-0">
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setEditing(p)} title="تعديل">
+                <Edit2 className="w-4 h-4" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                onClick={async () => {
+                  if (await confirm({ title: "حذف هذه الصفحة؟", description: `سيتم حذف "${p.title}" نهائياً. الرابط /${p.page_type === "city" ? "cities" : "routes"}/${p.slug} سيظهر 404. متأكد؟`, confirmText: "حذف", danger: true })) {
+                    remove.mutate(p.id);
+                  }
+                }}
+                title="حذف"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
+        {!isLoading && visible.length === 0 && (
+          <p className="text-center text-sm text-muted-foreground py-8">لا توجد صفحات بعد</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SeoPageEditor({ value, onChange, onSave, onCancel, saving }) {
+  const set = (key, val) => onChange({ ...value, [key]: val });
+
+  // Helpers for editing nested arrays (sections, faq, related, breadcrumbs)
+  const updateArrayItem = (arrKey, idx, patch) => {
+    const arr = [...(value[arrKey] || [])];
+    arr[idx] = { ...arr[idx], ...patch };
+    set(arrKey, arr);
+  };
+  const addArrayItem = (arrKey, template) => {
+    set(arrKey, [...(value[arrKey] || []), template]);
+  };
+  const removeArrayItem = (arrKey, idx) => {
+    const arr = [...(value[arrKey] || [])];
+    arr.splice(idx, 1);
+    set(arrKey, arr);
+  };
+
+  return (
+    <div className="bg-card border-2 border-primary/30 rounded-xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold">{value.id ? "تعديل صفحة SEO" : "صفحة SEO جديدة"}</h3>
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={onCancel}>
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">المعرّف (slug) *</label>
+          <input
+            value={value.slug || ""}
+            onChange={(e) => set("slug", e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+            placeholder="مثال: ramallah أو ramallah-nablus"
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+            disabled={!!value.id}
+          />
+          {value.id && <p className="text-[10px] text-muted-foreground mt-1">لا يمكن تعديل المعرّف بعد الحفظ</p>}
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground mb-1 block">نوع الصفحة *</label>
+          <select
+            value={value.page_type}
+            onChange={(e) => set("page_type", e.target.value)}
+            className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+          >
+            <option value="city">مدينة (/cities/...)</option>
+            <option value="route">مسار (/routes/...)</option>
+            <option value="other">أخرى</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">العنوان (H1) *</label>
+        <input value={value.title || ""} onChange={(e) => set("title", e.target.value)} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" dir="rtl" />
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">العنوان الفرعي</label>
+        <textarea value={value.subtitle || ""} onChange={(e) => set("subtitle", e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" dir="rtl" />
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">المقدمة (٢-٣ فقرات، افصلها بسطر فارغ)</label>
+        <textarea value={value.intro || ""} onChange={(e) => set("intro", e.target.value)} rows={6} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" dir="rtl" />
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">وصف Meta لمحركات البحث (١٥٠-١٦٠ حرف مثالي)</label>
+        <textarea value={value.meta_description || ""} onChange={(e) => set("meta_description", e.target.value)} rows={2} className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" dir="rtl" maxLength={300} />
+        <p className="text-[10px] text-muted-foreground mt-0.5">{(value.meta_description || "").length} / 160</p>
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">رابط البحث (اختياري)</label>
+        <input value={value.search_link || ""} onChange={(e) => set("search_link", e.target.value)} placeholder="/search?from=رام الله" className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm" />
+      </div>
+
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">كلمات مفتاحية (افصل بفاصلة)</label>
+        <input
+          value={(value.keywords || []).join("، ")}
+          onChange={(e) => set("keywords", e.target.value.split(/[,،]/).map(s => s.trim()).filter(Boolean))}
+          placeholder="رحلات رام الله، مشاوير رام الله، carpool Ramallah"
+          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+          dir="rtl"
+        />
+      </div>
+
+      {/* Sections editor */}
+      <fieldset className="border border-border rounded-lg p-3">
+        <legend className="text-xs font-bold px-2">الأقسام ({(value.sections || []).length})</legend>
+        <div className="space-y-2">
+          {(value.sections || []).map((s, i) => (
+            <div key={i} className="bg-muted/30 rounded-lg p-2 space-y-1.5">
+              <div className="flex gap-1">
+                <input
+                  value={s.heading || ""}
+                  onChange={(e) => updateArrayItem("sections", i, { heading: e.target.value })}
+                  placeholder="عنوان القسم (H2)"
+                  className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm"
+                  dir="rtl"
+                />
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={() => removeArrayItem("sections", i)}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <textarea
+                value={s.body || ""}
+                onChange={(e) => updateArrayItem("sections", i, { body: e.target.value })}
+                placeholder="محتوى القسم (افصل الفقرات بسطر فارغ)"
+                rows={4}
+                className="w-full px-2 py-1.5 rounded border border-border bg-background text-sm"
+                dir="rtl"
+              />
+            </div>
+          ))}
+          <Button size="sm" variant="outline" className="w-full gap-1 rounded-lg" onClick={() => addArrayItem("sections", { heading: "", body: "" })}>
+            <Plus className="w-3.5 h-3.5" /> إضافة قسم
+          </Button>
+        </div>
+      </fieldset>
+
+      {/* FAQ editor */}
+      <fieldset className="border border-border rounded-lg p-3">
+        <legend className="text-xs font-bold px-2">الأسئلة الشائعة ({(value.faq || []).length})</legend>
+        <div className="space-y-2">
+          {(value.faq || []).map((f, i) => (
+            <div key={i} className="bg-muted/30 rounded-lg p-2 space-y-1.5">
+              <div className="flex gap-1">
+                <input
+                  value={f.q || ""}
+                  onChange={(e) => updateArrayItem("faq", i, { q: e.target.value })}
+                  placeholder="السؤال"
+                  className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm"
+                  dir="rtl"
+                />
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={() => removeArrayItem("faq", i)}>
+                  <Trash2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              <textarea
+                value={f.a || ""}
+                onChange={(e) => updateArrayItem("faq", i, { a: e.target.value })}
+                placeholder="الجواب"
+                rows={2}
+                className="w-full px-2 py-1.5 rounded border border-border bg-background text-sm"
+                dir="rtl"
+              />
+            </div>
+          ))}
+          <Button size="sm" variant="outline" className="w-full gap-1 rounded-lg" onClick={() => addArrayItem("faq", { q: "", a: "" })}>
+            <Plus className="w-3.5 h-3.5" /> إضافة سؤال
+          </Button>
+        </div>
+      </fieldset>
+
+      {/* Related links */}
+      <fieldset className="border border-border rounded-lg p-3">
+        <legend className="text-xs font-bold px-2">روابط ذات صلة ({(value.related_links || []).length})</legend>
+        <div className="space-y-2">
+          {(value.related_links || []).map((r, i) => (
+            <div key={i} className="flex gap-1">
+              <input
+                value={r.label || ""}
+                onChange={(e) => updateArrayItem("related_links", i, { label: e.target.value })}
+                placeholder="نص الرابط"
+                className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm"
+                dir="rtl"
+              />
+              <input
+                value={r.path || ""}
+                onChange={(e) => updateArrayItem("related_links", i, { path: e.target.value })}
+                placeholder="/cities/..."
+                className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm"
+              />
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={() => removeArrayItem("related_links", i)}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" className="w-full gap-1 rounded-lg" onClick={() => addArrayItem("related_links", { label: "", path: "" })}>
+            <Plus className="w-3.5 h-3.5" /> إضافة رابط
+          </Button>
+        </div>
+      </fieldset>
+
+      {/* Breadcrumbs */}
+      <fieldset className="border border-border rounded-lg p-3">
+        <legend className="text-xs font-bold px-2">مسار التنقل (Breadcrumbs)</legend>
+        <div className="space-y-2">
+          {(value.breadcrumbs || []).map((b, i) => (
+            <div key={i} className="flex gap-1">
+              <input
+                value={b.name || ""}
+                onChange={(e) => updateArrayItem("breadcrumbs", i, { name: e.target.value })}
+                placeholder="الاسم"
+                className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm"
+                dir="rtl"
+              />
+              <input
+                value={b.path || ""}
+                onChange={(e) => updateArrayItem("breadcrumbs", i, { path: e.target.value })}
+                placeholder="/cities/..."
+                className="flex-1 px-2 py-1.5 rounded border border-border bg-background text-sm"
+              />
+              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600" onClick={() => removeArrayItem("breadcrumbs", i)}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" className="w-full gap-1 rounded-lg" onClick={() => addArrayItem("breadcrumbs", { name: "", path: "" })}>
+            <Plus className="w-3.5 h-3.5" /> إضافة عنصر
+          </Button>
+        </div>
+      </fieldset>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={!!value.is_published} onChange={(e) => set("is_published", e.target.checked)} />
+        <span>منشور (مرئي على الموقع)</span>
+      </label>
+
+      <div className="flex justify-end gap-2 pt-2 border-t border-border">
+        <Button variant="outline" onClick={onCancel} disabled={saving}>إلغاء</Button>
+        <Button onClick={onSave} disabled={saving} className="gap-1">
+          <Check className="w-4 h-4" />
+          {saving ? "جاري الحفظ..." : "حفظ"}
+        </Button>
       </div>
     </div>
   );

@@ -108,16 +108,10 @@ const Terms            = lazy(() => import('./pages/Terms'));
 // SEO landing pages — Arabic-keyword-targeted public routes. Lazy-loaded
 // so the main bundle stays lean for users who never visit them. Each
 // page renders the SeoLandingLayout shell with hand-written Arabic copy.
-const RouteRamallahNablus     = lazy(() => import('./pages/seo/RouteRamallahNablus'));
-const RouteJerusalemBethlehem = lazy(() => import('./pages/seo/RouteJerusalemBethlehem'));
-const RouteHebronJerusalem    = lazy(() => import('./pages/seo/RouteHebronJerusalem'));
-const CityRamallah            = lazy(() => import('./pages/seo/CityRamallah'));
-const CityNablus              = lazy(() => import('./pages/seo/CityNablus'));
-const CityHebron              = lazy(() => import('./pages/seo/CityHebron'));
-const CityBethlehem           = lazy(() => import('./pages/seo/CityBethlehem'));
-const CityJenin               = lazy(() => import('./pages/seo/CityJenin'));
-const CityTulkarm             = lazy(() => import('./pages/seo/CityTulkarm'));
-const CityQalqilya            = lazy(() => import('./pages/seo/CityQalqilya'));
+// SEO pages now DB-driven (migration 099) — edit content in admin dashboard
+// without code deploys. Falls back to a friendly "page not found" if a slug
+// isn't in the seo_pages table.
+const DynamicSeoPage          = lazy(() => import('./pages/seo/DynamicSeoPage'));
 
 // Page-level loading fallback
 const PageFallback = () => (
@@ -215,16 +209,11 @@ const AuthenticatedApp = () => {
             rank on queries like "رحلات رام الله نابلس" / "مشاوير القدس".
             Each page is a hand-written Arabic article + FAQ + CTAs into
             /search and /request-trip. */}
-        <Route path="/routes/ramallah-nablus"     element={<RouteRamallahNablus />} />
-        <Route path="/routes/jerusalem-bethlehem" element={<RouteJerusalemBethlehem />} />
-        <Route path="/routes/hebron-jerusalem"    element={<RouteHebronJerusalem />} />
-        <Route path="/cities/ramallah"            element={<CityRamallah />} />
-        <Route path="/cities/nablus"              element={<CityNablus />} />
-        <Route path="/cities/hebron"              element={<CityHebron />} />
-        <Route path="/cities/bethlehem"           element={<CityBethlehem />} />
-        <Route path="/cities/jenin"               element={<CityJenin />} />
-        <Route path="/cities/tulkarm"             element={<CityTulkarm />} />
-        <Route path="/cities/qalqilya"            element={<CityQalqilya />} />
+        {/* SEO landing pages — content stored in seo_pages table, edited
+            from the admin dashboard. Catches /cities/:slug and /routes/:slug
+            for every page the admin creates without needing a code change. */}
+        <Route path="/cities/:slug" element={<DynamicSeoPage pageType="city" />} />
+        <Route path="/routes/:slug" element={<DynamicSeoPage pageType="route" />} />
 
         {/* PROTECTED pages — require sign-in */}
         <Route path="/my-trips" element={<MyTrips />} />

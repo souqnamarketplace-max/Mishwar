@@ -131,18 +131,8 @@ const STATIC_ROUTES = [
 // one is a real React route under src/pages/seo/ and gets its own
 // sitemap entry with high priority because they're built specifically
 // to rank.
-const SEO_LANDING_ROUTES = [
-  { path: "/routes/ramallah-nablus",     priority: "0.9", changefreq: "weekly" },
-  { path: "/routes/jerusalem-bethlehem", priority: "0.9", changefreq: "weekly" },
-  { path: "/routes/hebron-jerusalem",    priority: "0.9", changefreq: "weekly" },
-  { path: "/cities/ramallah",            priority: "0.8", changefreq: "weekly" },
-  { path: "/cities/nablus",              priority: "0.8", changefreq: "weekly" },
-  { path: "/cities/hebron",              priority: "0.8", changefreq: "weekly" },
-  { path: "/cities/bethlehem",           priority: "0.8", changefreq: "weekly" },
-  { path: "/cities/jenin",               priority: "0.8", changefreq: "weekly" },
-  { path: "/cities/tulkarm",             priority: "0.8", changefreq: "weekly" },
-  { path: "/cities/qalqilya",            priority: "0.8", changefreq: "weekly" },
-];
+// SEO landing pages are now fully DB-driven (migration 099). Fetched via
+// fetchSeoPages() below.
 
 async function fetchRecentTrips() {
   // Pull confirmed + future-dated trips. Past trips are still public but
@@ -214,6 +204,20 @@ function urlEntry({ loc, lastmod, changefreq, priority }) {
   </url>`;
 }
 
+async function fetchSeoPages() {
+  // Migration 099 moved /cities/* and /routes/* content into the seo_pages
+  // table. Fetch all published pages here so admin-created pages get into
+  // the sitemap on the next deploy without any code change.
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/seo_pages?select=slug,page_type,updated_at&is_published=eq.true`;
+    const res = await fetch(url, { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
 async function main() {
   console.log(`▸ Generating sitemap with SITE_URL=${SITE_URL}`);
 
@@ -228,12 +232,18 @@ async function main() {
     }));
   }
 
-  // 2. SEO landing pages
-  for (const r of SEO_LANDING_ROUTES) {
+  // 2. SEO landing pages — fetched from seo_pages table (migration 099)
+  const seoPages = await fetchSeoPages();
+  console.log(`  · seo pages: ${seoPages.length}`);
+  for (const p of seoPages) {
+    if (!p.slug || !p.page_type) continue;
+    const prefix = p.page_type === "city" ? "/cities" : p.page_type === "route" ? "/routes" : "";
+    if (!prefix) continue;
     entries.push(urlEntry({
-      loc:        `${SITE_URL}${r.path}`,
-      changefreq: r.changefreq,
-      priority:   r.priority,
+      loc:        `${SITE_URL}${prefix}/${p.slug}`,
+      lastmod:    (p.updated_at || "").slice(0, 10) || TODAY,
+      changefreq: "weekly",
+      priority:   p.page_type === "route" ? "0.9" : "0.8",
     }));
   }
 
