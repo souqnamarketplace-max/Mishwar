@@ -1,0 +1,12 @@
+-- Migration 103: Fix gaps in email cascade (update_my_email RPC)
+-- Applied: 2026-05-28
+--
+-- CRITICAL FIX: messages.receiver_email was not being cascaded because
+-- mig 079 used 'recipient_email' (wrong column name, silently caught).
+-- 
+-- NEW TABLES added since mig 079: driver_payouts, passenger_verifications,
+-- release_note_reads, support_tickets, trip_request_contacts,
+-- trip_request_views, trip_requests.matched_with_email
+--
+-- Full RPC replaced in DB via Supabase MCP. This file is the record.
+-- See Supabase dashboard for the live function body.
