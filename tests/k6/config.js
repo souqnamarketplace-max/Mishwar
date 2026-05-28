@@ -4,7 +4,12 @@
 
 export const BASE_URL     = __ENV.BASE_URL     || "https://www.mishwaro.com";
 export const SUPABASE_URL = __ENV.SUPABASE_URL || "https://dimtdwahtwaslmnuakij.supabase.co";
-export const ANON_KEY     = __ENV.ANON_KEY     || "sb_publishable_LlK5ig0ruElVt3Z6j0FNkQ_MAGvKRC_";
+
+// Use the legacy JWT anon key for k6 tests.
+// The sb_publishable_* key has origin allowlist restrictions and returns
+// "Host not in allowlist" when called from k6 (no browser Origin header).
+export const ANON_KEY = __ENV.ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpbXRkd2FodHdhc2xtbnVha2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMjMyNTgsImV4cCI6MjA5Mjg5OTI1OH0.fNBDPm-pGZPzSp0lH8xv8ESiwjcixJMMD2dY-W3UYKc";
 
 // Standard Supabase REST headers for anonymous requests
 export const ANON_HEADERS = {
