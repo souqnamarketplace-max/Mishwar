@@ -134,7 +134,28 @@
         "availableLanguage": ["Arabic", "English"],
         "areaServed": "PS"
       },
-      "sameAs": []
+      "sameAs": [
+        "https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898",
+        "https://play.google.com/store/apps/details?id=com.mishwaro.app",
+        "https://www.linkedin.com/company/mishwaro",
+        "https://www.instagram.com/mishwaro.ps",
+        "https://twitter.com/mishwaro_ps",
+        "https://www.facebook.com/mishwaro.ps"
+      ],
+      "knowsAbout": [
+        "Carpooling",
+        "Ride sharing",
+        "Palestinian transportation",
+        "West Bank intercity travel",
+        "مشاركة الرحلات",
+        "النقل بين المدن الفلسطينية"
+      ],
+      "foundingDate": "2026",
+      "foundingLocation": {
+        "@type": "Place",
+        "name": "Ramallah, Palestine"
+      },
+      "legalName": "Souqnin Technology Inc."
     }
     </script>
 
@@ -188,6 +209,150 @@
     <!-- FAQPage JSON-LD lives in Help.jsx (via useSEO) so it is only
          injected on /help — not on every route. Having it here AND there
          caused Google to report "2 invalid unnamed items" on /help. -->
+
+    <!-- HowTo schema — AEO for "how to carpool in Palestine" queries.
+         AI answer engines (ChatGPT, Perplexity, Google AI Overviews)
+         cite HowTo schemas directly in their step-by-step answers. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "كيف تحجز رحلة مشتركة في فلسطين",
+      "alternateName": "How to book a shared ride in Palestine",
+      "description": "احجز مقعداً في رحلة مشتركة بين مدن الضفة الغربية عبر مشوارو في 4 خطوات",
+      "totalTime": "PT5M",
+      "supply": [{ "@type": "HowToSupply", "name": "هاتف ذكي أو متصفح" }],
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "ابحث عن رحلة",
+          "text": "افتح مشوارو وأدخل مدينة الانطلاق والوجهة والتاريخ للبحث عن الرحلات المتاحة.",
+          "url": "https://www.mishwaro.com/search"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "اختر سائقاً موثَّقاً",
+          "text": "اطّلع على ملف السائق: تقييمه، عدد رحلاته، وتعليقات الركاب السابقين. كل سائق مر بمراجعة رخصة قيادة وتأمين مركبة.",
+          "url": "https://www.mishwaro.com/search"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "احجز مقعدك",
+          "text": "اضغط 'احجز' واختر عدد المقاعد. السعر يظهر مسبقاً ولا توجد رسوم إضافية.",
+          "url": "https://www.mishwaro.com/search"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "تواصل مع السائق وادفع",
+          "text": "راسل السائق داخل التطبيق لتحديد نقطة الالتقاء. الدفع بينك وبين السائق مباشرة (نقداً، جوال باي، Reflect، أو تحويل بنكي).",
+          "url": "https://www.mishwaro.com/how-it-works"
+        }
+      ]
+    }
+    </script>
+
+    <!-- HowTo for drivers — targets "كيف أصبح سائقاً" queries -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      "name": "كيف تصبح سائقاً في مشوارو",
+      "alternateName": "How to become a driver on Mishwaro",
+      "description": "انضم كسائق على مشوارو وابدأ تغطية تكاليف رحلاتك اليومية في 5 خطوات",
+      "totalTime": "PT10M",
+      "step": [
+        {
+          "@type": "HowToStep",
+          "position": 1,
+          "name": "أنشئ حساباً",
+          "text": "سجّل بريدك الإلكتروني أو سجّل الدخول بـ Apple أو Google.",
+          "url": "https://www.mishwaro.com"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 2,
+          "name": "ارفع وثائق التوثيق",
+          "text": "أرفع رخصة القيادة، تسجيل المركبة، وثيقة التأمين، وصورتين شخصيتين.",
+          "url": "https://www.mishwaro.com/become-driver"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 3,
+          "name": "انتظر الموافقة",
+          "text": "فريق مشوارو يراجع وثائقك خلال 24-48 ساعة.",
+          "url": "https://www.mishwaro.com/become-driver"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 4,
+          "name": "اشترك في المنصة",
+          "text": "ادفع رسوم الاشتراك الشهري (30 شيكل) للوصول الكامل ونشر رحلات غير محدودة.",
+          "url": "https://www.mishwaro.com/become-driver"
+        },
+        {
+          "@type": "HowToStep",
+          "position": 5,
+          "name": "انشر رحلتك الأولى",
+          "text": "حدد مسار رحلتك، الوقت، عدد المقاعد المتاحة، والسعر للمقعد. الركاب يجدونك فوراً.",
+          "url": "https://www.mishwaro.com/create-trip"
+        }
+      ]
+    }
+    </script>
+
+    <!-- ItemList — Palestinian cities served. AI tools use ItemList to
+         answer "what cities does Mishwaro serve?" directly in results. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "مدن مشوارو في الضفة الغربية",
+      "alternateName": "Mishwaro cities in West Bank",
+      "description": "قائمة المدن الفلسطينية التي تخدمها منصة مشوارو لمشاركة الرحلات",
+      "numberOfItems": 9,
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "رام الله", "url": "https://www.mishwaro.com/cities/ramallah" },
+        { "@type": "ListItem", "position": 2, "name": "نابلس", "url": "https://www.mishwaro.com/cities/nablus" },
+        { "@type": "ListItem", "position": 3, "name": "الخليل", "url": "https://www.mishwaro.com/cities/hebron" },
+        { "@type": "ListItem", "position": 4, "name": "بيت لحم", "url": "https://www.mishwaro.com/cities/bethlehem" },
+        { "@type": "ListItem", "position": 5, "name": "جنين", "url": "https://www.mishwaro.com/cities/jenin" },
+        { "@type": "ListItem", "position": 6, "name": "طولكرم", "url": "https://www.mishwaro.com/cities/tulkarm" },
+        { "@type": "ListItem", "position": 7, "name": "قلقيلية", "url": "https://www.mishwaro.com/cities/qalqilya" },
+        { "@type": "ListItem", "position": 8, "name": "أريحا", "url": "https://www.mishwaro.com/search?from=أريحا" },
+        { "@type": "ListItem", "position": 9, "name": "سلفيت", "url": "https://www.mishwaro.com/search?from=سلفيت" }
+      ]
+    }
+    </script>
+
+    <!-- SpeakableSpecification — tells voice assistants and AI answer
+         engines which parts of the page to read aloud or summarize.
+         Targets queries like "what is Mishwaro" via Google Assistant,
+         Siri, and ChatGPT voice mode. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "مشوارو — مشاركة الرحلات في فلسطين",
+      "url": "https://www.mishwaro.com",
+      "speakable": {
+        "@type": "SpeakableSpecification",
+        "cssSelector": ["h1", ".hero-tagline", "meta[name='description']"]
+      },
+      "about": {
+        "@type": "Service",
+        "name": "مشوارو",
+        "serviceType": "Carpooling",
+        "description": "Mishwaro is the first Palestinian intercity carpooling app connecting verified drivers and passengers across West Bank cities including Ramallah, Nablus, Hebron, Bethlehem, Jenin, Tulkarm, and Qalqilya.",
+        "areaServed": "Palestine"
+      }
+    }
+    </script>
+
+
 
     <script type="application/ld+json">
     {
