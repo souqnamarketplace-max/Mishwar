@@ -1,0 +1,4 @@
+-- Migration 104: Fix Supabase Advisor warnings (security + performance)
+-- Applied: 2026-05-28
+-- Full SQL applied via Supabase MCP — see this file as the record.
+-- Fixes: function search_path, RLS always_true, auth_rls_initplan (22 policies across 12 tables)
