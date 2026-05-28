@@ -294,6 +294,15 @@ serve(async (req) => {
     });
   }
 
+  // Skip Apple "Hide My Email" private relay addresses — Resend cannot
+  // deliver to @privaterelay.appleid.com without Apple relay registration.
+  if (email.endsWith("@privaterelay.appleid.com")) {
+    console.log(`[send-welcome-email] Skipping Apple private relay: ${email}`);
+    return new Response(JSON.stringify({ skipped: "apple_private_relay" }), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    });
+  }
+
   // Duplicate-send guard — don't welcome the same user twice
   const alreadySent = await hasWelcomeBeenSent(email);
   if (alreadySent) {
