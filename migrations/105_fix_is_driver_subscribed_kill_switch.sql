@@ -1,0 +1,8 @@
+-- Migration 105: Fix is_driver_subscribed — respect app_settings.subscription_required
+-- Applied: 2026-05-28
+--
+-- BUG: RPC ignored the kill switch. When subscription_required=FALSE,
+-- drivers with no subscription record got subActive=false on PassengerRequests,
+-- showing the "اشترك الآن" gate even though subscriptions weren't required.
+--
+-- FIX: Read kill switch first — if OFF, return TRUE for all drivers.
