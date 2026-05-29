@@ -53,7 +53,10 @@ const DIST_PATH = path.join(ROOT, "dist", "sitemap.xml");
 const SITE_URL = (process.env.VITE_SITE_URL || "https://www.mishwaro.com").replace(/\/$/, "");
 
 const SUPABASE_URL    = process.env.VITE_SUPABASE_URL    || "https://dimtdwahtwaslmnuakij.supabase.co";
-const SUPABASE_ANON   = process.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_LlK5ig0ruElVt3Z6j0FNkQ_MAGvKRC_";
+// sb_publishable requires an Origin header (browser-only). The legacy JWT
+// anon key works from Node.js / CI without an Origin header.
+const SUPABASE_ANON   = process.env.VITE_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpbXRkd2FodHdhc2xtbnVha2lqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMjMyNTgsImV4cCI6MjA5Mjg5OTI1OH0.fNBDPm-pGZPzSp0lH8xv8ESiwjcixJMMD2dY-W3UYKc";
 
 // How many recent dynamic rows to include. Sitemap soft cap is 50k
 // entries / 50MB; we stay well under both. Pulling all trips ever isn't
@@ -233,9 +236,23 @@ async function main() {
   }
 
   // 2. SEO landing pages — fetched from seo_pages table (migration 099)
+  // Fallback: hardcoded known pages in case DB fetch fails (e.g. no Origin header in CI)
+  const STATIC_SEO_FALLBACK = [
+    { slug: "ramallah",            page_type: "city"  },
+    { slug: "nablus",              page_type: "city"  },
+    { slug: "hebron",              page_type: "city"  },
+    { slug: "bethlehem",           page_type: "city"  },
+    { slug: "jenin",               page_type: "city"  },
+    { slug: "tulkarm",             page_type: "city"  },
+    { slug: "qalqilya",            page_type: "city"  },
+    { slug: "ramallah-nablus",     page_type: "route" },
+    { slug: "jerusalem-bethlehem", page_type: "route" },
+    { slug: "hebron-jerusalem",    page_type: "route" },
+  ];
   const seoPages = await fetchSeoPages();
-  console.log(`  · seo pages: ${seoPages.length}`);
-  for (const p of seoPages) {
+  const resolvedSeoPages = seoPages.length > 0 ? seoPages : STATIC_SEO_FALLBACK;
+  console.log(`  · seo pages: ${resolvedSeoPages.length} (${seoPages.length > 0 ? "from DB" : "static fallback"})`);
+  for (const p of resolvedSeoPages) {
     if (!p.slug || !p.page_type) continue;
     const prefix = p.page_type === "city" ? "/cities" : p.page_type === "route" ? "/routes" : "";
     if (!prefix) continue;
