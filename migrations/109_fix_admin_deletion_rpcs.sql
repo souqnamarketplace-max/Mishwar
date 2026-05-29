@@ -1,0 +1,8 @@
+-- Migration 109: Fix admin_deletion_stats + admin_deletion_list + auth_user_role
+-- Applied: 2026-05-29
+-- ROOT CAUSE: auth.uid() returns NULL inside SECURITY DEFINER RPCs when called
+-- via sb_publishable key without browser Origin header.
+-- FIX: auth_user_role() now uses auth.email() as primary identifier (more reliable),
+-- with auth.uid() as fallback. Both deletion RPCs rebuilt with same pattern.
+-- This fixes the "admin_only" error in DashboardDeletions + all 21 RPCs that
+-- use auth_user_role().
