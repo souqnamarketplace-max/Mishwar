@@ -23,6 +23,29 @@ export const AuthProvider = ({ children }) => {
   const [authError, setAuthError] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [appPublicSettings, setAppPublicSettings] = useState(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  // ─── Fetch public app settings on mount ─────────────────────────────
+  // Runs immediately so maintenance mode is available before auth completes.
+  // Uses direct REST (no supabase-js) to avoid the sb_publishable origin
+  // restriction that blocks Node/non-browser contexts.
+  useEffect(() => {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!SUPABASE_URL || !ANON_KEY) return;
+    fetch(`${SUPABASE_URL}/rest/v1/app_settings?select=maintenance_mode,allow_registration,subscription_required&limit=1`, {
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(rows => {
+        const s = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        if (s) {
+          setAppPublicSettings(s);
+          setMaintenanceMode(!!s.maintenance_mode);
+        }
+      })
+      .catch(() => {}); // non-fatal — app works without it
+  }, []);
 
   // ─── Password recovery flag ─────────────────────────────────────────
   // True when the user landed here via a "Reset Password" email link.
@@ -608,6 +631,7 @@ export const AuthProvider = ({ children }) => {
       isLoadingPublicSettings,
       authError,
       appPublicSettings,
+      maintenanceMode,
       authChecked,
       logout,
       login,

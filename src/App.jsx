@@ -121,7 +121,7 @@ const PageFallback = () => (
 );
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, isAuthenticated, authChecked, user } = useAuth();
+  const { isLoadingAuth, isLoadingPublicSettings, isAuthenticated, authChecked, user, maintenanceMode } = useAuth();
   const location = useLocation();
 
   // Show loading spinner while checking auth
@@ -133,6 +133,37 @@ const AuthenticatedApp = () => {
             <span className="text-primary-foreground font-bold text-xl">م</span>
           </div>
           <div className="w-8 h-8 border-4 border-muted border-t-primary rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Maintenance mode gate ─────────────────────────────────────────────
+  // Admins always bypass so they can verify the app while it's down.
+  // The /dashboard path is always accessible to admins during maintenance.
+  const isAdmin = user?.role === 'admin';
+  const isDashboard = location.pathname.startsWith('/dashboard');
+  if (maintenanceMode && !isAdmin) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-background px-6" dir="rtl">
+        <div className="max-w-sm w-full text-center space-y-6">
+          <div className="w-20 h-20 bg-primary rounded-2xl flex items-center justify-center mx-auto">
+            <span className="text-primary-foreground font-black text-4xl">م</span>
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-foreground mb-2">مشوارو تحت الصيانة</h1>
+            <p className="text-muted-foreground leading-relaxed">
+              نحن نعمل على تحسين التطبيق لتجربة أفضل. سنعود قريباً إن شاء الله.
+            </p>
+          </div>
+          <div className="bg-muted/50 rounded-2xl p-4 text-sm text-muted-foreground">
+            <p>للتواصل: <span className="text-primary font-medium">support@mishwaro.com</span></p>
+          </div>
+          <div className="flex justify-center gap-2">
+            <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{animationDelay:'0ms'}}/>
+            <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{animationDelay:'150ms'}}/>
+            <div className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" style={{animationDelay:'300ms'}}/>
+          </div>
         </div>
       </div>
     );
