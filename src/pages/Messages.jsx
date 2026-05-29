@@ -406,7 +406,7 @@ export default function Messages() {
         setActiveId(tripScoped.id);
         setNewConv(null);
       } else {
-        setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+        setNewConv({ email: paramTo, name: ((() => { try { return decodeURIComponent(paramName || paramTo.split("@")[0]); } catch { return paramName || paramTo.split("@")[0]; } })()) });
         setActiveId("__new__");
       }
     } else if (paramRequest) {
@@ -431,7 +431,7 @@ export default function Messages() {
         setActiveId(requestScoped.id);
         setNewConv(null);
       } else {
-        setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+        setNewConv({ email: paramTo, name: ((() => { try { return decodeURIComponent(paramName || paramTo.split("@")[0]); } catch { return paramName || paramTo.split("@")[0]; } })()) });
         setActiveId("__new__");
       }
     } else {
@@ -443,7 +443,7 @@ export default function Messages() {
         setActiveId(existing.id);
         setNewConv(null);
       } else {
-        setNewConv({ email: paramTo, name: decodeURIComponent(paramName || paramTo.split("@")[0]) });
+        setNewConv({ email: paramTo, name: ((() => { try { return decodeURIComponent(paramName || paramTo.split("@")[0]); } catch { return paramName || paramTo.split("@")[0]; } })()) });
         setActiveId("__new__");
       }
     }
