@@ -87,6 +87,7 @@ export default function Onboarding() {
   const [searchParams] = useSearchParams();
   const { refreshUser } = useAuth();
   const [step, setStep] = useState(0);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [accountType, setAccountType] = useState(null); // "passenger" | "driver" | "both"
   const [customCarModel, setCustomCarModel] = useState(false); // Toggle for custom car model input
   const [form, setForm] = useState({ 
@@ -847,17 +848,35 @@ export default function Onboarding() {
 
         {/* Delete Account Option - Apple 5.1.1 Compliance */}
         <div className="mt-6 text-center">
-          <button
-            onClick={() => {
-              if (confirm("هل أنت متأكد من حذف حسابك؟ هذا الإجراء نهائي ولا يمكن التراجع عنه.")) {
-                deleteAccount.mutate();
-              }
-            }}
-            disabled={deleteAccount.isPending}
-            className="text-xs text-muted-foreground hover:text-destructive transition-colors underline disabled:opacity-50"
-          >
-            {deleteAccount.isPending ? "جاري الحذف..." : "لا أرغب في إكمال الإعداد - حذف حسابي"}
-          </button>
+          {!deleteConfirmOpen ? (
+            <button
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={deleteAccount.isPending}
+              className="text-xs text-muted-foreground hover:text-destructive transition-colors underline disabled:opacity-50"
+            >
+              لا أرغب في إكمال الإعداد - حذف حسابي
+            </button>
+          ) : (
+            <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 space-y-3" dir="rtl">
+              <p className="text-sm font-semibold text-destructive">هل أنت متأكد؟</p>
+              <p className="text-xs text-muted-foreground">هذا الإجراء نهائي ولا يمكن التراجع عنه.</p>
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-muted transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={() => { setDeleteConfirmOpen(false); deleteAccount.mutate(); }}
+                  disabled={deleteAccount.isPending}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                >
+                  {deleteAccount.isPending ? "جاري الحذف..." : "نعم، احذف حسابي"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
