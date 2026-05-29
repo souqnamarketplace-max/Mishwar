@@ -1,0 +1,7 @@
+-- Migration 110: Fix payment workflow gaps
+-- Applied: 2026-05-29
+-- 1. Normalise 'unpaid' → 'pending'
+-- 2. Add CHECK constraint on payment_status
+-- 3. Flag cancelled+paid bookings as refund_required
+-- 4. Rebuild driver_payments_summary — correct stats, admin gate
+-- 5. New admin_mark_booking_payment RPC — writes driver_amount, commission_amount, confirmed_by
