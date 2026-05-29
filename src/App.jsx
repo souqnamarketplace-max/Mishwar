@@ -141,10 +141,16 @@ const AuthenticatedApp = () => {
   // Public routes — accessible without sign-in
   const PUBLIC_PATHS = new Set([
     "/", "/search", "/how-it-works", "/community", "/help", "/support", "/contact",
-    "/about", "/about-us", "/blog", "/safety", "/privacy", "/privacy-policy", "/terms", "/terms-of-service",
+    "/about", "/about-us", "/blog", "/safety", "/privacy", "/privacy-policy", "/terms",
+    "/terms-of-service", "/become-driver",
   ]);
-  // /trip/:id is also public (view-only) — handled by prefix
-  const isPublicPath = PUBLIC_PATHS.has(location.pathname) || location.pathname.startsWith("/trip/");
+  // /trip/:id, /cities/:slug, /routes/:slug are also public — handled by prefix
+  const isPublicPath =
+    PUBLIC_PATHS.has(location.pathname) ||
+    location.pathname.startsWith("/trip/") ||
+    location.pathname.startsWith("/cities/") ||
+    location.pathname.startsWith("/routes/") ||
+    location.pathname.startsWith("/blog/");
 
   // Not authenticated AND trying to access a protected route → redirect to login
   if (!isAuthenticated) {
@@ -161,13 +167,17 @@ const AuthenticatedApp = () => {
   const onboardingExempt = new Set([
     "/onboarding", "/dashboard",
     "/", "/search", "/how-it-works", "/community", "/help", "/login",
+    "/become-driver", "/about", "/about-us", "/safety", "/privacy", "/terms",
   ]);
   const needsOnboarding = (
     isAuthenticated &&
     user &&
     !user.onboarding_completed &&
     !onboardingExempt.has(location.pathname) &&
-    !location.pathname.startsWith("/trip/")
+    !location.pathname.startsWith("/trip/") &&
+    !location.pathname.startsWith("/cities/") &&
+    !location.pathname.startsWith("/routes/") &&
+    !location.pathname.startsWith("/blog/")
   );
   if (needsOnboarding) {
     return <Navigate to="/onboarding" replace />;
