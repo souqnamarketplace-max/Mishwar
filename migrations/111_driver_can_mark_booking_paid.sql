@@ -1,0 +1,5 @@
+-- Migration 111: Allow drivers to mark their own bookings as paid
+-- Applied: 2026-05-29
+-- admin_mark_booking_payment() now accepts both admins AND drivers.
+-- Drivers can only mark bookings on their own trips (security enforced in RPC).
+-- Records payment_confirmed_by = driver email, driver_amount at commission rate.

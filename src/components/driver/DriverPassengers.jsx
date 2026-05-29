@@ -276,15 +276,19 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
   // with siblings. The dialog renders at the JSX root so it overlays
   // the trip selector + passenger list regardless of which one had focus.
   const { confirm: confirmBulk, dialog: bulkConfirmDialog } = useConfirm();
-  // Until this session, payment_status was a dead column that never moved
-  // off "pending". This is the missing write path on the driver side —
-  // the matching admin-side write lives in DashboardPayments.
+  // Driver marks a booking paid after receiving money.
+  // Uses admin_mark_booking_payment RPC (migration 111) which verifies the
+  // caller is the trip's driver, writes driver_amount at the correct
+  // commission rate, and records payment_confirmed_by = driver's email.
   const markPaid = useMutation({
     mutationFn: async ({ id, paid }) => {
-      await api.entities.Booking.update(id, {
-        payment_status: paid ? "paid" : "pending",
-        paid_at: paid ? new Date().toISOString() : null,
+      const { data, error } = await supabase.rpc("admin_mark_booking_payment", {
+        p_booking_id: id,
+        p_paid: paid,
+        p_reference: null,
       });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
     },
     // Optimistic — mark-paid fires once per passenger at trip end
     // (typically 2-4 quick taps in a row). Without optimistic each
