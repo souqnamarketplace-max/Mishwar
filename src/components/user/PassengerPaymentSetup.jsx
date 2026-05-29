@@ -3,7 +3,7 @@
  */
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Wallet, Building2, Smartphone, CreditCard, AlertCircle } from "lucide-react";
+import { CheckCircle, Wallet, Building2, Smartphone, AlertCircle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/apiClient";
 import { toast } from "sonner";
@@ -14,12 +14,6 @@ const METHODS = [
   { id: "bank_transfer", label: "تحويل بنكي",  icon: Building2,  color: "bg-blue-500/10 text-blue-600",     desc: "حوّل المبلغ للسائق قبل أو بعد الرحلة" },
   { id: "reflect",       label: "Reflect",      icon: Wallet,     color: "bg-purple-500/10 text-purple-600", desc: "أرسل عبر محفظة Reflect الإلكترونية" },
   { id: "jawwal_pay",    label: "Jawwal Pay",   icon: Smartphone, color: "bg-green-600/10 text-green-700",   desc: "ادفع عبر خدمة Jawwal Pay" },
-  // Canonical 'credit_card' — aligns with CreateTrip emit, DriverDashboard
-  // methodLabel decode, DriverPaymentSetup tab IDs (fixed in batch 6).
-  // preferred_payment isn't cross-referenced with trip-accepted methods
-  // yet, so 'card' vs 'credit_card' currently only changes the lookup
-  // label, but aligning now future-proofs the value.
-  { id: "credit_card",   label: "بطاقة",        icon: CreditCard, color: "bg-rose-500/10 text-rose-600",     desc: "بطاقة ائتمان أو خصم" },
 ];
 
 // Existing passenger profiles may have the legacy ID 'card' saved.
@@ -72,7 +66,7 @@ export default function PassengerPaymentSetup({ user }) {
       <div className="flex items-start gap-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
         <AlertCircle className="w-4 h-4 text-primary mt-0.5 shrink-0" />
         <p className="text-sm text-muted-foreground">
-          اختر طريقتك المفضلة للدفع. الدفع يتم مباشرة للسائق — مشوارو لا تتوسط في المدفوعات.
+          اختر طريقة الدفع المفضلة. ستُحدَّد تلقائياً عند حجز أي رحلة تقبل هذه الطريقة — يمكنك تغييرها في كل حجز.
         </p>
       </div>
 

@@ -73,6 +73,18 @@ export default function TripDetails() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState("cash");
 
+  // Pre-select the passenger's preferred payment method in the booking
+  // modal — but only if the driver actually accepts it on this trip.
+  // Falls back to cash if the preferred method isn't in trip.payment_methods.
+  useEffect(() => {
+    if (!tripData || !user?.preferred_payment) return;
+    const preferred = user.preferred_payment;
+    const accepted  = tripData.payment_methods;
+    // If driver hasn't restricted methods (empty array), all methods work
+    const driverAccepts = !accepted?.length || accepted.includes(preferred);
+    if (driverAccepts) setSelectedPayment(preferred);
+  }, [tripData, user?.preferred_payment]);
+
   // Scroll to top when trip page opens. Depends on lookupValue (the URL
   // param's resolved id) so it fires immediately on navigation, not
   // after the trip fetch resolves.
