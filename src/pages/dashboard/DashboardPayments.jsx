@@ -344,33 +344,56 @@ export default function DashboardPayments() {
                         {b.payment_reference && <p className="font-mono">مرجع: {b.payment_reference}</p>}
                       </td>
                       <td className="p-3">
-                        {needsRefund ? (
-                          <Button size="sm" variant="outline" className="h-7 text-xs text-destructive border-destructive/30"
-                            disabled={markRefunded.isPending}
-                            onClick={() => markRefunded.mutate({ id: b.id })}>
-                            <RefreshCw className="w-3 h-3 ml-1" />تسجيل استرداد
-                          </Button>
-                        ) : b.payment_status === "paid" ? (
-                          <Button size="sm" variant="ghost" className="h-7 text-xs"
-                            disabled={markPaid.isPending}
-                            onClick={() => markPaid.mutate({ id: b.id, paid: false })}>
-                            إلغاء الدفع
-                          </Button>
-                        ) : !isCancelled ? (
-                          <div className="space-y-1">
-                            <input
-                              value={referenceInput[b.id] || ""}
-                              onChange={e => setReferenceInput(prev => ({...prev, [b.id]: e.target.value}))}
-                              placeholder="رقم المرجع (اختياري)"
-                              className="w-full text-xs h-6 px-2 rounded border border-border bg-background"
-                            />
-                            <Button size="sm" className="h-7 text-xs gap-1 w-full"
-                              disabled={markPaid.isPending}
-                              onClick={() => markPaid.mutate({ id: b.id, paid: true })}>
-                              <CheckCircle className="w-3 h-3" />تأكيد الدفع
+                        <div className="space-y-1">
+                          {needsRefund ? (
+                            <Button size="sm" variant="outline" className="h-7 text-xs text-destructive border-destructive/30 w-full"
+                              disabled={markRefunded.isPending}
+                              onClick={() => markRefunded.mutate({ id: b.id })}>
+                              <RefreshCw className="w-3 h-3 ml-1" />تسجيل استرداد
                             </Button>
-                          </div>
-                        ) : null}
+                          ) : b.payment_status === "paid" ? (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs w-full"
+                              disabled={markPaid.isPending}
+                              onClick={() => markPaid.mutate({ id: b.id, paid: false })}>
+                              إلغاء الدفع
+                            </Button>
+                          ) : !isCancelled ? (
+                            <>
+                              <input
+                                value={referenceInput[b.id] || ""}
+                                onChange={e => setReferenceInput(prev => ({...prev, [b.id]: e.target.value}))}
+                                placeholder="رقم المرجع (اختياري)"
+                                className="w-full text-xs h-6 px-2 rounded border border-border bg-background"
+                              />
+                              <Button size="sm" className="h-7 text-xs gap-1 w-full"
+                                disabled={markPaid.isPending}
+                                onClick={() => markPaid.mutate({ id: b.id, paid: true })}>
+                                <CheckCircle className="w-3 h-3" />تأكيد الدفع
+                              </Button>
+                            </>
+                          ) : null}
+                          {/* Price adjustment — dispute resolution */}
+                          {!isCancelled && (
+                            <Button size="sm" variant="ghost" className="h-7 text-xs w-full text-muted-foreground"
+                              onClick={async () => {
+                                const newPrice = window.prompt(`تعديل السعر (الحالي: ₪${b.total_price}):`);
+                                if (newPrice === null || isNaN(Number(newPrice))) return;
+                                const reason = window.prompt("سبب التعديل:");
+                                if (reason === null) return;
+                                const { data, error } = await supabase.rpc("admin_adjust_booking", {
+                                  p_booking_id: b.id,
+                                  p_new_price: Number(newPrice),
+                                  p_reason: reason,
+                                });
+                                if (error || data?.error) { toast.error("فشل تعديل السعر"); return; }
+                                qc.invalidateQueries({ queryKey: ["payments-bookings"] });
+                                qc.invalidateQueries({ queryKey: ["payments-summary"] });
+                                toast.success(`تم تعديل السعر إلى ₪${newPrice} ✅`);
+                              }}>
+                              ✏️ تعديل السعر
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

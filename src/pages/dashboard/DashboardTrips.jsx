@@ -5,7 +5,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Car, Search, MapPin, ArrowLeft, Clock, Users, Trash2 } from "lucide-react";
+import { Car, MapPin, ArrowLeft, Clock, Users, Trash2, Pencil, X, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ export default function DashboardTrips() {
   const [dateRangePreset, setDateRangePreset] = useState("all");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [editingTrip, setEditingTrip] = useState(null); // { id, fields: {} }
   const qc = useQueryClient();
 
   // Realtime — admin sees trip changes instantly
@@ -106,6 +107,28 @@ export default function DashboardTrips() {
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["trips"] }); toast.success("تم تحديث الحالة"); },
     onError: (err) => toast.error(err?.message || "تعذر تنفيذ الإجراء"),
+  });
+
+  const editTrip = useMutation({
+    mutationFn: async ({ id, fields }) => {
+      const { data, error } = await supabase.rpc("admin_edit_trip", {
+        p_trip_id:        id,
+        p_from_city:      fields.from_city      || null,
+        p_to_city:        fields.to_city        || null,
+        p_price:          fields.price          ? Number(fields.price) : null,
+        p_available_seats:fields.available_seats? Number(fields.available_seats) : null,
+        p_driver_note:    fields.driver_note    || null,
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+    },
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["trips"] });
+      toast.success("تم تعديل الرحلة ✅");
+      logAdminAction("admin_edit_trip", "trip", id, {});
+      setEditingTrip(null);
+    },
+    onError: (err) => toast.error(err?.message || "تعذر تعديل الرحلة"),
   });
 
   // No more client-side filter — server does it all. Display rows directly.
@@ -210,10 +233,26 @@ export default function DashboardTrips() {
                           ))}
                         </select>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 flex items-center gap-1">
                         <Button
-                          variant="ghost"
-                          size="icon"
+                          variant="ghost" size="icon"
+                          className="w-8 h-8 hover:bg-primary/10"
+                          title="تعديل الرحلة"
+                          onClick={() => setEditingTrip({
+                            id: trip.id,
+                            fields: {
+                              from_city:       trip.from_city,
+                              to_city:         trip.to_city,
+                              price:           trip.price,
+                              available_seats: trip.available_seats,
+                              driver_note:     trip.driver_note || "",
+                            },
+                          })}
+                        >
+                          <Pencil className="w-3.5 h-3.5 text-primary" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="icon"
                           className="text-destructive hover:bg-destructive/10 w-8 h-8"
                           onClick={() => deleteMutation.mutate(trip.id)}
                         >
@@ -221,6 +260,56 @@ export default function DashboardTrips() {
                         </Button>
                       </td>
                     </tr>
+                    {/* Inline edit row */}
+                    {editingTrip?.id === trip.id && (
+                      <tr key={trip.id + "-edit"} className="bg-primary/5 border-b border-primary/20">
+                        <td colSpan={7} className="p-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2" dir="rtl">
+                            <div>
+                              <p className="text-[10px] text-muted-foreground mb-1">من</p>
+                              <input value={editingTrip.fields.from_city}
+                                onChange={e => setEditingTrip(t => ({ ...t, fields: { ...t.fields, from_city: e.target.value } }))}
+                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground mb-1">إلى</p>
+                              <input value={editingTrip.fields.to_city}
+                                onChange={e => setEditingTrip(t => ({ ...t, fields: { ...t.fields, to_city: e.target.value } }))}
+                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground mb-1">السعر ₪</p>
+                              <input type="number" value={editingTrip.fields.price}
+                                onChange={e => setEditingTrip(t => ({ ...t, fields: { ...t.fields, price: e.target.value } }))}
+                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-muted-foreground mb-1">المقاعد المتاحة</p>
+                              <input type="number" value={editingTrip.fields.available_seats}
+                                onChange={e => setEditingTrip(t => ({ ...t, fields: { ...t.fields, available_seats: e.target.value } }))}
+                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background" />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <p className="text-[10px] text-muted-foreground mb-1">ملاحظة السائق</p>
+                              <input value={editingTrip.fields.driver_note}
+                                onChange={e => setEditingTrip(t => ({ ...t, fields: { ...t.fields, driver_note: e.target.value } }))}
+                                className="w-full text-xs px-2 py-1.5 rounded-lg border border-border bg-background" />
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" className="h-7 text-xs gap-1"
+                              disabled={editTrip.isPending}
+                              onClick={() => editTrip.mutate({ id: editingTrip.id, fields: editingTrip.fields })}>
+                              <Check className="w-3 h-3" />حفظ
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-xs gap-1"
+                              onClick={() => setEditingTrip(null)}>
+                              <X className="w-3 h-3" />إلغاء
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
                   );
                 })}
               </tbody>

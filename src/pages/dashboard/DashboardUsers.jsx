@@ -420,6 +420,7 @@ export default function DashboardUsers() {
                               phone: user.phone,
                               role: user.role,
                               is_active: user.is_active !== false,
+                              account_type: user.account_type || "passenger",
                             });
                             setShowModal(true);
                           }}
@@ -482,14 +483,18 @@ export default function DashboardUsers() {
                 </div>
               </div>
 
-              {/* Account Type & Role */}
+              {/* Account Type — editable by admin */}
               <div>
                 <Label className="text-sm">نوع الحساب</Label>
-                <div className="mt-1 p-3 bg-muted/50 rounded-lg text-sm">
-                  {selectedUser.account_type === "both" ? "سائق + راكب" :
-                   selectedUser.account_type === "driver" ? "سائق" :
-                   "راكب"}
-                </div>
+                <select
+                  value={editForm.account_type || selectedUser.account_type || "passenger"}
+                  onChange={(e) => setEditForm({ ...editForm, account_type: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm mt-1"
+                >
+                  <option value="passenger">راكب فقط</option>
+                  <option value="driver">سائق فقط</option>
+                  <option value="both">سائق + راكب</option>
+                </select>
               </div>
               <div>
                 <Label className="text-sm">الصلاحية</Label>
@@ -597,6 +602,95 @@ export default function DashboardUsers() {
               )}
             </div>
 
+            {/* ── Admin Support Quick Actions ────────────────────── */}
+            <div className="border-t border-border pt-4 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">إجراءات الدعم السريعة</p>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Grant free subscription */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg text-xs h-8 gap-1"
+                  onClick={async () => {
+                    const days = window.prompt("عدد أيام الاشتراك المجاني:", "30");
+                    if (!days || isNaN(Number(days))) return;
+                    const { data, error } = await supabase.rpc("admin_grant_free_subscription", {
+                      p_driver_email: selectedUser.email,
+                      p_days: Number(days),
+                      p_note: "اشتراك مجاني ممنوح من الدعم",
+                    });
+                    if (error || data?.error) { toast.error("فشل منح الاشتراك: " + (data?.error || error?.message)); return; }
+                    toast.success(`تم منح ${days} يوم اشتراك مجاني ✅`);
+                    logAdminAction("admin_grant_free_sub", "subscription", selectedUser.id, { days: Number(days), email: selectedUser.email });
+                  }}
+                >
+                  🎁 اشتراك مجاني
+                </Button>
+
+                {/* Send notification to this user */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-lg text-xs h-8 gap-1"
+                  onClick={async () => {
+                    const title = window.prompt("عنوان الإشعار:");
+                    if (!title) return;
+                    const msg = window.prompt("نص الإشعار:");
+                    if (!msg) return;
+                    const { data, error } = await supabase.rpc("admin_notify_user", {
+                      p_user_email: selectedUser.email,
+                      p_title: title,
+                      p_message: msg,
+                    });
+                    if (error || data?.error) { toast.error("فشل الإرسال"); return; }
+                    toast.success("تم إرسال الإشعار ✅");
+                    logAdminAction("admin_notify_user", "notification", selectedUser.id, { title, email: selectedUser.email });
+                  }}
+                >
+                  🔔 إشعار شخصي
+                </Button>
+
+                {/* Reset onboarding — user stuck in onboarding loop */}
+                <Button
+                  size="sm" variant="outline"
+                  className="rounded-lg text-xs h-8 gap-1"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from("profiles")
+                      .update({ onboarding_completed: false })
+                      .eq("id", selectedUser.id);
+                    if (error) { toast.error("فشل إعادة التهيئة"); return; }
+                    qc.invalidateQueries({ queryKey: ["users"] });
+                    toast.success("تم إعادة تعيين خطوات الإعداد ✅");
+                    logAdminAction("admin_reset_onboarding", "user", selectedUser.id, { email: selectedUser.email });
+                  }}
+                >
+                  🔄 إعادة الإعداد
+                </Button>
+
+                {/* Cancel all active bookings for this user */}
+                <Button
+                  size="sm" variant="outline"
+                  className="rounded-lg text-xs h-8 gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={async () => {
+                    const reason = window.prompt("سبب الإلغاء (للسجل):");
+                    if (reason === null) return;
+                    const { error } = await supabase
+                      .from("bookings")
+                      .update({ status: "cancelled", cancel_reason: "admin", cancellation_reason: reason || "إلغاء إداري", cancelled_by: "admin", cancelled_at: new Date().toISOString() })
+                      .eq("passenger_email", selectedUser.email)
+                      .in("status", ["pending", "confirmed"]);
+                    if (error) { toast.error("فشل الإلغاء"); return; }
+                    qc.invalidateQueries({ queryKey: ["users"] });
+                    toast.success("تم إلغاء جميع حجوزات المستخدم النشطة");
+                    logAdminAction("admin_cancel_user_bookings", "booking", selectedUser.id, { email: selectedUser.email, reason });
+                  }}
+                >
+                  🚫 إلغاء حجوزاته
+                </Button>
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <Button
                 onClick={() => setShowModal(false)}
@@ -606,7 +700,22 @@ export default function DashboardUsers() {
                 إلغاء
               </Button>
               <Button
-                onClick={() => updateUserMutation.mutate(editForm)}
+                onClick={async () => {
+                  // Save basic fields
+                  updateUserMutation.mutate(editForm);
+                  // If account_type changed, apply via RPC
+                  if (editForm.account_type && editForm.account_type !== selectedUser.account_type) {
+                    const { data, error } = await supabase.rpc("admin_set_account_type", {
+                      p_user_id: selectedUser.id,
+                      p_type: editForm.account_type,
+                    });
+                    if (error || data?.error) {
+                      toast.error("فشل تغيير نوع الحساب: " + (data?.error || error?.message));
+                    } else {
+                      logAdminAction("admin_set_account_type", "user", selectedUser.id, { type: editForm.account_type, email: selectedUser.email });
+                    }
+                  }
+                }}
                 className="flex-1 bg-primary text-primary-foreground rounded-xl"
                 disabled={updateUserMutation.isPending}
               >
