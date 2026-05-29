@@ -52,9 +52,13 @@
 
 // deno-lint-ignore-file no-explicit-any
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const SUPABASE_URL   = Deno.env.get("SUPABASE_URL");
-const SUPABASE_ANON  = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const RESEND_API_KEY   = Deno.env.get("RESEND_API_KEY");
+const SUPABASE_URL     = Deno.env.get("SUPABASE_URL");
+// Use service role for REST calls — the sb_publishable anon key has
+// origin allowlist restrictions and returns "Host not in allowlist"
+// when called from a Deno Edge Function (no browser Origin header).
+const SUPABASE_SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const SUPABASE_ANON    = Deno.env.get("SUPABASE_ANON_KEY") || SUPABASE_SERVICE;
 
 const FROM_EMAIL = "noreply@mishwaro.com";
 const FROM_NAME  = "مشوارو";
@@ -93,12 +97,12 @@ function formatAccountType(t: string | null | undefined): string {
 
 // ─── REST helpers (auth-as-caller, RLS still applies) ────────────────────
 
-async function rest(jwt: string, path: string): Promise<any> {
+async function rest(path: string): Promise<any> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     headers: {
-      apikey: SUPABASE_ANON || "",
-      Authorization: `Bearer ${jwt}`,
-      "Content-Type": "application/json",
+      apikey:          SUPABASE_SERVICE || "",
+      Authorization:   `Bearer ${SUPABASE_SERVICE}`,
+      "Content-Type":  "application/json",
     },
   });
   if (!res.ok) {
@@ -106,6 +110,17 @@ async function rest(jwt: string, path: string): Promise<any> {
     throw new Error(`REST ${path} failed: ${res.status} ${t.slice(0, 200)}`);
   }
   return res.json();
+}
+
+// Extract user id from JWT without network call
+function extractUserId(jwt: string): string | null {
+  try {
+    const payload = jwt.split(".")[1];
+    const decoded = JSON.parse(atob(payload));
+    return decoded.sub || null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── Email body builders ────────────────────────────────────────────────
@@ -325,10 +340,18 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // Get caller's profile (RLS scopes to self automatically)
+  // Get caller's user id from JWT
+  const userId = extractUserId(jwt);
+  if (!userId) {
+    return new Response(JSON.stringify({ error: "invalid_jwt_no_sub" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // Get caller's profile using service role key (scoped by id)
   let profile: any = null;
   try {
-    const rows = await rest(jwt, "profiles?select=id,email,full_name,phone,dob,account_type,created_at&limit=1");
+    const rows = await rest(`profiles?select=id,email,full_name,phone,dob,account_type,created_at&id=eq.${userId}&limit=1`);
     profile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   } catch (e) {
     console.error("[send-account-email] profile fetch failed:", String(e));
@@ -352,7 +375,6 @@ Deno.serve(async (req: Request) => {
     let bookings: any[] = [];
     try {
       trips = await rest(
-        jwt,
         `trips?select=id,date,from_city,to_city,price,status&driver_email=eq.${encodeURIComponent(profile.email)}&order=date.desc&limit=50`,
       );
     } catch (e) {
@@ -360,7 +382,6 @@ Deno.serve(async (req: Request) => {
     }
     try {
       bookings = await rest(
-        jwt,
         `bookings?select=id,created_at,seats_booked,total_price,status,trip:trips(from_city,to_city,price)&passenger_email=eq.${encodeURIComponent(profile.email)}&status=neq.cancelled&order=created_at.desc&limit=50`,
       );
     } catch (e) {

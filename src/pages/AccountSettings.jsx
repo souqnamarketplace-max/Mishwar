@@ -751,10 +751,6 @@ export default function AccountSettings() {
       setActiveSubscription(detectedSub);
 
       // ── Send the user a copy of their data BEFORE we anonymize ─────
-      // TEMPORARILY DISABLED: Edge Function failing with 500 error
-      // Re-enable post-launch after fixing send-account-email function
-      // The user can still download their data manually via JSON export button
-      /*
       if (requestDataExport) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -784,7 +780,6 @@ export default function AccountSettings() {
           );
         }
       }
-      */
 
       // Record intent BEFORE we touch the row, so even if the next step
       // silently fails (e.g. expired session vs RLS), the admin team sees
