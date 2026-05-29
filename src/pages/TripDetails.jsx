@@ -14,7 +14,7 @@ import {
   Shield, Phone, MessageCircle, Heart, Share2, Navigation,
   Snowflake, Music, Cigarette, Briefcase, ChevronLeft, CheckCircle,
   Headphones, X, Check, CreditCard, Wallet, Building2, AlertCircle,
-  UserPlus, UserCheck
+  UserPlus, UserCheck, Copy
 } from "lucide-react";
 import { toast } from "sonner";
 import UserActionsMenu from "@/components/shared/UserActionsMenu";
@@ -580,6 +580,49 @@ export default function TripDetails() {
                       <span>⏳</span> بانتظار موافقة السائق
                     </div>
                   )}
+
+                  {/* Show driver payment details after booking if non-cash method was chosen */}
+                  {activeBooking?.payment_method && activeBooking.payment_method !== "cash" && (() => {
+                    const p = driverProfile;
+                    const method = activeBooking.payment_method;
+                    const details = [];
+                    if (method === "bank_transfer") {
+                      if (p?.bank_name)           details.push({ label: "البنك",       value: p.bank_name });
+                      if (p?.bank_account_name)   details.push({ label: "اسم الحساب", value: p.bank_account_name });
+                      if (p?.bank_iban)           details.push({ label: "الآيبان",     value: p.bank_iban });
+                      if (p?.bank_account_number) details.push({ label: "رقم الحساب", value: p.bank_account_number });
+                    } else if (method === "reflect") {
+                      if (p?.reflect_number) details.push({ label: "رقم Reflect", value: p.reflect_number });
+                    } else if (method === "jawwal_pay") {
+                      if (p?.jawwal_pay_number) details.push({ label: "رقم جوال باي", value: p.jawwal_pay_number });
+                    }
+                    if (details.length === 0) return null;
+                    return (
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 overflow-hidden mt-1" dir="rtl">
+                        <div className="px-3 py-2 bg-primary/10 flex items-center gap-2">
+                          <Wallet className="w-3.5 h-3.5 text-primary" />
+                          <p className="text-xs font-bold text-primary">حوّل ₪{trip.price} للسائق</p>
+                        </div>
+                        <div className="p-3 space-y-2">
+                          {details.map(({ label, value }) => (
+                            <div key={label} className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-xs font-mono font-semibold truncate">{value}</span>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(value).then(() => toast.success(`تم نسخ ${label}`)).catch(() => {})}
+                                  className="p-1 rounded hover:bg-primary/10 shrink-0"
+                                  aria-label={`نسخ ${label}`}
+                                >
+                                  <Copy className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <Button
                     className="w-full h-11 rounded-xl font-bold bg-primary text-primary-foreground"
                     onClick={() => navigate(`/my-trips?trip=${id}`)}
@@ -1267,6 +1310,67 @@ export default function TripDetails() {
               <span className="text-sm text-muted-foreground">المبلغ الإجمالي</span>
               <span className="text-2xl font-black text-primary">₪{trip.price}</span>
             </div>
+
+            {/* Driver payment account details — shown when passenger picks
+                a non-cash method so they know exactly where to send money.
+                Pulls from driverProfile which is already fetched above. */}
+            {selectedPayment && selectedPayment !== "cash" && (() => {
+              const p = driverProfile;
+              const details = [];
+
+              if (selectedPayment === "bank_transfer") {
+                if (p?.bank_name)           details.push({ label: "البنك",          value: p.bank_name });
+                if (p?.bank_account_name)   details.push({ label: "اسم الحساب",     value: p.bank_account_name });
+                if (p?.bank_iban)           details.push({ label: "رقم الآيبان",    value: p.bank_iban });
+                if (p?.bank_account_number) details.push({ label: "رقم الحساب",     value: p.bank_account_number });
+              } else if (selectedPayment === "reflect") {
+                if (p?.reflect_number) details.push({ label: "رقم Reflect",  value: p.reflect_number });
+              } else if (selectedPayment === "jawwal_pay") {
+                if (p?.jawwal_pay_number) details.push({ label: "رقم جوال باي", value: p.jawwal_pay_number });
+              }
+
+              if (details.length === 0) {
+                return (
+                  <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed" dir="rtl">
+                    <p className="font-semibold mb-1">💬 لم يُضف السائق تفاصيل الدفع بعد</p>
+                    <p>راسل السائق عبر الدردشة قبل الرحلة ليزودك بتفاصيل التحويل.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 overflow-hidden" dir="rtl">
+                  <div className="px-3 py-2 bg-primary/10 flex items-center gap-2">
+                    <Wallet className="w-3.5 h-3.5 text-primary" />
+                    <p className="text-xs font-bold text-primary">تفاصيل الدفع للسائق</p>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {details.map(({ label, value }) => (
+                      <div key={label} className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-xs font-mono font-semibold text-foreground truncate">{value}</span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(value).then(() =>
+                                toast.success(`تم نسخ ${label}`)
+                              ).catch(() => toast.error("تعذّر النسخ"));
+                            }}
+                            className="p-1 rounded hover:bg-primary/10 transition-colors shrink-0"
+                            aria-label={`نسخ ${label}`}
+                          >
+                            <Copy className="w-3 h-3 text-muted-foreground" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
+                      أرسل ₪{trip.price} قبل أو بعد الرحلة واحتفظ بلقطة شاشة للتأكيد.
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Confirm button */}
             <Button
