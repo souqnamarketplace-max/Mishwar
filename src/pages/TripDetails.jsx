@@ -345,6 +345,25 @@ export default function TripDetails() {
         payment_method: selectedPayment,
         seats: 1,
       });
+
+      // If non-cash payment — notify driver upfront so they know
+      // a digital transfer is coming and can watch for it
+      if (selectedPayment && selectedPayment !== "cash" && tripData?.driver_email) {
+        const methodLabel =
+          selectedPayment === "bank_transfer" ? "تحويل بنكي" :
+          selectedPayment === "reflect"       ? "Reflect"    :
+          selectedPayment === "jawwal_pay"    ? "جوال باي"   : selectedPayment;
+        import("@/lib/notifyUser").then(({ notifyUser }) => {
+          notifyUser({
+            user_email: tripData.driver_email,
+            title:      `💳 حجز جديد — الدفع عبر ${methodLabel}`,
+            message:    `${user?.full_name || "راكب"} حجز مقعداً وسيدفع ₪${tripData.price} عبر ${methodLabel}. انتظر تأكيد الدفع منه.`,
+            type:       "payment",
+            trip_id:    tripData.id,
+            link:       "/dashboard?tab=passengers",
+          }).catch(() => {});
+        });
+      }
     },
     onError: (err) => {
       setShowConfirm(false);
@@ -632,6 +651,36 @@ export default function TripDetails() {
                             </div>
                           ))}
                         </div>
+                        {/* Notify driver button — passenger taps after transferring */}
+                        {activeBooking.payment_status !== "paid" && (
+                          <button
+                            className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-500/10 border-t border-green-200/50 text-green-700 text-xs font-bold hover:bg-green-500/20 active:scale-[0.98] transition-all"
+                            onClick={async () => {
+                              const methodLabel =
+                                method === "bank_transfer" ? "تحويل بنكي" :
+                                method === "reflect"       ? "Reflect"    :
+                                method === "jawwal_pay"    ? "جوال باي"   : method;
+                              // Notify the driver to check and confirm
+                              const { notifyUser } = await import("@/lib/notifyUser");
+                              await notifyUser({
+                                user_email: trip.driver_email || trip.created_by,
+                                title:      "💰 راكب أرسل الدفعة — تحقق وأكد",
+                                message:    `${user?.full_name || "راكب"} أرسل ₪${trip.price} عبر ${methodLabel}. افتح قائمة الركاب وأكد استلام الدفعة.`,
+                                type:       "payment",
+                                trip_id:    trip.id,
+                                link:       "/dashboard?tab=passengers",
+                              }).catch(() => {});
+                              toast.success("تم إشعار السائق ✅ سيؤكد الاستلام قريباً");
+                            }}
+                          >
+                            ✅ أرسلت الدفعة — أشعر السائق
+                          </button>
+                        )}
+                        {activeBooking.payment_status === "paid" && (
+                          <div className="w-full flex items-center justify-center gap-2 py-2 bg-green-500/10 border-t border-green-200/50 text-green-700 text-xs font-bold">
+                            ✅ تم تأكيد الدفع من السائق
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
