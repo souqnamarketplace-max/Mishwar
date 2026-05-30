@@ -24,6 +24,8 @@ Allow: /community
 Allow: /help
 Allow: /safety
 Allow: /blog
+Allow: /help.md
+Allow: /llms-full.txt
 Allow: /privacy
 Allow: /privacy-policy
 Allow: /terms
