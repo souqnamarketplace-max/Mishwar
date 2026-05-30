@@ -19,7 +19,7 @@
 
 - **iOS**: https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898
 - **Apple App ID**: 6768105898 | **Bundle**: com.mishwaro.app
-- **Android**: https://play.google.com/store/apps/details?id=com.mishwaro.app (submitted May 2026, under review)
+- **Android**: https://play.google.com/store/apps/details?id=com.mishwaro.app (LIVE on Google Play — May 2026)
 - **Package**: com.mishwaro.app
 - **Web app**: https://www.mishwaro.com (full PWA, works on any device)
 

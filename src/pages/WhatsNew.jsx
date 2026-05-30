@@ -11,7 +11,7 @@ import {
   Sparkles, Loader2,
   Repeat, Heart, Bell, Car, MessageCircle, UserCheck, MapPin,
   Calendar, Clock, Star, Settings, ShieldCheck, Zap, Gift,
-  TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search,
+  TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search, Smartphone,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
@@ -23,7 +23,7 @@ import EmptyState from "@/components/shared/EmptyState";
 const ICONS = {
   Sparkles, Repeat, Heart, Bell, Car, MessageCircle, UserCheck,
   MapPin, Calendar, Clock, Star, Settings, ShieldCheck, Zap,
-  Gift, TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search,
+  Gift, TrendingUp, Award, AlertCircle, CheckCircle, Plus, Search, Smartphone,
 };
 
 /**

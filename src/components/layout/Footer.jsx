@@ -92,18 +92,13 @@ export default function Footer() {
                   <p className="text-sm font-bold">App Store</p>
                 </div>
               </a>
-              {/* Google Play — submitted, waiting on Google review.
-                  Marked as "coming soon" but the link works the moment
-                  the app is approved (URL is deterministic from package id). */}
+              {/* Google Play — LIVE as of 2026-05-30 */}
               <a
                 href="https://play.google.com/store/apps/details?id=com.mishwaro.app"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-3 bg-white/10 hover:bg-white/20 active:bg-white/25 transition-colors rounded-xl px-3 py-2"
               >
-                {/* Official Google Play 4-color triangle. Hardcoded brand
-                    colors (not currentColor) so the icon reads correctly
-                    on the dark green footer just like the real Google badge. */}
                 <svg viewBox="0 0 512 512" className="w-6 h-6 shrink-0" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path fill="#00d2ff"  d="M89 28.4C82.2 35.6 78.2 46.7 78.2 61.2v389.6c0 14.5 4 25.6 10.8 32.8l1.3 1.2 218-217.9v-2.6L90.3 27.2 89 28.4z"/>
                   <path fill="#fcc934" d="M380.5 339.1l-72.4-72.5v-2.6l72.5-72.5 1.6 1 86 48.8c24.5 13.9 24.5 36.7 0 50.6l-86 48.8-1.7 0.4z"/>
@@ -111,7 +106,7 @@ export default function Footer() {
                   <path fill="#00e676" d="M382.1 174 125.5 28.2C110.4 19.7 97.1 20.8 89 29.4L308.1 248.4 382.1 174z"/>
                 </svg>
                 <div>
-                  <p className="text-[10px] text-primary-foreground/50">قريباً على</p>
+                  <p className="text-[10px] text-primary-foreground/50">متوفر على</p>
                   <p className="text-sm font-bold">Google Play</p>
                 </div>
               </a>
