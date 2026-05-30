@@ -1,0 +1,4 @@
+-- Migration 117: update_driver_location + clear_driver_location RPCs
+-- Applied: 2026-05-30
+-- Replaces buggy client-side upsert (driver_email: null) with server-side RPC
+-- that resolves driver_email via auth.email() (SECURITY DEFINER).

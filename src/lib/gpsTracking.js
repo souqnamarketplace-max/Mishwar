@@ -85,42 +85,22 @@ export function useGPSTripCompletion(trip, onComplete, { bufferMinutes = 20 } = 
     const dist = haversineKm(latitude, longitude, destCoords[0], destCoords[1]);
     setDistanceKm(dist);
 
-    // ── Persist to DB (admin-only table) every 30s ────────────────────────
-    // Rate-limited so we don't hammer the DB on every GPS tick.
+    // ── Persist to DB via RPC (admin-only table, rate-limited 30s) ─────────
+    // Uses update_driver_location RPC (migration 117) which resolves
+    // driver_email server-side via auth.email() — no null-email bug.
     const now = Date.now();
     if (now - lastPersistRef.current > 30_000) {
       lastPersistRef.current = now;
-      supabase.from("driver_locations").upsert({
-        driver_email: null, // filled by RLS from auth.email()
-        latitude,
-        longitude,
-        accuracy_m:  accuracy  ?? null,
-        speed_kmh:   speed != null ? Math.round(speed * 3.6) : null,
-        heading:     heading   ?? null,
-        from_city:   trip?.from_city ?? null,
-        to_city:     trip?.to_city   ?? null,
-        trip_id:     trip?.id        ?? null,
-        updated_at:  new Date().toISOString(),
-      }, { onConflict: "driver_email", ignoreDuplicates: false })
-        .then(({ error }) => {
-          // driver_email is required — fill from auth session
-          if (error?.message?.includes("null value") || error?.message?.includes("driver_email")) {
-            supabase.auth.getSession().then(({ data: { session } }) => {
-              if (!session?.user?.email) return;
-              supabase.from("driver_locations").upsert({
-                driver_email: session.user.email,
-                latitude, longitude,
-                accuracy_m:  accuracy  ?? null,
-                speed_kmh:   speed != null ? Math.round(speed * 3.6) : null,
-                heading:     heading   ?? null,
-                from_city:   trip?.from_city ?? null,
-                to_city:     trip?.to_city   ?? null,
-                trip_id:     trip?.id        ?? null,
-                updated_at:  new Date().toISOString(),
-              }, { onConflict: "driver_email", ignoreDuplicates: false }).then(() => {});
-            });
-          }
-        });
+      supabase.rpc("update_driver_location", {
+        p_latitude:   latitude,
+        p_longitude:  longitude,
+        p_accuracy_m: accuracy  ?? null,
+        p_speed_kmh:  speed != null ? Math.round(speed * 3.6) : null,
+        p_heading:    heading   ?? null,
+        p_trip_id:    trip?.id        ?? null,
+        p_from_city:  trip?.from_city ?? null,
+        p_to_city:    trip?.to_city   ?? null,
+      }).then(() => {}); // fire-and-forget
     }
 
     if (dist <= radius) {

@@ -526,7 +526,8 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             const cfg = statusConfig[trip.status] || statusConfig.confirmed;
             return (
               <div key={trip.id}>
-              {trip.status === "in_progress" && (
+              {/* GPS tracker for in_progress AND confirmed trips happening now */}
+              {(trip.status === "in_progress" || trip.status === "confirmed") && (
                 <GPSTripTracker
                   trip={trip}
                   bookings={bookings}
