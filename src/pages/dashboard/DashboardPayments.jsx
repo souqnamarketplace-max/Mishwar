@@ -374,24 +374,33 @@ export default function DashboardPayments() {
                           ) : null}
                           {/* Price adjustment — dispute resolution */}
                           {!isCancelled && (
-                            <Button size="sm" variant="ghost" className="h-7 text-xs w-full text-muted-foreground"
-                              onClick={async () => {
-                                const newPrice = window.prompt(`تعديل السعر (الحالي: ₪${b.total_price}):`);
-                                if (newPrice === null || isNaN(Number(newPrice))) return;
-                                const reason = window.prompt("سبب التعديل:");
-                                if (reason === null) return;
-                                const { data, error } = await supabase.rpc("admin_adjust_booking", {
-                                  p_booking_id: b.id,
-                                  p_new_price: Number(newPrice),
-                                  p_reason: reason,
-                                });
-                                if (error || data?.error) { toast.error("فشل تعديل السعر"); return; }
-                                qc.invalidateQueries({ queryKey: ["payments-bookings"] });
-                                qc.invalidateQueries({ queryKey: ["payments-summary"] });
-                                toast.success(`تم تعديل السعر إلى ₪${newPrice} ✅`);
-                              }}>
-                              ✏️ تعديل السعر
-                            </Button>
+                            <div className="space-y-1 pt-1 border-t border-border/50">
+                              <div className="flex gap-1">
+                                <input
+                                  type="number"
+                                  placeholder={`₪${b.total_price}`}
+                                  className="flex-1 text-xs h-6 px-2 rounded border border-border bg-background"
+                                  id={`price-${b.id}`}
+                                />
+                                <Button size="sm" variant="ghost"
+                                  className="h-6 text-[10px] px-2"
+                                  onClick={async () => {
+                                    const input = document.getElementById(`price-${b.id}`);
+                                    const newPrice = input?.value;
+                                    if (!newPrice || isNaN(Number(newPrice))) return;
+                                    const { data, error } = await supabase.rpc("admin_adjust_booking", {
+                                      p_booking_id: b.id,
+                                      p_new_price: Number(newPrice),
+                                      p_reason: "تعديل إداري",
+                                    });
+                                    if (error || data?.error) { toast.error("فشل تعديل السعر"); return; }
+                                    qc.invalidateQueries({ queryKey: ["payments-bookings"] });
+                                    qc.invalidateQueries({ queryKey: ["payments-summary"] });
+                                    toast.success(`تم تعديل السعر إلى ₪${newPrice} ✅`);
+                                    if (input) input.value = "";
+                                  }}>✏️</Button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </td>

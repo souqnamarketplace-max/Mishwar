@@ -25,6 +25,10 @@ export default function DashboardUsers() {
   const [showModal, setShowModal] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [showAccessKey, setShowAccessKey] = useState(false);
+  const [subDays, setSubDays] = useState("30");
+  const [notifyTitle, setNotifyTitle] = useState("");
+  const [notifyMsg, setNotifyMsg] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
   const qc = useQueryClient();
 
   React.useEffect(() => {
@@ -171,7 +175,13 @@ export default function DashboardUsers() {
     onSuccess: (_, data) => {
       qc.invalidateQueries({ queryKey: ["users"] });
       toast.success("تم تحديث بيانات المستخدم");
-      logAdminAction("admin_update_user", "user", data.userId, { role: data.data?.role, is_active: data.data?.is_active });
+      // Fix: data IS editForm, not wrapped in .data
+      logAdminAction("admin_update_user", "user", data.id, {
+        email:      selectedUser?.email,
+        role:       data.role,
+        is_active:  data.is_active,
+        full_name:  data.full_name,
+      });
       setShowModal(false);
     },
     onError: (error) => {
@@ -603,91 +613,137 @@ export default function DashboardUsers() {
             </div>
 
             {/* ── Admin Support Quick Actions ────────────────────── */}
-            <div className="border-t border-border pt-4 space-y-2">
+            <div className="border-t border-border pt-4 space-y-3">
               <p className="text-xs font-semibold text-muted-foreground">إجراءات الدعم السريعة</p>
+
+              {/* Free subscription */}
+              <div className="bg-muted/30 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-medium">🎁 اشتراك مجاني</p>
+                <div className="flex gap-2">
+                  <input
+                    type="number" min="1" max="365"
+                    value={subDays}
+                    onChange={e => setSubDays(e.target.value)}
+                    className="w-20 text-xs h-7 px-2 rounded-lg border border-border bg-background"
+                    placeholder="أيام"
+                  />
+                  <span className="text-xs self-center text-muted-foreground">يوم</span>
+                  <Button size="sm" variant="outline" className="h-7 text-xs mr-auto"
+                    onClick={async () => {
+                      if (!subDays || isNaN(Number(subDays))) return;
+                      const { data, error } = await supabase.rpc("admin_grant_free_subscription", {
+                        p_driver_email: selectedUser.email,
+                        p_days: Number(subDays),
+                        p_note: "اشتراك مجاني ممنوح من الدعم",
+                      });
+                      if (error || data?.error) { toast.error("فشل منح الاشتراك: " + (data?.error || error?.message)); return; }
+                      toast.success(`تم منح ${subDays} يوم اشتراك مجاني ✅`);
+                      logAdminAction("admin_grant_free_sub", "subscription", selectedUser.id, {
+                        days: Number(subDays), email: selectedUser.email,
+                        admin_email: (await supabase.auth.getUser()).data?.user?.email,
+                      });
+                    }}
+                  >منح</Button>
+                </div>
+              </div>
+
+              {/* Personal notification — wired to push + in-app */}
+              <div className="bg-muted/30 rounded-xl p-3 space-y-2">
+                <p className="text-xs font-medium">🔔 إشعار شخصي</p>
+                <input
+                  value={notifyTitle}
+                  onChange={e => setNotifyTitle(e.target.value)}
+                  placeholder="عنوان الإشعار"
+                  className="w-full text-xs h-7 px-2 rounded-lg border border-border bg-background"
+                />
+                <div className="flex gap-2">
+                  <input
+                    value={notifyMsg}
+                    onChange={e => setNotifyMsg(e.target.value)}
+                    placeholder="نص الإشعار"
+                    className="flex-1 text-xs h-7 px-2 rounded-lg border border-border bg-background"
+                  />
+                  <Button size="sm" variant="outline" className="h-7 text-xs shrink-0"
+                    disabled={!notifyTitle || !notifyMsg}
+                    onClick={async () => {
+                      if (!notifyTitle || !notifyMsg) return;
+                      // 1. Insert in-app notification
+                      const { data: rpcData, error: rpcErr } = await supabase.rpc("admin_notify_user", {
+                        p_user_email: selectedUser.email,
+                        p_title: notifyTitle,
+                        p_message: notifyMsg,
+                      });
+                      if (rpcErr || rpcData?.error) { toast.error("فشل الإرسال"); return; }
+
+                      // 2. Send push notification via Edge Function
+                      try {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        if (session?.access_token) {
+                          await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push-notification`, {
+                            method: "POST",
+                            headers: {
+                              Authorization: `Bearer ${session.access_token}`,
+                              "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                              recipient_email: selectedUser.email,
+                              title: notifyTitle,
+                              body: notifyMsg,
+                              type: "system",
+                            }),
+                          });
+                        }
+                      } catch { /* push is best-effort */ }
+
+                      toast.success("تم إرسال الإشعار ✅");
+                      logAdminAction("admin_notify_user", "notification", selectedUser.id, {
+                        title: notifyTitle, email: selectedUser.email,
+                      });
+                      setNotifyTitle("");
+                      setNotifyMsg("");
+                    }}
+                  >إرسال</Button>
+                </div>
+              </div>
+
+              {/* Reset onboarding */}
               <div className="grid grid-cols-2 gap-2">
-                {/* Grant free subscription */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-lg text-xs h-8 gap-1"
+                <Button size="sm" variant="outline" className="h-8 text-xs"
                   onClick={async () => {
-                    const days = window.prompt("عدد أيام الاشتراك المجاني:", "30");
-                    if (!days || isNaN(Number(days))) return;
-                    const { data, error } = await supabase.rpc("admin_grant_free_subscription", {
-                      p_driver_email: selectedUser.email,
-                      p_days: Number(days),
-                      p_note: "اشتراك مجاني ممنوح من الدعم",
-                    });
-                    if (error || data?.error) { toast.error("فشل منح الاشتراك: " + (data?.error || error?.message)); return; }
-                    toast.success(`تم منح ${days} يوم اشتراك مجاني ✅`);
-                    logAdminAction("admin_grant_free_sub", "subscription", selectedUser.id, { days: Number(days), email: selectedUser.email });
-                  }}
-                >
-                  🎁 اشتراك مجاني
-                </Button>
-
-                {/* Send notification to this user */}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="rounded-lg text-xs h-8 gap-1"
-                  onClick={async () => {
-                    const title = window.prompt("عنوان الإشعار:");
-                    if (!title) return;
-                    const msg = window.prompt("نص الإشعار:");
-                    if (!msg) return;
-                    const { data, error } = await supabase.rpc("admin_notify_user", {
-                      p_user_email: selectedUser.email,
-                      p_title: title,
-                      p_message: msg,
-                    });
-                    if (error || data?.error) { toast.error("فشل الإرسال"); return; }
-                    toast.success("تم إرسال الإشعار ✅");
-                    logAdminAction("admin_notify_user", "notification", selectedUser.id, { title, email: selectedUser.email });
-                  }}
-                >
-                  🔔 إشعار شخصي
-                </Button>
-
-                {/* Reset onboarding — user stuck in onboarding loop */}
-                <Button
-                  size="sm" variant="outline"
-                  className="rounded-lg text-xs h-8 gap-1"
-                  onClick={async () => {
-                    const { error } = await supabase
-                      .from("profiles")
-                      .update({ onboarding_completed: false })
-                      .eq("id", selectedUser.id);
+                    const { error } = await supabase.from("profiles").update({ onboarding_completed: false }).eq("id", selectedUser.id);
                     if (error) { toast.error("فشل إعادة التهيئة"); return; }
                     qc.invalidateQueries({ queryKey: ["users"] });
                     toast.success("تم إعادة تعيين خطوات الإعداد ✅");
                     logAdminAction("admin_reset_onboarding", "user", selectedUser.id, { email: selectedUser.email });
                   }}
-                >
-                  🔄 إعادة الإعداد
-                </Button>
+                >🔄 إعادة الإعداد</Button>
 
-                {/* Cancel all active bookings for this user */}
-                <Button
-                  size="sm" variant="outline"
-                  className="rounded-lg text-xs h-8 gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
-                  onClick={async () => {
-                    const reason = window.prompt("سبب الإلغاء (للسجل):");
-                    if (reason === null) return;
-                    const { error } = await supabase
-                      .from("bookings")
-                      .update({ status: "cancelled", cancel_reason: "admin", cancellation_reason: reason || "إلغاء إداري", cancelled_by: "admin", cancelled_at: new Date().toISOString() })
-                      .eq("passenger_email", selectedUser.email)
-                      .in("status", ["pending", "confirmed"]);
-                    if (error) { toast.error("فشل الإلغاء"); return; }
-                    qc.invalidateQueries({ queryKey: ["users"] });
-                    toast.success("تم إلغاء جميع حجوزات المستخدم النشطة");
-                    logAdminAction("admin_cancel_user_bookings", "booking", selectedUser.id, { email: selectedUser.email, reason });
-                  }}
-                >
-                  🚫 إلغاء حجوزاته
-                </Button>
+                {/* Cancel all active bookings */}
+                <div className="col-span-2 bg-muted/30 rounded-xl p-2 space-y-1.5">
+                  <div className="flex gap-2">
+                    <input
+                      value={cancelReason}
+                      onChange={e => setCancelReason(e.target.value)}
+                      placeholder="سبب إلغاء الحجوزات"
+                      className="flex-1 text-xs h-7 px-2 rounded-lg border border-border bg-background"
+                    />
+                    <Button size="sm" variant="outline"
+                      className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 shrink-0"
+                      onClick={async () => {
+                        const { error } = await supabase
+                          .from("bookings")
+                          .update({ status: "cancelled", cancellation_reason: cancelReason || "إلغاء إداري", cancelled_by: "admin", cancelled_at: new Date().toISOString() })
+                          .eq("passenger_email", selectedUser.email)
+                          .in("status", ["pending", "confirmed"]);
+                        if (error) { toast.error("فشل الإلغاء"); return; }
+                        qc.invalidateQueries({ queryKey: ["users"] });
+                        toast.success("تم إلغاء جميع حجوزاته النشطة");
+                        logAdminAction("admin_cancel_user_bookings", "booking", selectedUser.id, { email: selectedUser.email, reason: cancelReason });
+                        setCancelReason("");
+                      }}
+                    >🚫 إلغاء حجوزاته</Button>
+                  </div>
+                </div>
               </div>
             </div>
 
