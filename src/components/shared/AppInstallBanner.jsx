@@ -1,26 +1,32 @@
-import React, { useState, useEffect } from "react";
-import { X } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { X, Download } from "lucide-react";
 
 /**
- * AppInstallBanner
+ * AppInstallBanner — multi-layer mobile app discovery
  *
- * Shows a bottom-sheet banner prompting mobile browser users to download
- * the native app. Detects the platform and links to the correct store.
+ * Layer 1 (Android Chrome): captures the browser's native beforeinstallprompt
+ *   event and shows a custom trigger. When the user taps "تحميل", Chrome shows
+ *   the OS-level "Add to Home Screen" sheet immediately.
+ *
+ * Layer 2 (All mobile browsers): bottom-sheet banner linking to the correct
+ *   app store — App Store for iOS, Google Play for Android.
+ *
+ * Layer 3 (Nav chip): a small persistent "📲 تحميل التطبيق" chip in the
+ *   mobile nav so users who dismiss the banner still have a way back.
  *
  * Rules:
- * - Only shows on mobile browsers (not in the Capacitor native app shell)
- * - Only shows on iOS or Android
- * - Dismissed state persists in localStorage for 14 days
- * - Never shows if the user is already in standalone/PWA mode
- * - Delays 3 seconds after page load so it doesn't interrupt first impression
+ * - Never shows inside Capacitor native shell
+ * - Never shows in standalone/PWA mode
+ * - Banner respects 14-day dismiss, nav chip is always visible on mobile
+ * - iOS Chrome (CriOS) is treated same as iOS Safari — links to App Store
  */
 
-const IOS_APP_URL    = "https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898";
+const IOS_APP_URL     = "https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898";
 const ANDROID_APP_URL = "https://play.google.com/store/apps/details?id=com.mishwaro.app";
-const DISMISS_KEY    = "mishwaro_app_banner_dismissed";
-const DISMISS_DAYS   = 14;
+const DISMISS_KEY     = "mishwaro_app_banner_v2";
+const DISMISS_DAYS    = 7; // reduced to 7 — more chances to convert
 
-function getStoredDismissal() {
+function isDismissed() {
   try {
     const raw = localStorage.getItem(DISMISS_KEY);
     if (!raw) return false;
@@ -28,119 +34,200 @@ function getStoredDismissal() {
     const expired = Date.now() - ts > DISMISS_DAYS * 86_400_000;
     if (expired) localStorage.removeItem(DISMISS_KEY);
     return !expired;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
-function dismiss() {
+function saveDismissal() {
   try { localStorage.setItem(DISMISS_KEY, JSON.stringify({ ts: Date.now() })); } catch {}
+}
+
+function detectPlatform(ua) {
+  if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+  if (/Android/i.test(ua) && /Mobile/i.test(ua)) return "android";
+  return null;
 }
 
 export default function AppInstallBanner() {
   const [visible, setVisible] = useState(false);
-  const [platform, setPlatform] = useState(null); // "ios" | "android"
+  const [platform, setPlatform] = useState(null);
+  const [pwaPrompt, setPwaPrompt] = useState(null); // Android Chrome native prompt
+  const pwaPromptRef = useRef(null);
 
   useEffect(() => {
-    // Already in native app (Capacitor) — never show
+    // Never show inside Capacitor or PWA standalone mode
     if (window.Capacitor?.isNativePlatform?.()) return;
-    // Already installed as PWA/standalone
     if (window.matchMedia("(display-mode: standalone)").matches) return;
-    // Already dismissed recently
-    if (getStoredDismissal()) return;
 
     const ua = navigator.userAgent || "";
-    const isIOS     = /iPhone|iPad|iPod/i.test(ua) && !/CriOS|FxiOS/i.test(ua);
-    // Show on Android Chrome/WebView — exclude desktop Chrome
-    const isAndroid = /Android/i.test(ua) && /Mobile/i.test(ua);
+    const plat = detectPlatform(ua);
+    if (!plat) return;
+    setPlatform(plat);
 
-    if (!isIOS && !isAndroid) return;
+    // Capture Android Chrome native install prompt
+    const handlePrompt = (e) => {
+      e.preventDefault();
+      pwaPromptRef.current = e;
+      setPwaPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handlePrompt);
 
-    setPlatform(isIOS ? "ios" : "android");
+    // Show banner after 2.5s if not dismissed
+    if (!isDismissed()) {
+      const t = setTimeout(() => setVisible(true), 2500);
+      return () => {
+        window.removeEventListener("beforeinstallprompt", handlePrompt);
+        clearTimeout(t);
+      };
+    }
 
-    // Delay so the user sees the page first
-    const t = setTimeout(() => setVisible(true), 3000);
-    return () => clearTimeout(t);
+    return () => window.removeEventListener("beforeinstallprompt", handlePrompt);
   }, []);
 
-  if (!visible || !platform) return null;
-
-  const storeUrl  = platform === "ios" ? IOS_APP_URL : ANDROID_APP_URL;
-  const storeLabel = platform === "ios"
-    ? "App Store"
-    : "Google Play";
-  const storeIcon = platform === "ios" ? "🍎" : "▶";
-
   const handleDismiss = () => {
-    dismiss();
+    saveDismissal();
     setVisible(false);
   };
 
+  const handleDownload = async () => {
+    // Android Chrome: trigger native OS install sheet
+    if (pwaPromptRef.current) {
+      pwaPromptRef.current.prompt();
+      const { outcome } = await pwaPromptRef.current.userChoice;
+      if (outcome === "accepted") {
+        setVisible(false);
+        return;
+      }
+    }
+    // Fallback: open the store URL
+    window.open(
+      platform === "ios" ? IOS_APP_URL : ANDROID_APP_URL,
+      "_blank",
+      "noopener,noreferrer"
+    );
+    handleDismiss();
+  };
+
+  if (!platform) return null;
+
+  const storeLabel = platform === "ios" ? "App Store" : "Google Play";
+  const storeIcon  = platform === "ios" ? "🍎" : "▶";
+
   return (
-    <div
-      dir="rtl"
-      className="fixed bottom-0 inset-x-0 z-[200] safe-bottom"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-    >
-      {/* Backdrop tap to dismiss */}
-      <div className="absolute inset-x-0 bottom-full h-8" onClick={handleDismiss} />
+    <>
+      {/* ── Bottom-sheet banner ──────────────────────────────── */}
+      {visible && (
+        <div
+          dir="rtl"
+          role="dialog"
+          aria-label="تنزيل تطبيق مشوارو"
+          className="fixed bottom-0 inset-x-0 z-[200]"
+          style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        >
+          {/* Tap-outside to dismiss */}
+          <div
+            className="fixed inset-0 bg-black/20 backdrop-blur-[1px]"
+            onClick={handleDismiss}
+          />
 
-      <div className="mx-3 mb-3 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-        {/* Green accent bar */}
-        <div className="h-1 w-full bg-gradient-to-l from-primary to-accent" />
+          <div className="relative mx-3 mb-3 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+            {/* Accent bar */}
+            <div className="h-1 w-full bg-gradient-to-l from-primary to-accent" />
 
-        <div className="p-4 flex items-center gap-3">
-          {/* App icon */}
-          <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-md">
-            <span className="text-primary-foreground font-black text-2xl">م</span>
-          </div>
+            <div className="p-4 flex items-center gap-3">
+              {/* App icon */}
+              <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shrink-0 shadow-lg">
+                <span className="text-primary-foreground font-black text-2xl select-none">م</span>
+              </div>
 
-          {/* Text */}
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm text-foreground leading-tight">
-              حمّل تطبيق مشوارو
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5 leading-tight">
-              تجربة أسرع وإشعارات فورية عبر {storeLabel}
-            </p>
-            {/* Stars */}
-            <div className="flex items-center gap-0.5 mt-1">
-              {[1,2,3,4,5].map(i => (
-                <span key={i} className="text-yellow-400 text-[10px]">★</span>
-              ))}
-              <span className="text-[10px] text-muted-foreground mr-1">مجاني</span>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm text-foreground leading-snug">مشوارو — تطبيق السفر الفلسطيني</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  إشعارات فورية • أسرع • متوفر على {storeLabel}
+                </p>
+                <div className="flex items-center gap-0.5 mt-1">
+                  {[1,2,3,4,5].map(i => (
+                    <span key={i} className="text-yellow-400 text-[10px]">★</span>
+                  ))}
+                  <span className="text-[10px] text-muted-foreground mr-1">مجاني</span>
+                </div>
+              </div>
+
+              {/* CTA */}
+              <div className="flex flex-col items-center gap-1.5 shrink-0">
+                <button
+                  onClick={handleDownload}
+                  className="bg-primary text-primary-foreground text-xs font-bold px-4 py-2 rounded-xl shadow-lg active:scale-95 transition-all whitespace-nowrap"
+                >
+                  {storeIcon} تحميل
+                </button>
+                <button
+                  onClick={handleDismiss}
+                  className="text-[10px] text-muted-foreground"
+                >
+                  لاحقاً
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* CTA */}
-          <div className="flex flex-col items-center gap-2 shrink-0">
-            <a
-              href={storeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={handleDismiss}
-              className="bg-primary text-primary-foreground text-xs font-bold px-4 py-2 rounded-xl shadow hover:bg-primary/90 active:scale-95 transition-all whitespace-nowrap"
-            >
-              {storeIcon} تحميل
-            </a>
+            {/* Close button */}
             <button
               onClick={handleDismiss}
-              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute top-3 left-3 w-6 h-6 flex items-center justify-center rounded-full bg-muted"
+              aria-label="إغلاق"
             >
-              لاحقاً
+              <X className="w-3 h-3 text-muted-foreground" />
             </button>
           </div>
-
-          {/* Close */}
-          <button
-            onClick={handleDismiss}
-            className="absolute top-3 left-3 w-6 h-6 flex items-center justify-center rounded-full bg-muted hover:bg-muted/80"
-            aria-label="إغلاق"
-          >
-            <X className="w-3.5 h-3.5 text-muted-foreground" />
-          </button>
         </div>
-      </div>
-    </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * MobileAppChip — small persistent chip shown in mobile nav.
+ * Always visible on mobile (doesn't respect the dismiss state).
+ * Gives users a second chance after dismissing the banner.
+ */
+export function MobileAppChip() {
+  const [platform, setPlatform] = useState(null);
+  const [pwaPrompt, setPwaPrompt] = useState(null);
+
+  useEffect(() => {
+    if (window.Capacitor?.isNativePlatform?.()) return;
+    if (window.matchMedia("(display-mode: standalone)").matches) return;
+    const ua = navigator.userAgent || "";
+    const plat = detectPlatform(ua);
+    if (plat) setPlatform(plat);
+
+    const handler = (e) => { e.preventDefault(); setPwaPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  if (!platform) return null;
+
+  const handleTap = async () => {
+    if (pwaPrompt) {
+      pwaPrompt.prompt();
+      return;
+    }
+    window.open(
+      platform === "ios" ? IOS_APP_URL : ANDROID_APP_URL,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  };
+
+  return (
+    <button
+      onClick={handleTap}
+      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-bold sm:hidden"
+      aria-label="تحميل تطبيق مشوارو"
+    >
+      <Download className="w-3 h-3" />
+      <span>حمّل التطبيق</span>
+    </button>
   );
 }

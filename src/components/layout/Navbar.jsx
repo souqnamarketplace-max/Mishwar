@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import NotificationBell from "../notifications/NotificationBell";
 import { useGlobalSearch } from "@/lib/GlobalSearchContext";
 import { useUnreadReleaseNotes } from "@/hooks/useUnreadReleaseNotes";
+import { MobileAppChip } from "@/components/shared/AppInstallBanner";
 
 const LOGO_URL = "/logo.png";
 
@@ -105,6 +106,9 @@ export default function Navbar() {
               <p className="text-[10px] text-muted-foreground leading-tight">رحلتك أسهل، أوفر، وأسرع</p>
             </div>
           </Link>
+
+          {/* Mobile app download chip — visible only on mobile, next to logo */}
+          <MobileAppChip />
 
           {/* Desktop Nav */}
           <div className="hidden lg:flex items-center gap-1">
@@ -448,6 +452,29 @@ export default function Navbar() {
                 <LogOut className="w-4 h-4" />
                 تسجيل الخروج
               </button>
+
+              {/* App store download links — always visible in mobile menu */}
+              <div className="mx-4 mt-3 pt-3 border-t border-border">
+                <p className="text-[10px] text-muted-foreground mb-2 text-center">حمّل التطبيق</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href="https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898"
+                    target="_blank" rel="noopener noreferrer"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-black text-white text-xs font-bold"
+                  >
+                    <span>🍎</span> App Store
+                  </a>
+                  <a
+                    href="https://play.google.com/store/apps/details?id=com.mishwaro.app"
+                    target="_blank" rel="noopener noreferrer"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold"
+                  >
+                    <span>▶</span> Google Play
+                  </a>
+                </div>
+              </div>
             </div>
           </motion.div>
         )}
