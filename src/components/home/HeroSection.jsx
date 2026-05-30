@@ -119,20 +119,23 @@ export default function HeroSection() {
   const SlideIndicators = ({ className = "" }) => {
     if (slides.length <= 1) return null;
     return (
-      <div className={`flex items-center gap-2 ${className}`} dir="ltr">
+      <div className={`flex items-center gap-1 sm:gap-2 ${className}`} dir="ltr">
         {/* Prev button */}
         <button onClick={prev}
-          className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/30 border border-white/20 flex items-center justify-center transition-all backdrop-blur-sm"
+          className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-white/15 hover:bg-white/30 border border-white/20 flex items-center justify-center transition-all backdrop-blur-sm"
           aria-label="السابق">
-          <ChevronRight className="w-3.5 h-3.5 text-white" />
+          <ChevronRight className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" />
         </button>
 
-        {/* Progress bars — thin horizontal lines, much more refined than dots */}
+        {/* Progress bars */}
         <div className="flex items-center gap-1">
           {slides.map((_, i) => (
             <button key={i} onClick={() => goTo(i, i > slideIdx ? 1 : -1)}
-              className="relative h-0.5 rounded-full overflow-hidden transition-all duration-300"
-              style={{ width: i === slideIdx ? 28 : 14 }}
+              className={`relative h-0.5 rounded-full overflow-hidden transition-all duration-300 ${
+                i === slideIdx
+                  ? "w-[18px] sm:w-[28px]"
+                  : "w-[8px] sm:w-[14px]"
+              }`}
               aria-label={`الشريحة ${i + 1}`}>
               <div className="absolute inset-0 bg-white/30 rounded-full" />
               {i === slideIdx && (
@@ -150,13 +153,13 @@ export default function HeroSection() {
 
         {/* Next button */}
         <button onClick={next}
-          className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/30 border border-white/20 flex items-center justify-center transition-all backdrop-blur-sm"
+          className="w-5 h-5 sm:w-7 sm:h-7 rounded-full bg-white/15 hover:bg-white/30 border border-white/20 flex items-center justify-center transition-all backdrop-blur-sm"
           aria-label="التالي">
-          <ChevronLeft className="w-3.5 h-3.5 text-white" />
+          <ChevronLeft className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-white" />
         </button>
 
         {/* Slide counter */}
-        <span className="text-white/50 text-[10px] font-mono mr-1">
+        <span className="text-white/50 text-[9px] sm:text-[10px] font-mono mr-0.5 sm:mr-1">
           {String(slideIdx + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")}
         </span>
       </div>
