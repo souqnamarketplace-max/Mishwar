@@ -390,9 +390,17 @@ export default function DashboardSubscriptions() {
           actionPending={approveMutation.isPending}
         />
       ) : view === "active" ? (
-        <SubscriptionList rows={active} emptyMessage="لا يوجد مشتركون نشطون" />
+        <SubscriptionList
+          rows={active}
+          emptyMessage="لا يوجد مشتركون نشطون"
+          onExtended={() => qc.invalidateQueries({ queryKey: ["subscriptions"] })}
+        />
       ) : (
-        <SubscriptionList rows={historyAll} emptyMessage="السجل فارغ" />
+        <SubscriptionList
+          rows={historyAll}
+          emptyMessage="السجل فارغ"
+          onExtended={() => qc.invalidateQueries({ queryKey: ["subscriptions"] })}
+        />
       )}
 
       {!isLoading && totalPages > 1 && (
@@ -464,7 +472,7 @@ function ViewTab({ id, active, onChange, label, alert }) {
   );
 }
 
-function SubscriptionList({ rows, emptyMessage, showActions, onApprove, onReject, actionPending }) {
+function SubscriptionList({ rows, emptyMessage, showActions, onApprove, onReject, actionPending, onExtended }) {
   if (rows.length === 0) {
     return (
       <div className="bg-card border border-border rounded-2xl p-12 text-center">
@@ -483,13 +491,83 @@ function SubscriptionList({ rows, emptyMessage, showActions, onApprove, onReject
           onApprove={onApprove}
           onReject={onReject}
           actionPending={actionPending}
+          onExtended={onExtended}
         />
       ))}
     </div>
   );
 }
 
-function SubscriptionRow({ row, showActions, onApprove, onReject, actionPending }) {
+function ExtendSubscriptionRow({ row, onExtended }) {
+  const [open, setOpen] = useState(false);
+  const [days, setDays] = useState("30");
+  const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleExtend = async () => {
+    const d = parseInt(days, 10);
+    if (!d || d < 1 || d > 365) { toast.error("أدخل عدد أيام صحيح (1-365)"); return; }
+    setLoading(true);
+    const { data, error } = await supabase.rpc("admin_extend_subscription", {
+      p_driver_email: row.driver_email,
+      p_days: d,
+      p_reason: reason || null,
+    });
+    setLoading(false);
+    if (error || data?.error) { toast.error("فشل التمديد: " + (error?.message || data?.error)); return; }
+    const newEnd = data?.new_period_end
+      ? new Date(data.new_period_end).toLocaleDateString("ar-EG", { year:"numeric", month:"long", day:"numeric" })
+      : "";
+    toast.success(`✅ تم تمديد اشتراك ${row.driver_email} بـ ${d} يوم${newEnd ? ` · ينتهي ${newEnd}` : ""}`);
+    setOpen(false);
+    setDays("30");
+    setReason("");
+    onExtended?.();
+  };
+
+  return (
+    <div className="mt-3">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs text-primary border border-primary/30 rounded-lg hover:bg-primary/5 transition-colors"
+        >
+          ⏳ تمديد الاشتراك
+        </button>
+      ) : (
+        <div className="mt-2 bg-primary/5 rounded-xl p-3 space-y-2 border border-primary/20">
+          <p className="text-xs font-semibold text-primary">تمديد اشتراك {row.driver_email}</p>
+          <div className="flex gap-2">
+            <input
+              type="number" min="1" max="365"
+              value={days}
+              onChange={e => setDays(e.target.value)}
+              placeholder="30"
+              className="w-20 text-xs h-8 px-2 rounded-lg border border-border bg-background"
+            />
+            <span className="text-xs self-center text-muted-foreground">يوم</span>
+            <input
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="السبب (اختياري)"
+              className="flex-1 text-xs h-8 px-2 rounded-lg border border-border bg-background"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="h-7 text-xs flex-1" onClick={handleExtend} disabled={loading}>
+              {loading ? "جاري..." : "✅ تمديد"}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setOpen(false)}>
+              إلغاء
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubscriptionRow({ row, showActions, onApprove, onReject, actionPending, onExtended }) {
   const cfg     = STATUS_CONFIG[row.status] || STATUS_CONFIG.pending;
   const method  = METHOD_LABELS[row.payment_method] || METHOD_LABELS.other;
   const StatusIcon = cfg.icon;
@@ -598,6 +676,11 @@ function SubscriptionRow({ row, showActions, onApprove, onReject, actionPending 
             رفض
           </Button>
         </div>
+      )}
+
+      {/* Extend button — for active/in_grace/expired subscriptions */}
+      {(row.status === "active" || row.status === "in_grace" || row.status === "expired") && (
+        <ExtendSubscriptionRow row={row} onExtended={onExtended} />
       )}
     </div>
   );

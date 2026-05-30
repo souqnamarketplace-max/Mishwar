@@ -1,0 +1,7 @@
+-- Migration 120: admin_extend_subscription RPC
+-- Applied: 2026-05-30
+-- Allows admin to extend an existing active/expired subscription or create one.
+-- Extends period_end from current end date (or NOW if expired).
+-- Always logs to admin_audit_log with old/new dates.
+-- Distinct from admin_grant_free_subscription (creates new row);
+-- this modifies the existing row and chains the extension properly.
