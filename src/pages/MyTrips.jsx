@@ -1070,10 +1070,10 @@ export default function MyTrips() {
                             راسل السائق
                           </Link>
 
-                          {/* Cancel booking — destructive style, FULL-WIDTH on
-                              mobile to ensure discoverability. Only shown when
-                              status allows cancellation. */}
-                          {(status === "confirmed" || status === "pending") && (
+                          {/* Cancel booking — only shown before departure.
+                              isTripExpired uses Asia/Jerusalem time so it's
+                              correct regardless of where the passenger is. */}
+                          {(status === "confirmed" || status === "pending") && !isTripExpired(trip) && (
                             <button
                               type="button"
                               onClick={() => {
