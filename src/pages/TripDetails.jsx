@@ -241,6 +241,24 @@ export default function TripDetails() {
     staleTime: 60_000,
   });
 
+  // Check if the current passenger has already reviewed this trip
+  const { data: myTripReview = null } = useQuery({
+    queryKey: ["my-trip-review", id, user?.email],
+    queryFn: async () => {
+      if (!user?.email || !id) return null;
+      const { data } = await supabase
+        .from("reviews")
+        .select("id, rating, comment")
+        .eq("trip_id", id)
+        .eq("reviewer_email", user.email)
+        .eq("review_type", "passenger_rates_driver")
+        .maybeSingle();
+      return data || null;
+    },
+    enabled: !!user?.email && !!id,
+    staleTime: 30_000,
+  });
+
   // Fetch driver's license to surface their verification status to passengers.
   // The "موثق" badge MUST reflect reality — previously it was hardcoded TRUE
   // for every driver, which is misleading for passengers comparing trips
@@ -588,8 +606,72 @@ export default function TripDetails() {
                 </div>
               </div>
 
-              {/* Book button */}
-              {isOwnTrip ? (
+              {/* ── COMPLETED TRIP PANEL ─────────────────────────────
+                  Replaces the booking UI entirely for completed trips.
+                  Shows review CTA (once-only) or "already reviewed". */}
+              {trip.status === "completed" && !isOwnTrip ? (
+                <div className="space-y-3 mt-2" dir="rtl">
+                  <div className="flex items-center justify-center gap-2 py-2 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-medium">
+                    <CheckCircle className="w-4 h-4" /> اكتملت هذه الرحلة
+                  </div>
+
+                  {booked && !myTripReview && (
+                    <button
+                      className="w-full flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-xl px-4 py-3 hover:bg-yellow-100 transition-colors active:scale-[0.99]"
+                      onClick={() => {
+                        navigate(`/my-trips?tab=completed&trip=${id}`);
+                      }}
+                    >
+                      <div className="flex gap-0.5">
+                        {[1,2,3,4,5].map(s => <Star key={s} className="w-4 h-4 text-yellow-400 fill-yellow-400" />)}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-yellow-800">قيّم السائق</p>
+                        <p className="text-xs text-yellow-600">شاركنا تجربتك مع {trip.driver_name || "السائق"}</p>
+                      </div>
+                    </button>
+                  )}
+
+                  {booked && myTripReview && (
+                    <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-center space-y-1">
+                      <div className="flex justify-center gap-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <Star key={s} className={`w-4 h-4 ${s <= (myTripReview.rating || 0) ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`} />
+                        ))}
+                      </div>
+                      <p className="text-xs text-green-700 font-medium">✅ قيّمت هذه الرحلة — شكراً!</p>
+                      {myTripReview.comment && (
+                        <p className="text-xs text-muted-foreground italic">"{myTripReview.comment}"</p>
+                      )}
+                    </div>
+                  )}
+
+                  {!booked && (
+                    <p className="text-xs text-muted-foreground text-center">لم تكن راكباً في هذه الرحلة</p>
+                  )}
+
+                  <Link
+                    to="/search"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    ابحث عن رحلة مشابهة ←
+                  </Link>
+                </div>
+              ) : trip.status === "cancelled" && !isOwnTrip ? (
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-center justify-center gap-2 py-2.5 bg-destructive/5 border border-destructive/20 rounded-xl text-destructive text-sm font-medium">
+                    ❌ تم إلغاء هذه الرحلة
+                  </div>
+                  <Link
+                    to="/search"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-sm text-muted-foreground hover:bg-muted transition-colors"
+                  >
+                    ابحث عن رحلة بديلة ←
+                  </Link>
+                </div>
+
+              ) : /* Book button */
+              isOwnTrip ? (
                 <Button
                   className="w-full h-11 rounded-xl font-bold gap-2 mt-2 bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20"
                   onClick={() => navigate(`/driver?tab=passengers&trip=${id}`)}
