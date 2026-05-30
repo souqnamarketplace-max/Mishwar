@@ -1,0 +1,6 @@
+-- Migration 118: Fix notify_passengers_trip_started trigger
+-- Applied: 2026-05-30
+-- Added link column to both notifications:
+-- in_progress: link = /my-trips
+-- completed: link = /my-trips?tab=completed&trip=<trip_id>
+-- Backfilled existing ⭐ notifications with correct links

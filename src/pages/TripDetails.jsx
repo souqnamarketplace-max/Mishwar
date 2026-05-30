@@ -786,7 +786,17 @@ export default function TripDetails() {
                 <ArrowRight className="w-5 h-5 text-primary" />
                 <span>{trip.to_city}</span>
               </div>
-              <Badge className="bg-accent/10 text-accent border-accent/20">مؤكدة</Badge>
+              <Badge className={
+                trip.status === "completed" ? "bg-green-500/10 text-green-700 border-green-200" :
+                trip.status === "cancelled" ? "bg-destructive/10 text-destructive border-destructive/20" :
+                trip.status === "in_progress" ? "bg-blue-500/10 text-blue-700 border-blue-200" :
+                "bg-accent/10 text-accent border-accent/20"
+              }>
+                {trip.status === "completed"  ? "مكتملة" :
+                 trip.status === "cancelled"  ? "ملغاة"  :
+                 trip.status === "in_progress"? "جارية"  :
+                 "مؤكدة"}
+              </Badge>
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
               <Calendar className="w-4 h-4" />

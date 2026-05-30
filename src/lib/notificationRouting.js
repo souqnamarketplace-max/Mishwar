@@ -58,8 +58,15 @@ export function getNotifTarget(notif) {
     //   - migration 036 cascade title 'تم إلغاء حجز معلق'
     //   - any legacy variant
     if (t.includes("إلغاء حجز") && t.includes("معلق")) return "/driver?tab=passengers";
-    // Trip started/completed for passenger → my trips
-    if (t.includes("انطلقت") || t.includes("اكتملت") || t.includes("قيّم السائق")) return "/my-trips";
+    // Trip started/completed for passenger → my trips completed tab
+    if (t.includes("انطلقت") || t.includes("اكتملت") || t.includes("قيّم السائق")) return "/my-trips?tab=completed";
+    // Review request ("كيف كانت رحلتك؟") — send directly to completed tab
+    // with the trip highlighted so passenger can tap and rate immediately
+    if (t.includes("كيف كانت") || t.includes("قيّم تجربتك")) {
+      return notif.trip_id
+        ? `/my-trips?tab=completed&trip=${notif.trip_id}`
+        : "/my-trips?tab=completed";
+    }
     // New trip match → trip details
     if (type === "new_trip") return `/trip/${notif.trip_id}`;
     // Rating received → driver's ratings tab. The tab id is 'my-ratings'
