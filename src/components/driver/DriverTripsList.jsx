@@ -11,6 +11,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { todayISO, isFutureOrToday } from "@/lib/validation";
+import { isTripExpired } from "@/lib/tripScheduling";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -526,8 +527,20 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
             const cfg = statusConfig[trip.status] || statusConfig.confirmed;
             return (
               <div key={trip.id}>
-              {/* GPS tracker for in_progress AND confirmed trips happening now */}
-              {(trip.status === "in_progress" || trip.status === "confirmed") && (
+              {/* GPS tracker: only for in_progress trips OR confirmed trips
+                  departing within 2 hours. Never for future or past trips. */}
+              {(() => {
+                if (trip.status === "in_progress") return true;
+                if (trip.status !== "confirmed") return false;
+                if (!trip.date || !trip.time) return false;
+                // Check departure is within 2h from now (Asia/Jerusalem)
+                const [yy, mo, dd] = trip.date.split("-").map(Number);
+                const [hh, mm] = trip.time.split(":").map(Number);
+                const utcOffset = 3; // Jerusalem is UTC+3 (approximate, ignores DST edge)
+                const depUtc = Date.UTC(yy, mo-1, dd, hh - utcOffset, mm);
+                const minsUntil = (depUtc - Date.now()) / 60_000;
+                return minsUntil <= 120 && minsUntil > -30; // 2h before to 30min after
+              })() && (
                 <GPSTripTracker
                   trip={trip}
                   bookings={bookings}
