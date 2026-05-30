@@ -99,8 +99,13 @@ export function isTripExpired(trip) {
   return start.getTime() <= Date.now();
 }
 
-/** True if a trip's start+30min window has already passed (it's completed). */
+/** True if a trip is completed — either the driver marked it done (status='completed')
+ *  OR the departure window has passed (time-based fallback for trips never explicitly completed). */
 export function isTripCompleted(trip) {
+  if (!trip) return false;
+  // Driver explicitly completed the trip — most reliable signal
+  if (trip.status === "completed") return true;
+  // Time-based fallback: window has passed
   const w = getTripWindow(trip);
   if (!w) return false;
   return w.end.getTime() <= Date.now();

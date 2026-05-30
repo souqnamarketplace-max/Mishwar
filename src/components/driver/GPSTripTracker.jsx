@@ -57,15 +57,24 @@ export default function GPSTripTracker({ trip, bookings, driverUser }) {
         message: `وصلت رحلتك من ${trip.from_city} إلى ${trip.to_city}. شكراً لاستخدامك مشواروو!`,
         type: "system",
         trip_id: trip.id,
-        // Lands passenger on their completed-trips tab so they can
-        // tap the trip and trigger the PassengerReviewWizard.
-        link: "/my-trips?tab=completed",
+        // Include trip ID so auto-open wizard fires on /my-trips
+        link: `/my-trips?tab=completed&trip=${trip.id}`,
       }).catch(() => { /* non-fatal */ })
     );
-    // Don't await — fire-and-forget so the review wizard opens
-    // immediately. Passengers get their notifications when they
-    // arrive; if any fail silently, the trip-completed state in
-    // /my-trips is still accurate on their next refresh.
+
+    // Also notify the driver themselves to rate their passengers
+    const driverEmail = trip.created_by || trip.driver_email;
+    if (driverEmail && passengers.length > 0) {
+      notifyUser({
+        user_email: driverEmail,
+        title: "⭐ قيّم ركابك",
+        message: `اكتملت رحلتك من ${trip.from_city} إلى ${trip.to_city}. يمكنك الآن تقييم الركاب من لوحة السائق.`,
+        type: "system",
+        trip_id: trip.id,
+        link: "/driver?tab=rate-passengers",
+      }).catch(() => { /* non-fatal */ });
+    }
+
     Promise.allSettled(sideEffects);
 
     toast.success("✅ اكتملت الرحلة! يمكنك الآن تقييم الركاب");
