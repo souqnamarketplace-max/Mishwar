@@ -145,8 +145,12 @@ function DesktopTabBar({ tabs, active, onChange }) {
 // booking.created_at (when the seat was reserved). A passenger who books
 // today for a trip next month should count against next month's earnings,
 // not this month's — matching how the driver thinks about cash flow.
-function EarningsTab({ bookings, trips, totalEarnings }) {
-  const confirmed = bookings.filter(b => b.status === "confirmed" || b.status === "completed");
+function EarningsTab({ bookings, trips, totalEarnings, pendingEarnings = 0 }) {
+  // Show paid earnings vs pending receivable separately so driver knows
+  // the difference between money already in hand vs money still owed.
+  // Filter for confirmed/completed PAID bookings only — pending bookings
+  // belong in a separate "to-receive" stat below.
+  const confirmed = bookings.filter(b => (b.status === "confirmed" || b.status === "completed") && b.payment_status === "paid");
   const byMethod = confirmed.reduce((acc, b) => {
     const m = b.payment_method || "cash";
     acc[m] = (acc[m] || 0) + (b.total_price || 0);
@@ -251,10 +255,23 @@ function EarningsTab({ bookings, trips, totalEarnings }) {
     <div className="space-y-4" dir="rtl">
       {/* Summary card — all-time, hero treatment */}
       <div className="bg-gradient-to-br from-primary to-accent rounded-2xl p-5 text-primary-foreground">
-        <p className="text-sm opacity-80 mb-1">إجمالي الأرباح</p>
+        <p className="text-sm opacity-80 mb-1">الأرباح المحصّلة</p>
         <p className="text-4xl font-black">₪{totalEarnings.toLocaleString()}</p>
-        <p className="text-xs opacity-70 mt-2">{confirmed.length} حجز مؤكد · متوسط ₪{avgPerBooking}/حجز</p>
+        <p className="text-xs opacity-70 mt-2">{confirmed.length} حجز مدفوع · متوسط ₪{avgPerBooking}/حجز</p>
       </div>
+
+      {/* Pending receivable — money expected but not yet collected */}
+      {pendingEarnings > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-yellow-700 font-medium mb-0.5">بانتظار التحصيل</p>
+            <p className="text-2xl font-bold text-yellow-800">₪{pendingEarnings.toLocaleString()}</p>
+          </div>
+          <p className="text-[11px] text-yellow-700 leading-tight text-left max-w-[140px]">
+            حجوزات مؤكدة لم تُسجّل كمدفوعة بعد. اضغط "تم الدفع" في صفحة الركاب عند استلام المبلغ.
+          </p>
+        </div>
+      )}
 
       {/* Time-period quick stats grid. Four tiles: this week, this month,
           last 30 days rolling, all-time count. Mobile: 2 cols. Desktop: 4 cols.
@@ -439,7 +456,13 @@ export default function DriverDashboard() {
     enabled: !!user?.email && tripIds.length > 0,
   });
 
-  const totalEarnings    = bookings.filter(b => b.status === "confirmed" || b.status === "completed").reduce((s, b) => s + (b.total_price || 0), 0);
+  // Earnings: only PAID bookings count toward "received earnings".
+  // Confirmed/completed but not-yet-paid are shown as pending receivable.
+  // Previously this included unpaid bookings, overstating actual revenue.
+  const paidBookings     = bookings.filter(b => (b.status === "confirmed" || b.status === "completed") && b.payment_status === "paid");
+  const pendingBookings  = bookings.filter(b => (b.status === "confirmed" || b.status === "completed") && b.payment_status !== "paid");
+  const totalEarnings    = paidBookings.reduce((s, b) => s + (b.total_price || 0), 0);
+  const pendingEarnings  = pendingBookings.reduce((s, b) => s + (b.total_price || 0), 0);
   const totalPassengers  = bookings.filter(b => b.status !== "cancelled").length;
   const activeTrips      = trips.filter(t => t.status === "confirmed" || t.status === "in_progress").length;
   const completedTrips   = trips.filter(t => t.status === "completed").length;
@@ -531,7 +554,7 @@ export default function DriverDashboard() {
         )}
 
         {activeTab === "earnings" && (
-          <EarningsTab bookings={bookings} trips={trips} totalEarnings={totalEarnings} />
+          <EarningsTab bookings={bookings} trips={trips} totalEarnings={totalEarnings} pendingEarnings={pendingEarnings} />
         )}
 
         {activeTab === "my-ratings" && (
