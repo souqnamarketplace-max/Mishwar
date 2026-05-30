@@ -1,0 +1,6 @@
+-- Migration 115: Fix book_seat RPC
+-- Applied: 2026-05-30
+-- book_seat was inserting payment_status='unpaid' which violates the
+-- CHECK constraint added in migration 110 (valid values: pending/paid/refunded/failed).
+-- This broke every booking on the platform with a 400 error.
+-- Fix: change to 'pending' (canonical initial payment status).
