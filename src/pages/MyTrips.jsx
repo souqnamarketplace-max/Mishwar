@@ -132,6 +132,8 @@ export default function MyTrips() {
     }
   }, [highlightTripId]);
 
+
+
   // Cancel booking mutation (for passenger bookings)
   const cancelBookingMutation = useMutation({
     mutationFn: async (input) => {
@@ -1085,6 +1087,26 @@ export default function MyTrips() {
                                     ? `${trip.date}T${trip.time}:00`
                                     : (trip.date ? `${trip.date}T00:00:00` : null),
                                 });
+
+  // Auto-open review wizard when arriving from the completion notification.
+  // When URL has ?tab=completed&trip=<id>, find the trip and open the
+  // wizard directly so the passenger doesn't have to hunt for the button.
+  // Uses raw query data to avoid TDZ with derived Sets declared later.
+  const autoOpenedReview = useRef(false);
+  useEffect(() => {
+    if (!highlightTripId || autoOpenedReview.current) return;
+    if (activeTab !== "completed") return;
+    const allLoaded = [...allTrips, ...driverTrips];
+    if (!allLoaded.length) return; // data not loaded yet
+    const trip = allLoaded.find(t => t.id === highlightTripId);
+    if (!trip) return;
+    const hasBooking = (passengerBookings || []).some(b => b.trip_id === highlightTripId);
+    const alreadyReviewed = (myReviews || []).some(r => r.trip_id === highlightTripId);
+    if (hasBooking && !alreadyReviewed) {
+      autoOpenedReview.current = true;
+      setTimeout(() => setWizardTrip(trip), 800);
+    }
+  }, [highlightTripId, activeTab, allTrips, driverTrips, passengerBookings, myReviews]);
                               }}
                               disabled={cancelBookingMutation.isPending}
                               className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-destructive/40 bg-destructive/5 text-destructive text-sm font-bold hover:bg-destructive/10 active:scale-[0.98] transition-all min-h-[44px] disabled:opacity-60"
