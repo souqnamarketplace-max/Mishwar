@@ -38,7 +38,21 @@
     {
       "source": "/(.*)",
       "has": [
-        { "type": "host", "value": "mishwar-nu.vercel.app" }
+        {
+          "type": "host",
+          "value": "mishwar-nu.vercel.app"
+        }
+      ],
+      "destination": "https://www.mishwaro.com/$1",
+      "permanent": true
+    },
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "mishwaro.com"
+        }
       ],
       "destination": "https://www.mishwaro.com/$1",
       "permanent": true
