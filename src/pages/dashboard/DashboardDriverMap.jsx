@@ -26,6 +26,8 @@ export default function DashboardDriverMap() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [filterRoute, setFilterRoute] = useState(""); // "from|to" or ""
+  const [filterAge, setFilterAge] = useState("all");  // "all" | "5" | "15" | "30"
   const mapRef   = useRef(null);
   const leafMap  = useRef(null);
   const markers  = useRef({});
@@ -102,7 +104,7 @@ export default function DashboardDriverMap() {
     import("leaflet").then(L => {
       L = L.default || L;
 
-      const activeEmails = new Set(drivers.map(d => d.driver_email));
+      const activeEmails = new Set(filteredDrivers.map(d => d.driver_email));
 
       // Remove stale markers
       Object.keys(markers.current).forEach(email => {
@@ -113,7 +115,7 @@ export default function DashboardDriverMap() {
       });
 
       // Add / update markers
-      drivers.forEach(driver => {
+      filteredDrivers.forEach(driver => {
         const age    = minutesAgo(driver.updated_at);
         const color  = age < 5 ? "#22c55e" : age < 15 ? "#f59e0b" : "#ef4444";
         const isNew  = age < 2;
@@ -169,9 +171,27 @@ export default function DashboardDriverMap() {
         markers.current[selected].openPopup();
       }
     });
-  }, [drivers, selected]);
+  }, [filteredDrivers, selected]);
 
   const activeCount = drivers.length;
+
+  // ── Apply filters ─────────────────────────────────────────────────────
+  const filteredDrivers = drivers.filter(d => {
+    if (filterAge !== "all" && minutesAgo(d.updated_at) > Number(filterAge)) return false;
+    if (filterRoute) {
+      const [from, to] = filterRoute.split("|");
+      if (from && d.from_city !== from) return false;
+      if (to && d.to_city !== to) return false;
+    }
+    return true;
+  });
+
+  // Unique routes for the route filter dropdown
+  const routes = [...new Set(
+    drivers
+      .filter(d => d.from_city && d.to_city)
+      .map(d => `${d.from_city}|${d.to_city}`)
+  )];
 
   return (
     <div dir="rtl">
@@ -194,6 +214,64 @@ export default function DashboardDriverMap() {
             <RefreshCw className="w-3.5 h-3.5" />تحديث
           </Button>
         </div>
+      </div>
+
+      {/* ── Filters ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2 mb-4 p-3 bg-muted/30 rounded-xl border border-border">
+        {/* Activity filter */}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground shrink-0">النشاط:</span>
+          <div className="flex gap-1">
+            {[
+              { val: "all", label: "الكل" },
+              { val: "5",   label: "آخر 5د" },
+              { val: "15",  label: "آخر 15د" },
+              { val: "30",  label: "آخر 30د" },
+            ].map(f => (
+              <button key={f.val} onClick={() => setFilterAge(f.val)}
+                className={`text-xs px-2.5 py-1 rounded-lg transition-all ${
+                  filterAge === f.val
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background border border-border hover:bg-muted"
+                }`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Route filter */}
+        {routes.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground shrink-0">المسار:</span>
+            <select
+              value={filterRoute}
+              onChange={e => { setFilterRoute(e.target.value); setSelected(null); }}
+              className="text-xs h-7 px-2 rounded-lg border border-border bg-background"
+            >
+              <option value="">كل المسارات</option>
+              {routes.map(r => {
+                const [from, to] = r.split("|");
+                return <option key={r} value={r}>{from} → {to}</option>;
+              })}
+            </select>
+          </div>
+        )}
+
+        {/* Clear filters */}
+        {(filterAge !== "all" || filterRoute) && (
+          <button
+            onClick={() => { setFilterAge("all"); setFilterRoute(""); setSelected(null); }}
+            className="text-xs text-muted-foreground hover:text-destructive transition-colors mr-auto"
+          >
+            × مسح الفلاتر
+          </button>
+        )}
+
+        {/* Results count */}
+        <span className="text-xs text-muted-foreground mr-auto self-center">
+          {filteredDrivers.length} من {activeCount} سائق
+        </span>
       </div>
 
       {/* ── Stats row ───────────────────────────────────────────────── */}
@@ -246,8 +324,10 @@ export default function DashboardDriverMap() {
           <p className="text-xs font-semibold text-muted-foreground mb-3">السائقون على الطريق</p>
           {activeCount === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">لا يوجد سائقون نشطون</p>
+          ) : filteredDrivers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">لا نتائج بهذا الفلتر</p>
           ) : (
-            drivers.map(driver => {
+            filteredDrivers.map(driver => {
               const age   = minutesAgo(driver.updated_at);
               const color = age < 5 ? "bg-green-500" : age < 15 ? "bg-yellow-500" : "bg-red-400";
               const isSelected = selected === driver.driver_email;
