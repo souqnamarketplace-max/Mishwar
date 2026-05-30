@@ -76,16 +76,6 @@ export default function AccountSettings() {
 
   // Detect which documents are expired so we can highlight them
   // when the driver arrives from an expiry notification link.
-  const [expiredFields, setExpiredFields] = useState(new Set());
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    const expired = new Set();
-    if (licenseExpiry     && licenseExpiry < today)           expired.add("license");
-    if (carRegistrationExpiry && carRegistrationExpiry < today) expired.add("registration");
-    if (insuranceExpiry   && insuranceExpiry < today)          expired.add("insurance");
-    setExpiredFields(expired);
-  }, [licenseExpiry, carRegistrationExpiry, insuranceExpiry]);
-
   // Sync form with user data
   // Driver License query
   const { data: license } = useQuery({
@@ -102,6 +92,19 @@ export default function AccountSettings() {
   const [licenseExpiry, setLicenseExpiry] = useState("");
   const [carRegistrationExpiry, setCarRegistrationExpiry] = useState("");
   const [insuranceExpiry, setInsuranceExpiry] = useState("");
+
+  // Detect which docs are expired — placed AFTER the expiry state vars
+  // to avoid TDZ in production minified build (dep array is evaluated
+  // synchronously at render; variables must be declared before this line)
+  const [expiredFields, setExpiredFields] = useState(new Set());
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const expired = new Set();
+    if (licenseExpiry           && licenseExpiry < today)           expired.add("license");
+    if (carRegistrationExpiry   && carRegistrationExpiry < today)   expired.add("registration");
+    if (insuranceExpiry         && insuranceExpiry < today)         expired.add("insurance");
+    setExpiredFields(expired);
+  }, [licenseExpiry, carRegistrationExpiry, insuranceExpiry]);
   const [licenseImageUrl, setLicenseImageUrl] = useState("");
   const [carRegistrationUrl, setCarRegistrationUrl] = useState("");
   const [insuranceUrl, setInsuranceUrl] = useState("");
