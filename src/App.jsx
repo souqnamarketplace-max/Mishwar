@@ -63,6 +63,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import { GlobalSearchProvider } from '@/lib/GlobalSearchContext';
+import AppInstallBanner from '@/components/shared/AppInstallBanner';
 
 import AppLayout from './components/layout/AppLayout';
 import { lazy, Suspense, useState } from 'react';
@@ -301,6 +302,7 @@ function App() {
               on mount with 'useNavigate() may be used only in the
               context of a <Router> component'. */}
           <GlobalSearchProvider>
+            <AppInstallBanner />
           <ScrollToTop />
             <Routes>
               {/* Public login route — always accessible */}
