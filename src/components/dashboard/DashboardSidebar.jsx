@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard, Wallet,
-  Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox, Megaphone, UserX
+  Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox, Megaphone, UserX, Navigation
 } from "lucide-react";
 
 // Centralised logout for the dashboard sidebar. Mirrors the
@@ -42,7 +42,8 @@ const menuItems = [
   { id: "support", icon: Headphones, label: "الدعم والشكاوى" },
   { id: "feedback", icon: MessageSquarePlus, label: "الاقتراحات والشكاوى" },
   { id: "licenses", icon: Shield, label: "توثيق السائقين" },
-  { id: "cities", icon: MapPin, label: "المدن المقترحة" },
+  { id: "cities",    icon: MapPin,      label: "المدن المقترحة" },
+  { id: "drivermap", icon: Navigation,  label: "خريطة السائقين" },
   { id: "content", icon: FileText, label: "إدارة المحتوى" },
   { id: "hero-slides", icon: ImageIcon, label: "شرائح الصفحة الرئيسية" },
   // OFFERS / COUPONS — HIDDEN FOR v1.0 LAUNCH (M-06 in pre-launch audit).

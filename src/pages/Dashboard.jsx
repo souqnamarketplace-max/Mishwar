@@ -28,6 +28,7 @@ import DashboardSettings from "./dashboard/DashboardSettings";
 import DashboardHeroSlides from "./dashboard/DashboardHeroSlides";
 import DashboardLogs from "./dashboard/DashboardLogs";
 import DashboardCities from "./dashboard/DashboardCities";
+import DashboardDriverMap from "./dashboard/DashboardDriverMap";
 import DashboardLicenses from "./dashboard/DashboardLicenses";
 import AdminNotificationBell from "@/components/notifications/AdminNotificationBell";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -744,8 +745,9 @@ export default function Dashboard() {
         )}
         {activePage === "hero-slides" && <DashboardHeroSlides />}
         {activePage === "settings" && <DashboardSettings />}
-        {activePage === "logs" && <DashboardLogs />}
-        {activePage === "cities" && <DashboardCities />}
+        {activePage === "logs"     && <DashboardLogs />}
+        {activePage === "cities"   && <DashboardCities />}
+        {activePage === "drivermap" && <DashboardDriverMap />}
       </div>
     </div>
   );

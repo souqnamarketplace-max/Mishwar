@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { CITY_COORDS } from "./mapUtils";
+import { supabase } from "./supabase";
 
 // ─── Dynamic radius per city (km) ────────────────────────────────────────────
 const BIG_CITIES = new Set([
@@ -35,8 +36,7 @@ export function haversineKm(lat1, lon1, lat2, lon2) {
 // ─── React hook — GPS trip completion ────────────────────────────────────────
 // Usage: const { status, distanceKm, minutesLeft, requestLocation } = useGPSTripCompletion(trip, onComplete)
 // status: 'idle' | 'granted' | 'denied' | 'near' | 'countdown' | 'done'
-export function useGPSTripCompletion(trip, onComplete, { bufferMinutes = 20 } = {}) {
-  const [status, setStatus] = useState("idle");       // idle | granted | denied | near | countdown | done
+export function useGPSTripCompletion(trip, onComplete, { bufferMinutes = 20 } = {}) {  const [status, setStatus] = useState("idle");       // idle | granted | denied | near | countdown | done
   const [distanceKm, setDistanceKm] = useState(null);
   const [minutesLeft, setMinutesLeft] = useState(null);
   const countdownRef = useRef(null);
@@ -66,28 +66,73 @@ export function useGPSTripCompletion(trip, onComplete, { bufferMinutes = 20 } = 
       if (elapsed >= bufferMinutes) {
         clearInterval(countdownRef.current);
         setStatus("done");
+        // Remove driver location from DB — trip is done, no longer on road
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user?.email) {
+            supabase.from("driver_locations").delete().eq("driver_email", session.user.email).then(() => {});
+          }
+        });
         onComplete?.();
       }
     }, 30_000); // check every 30 seconds
   }, [bufferMinutes, onComplete, clearCountdown]);
 
+  const lastPersistRef = useRef(0);
+
   const handlePosition = useCallback((pos) => {
     if (!destCoords) return;
-    const { latitude, longitude } = pos.coords;
+    const { latitude, longitude, accuracy, speed, heading } = pos.coords;
     const dist = haversineKm(latitude, longitude, destCoords[0], destCoords[1]);
     setDistanceKm(dist);
+
+    // ── Persist to DB (admin-only table) every 30s ────────────────────────
+    // Rate-limited so we don't hammer the DB on every GPS tick.
+    const now = Date.now();
+    if (now - lastPersistRef.current > 30_000) {
+      lastPersistRef.current = now;
+      supabase.from("driver_locations").upsert({
+        driver_email: null, // filled by RLS from auth.email()
+        latitude,
+        longitude,
+        accuracy_m:  accuracy  ?? null,
+        speed_kmh:   speed != null ? Math.round(speed * 3.6) : null,
+        heading:     heading   ?? null,
+        from_city:   trip?.from_city ?? null,
+        to_city:     trip?.to_city   ?? null,
+        trip_id:     trip?.id        ?? null,
+        updated_at:  new Date().toISOString(),
+      }, { onConflict: "driver_email", ignoreDuplicates: false })
+        .then(({ error }) => {
+          // driver_email is required — fill from auth session
+          if (error?.message?.includes("null value") || error?.message?.includes("driver_email")) {
+            supabase.auth.getSession().then(({ data: { session } }) => {
+              if (!session?.user?.email) return;
+              supabase.from("driver_locations").upsert({
+                driver_email: session.user.email,
+                latitude, longitude,
+                accuracy_m:  accuracy  ?? null,
+                speed_kmh:   speed != null ? Math.round(speed * 3.6) : null,
+                heading:     heading   ?? null,
+                from_city:   trip?.from_city ?? null,
+                to_city:     trip?.to_city   ?? null,
+                trip_id:     trip?.id        ?? null,
+                updated_at:  new Date().toISOString(),
+              }, { onConflict: "driver_email", ignoreDuplicates: false }).then(() => {});
+            });
+          }
+        });
+    }
 
     if (dist <= radius) {
       setStatus(prev => prev === "countdown" || prev === "done" ? prev : "near");
       startCountdown();
     } else {
-      // Driver moved away — cancel countdown
       if (arrivalTimeRef.current) {
         clearCountdown();
         setStatus("granted");
       }
     }
-  }, [destCoords, radius, startCountdown, clearCountdown]);
+  }, [destCoords, radius, startCountdown, clearCountdown, trip]);
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) { setStatus("denied"); return; }

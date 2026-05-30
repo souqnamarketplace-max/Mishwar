@@ -1,0 +1,5 @@
+-- Migration 116: driver_locations table for admin GPS tracking
+-- Applied: 2026-05-30
+-- Security: admin reads all, drivers upsert own row only, passengers have zero access
+-- RLS enforces: no passenger can ever see driver locations
+-- Rows auto-cleared when driver completes trip via GPS tracker
