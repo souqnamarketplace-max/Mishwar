@@ -39,6 +39,14 @@ const PAGE_SIZE = 25;
 
 export default function DashboardRequests() {
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const u = api.entities.TripRequest.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["trip_requests"] });
+    });
+    return () => u && u();
+  }, []);
   const [filter, setFilter] = useState("open");
   const [search, setSearch] = useState("");
   const [page, setPage]     = useState(1);

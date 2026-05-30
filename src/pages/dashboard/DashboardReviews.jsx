@@ -11,6 +11,14 @@ import { toast } from "sonner";
 
 export default function DashboardReviews() {
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const u = api.entities.Review.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["reviews"] });
+    });
+    return () => u && u();
+  }, []);
   const [search, setSearch] = useState("");
   const [ratingFilter, setRatingFilter] = useState("");
   const [dateRangePreset, setDateRangePreset] = useState("all");

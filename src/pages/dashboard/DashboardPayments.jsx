@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import Pagination from "@/components/dashboard/Pagination";
 import DashboardFilterBar, { resolveDateRange } from "@/components/dashboard/DashboardFilterBar";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -106,6 +107,15 @@ export default function DashboardPayments() {
 
   // ── Mark payment via new RPC ─────────────────────────────────────────
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const u = api.entities.Booking.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["payments-bookings"] });
+      qc.invalidateQueries({ queryKey: ["payments-summary"] });
+    });
+    return () => u && u();
+  }, []);
   const markPaid = useMutation({
     mutationFn: async ({ id, paid }) => {
       const ref = referenceInput[id]?.trim() || null;

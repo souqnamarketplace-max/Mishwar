@@ -25,6 +25,7 @@ export default function DashboardTrips() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [editingTrip, setEditingTrip] = useState(null); // { id, fields: {} }
+  const [selectedTripIds, setSelectedTripIds] = useState(new Set());
   const qc = useQueryClient();
 
   // Realtime — admin sees trip changes instantly
@@ -183,9 +184,39 @@ export default function DashboardTrips() {
           <div className="p-8 text-center text-muted-foreground">جاري التحميل...</div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Bulk-action bar */}
+            {selectedTripIds.size > 0 && (
+              <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center gap-3" dir="rtl">
+                <span className="text-sm font-medium text-primary">{selectedTripIds.size} رحلة محددة</span>
+                <Button size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setSelectedTripIds(new Set())}>إلغاء التحديد</Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 mr-auto text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={async () => {
+                    const ids = Array.from(selectedTripIds);
+                    const { error } = await supabase.from("trips").update({ status: "cancelled" }).in("id", ids);
+                    if (error) { toast.error("فشل الإلغاء"); return; }
+                    toast.success(`تم إلغاء ${ids.length} رحلة ✅`);
+                    qc.invalidateQueries({ queryKey: ["trips"] });
+                    setSelectedTripIds(new Set());
+                    ids.forEach(id => logAdminAction("admin_bulk_cancel_trip", "trip", id, {}));
+                  }}>
+                  🚫 إلغاء المحدد
+                </Button>
+              </div>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-right text-xs text-muted-foreground border-b border-border bg-muted/30">
+                  <th className="p-3 w-8">
+                    <input type="checkbox"
+                      checked={filtered.length > 0 && filtered.every(t => selectedTripIds.has(t.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedTripIds(new Set(filtered.map(t => t.id)));
+                        else setSelectedTripIds(new Set());
+                      }}
+                      className="w-4 h-4 accent-primary cursor-pointer"
+                    />
+                  </th>
                   <th className="p-3">المسار</th>
                   <th className="p-3">السائق</th>
                   <th className="p-3">التاريخ</th>
@@ -200,7 +231,19 @@ export default function DashboardTrips() {
                   const sc = statusConfig[trip.status] || statusConfig.confirmed;
                   return (
                     <React.Fragment key={trip.id}>
-                    <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                    <tr className={`border-b border-border/50 hover:bg-muted/20 transition-colors ${selectedTripIds.has(trip.id) ? "bg-primary/5" : ""}`}>
+                      <td className="p-3">
+                        <input type="checkbox"
+                          checked={selectedTripIds.has(trip.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedTripIds);
+                            if (e.target.checked) next.add(trip.id);
+                            else next.delete(trip.id);
+                            setSelectedTripIds(next);
+                          }}
+                          className="w-4 h-4 accent-primary cursor-pointer"
+                        />
+                      </td>
                       <td className="p-3">
                         <div className="flex items-center gap-1 font-medium">
                           <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -264,7 +307,7 @@ export default function DashboardTrips() {
                     {/* Inline edit row */}
                     {editingTrip?.id === trip.id && (
                       <tr key={trip.id + "-edit"} className="bg-primary/5 border-b border-primary/20">
-                        <td colSpan={7} className="p-3">
+                        <td colSpan={8} className="p-3">
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-2" dir="rtl">
                             <div>
                               <p className="text-[10px] text-muted-foreground mb-1">من</p>

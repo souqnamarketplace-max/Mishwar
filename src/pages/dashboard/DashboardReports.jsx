@@ -40,6 +40,14 @@ const REPORTER_NOTIF_BY_STATUS = {
 
 export default function DashboardReports() {
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const u = api.entities.UserReport.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["user_reports"] });
+    });
+    return () => u && u();
+  }, []);
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [filter, setFilter] = useState("pending");
   const [search, setSearch] = useState("");

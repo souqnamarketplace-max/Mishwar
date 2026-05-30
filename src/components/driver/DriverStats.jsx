@@ -1,12 +1,19 @@
 import React from "react";
 import { DollarSign, Users, Car, CheckCircle } from "lucide-react";
 
-export default function DriverStats({ totalEarnings = 0, totalPassengers = 0, activeTrips = 0, completedTrips = 0 }) {
+// Defensive numeric formatter — handles undefined, null, NaN, Infinity, strings
+const fmt = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n) || isNaN(n)) return 0;
+  return Math.max(0, n);
+};
+
+export default function DriverStats({ totalEarnings, totalPassengers, activeTrips, completedTrips }) {
   const stats = [
-    { label: "الأرباح المحصّلة", value: `₪${(totalEarnings || 0).toLocaleString()}`, icon: DollarSign, bg: "bg-primary/10", color: "text-primary" },
-    { label: "الركاب الكلي", value: totalPassengers, icon: Users, bg: "bg-accent/10", color: "text-accent" },
-    { label: "رحلات نشطة", value: activeTrips, icon: Car, bg: "bg-yellow-500/10", color: "text-yellow-600" },
-    { label: "رحلات مكتملة", value: completedTrips, icon: CheckCircle, bg: "bg-green-500/10", color: "text-green-600" },
+    { label: "الأرباح المحصّلة", value: `₪${fmt(totalEarnings).toLocaleString()}`, icon: DollarSign, bg: "bg-primary/10", color: "text-primary" },
+    { label: "الركاب الكلي",     value: fmt(totalPassengers),                       icon: Users,      bg: "bg-accent/10",   color: "text-accent" },
+    { label: "رحلات نشطة",       value: fmt(activeTrips),                           icon: Car,        bg: "bg-yellow-500/10", color: "text-yellow-600" },
+    { label: "رحلات مكتملة",     value: fmt(completedTrips),                        icon: CheckCircle, bg: "bg-green-500/10", color: "text-green-600" },
   ];
 
   return (

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { friendlyError } from "@/lib/errors";
 import { logAdminAction } from "@/lib/adminAudit";
@@ -33,6 +34,18 @@ const STATUS_FILTERS = [
 
 export default function DashboardPassengerVerifications() {
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const channel = supabase.channel("pv-" + Math.random().toString(36).slice(2, 8))
+      .on("postgres_changes", { event: "*", schema: "public", table: "passenger_verifications" }, () => {
+        qc.invalidateQueries({ queryKey: ["passenger-verifications"] });
+        qc.invalidateQueries({ queryKey: ["verifications"] });
+        qc.invalidateQueries({ queryKey: ["admin-passenger-verifications"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
   const [filter, setFilter] = useState("pending");
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState(null);
@@ -154,6 +167,18 @@ function StatTile({ label, value, color, bg, urgent }) {
 
 function VerificationRow({ row, expanded, onToggle, onReviewed }) {
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const channel = supabase.channel("pv-" + Math.random().toString(36).slice(2, 8))
+      .on("postgres_changes", { event: "*", schema: "public", table: "passenger_verifications" }, () => {
+        qc.invalidateQueries({ queryKey: ["passenger-verifications"] });
+        qc.invalidateQueries({ queryKey: ["verifications"] });
+        qc.invalidateQueries({ queryKey: ["admin-passenger-verifications"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
   const [decision, setDecision] = useState(null); // 'approved' | 'rejected' | 'revoked'
   const [reason, setReason] = useState("");
   const [adminNote, setAdminNote] = useState("");

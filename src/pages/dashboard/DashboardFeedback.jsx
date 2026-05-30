@@ -23,6 +23,15 @@ const STATUS_CONFIG = {
 
 export default function DashboardFeedback() {
   const qc = useQueryClient();
+
+  // Realtime — admin sees changes instantly without manual refresh
+  React.useEffect(() => {
+    const u = api.entities.SupportTicket.subscribe(() => {
+      qc.invalidateQueries({ queryKey: ["feedback"] });
+      qc.invalidateQueries({ queryKey: ["support_tickets"] });
+    });
+    return () => u && u();
+  }, []);
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState(null);

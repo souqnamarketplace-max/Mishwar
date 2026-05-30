@@ -20,6 +20,7 @@ export default function DashboardUsers() {
   const PAGE_SIZE = 25;
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [filter, setFilter] = useState("all"); // all, driver, passenger, admin
   const [selectedUser, setSelectedUser] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -322,9 +323,42 @@ export default function DashboardUsers() {
           </div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Bulk-action bar — appears when items are selected */}
+            {selectedIds.size > 0 && (
+              <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 flex items-center gap-3" dir="rtl">
+                <span className="text-sm font-medium text-primary">{selectedIds.size} محدد</span>
+                <Button size="sm" variant="outline" className="h-7 text-xs"
+                  onClick={() => setSelectedIds(new Set())}>
+                  إلغاء التحديد
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs gap-1 mr-auto text-destructive border-destructive/30 hover:bg-destructive/10"
+                  onClick={async () => {
+                    const emails = filtered.filter(u => selectedIds.has(u.id)).map(u => u.email).filter(Boolean);
+                    if (!emails.length) return;
+                    const { error } = await supabase.from("profiles").update({ is_active: false }).in("email", emails);
+                    if (error) { toast.error("فشل التعطيل"); return; }
+                    toast.success(`تم تعطيل ${emails.length} مستخدم ✅`);
+                    qc.invalidateQueries({ queryKey: ["users"] });
+                    setSelectedIds(new Set());
+                    emails.forEach(e => logAdminAction("admin_bulk_deactivate", "user", null, { email: e }));
+                  }}>
+                  🚫 تعطيل المحددين
+                </Button>
+              </div>
+            )}
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-right text-xs text-muted-foreground border-b border-border bg-muted/30">
+                  <th className="p-3 w-8">
+                    <input type="checkbox"
+                      checked={filtered.length > 0 && filtered.every(u => selectedIds.has(u.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedIds(new Set(filtered.map(u => u.id)));
+                        else setSelectedIds(new Set());
+                      }}
+                      className="w-4 h-4 accent-primary cursor-pointer"
+                    />
+                  </th>
                   <th className="p-3">المستخدم</th>
                   <th className="p-3">النوع</th>
                   <th className="p-3">الإحصائيات</th>
@@ -336,8 +370,19 @@ export default function DashboardUsers() {
               </thead>
               <tbody>
                 {filtered.map((user) => (
-                  <tr key={user.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                  <tr key={user.id} className={`border-b border-border/50 hover:bg-muted/20 transition-colors ${selectedIds.has(user.id) ? "bg-primary/5" : ""}`}>
                     <td className="p-3">
+                      <input type="checkbox"
+                        checked={selectedIds.has(user.id)}
+                        onChange={(e) => {
+                          const next = new Set(selectedIds);
+                          if (e.target.checked) next.add(user.id);
+                          else next.delete(user.id);
+                          setSelectedIds(next);
+                        }}
+                        className="w-4 h-4 accent-primary cursor-pointer"
+                      />
+                    </td>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
                           {user.avatar_url ? (
