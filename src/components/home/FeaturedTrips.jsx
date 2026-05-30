@@ -204,7 +204,12 @@ export default function FeaturedTrips() {
   // even before the cron has run.
   const { data: trips_unfiltered = [] } = useQuery({
     queryKey: ["featured-trips"],
-    queryFn: () => api.entities.Trip.filter({ status: "confirmed" }, "-created_date", 20),
+    // Sort by soonest departure date so upcoming trips always appear
+    // regardless of when they were posted. Previously sorted by -created_at
+    // which meant a single driver with 20+ recurring trips would fill the
+    // entire fetch window, leaving no room for other drivers' trips.
+    // Limit raised to 60 to survive one driver with many recurring trips.
+    queryFn: () => api.entities.Trip.filter({ status: "confirmed" }, "date", 60),
   });
 
   const blockedSet = useBlockedEmails();
@@ -262,6 +267,12 @@ export default function FeaturedTrips() {
       const userCity = user?.city || "";
       const nearby = userCity ? diverse.filter(t => t.from_city === userCity) : [];
       const result = nearby.length >= 2 ? nearby : diverse;
+      // Sort by soonest date so the next departure is always card #1
+      result.sort((a, b) => {
+        const da = new Date((a.date || "") + "T" + (a.time || "00:00"));
+        const db = new Date((b.date || "") + "T" + (b.time || "00:00"));
+        return da - db;
+      });
       return result.slice(0, 6);
     },
     [trips_unfiltered, blockedSet]
