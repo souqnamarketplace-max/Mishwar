@@ -59,7 +59,7 @@ export function getNotifTarget(notif) {
     //   - any legacy variant
     if (t.includes("إلغاء حجز") && t.includes("معلق")) return "/driver?tab=passengers";
     // Driver notified to rate their passengers
-    if (t.includes("قيّم ركابك") || l.includes("rate-passengers")) return "/driver?tab=rate-passengers";
+    if (t.includes("قيّم ركابك") || (notif.link || "").includes("rate-passengers")) return "/driver?tab=rate-passengers";
     if (t.includes("انطلقت") || t.includes("اكتملت") || t.includes("قيّم السائق")) return "/my-trips?tab=completed";
     // Review request ("كيف كانت رحلتك؟") — send directly to completed tab
     // with the trip highlighted so passenger can tap and rate immediately

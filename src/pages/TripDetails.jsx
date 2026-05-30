@@ -375,10 +375,10 @@ export default function TripDetails() {
           notifyUser({
             user_email: tripData.driver_email,
             title:      `💳 حجز جديد — الدفع عبر ${methodLabel}`,
-            message:    `${user?.full_name || "راكب"} حجز مقعداً وسيدفع ₪${tripData.price} عبر ${methodLabel}. انتظر تأكيد الدفع منه.`,
+            message:    `${user?.full_name || user?.email?.split("@")[0] || "راكب"} حجز مقعداً وسيدفع ₪${tripData.price} عبر ${methodLabel}. انتظر تأكيد الدفع منه.`,
             type:       "payment",
             trip_id:    tripData.id,
-            link:       "/dashboard?tab=passengers",
+            link:       `/driver?tab=passengers&trip=${tripData.id}`,
           }).catch(() => {});
         });
       }
@@ -747,10 +747,10 @@ export default function TripDetails() {
                               await notifyUser({
                                 user_email: trip.driver_email || trip.created_by,
                                 title:      "💰 راكب أرسل الدفعة — تحقق وأكد",
-                                message:    `${user?.full_name || "راكب"} أرسل ₪${trip.price} عبر ${methodLabel}. افتح قائمة الركاب وأكد استلام الدفعة.`,
+                                message:    `${user?.full_name || user?.email?.split("@")[0] || "راكب"} أرسل ₪${trip.price} عبر ${methodLabel}. افتح قائمة الركاب وأكد استلام الدفعة.`,
                                 type:       "payment",
                                 trip_id:    trip.id,
-                                link:       "/dashboard?tab=passengers",
+                                link:       "/driver?tab=passengers",
                               }).catch(() => {});
                               toast.success("تم إشعار السائق ✅ سيؤكد الاستلام قريباً");
                             }}
