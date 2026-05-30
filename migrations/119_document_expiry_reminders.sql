@@ -1,0 +1,6 @@
+-- Migration 119: Document expiry proactive reminders
+-- Applied: 2026-05-30
+-- Two cron jobs:
+--   05:00 UTC daily: check_expiring_documents() — sends reminders at 30/7/1 days before expiry
+--   05:30 UTC daily: notify_expired_documents() — alerts for already-expired docs (once per day)
+-- see Supabase dashboard for full function bodies

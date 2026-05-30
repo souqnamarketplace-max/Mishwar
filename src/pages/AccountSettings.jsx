@@ -74,6 +74,18 @@ export default function AccountSettings() {
     setTimeout(tryScroll, 100);
   }, []);
 
+  // Detect which documents are expired so we can highlight them
+  // when the driver arrives from an expiry notification link.
+  const [expiredFields, setExpiredFields] = useState(new Set());
+  useEffect(() => {
+    const today = new Date().toISOString().split("T")[0];
+    const expired = new Set();
+    if (licenseExpiry     && licenseExpiry < today)           expired.add("license");
+    if (carRegistrationExpiry && carRegistrationExpiry < today) expired.add("registration");
+    if (insuranceExpiry   && insuranceExpiry < today)          expired.add("insurance");
+    setExpiredFields(expired);
+  }, [licenseExpiry, carRegistrationExpiry, insuranceExpiry]);
+
   // Sync form with user data
   // Driver License query
   const { data: license } = useQuery({
@@ -1438,7 +1450,23 @@ export default function AccountSettings() {
         )}
 
         {user?.account_type && (user.account_type === "driver" || user.account_type === "both") && (
-          <div id="license" className="bg-card rounded-2xl border border-border p-6 space-y-4 scroll-mt-24">
+          <div id="license" className={`bg-card rounded-2xl border p-6 space-y-4 scroll-mt-24 ${expiredFields.size > 0 ? "border-destructive/50 ring-2 ring-destructive/20" : "border-border"}`}>
+            {/* Expired documents alert — shown when driver arrives from the expiry
+                notification link. Lists exactly which documents need renewal. */}
+            {expiredFields.size > 0 && (
+              <div className="bg-red-500/10 border-2 border-red-500/40 rounded-xl p-4 flex items-start gap-3" dir="rtl">
+                <span className="text-2xl shrink-0">🔴</span>
+                <div>
+                  <p className="font-bold text-red-700 mb-1">وثائق منتهية الصلاحية — حسابك موقوف عن نشر الرحلات</p>
+                  <ul className="text-sm text-red-600 space-y-0.5">
+                    {expiredFields.has("license")       && <li>• رخصة القيادة — يجب رفع رخصة جديدة سارية المفعول</li>}
+                    {expiredFields.has("registration")  && <li>• ترخيص المركبة — يجب رفع ترخيص محدث</li>}
+                    {expiredFields.has("insurance")     && <li>• وثيقة التأمين — يجب رفع بوليصة تأمين جديدة</li>}
+                  </ul>
+                  <p className="text-xs text-red-500 mt-2">ارفع الوثائق الجديدة أدناه واضغط حفظ. سيراجع الفريق الوثائق ويعيد تفعيل حسابك خلال 24 ساعة.</p>
+                </div>
+              </div>
+            )}
             {/* Re-verification alert when driver changed vehicle.
                 Shows different state based on whether docs were already submitted:
                 - status='incomplete' or null → RED "must upload"
@@ -1551,30 +1579,36 @@ export default function AccountSettings() {
                 />
               </div>
               <div>
-                <Label>تاريخ انتهاء الرخصة</Label>
+                <Label className={expiredFields.has("license") ? "text-destructive font-bold" : ""}>
+                  تاريخ انتهاء الرخصة {expiredFields.has("license") && <span className="text-destructive text-xs mr-1">⚠️ منتهية — يجب تجديدها</span>}
+                </Label>
                 <DateInput
                   min={todayISO()}
                   value={licenseExpiry}
                   onChange={(e) => setLicenseExpiry(e.target.value)}
-                  className="rounded-xl h-10 mt-1 bg-background border border-input px-3"
+                  className={`rounded-xl h-10 mt-1 bg-background px-3 ${expiredFields.has("license") ? "border-2 border-destructive ring-1 ring-destructive/30" : "border border-input"}`}
                 />
               </div>
               <div>
-                <Label>تاريخ انتهاء تسجيل المركبة</Label>
+                <Label className={expiredFields.has("registration") ? "text-destructive font-bold" : ""}>
+                  تاريخ انتهاء تسجيل المركبة {expiredFields.has("registration") && <span className="text-destructive text-xs mr-1">⚠️ منتهية — يجب تجديدها</span>}
+                </Label>
                 <DateInput
                   min={todayISO()}
                   value={carRegistrationExpiry}
                   onChange={(e) => setCarRegistrationExpiry(e.target.value)}
-                  className="rounded-xl h-10 mt-1 bg-background border border-input px-3"
+                  className={`rounded-xl h-10 mt-1 bg-background px-3 ${expiredFields.has("registration") ? "border-2 border-destructive ring-1 ring-destructive/30" : "border border-input"}`}
                 />
               </div>
               <div>
-                <Label>تاريخ انتهاء التأمين</Label>
+                <Label className={expiredFields.has("insurance") ? "text-destructive font-bold" : ""}>
+                  تاريخ انتهاء التأمين {expiredFields.has("insurance") && <span className="text-destructive text-xs mr-1">⚠️ منتهية — يجب تجديدها</span>}
+                </Label>
                 <DateInput
                   min={todayISO()}
                   value={insuranceExpiry}
                   onChange={(e) => setInsuranceExpiry(e.target.value)}
-                  className="rounded-xl h-10 mt-1 bg-background border border-input px-3"
+                  className={`rounded-xl h-10 mt-1 bg-background px-3 ${expiredFields.has("insurance") ? "border-2 border-destructive ring-1 ring-destructive/30" : "border border-input"}`}
                 />
               </div>
 
