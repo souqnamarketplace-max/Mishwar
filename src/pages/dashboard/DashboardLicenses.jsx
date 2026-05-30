@@ -308,7 +308,7 @@ export default function DashboardLicenses() {
       {selectedLicense && (
         <ModalPortal>
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center overflow-y-auto z-50 py-4 px-4">
-          <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-6 my-auto">
+          <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-6">
             <h2 className="text-xl font-bold mb-4">{selectedLicense.driver_name}</h2>
 
             <div className="space-y-4 mb-6">

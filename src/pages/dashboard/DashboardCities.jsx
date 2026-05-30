@@ -628,7 +628,7 @@ function ApproveModal({ row, onClose, onSubmit, submitting }) {
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-y-auto py-4 px-4" onClick={onClose} dir="rtl">
-      <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-5 my-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl border border-border max-w-lg w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg flex items-center gap-2">
             {isAddMode ? <Plus className="w-5 h-5 text-primary" /> : <CheckCircle2 className="w-5 h-5 text-primary" />}
@@ -745,7 +745,7 @@ function RejectModal({ row, onClose, onSubmit, submitting }) {
   return (
     <ModalPortal>
     <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-y-auto py-4 px-4" onClick={onClose} dir="rtl">
-      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5 my-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-lg flex items-center gap-2">
             <XCircle className="w-5 h-5 text-destructive" />

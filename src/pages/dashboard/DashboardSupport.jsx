@@ -179,7 +179,7 @@ export default function DashboardSupport() {
       {/* Resolution Note Modal */}
       {replyingTo && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-4 px-4">
-          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm my-auto" dir="rtl">
+          <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-sm" dir="rtl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold">إضافة ملاحظة / حل</h3>
               <button onClick={() => setReplyingTo(null)}><X className="w-4 h-4" /></button>

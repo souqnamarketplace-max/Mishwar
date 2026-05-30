@@ -626,7 +626,7 @@ function RejectModal({ row, onClose, onSubmit, submitting }) {
       aria-labelledby="reject-modal-title"
       aria-describedby="reject-modal-desc"
     >
-      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5 my-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <h3 id="reject-modal-title" className="font-bold text-lg mb-1">رفض طلب الاشتراك</h3>
         <p id="reject-modal-desc" className="text-sm text-muted-foreground mb-4">
           سنرسل سبب الرفض للسائق ليتمكن من تصحيح المعلومات وإعادة الإرسال.
@@ -697,7 +697,7 @@ function GrantSingleModal({ onClose, onSubmit, submitting }) {
       aria-labelledby="grant-single-modal-title"
       aria-describedby="grant-single-modal-desc"
     >
-      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5 my-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 id="grant-single-modal-title" className="font-bold text-lg flex items-center gap-2">
             <Gift className="w-5 h-5 text-primary" aria-hidden="true" />
@@ -792,7 +792,7 @@ function GrantBulkModal({ onClose, onSubmit, submitting }) {
       aria-labelledby="grant-bulk-modal-title"
       aria-describedby="grant-bulk-modal-desc"
     >
-      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5 my-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-card rounded-2xl border border-border max-w-md w-full p-5" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 id="grant-bulk-modal-title" className="font-bold text-lg flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-primary" aria-hidden="true" />

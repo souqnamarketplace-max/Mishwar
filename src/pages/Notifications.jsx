@@ -708,7 +708,7 @@ export default function Notifications() {
           aria-labelledby="thank-you-modal-title"
         >
           <div
-            className="bg-card rounded-2xl border border-border max-w-md w-full p-6 my-auto shadow-2xl"
+            className="bg-card rounded-2xl border border-border max-w-md w-full p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             dir="rtl"
           >

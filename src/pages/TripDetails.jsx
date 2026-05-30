@@ -1405,7 +1405,7 @@ export default function TripDetails() {
       {showConfirm && trip && !isOwnTrip && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowConfirm(false)} />
-          <div className="relative bg-card rounded-2xl w-full max-w-md p-5 shadow-2xl my-auto" dir="rtl">
+          <div className="relative bg-card rounded-2xl w-full max-w-md p-5 shadow-2xl" dir="rtl">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-black text-lg">تأكيد الحجز</h3>

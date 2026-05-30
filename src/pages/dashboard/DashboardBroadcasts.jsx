@@ -369,7 +369,7 @@ export default function DashboardBroadcasts() {
           onClick={() => !sendMutation.isPending && setConfirmOpen(false)}
         >
           <div
-            className="bg-card rounded-2xl max-w-md w-full p-6 my-auto"
+            className="bg-card rounded-2xl max-w-md w-full p-6"
             onClick={(e) => e.stopPropagation()}
             dir="rtl"
           >
