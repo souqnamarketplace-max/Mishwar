@@ -644,7 +644,7 @@ export default function Notifications() {
           so fixed positioning works directly. */}
       {pendingPref && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-4 px-4"
           onClick={() => !deletePref.isPending && setDeletePending(null)}
           aria-hidden="true"
         >
@@ -701,14 +701,14 @@ export default function Notifications() {
           shrink-wrap fixed positioning to the wrong viewport). */}
       {viewingMessage && typeof document !== "undefined" && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm py-4 px-4"
           onClick={() => setViewingMessage(null)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="thank-you-modal-title"
         >
           <div
-            className="bg-card rounded-2xl border border-border max-w-md w-full p-6 max-h-[80vh] overflow-y-auto shadow-2xl"
+            className="bg-card rounded-2xl border border-border max-w-md w-full p-6 my-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             dir="rtl"
           >

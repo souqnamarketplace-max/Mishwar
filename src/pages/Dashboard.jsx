@@ -649,7 +649,7 @@ export default function Dashboard() {
 
           {/* Broadcast Modal */}
           {showBroadcast && createPortal(
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-4 px-4">
               <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md" dir="rtl">
                 <h3 className="font-bold text-lg mb-1">📢 بث إشعار لجميع المستخدمين</h3>
                 <p className="text-sm text-muted-foreground mb-4">سيصل هذا الإشعار لجميع المستخدمين المسجلين</p>
@@ -673,7 +673,7 @@ export default function Dashboard() {
           {/* Second-stage broadcast confirmation — final guard before
               fan-out RPC fires a notification at every user in the DB. */}
           {broadcastConfirm && createPortal(
-            <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/60 z-[60] flex items-start justify-center overflow-y-auto py-4 px-4">
               <div className="bg-card rounded-2xl border border-border p-6 w-full max-w-md" dir="rtl">
                 <div className="w-12 h-12 rounded-2xl bg-yellow-500/10 flex items-center justify-center mb-3">
                   <span className="text-2xl">⚠️</span>

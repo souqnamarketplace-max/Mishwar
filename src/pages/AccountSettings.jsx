@@ -1780,7 +1780,7 @@ export default function AccountSettings() {
 
         {/* Delete Confirmation Modal */}
         {showDeleteConfirm && createPortal(
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 py-4 px-4">
             <div className="bg-card rounded-2xl border border-border p-6 max-w-sm mx-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-bold text-foreground">حذف الحساب</h3>

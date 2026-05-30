@@ -455,8 +455,8 @@ export default function DashboardUsers() {
 
       {/* User Edit Modal */}
       {showModal && selectedUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-2xl border border-border max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5">
+        <div className="fixed inset-0 bg-black/50 flex items-start justify-center overflow-y-auto z-50 py-4 px-4">
+          <div className="bg-card rounded-2xl border border-border max-w-2xl w-full my-auto p-6 space-y-5">
             <div>
               <h2 className="text-xl font-bold text-foreground">تعديل بيانات المستخدم</h2>
               <p className="text-sm text-muted-foreground">{selectedUser.email}</p>

@@ -1099,7 +1099,7 @@ export default function Login() {
 
       {/* Forgot Password Modal — outside the card, always rendered when needed */}
       {showForgot && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-4 px-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg">استعادة كلمة المرور</h3>
