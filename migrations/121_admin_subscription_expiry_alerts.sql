@@ -1,0 +1,6 @@
+-- Migration 121: Admin subscription expiry alerts
+-- Applied: 2026-05-30
+-- notify_admin_expiring_subscriptions() RPC: notifies all admin accounts
+-- when any driver subscription expires in 7 or 1 days.
+-- Cron: daily at 07:00 UTC (10:00 Palestine time)
+-- Deduped: one notification per admin per driver per day

@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { api } from "@/api/apiClient";
 import { toast } from "sonner";
 import { friendlyError } from "@/lib/errors";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import {
   LayoutDashboard, Users, Car, CalendarCheck, CreditCard, Wallet,
-  Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox, Megaphone, UserX, Navigation
+  Star, Bell, Headphones, FileText, Settings, Activity, Home, LogOut, Shield, ShieldCheck, MessageSquarePlus, ImageIcon, Flag, ChevronDown, MapPin, Inbox, Megaphone, UserX, Navigation
 } from "lucide-react";
 
 // Centralised logout for the dashboard sidebar. Mirrors the
@@ -26,26 +28,46 @@ async function handleLogout() {
 }
 
 const menuItems = [
-  { id: "overview", icon: LayoutDashboard, label: "لوحة التحكم" },
-  { id: "users", icon: Users, label: "إدارة المستخدمين" },
-  { id: "deletions", icon: UserX, label: "حذف الحسابات" },
-  { id: "trips", icon: Car, label: "إدارة الرحلات" },
-  { id: "bookings", icon: CalendarCheck, label: "إدارة الحجوزات" },
-  { id: "trip-requests", icon: Inbox, label: "طلبات الركاب" },
-  { id: "passenger-verifications", icon: Shield, label: "توثيق الركاب" },
-  { id: "reviews", icon: Star, label: "التقييمات والمراجعات" },
-  { id: "payments", icon: CreditCard, label: "المعاملات والمدفوعات" },
-  { id: "subscriptions", icon: Wallet, label: "اشتراكات السائقين" },
-  { id: "reports", icon: Flag, label: "بلاغات المستخدمين" },
-  { id: "notifications", icon: Bell, label: "الإشعارات" },
-  { id: "broadcasts", icon: Megaphone, label: "البث والتسويق" },
-  { id: "support", icon: Headphones, label: "الدعم والشكاوى" },
-  { id: "feedback", icon: MessageSquarePlus, label: "الاقتراحات والشكاوى" },
-  { id: "licenses", icon: Shield, label: "توثيق السائقين" },
-  { id: "cities",    icon: MapPin,      label: "المدن المقترحة" },
-  { id: "drivermap", icon: Navigation,  label: "خريطة السائقين" },
-  { id: "content", icon: FileText, label: "إدارة المحتوى" },
-  { id: "hero-slides", icon: ImageIcon, label: "شرائح الصفحة الرئيسية" },
+  // ── Overview ─────────────────────────────────────────────────────────
+  { id: "overview",                icon: LayoutDashboard,  label: "لوحة التحكم" },
+
+  // ── Verifications — high daily volume, at the top ────────────────────
+  { id: "licenses",                icon: ShieldCheck,      label: "توثيق السائقين 🪪" },
+  { id: "passenger-verifications", icon: Shield,           label: "توثيق الركاب 🛡️" },
+
+  // ── Core operations — used heavily every day ──────────────────────────
+  { id: "subscriptions",           icon: Wallet,           label: "اشتراكات السائقين" },
+  { id: "users",                   icon: Users,            label: "إدارة المستخدمين" },
+  { id: "bookings",                icon: CalendarCheck,    label: "إدارة الحجوزات" },
+  { id: "trips",                   icon: Car,              label: "إدارة الرحلات" },
+  { id: "payments",                icon: CreditCard,       label: "المعاملات والمدفوعات" },
+
+  // ── Live monitoring ───────────────────────────────────────────────────
+  { id: "drivermap",               icon: Navigation,       label: "خريطة السائقين 🔴" },
+
+  // ── Passenger side ────────────────────────────────────────────────────
+  { id: "trip-requests",           icon: Inbox,            label: "طلبات الركاب" },
+
+  // ── Trust & safety ───────────────────────────────────────────────────
+  { id: "reports",                 icon: Flag,             label: "البلاغات" },
+  { id: "support",                 icon: Headphones,       label: "الدعم والشكاوى" },
+  { id: "reviews",                 icon: Star,             label: "التقييمات" },
+
+  // ── Engagement ───────────────────────────────────────────────────────
+  { id: "notifications",           icon: Bell,             label: "الإشعارات" },
+  { id: "broadcasts",              icon: Megaphone,        label: "البث والتسويق" },
+  { id: "feedback",                icon: MessageSquarePlus,label: "الاقتراحات" },
+
+  // ── Content & config ─────────────────────────────────────────────────
+  { id: "content",                 icon: FileText,         label: "إدارة المحتوى" },
+  { id: "hero-slides",             icon: ImageIcon,        label: "شرائح الصفحة الرئيسية" },
+  { id: "cities",                  icon: MapPin,           label: "المدن المقترحة" },
+
+  // ── Admin tools — rarely needed ───────────────────────────────────────
+  { id: "deletions",               icon: UserX,            label: "حذف الحسابات" },
+  { id: "settings",                icon: Settings,         label: "إعدادات النظام" },
+  { id: "logs",                    icon: Activity,         label: "سجل النشاطات" },
+];
   // OFFERS / COUPONS — HIDDEN FOR v1.0 LAUNCH (M-06 in pre-launch audit).
   // The admin UI to CREATE coupons works, but the redemption side is
   // completely unwired: there's no input field on the booking flow,
@@ -130,6 +152,21 @@ export function DashboardMobileTabSelector({ activePage, setActivePage }) {
 }
 
 export default function DashboardSidebar({ activePage, setActivePage }) {
+  // Count subscriptions expiring within 7 days — shows a red badge on the menu item
+  const { data: expiringCount = 0 } = useQuery({
+    queryKey: ["admin-expiring-subs-count"],
+    queryFn: async () => {
+      const in7days = new Date(Date.now() + 7 * 86_400_000).toISOString();
+      const { count } = await supabase
+        .from("driver_subscriptions")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "active")
+        .lte("period_end", in7days)
+        .gte("period_end", new Date().toISOString());
+      return count || 0;
+    },
+    staleTime: 60_000,
+  });
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-sidebar border-l border-sidebar-border h-screen sticky top-0 overflow-hidden">
       {/* Logo — fixed, never scrolls */}
@@ -158,7 +195,13 @@ export default function DashboardSidebar({ activePage, setActivePage }) {
             }`}
           >
             <item.icon className="w-4 h-4 shrink-0" />
-            <span>{item.label}</span>
+            <span className="flex-1 text-right">{item.label}</span>
+            {/* Red badge for expiring subscriptions */}
+            {item.id === "subscriptions" && expiringCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+                {expiringCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>
