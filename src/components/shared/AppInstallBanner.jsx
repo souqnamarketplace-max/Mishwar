@@ -15,7 +15,7 @@ import { X } from "lucide-react";
  * - Delays 3 seconds after page load so it doesn't interrupt first impression
  */
 
-const IOS_APP_URL    = "https://apps.apple.com/app/id6768105898";
+const IOS_APP_URL    = "https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898";
 const ANDROID_APP_URL = "https://play.google.com/store/apps/details?id=com.mishwaro.app";
 const DISMISS_KEY    = "mishwaro_app_banner_dismissed";
 const DISMISS_DAYS   = 14;
