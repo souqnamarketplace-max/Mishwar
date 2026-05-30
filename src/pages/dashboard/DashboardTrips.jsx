@@ -199,7 +199,8 @@ export default function DashboardTrips() {
                 {filtered.map((trip) => {
                   const sc = statusConfig[trip.status] || statusConfig.confirmed;
                   return (
-                    <tr key={trip.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                    <React.Fragment key={trip.id}>
+                    <tr className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="p-3">
                         <div className="flex items-center gap-1 font-medium">
                           <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -310,6 +311,7 @@ export default function DashboardTrips() {
                         </td>
                       </tr>
                     )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
