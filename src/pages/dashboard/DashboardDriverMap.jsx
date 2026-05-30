@@ -98,6 +98,25 @@ export default function DashboardDriverMap() {
     });
   }, []);
 
+  // ── Computed (must be BEFORE useEffects that depend on them) ───────────
+  const activeCount = drivers.length;
+
+  const filteredDrivers = drivers.filter(d => {
+    if (filterAge !== "all" && minutesAgo(d.updated_at) > Number(filterAge)) return false;
+    if (filterRoute) {
+      const [from, to] = filterRoute.split("|");
+      if (from && d.from_city !== from) return false;
+      if (to && d.to_city !== to) return false;
+    }
+    return true;
+  });
+
+  const routes = [...new Set(
+    drivers
+      .filter(d => d.from_city && d.to_city)
+      .map(d => `${d.from_city}|${d.to_city}`)
+  )];
+
   // ── Sync markers to map ────────────────────────────────────────────────
   useEffect(() => {
     if (!leafMap.current) return;
@@ -173,25 +192,6 @@ export default function DashboardDriverMap() {
     });
   }, [filteredDrivers, selected]);
 
-  const activeCount = drivers.length;
-
-  // ── Apply filters ─────────────────────────────────────────────────────
-  const filteredDrivers = drivers.filter(d => {
-    if (filterAge !== "all" && minutesAgo(d.updated_at) > Number(filterAge)) return false;
-    if (filterRoute) {
-      const [from, to] = filterRoute.split("|");
-      if (from && d.from_city !== from) return false;
-      if (to && d.to_city !== to) return false;
-    }
-    return true;
-  });
-
-  // Unique routes for the route filter dropdown
-  const routes = [...new Set(
-    drivers
-      .filter(d => d.from_city && d.to_city)
-      .map(d => `${d.from_city}|${d.to_city}`)
-  )];
 
   return (
     <div dir="rtl">
