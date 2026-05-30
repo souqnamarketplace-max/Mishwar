@@ -266,11 +266,11 @@ export default function RouteMap({
 
           // Fit map to route bounds with padding
           const bounds = L.latLngBounds(latLngs);
-          map.fitBounds(bounds, { padding: [40, 40] });
+          map.fitBounds(bounds, { padding: [40, 40], animate: false });
         } else {
           // Geometry unavailable — show message instead of fake line
           const bounds = L.latLngBounds([fromCoords, toCoords]);
-          map.fitBounds(bounds, { padding: [50, 50] });
+          map.fitBounds(bounds, { padding: [50, 50], animate: false });
         }
 
       } catch (e) {

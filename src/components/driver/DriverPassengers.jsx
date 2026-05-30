@@ -378,6 +378,30 @@ export default function DriverPassengers({ trips, bookings, selectedTripId, onSe
                 {selectedTrip.from_city} ← {selectedTrip.to_city}
               </h3>
               <Badge className="bg-primary/10 text-primary text-xs">{activeBookings.length} راكب</Badge>
+
+              {/* Arrival notification — driver taps when at pickup point */}
+              {activeBookings.length > 0 && (
+                <button
+                  className="mr-auto flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-500/10 border border-green-300/40 text-green-700 text-xs font-bold hover:bg-green-500/20 active:scale-95 transition-all"
+                  onClick={async () => {
+                    const confirmed = activeBookings.filter(b => b.status === "confirmed");
+                    if (confirmed.length === 0) return;
+                    await Promise.allSettled(confirmed.map(b =>
+                      notifyUser({
+                        user_email:   b.passenger_email,
+                        title:        "🚗 السائق وصل!",
+                        message:      `سائقك وصل إلى ${selectedTrip.from_city}. اخرج الآن لتجد السيارة في الموعد!`,
+                        type:         "system",
+                        trip_id:      selectedTrip.id,
+                        link:         `/trip/${selectedTrip.id}`,
+                      })
+                    ));
+                    toast.success(`تم إشعار ${confirmed.length} راكب بوصولك ✅`);
+                  }}
+                >
+                  📍 أنا وصلت — أشعر الركاب
+                </button>
+              )}
             </div>
 
             {/* Bulk-approve strip — appears only when 2+ pending bookings
