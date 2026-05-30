@@ -113,7 +113,7 @@ export default function BookingRequestPopup({ user }) {
             // — the user's words. MyTrips reads ?tab=X on mount
             // (migration to that behaviour shipped in the same commit
             // as this one).
-            link: "/my-trips?tab=confirmed",
+            link: `/my-trips?tab=confirmed&trip=${booking.trip_id}`,
           });
           logAudit("driver_confirm_booking", "booking", id, { passenger_email: booking.passenger_email });
           toast.success("✅ تم قبول الحجز");
@@ -126,7 +126,7 @@ export default function BookingRequestPopup({ user }) {
             trip_id: booking.trip_id,
             // Take the passenger to the cancelled tab where they can
             // see WHO rejected it and find an alternative trip.
-            link: "/my-trips?tab=cancelled",
+            link: `/my-trips?tab=cancelled&trip=${booking.trip_id}`,
           });
           logAudit("driver_reject_booking", "booking", id, {
             passenger_email: booking.passenger_email,

@@ -416,7 +416,9 @@ export default function DriverDashboard() {
 
   const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "trips");
-  const [selectedTripId, setSelectedTripId] = useState(null);
+  // Pre-select the trip from the URL param so notification deep-links
+  // land the driver on the right trip's passenger list automatically
+  const [selectedTripId, setSelectedTripId] = useState(searchParams.get("trip") || null);
   const qc = useQueryClient();
 
   const { data: user } = useQuery({ queryKey: ["me"], queryFn: () => api.auth.me() });

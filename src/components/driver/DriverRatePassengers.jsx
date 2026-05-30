@@ -98,7 +98,7 @@ export default function DriverRatePassengers({ trips, bookings }) {
           message: `كتب السائق تقييماً عن رحلتك من ${trip?.from_city || ""} إلى ${trip?.to_city || ""}`,
           type: "system",
           trip_id: booking.trip_id,
-          link: "/my-trips?tab=completed",
+          link: `/my-trips?tab=completed&trip=${booking.trip_id}`,
         }).catch(() => { /* non-fatal */ });
       }
       try {

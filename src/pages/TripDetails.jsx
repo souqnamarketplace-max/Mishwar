@@ -750,7 +750,7 @@ export default function TripDetails() {
                                 message:    `${user?.full_name || user?.email?.split("@")[0] || "راكب"} أرسل ₪${trip.price} عبر ${methodLabel}. افتح قائمة الركاب وأكد استلام الدفعة.`,
                                 type:       "payment",
                                 trip_id:    trip.id,
-                                link:       "/driver?tab=passengers",
+                                link:       `/driver?tab=passengers&trip=${trip.id}`,
                               }).catch(() => {});
                               toast.success("تم إشعار السائق ✅ سيؤكد الاستلام قريباً");
                             }}

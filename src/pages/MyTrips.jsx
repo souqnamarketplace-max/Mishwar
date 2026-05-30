@@ -221,7 +221,7 @@ export default function MyTrips() {
             // and the driver had to manually navigate to find the
             // cancellation. Bug since ~mig 027; fixed in the full
             // notification audit (this commit).
-            link: "/driver?tab=passengers",
+            link: `/driver?tab=passengers&trip=${trip.id}`,
           });
         }
       } catch (e) { console.warn("[Notif] booking_cancelled:", e?.message); }
