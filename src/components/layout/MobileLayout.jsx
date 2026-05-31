@@ -632,7 +632,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <LogOut className="w-5 h-5 shrink-0" />
                 <span className="text-sm font-medium">تسجيل الخروج</span>
               </button>
-              <p className="text-center text-[11px] text-muted-foreground pb-2">مشوارو · النسخة 1.0</p>
+              <p className="text-center text-[11px] text-muted-foreground pb-2">مشوارو · النسخة 1.0.3</p>
             </div>
               </>
             ) : (
@@ -719,7 +719,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 </div>
 
                 <div className="border-t border-border py-2" dir="rtl">
-                  <p className="text-center text-[11px] text-muted-foreground pb-1">مشوارو · النسخة 1.0</p>
+                  <p className="text-center text-[11px] text-muted-foreground pb-1">مشوارو · النسخة 1.0.3</p>
                 </div>
               </>
             )}
