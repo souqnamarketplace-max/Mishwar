@@ -54,9 +54,15 @@ function getIndexHtml() {
 // Inject or replace a <meta> tag in HTML
 function setMeta(html, attr, attrVal, contentVal) {
   const escaped = esc(contentVal);
-  const re = new RegExp(`<meta\\s+${attr}="${attrVal}"[^>]*>`, "i");
+  // Use word boundary after attrVal so og:image doesn't match og:image:width
+  const re = new RegExp(`<meta\\s+${attr}="${attrVal.replace(/:/g, "\\:")}(?=[":])(?:[^>]*)>`, "i");
+  // Fallback: exact attribute match
+  const reFallback = new RegExp(`<meta\\s+${attr}="${attrVal}"[^>]*>`, "i");
   if (re.test(html)) {
     return html.replace(re, `<meta ${attr}="${attrVal}" content="${escaped}" />`);
+  }
+  if (reFallback.test(html)) {
+    return html.replace(reFallback, `<meta ${attr}="${attrVal}" content="${escaped}" />`);
   }
   // Not found — insert before </head>
   return html.replace("</head>", `<meta ${attr}="${attrVal}" content="${escaped}" />\n</head>`);
@@ -186,7 +192,18 @@ export default async function handler(req, res) {
       dist,
     ].filter(Boolean).join(" · ");
 
-    const ogImage = `${APP_URL}/og-trip-placeholder.png`; // static placeholder
+    // Dynamic OG image — generated per-trip with route, price, date baked in.
+    // WhatsApp, Telegram, iMessage all fetch this URL when the link is shared.
+    // Params are URL-encoded so Arabic city names survive the HTTP round-trip.
+    const ogParams = new URLSearchParams({
+      from:   from,
+      to:     to,
+      price:  String(price),
+      date:   date,
+      seats:  String(seats),
+      driver: driver,
+    });
+    const ogImage = `${APP_URL}/api/og-trip?${ogParams.toString()}`;
     // tripUrl uses the original URL form (UUID or slug) the visitor hit.
     // For canonical SEO consolidation the rendered <link rel="canonical">
     // and <meta property="og:url"> always point to whatever was in the
@@ -202,8 +219,10 @@ export default async function handler(req, res) {
     html = setMeta(html, "property", "og:title",       title);
     html = setMeta(html, "property", "og:description", desc);
     html = setMeta(html, "property", "og:url",         tripUrl);
-    html = setMeta(html, "property", "og:image",       ogImage);
-    html = setMeta(html, "property", "og:type",        "article");
+    html = setMeta(html, "property", "og:image",        ogImage);
+    html = setMeta(html, "property", "og:image:width",  "1200");
+    html = setMeta(html, "property", "og:image:height", "630");
+    html = setMeta(html, "property", "og:type",         "article");
 
     // Twitter card
     html = setMeta(html, "name", "twitter:title",       title);
