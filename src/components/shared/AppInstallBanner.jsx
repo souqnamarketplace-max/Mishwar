@@ -186,35 +186,34 @@ export default function AppInstallBanner() {
 }
 
 /**
- * MobileAppChip — small persistent chip shown in mobile nav.
- * Always visible on mobile (doesn't respect the dismiss state).
- * Gives users a second chance after dismissing the banner.
+ * MobileAppChip — "احصل على التطبيق" pill shown in the navbar.
+ * Visible on all screens under 640px wide (sm breakpoint).
+ * Uses UA only to pick which store URL to open.
+ * Always renders on mobile — no platform detection gate.
  */
 export function MobileAppChip() {
-  const [platform, setPlatform] = useState(null);
   const [pwaPrompt, setPwaPrompt] = useState(null);
 
   useEffect(() => {
     if (window.Capacitor?.isNativePlatform?.()) return;
     if (window.matchMedia("(display-mode: standalone)").matches) return;
-    const ua = navigator.userAgent || "";
-    const plat = detectPlatform(ua);
-    if (plat) setPlatform(plat);
-
     const handler = (e) => { e.preventDefault(); setPwaPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  if (!platform) return null;
+  // Don't show inside native app shell or PWA
+  if (typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.()) return null;
 
   const handleTap = async () => {
     if (pwaPrompt) {
       pwaPrompt.prompt();
       return;
     }
+    const ua = navigator.userAgent || "";
+    const isIOS = /iPhone|iPad|iPod/i.test(ua);
     window.open(
-      platform === "ios" ? IOS_APP_URL : ANDROID_APP_URL,
+      isIOS ? IOS_APP_URL : ANDROID_APP_URL,
       "_blank",
       "noopener,noreferrer"
     );

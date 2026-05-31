@@ -129,6 +129,17 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            {/* Get the app — desktop only (mobile uses MobileAppChip near logo) */}
+            {!user && (
+              <a
+                href="https://apps.apple.com/dz/app/mishwaro-%D9%85%D8%B4%D9%88%D8%A7%D8%B1%D9%88/id6768105898"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden lg:flex items-center px-3.5 py-1.5 rounded-full border border-border bg-background text-foreground text-[13px] font-medium shadow-sm hover:bg-muted transition-colors whitespace-nowrap"
+              >
+                احصل على التطبيق
+              </a>
+            )}
             {/* Primary CTA — context-aware.
                 - Drivers / both         → "أنشر رحلة" (their primary action)
                 - Passengers             → "اطلب رحلة" (primary, green)
