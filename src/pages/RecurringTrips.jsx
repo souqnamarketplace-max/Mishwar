@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Repeat, Plus, Trash2, Calendar, Clock, MapPin, DollarSign, Users, X as XIcon, Loader2, AlertCircle, Sparkles } from "lucide-react";
@@ -297,7 +298,7 @@ export default function RecurringTrips() {
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

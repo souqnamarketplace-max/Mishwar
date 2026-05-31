@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useSEO } from "@/hooks/useSEO";
 import { friendlyError } from "@/lib/errors";
 import React, { useState, useEffect } from 'react';
@@ -1098,7 +1099,7 @@ export default function Login() {
       <LegalSheet kind={openLegal} onClose={() => setOpenLegal(null)} />
 
       {/* Forgot Password Modal — outside the card, always rendered when needed */}
-      {showForgot && (
+      {showForgot && createPortal(
         <div className="fixed inset-0 bg-black/50 z-50 flex items-start justify-center overflow-y-auto py-4 px-4">
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
@@ -1133,7 +1134,7 @@ export default function Login() {
             )}
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

@@ -1086,8 +1086,12 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
         </div>,
         document.body
       )}
-      {/* Edit Trip Modal — expanded */}
-      {editingTrip && (
+      {/* Edit Trip Modal — rendered via createPortal so fixed positioning
+          escapes any Framer Motion transform stacking context. Without
+          createPortal, 'fixed inset-0' is relative to the nearest transformed
+          ancestor (the page transition wrapper) which causes the modal to
+          render below the viewport instead of centered on screen. */}
+      {editingTrip && createPortal(
         <div className="fixed inset-0 bg-black/50 z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={(e) => { if (e.target === e.currentTarget) setEditingTrip(null); }}>
           <div className="bg-card rounded-t-2xl sm:rounded-2xl border border-border w-full sm:max-w-lg max-h-[90vh] overflow-y-auto" dir="rtl">
             <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10">
@@ -1233,7 +1237,8 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
               <Button variant="outline" className="rounded-xl" onClick={() => setEditingTrip(null)}>إلغاء</Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
