@@ -1861,11 +1861,16 @@ function MessageInput({ draft, setDraft, onSend, onSendImage, onSendLocation, di
 
 function ClosedNotice({ status }) {
   return (
-    <div className="p-4 border-t border-border bg-muted/30 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+    <div
+      className="border-t border-border bg-muted/40 flex items-center justify-center gap-2 text-sm text-muted-foreground px-4 pt-4"
+      style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+    >
       <Lock className="w-4 h-4 shrink-0" />
-      {status === "completed"
-        ? "انتهت الرحلة — المحادثة مغلقة 🏁"
-        : "تم إلغاء الرحلة — المحادثة مغلقة"}
+      <span>
+        {status === "completed"
+          ? "انتهت الرحلة — المحادثة مغلقة 🏁"
+          : "تم إلغاء الرحلة — المحادثة مغلقة 🚫"}
+      </span>
     </div>
   );
 }

@@ -656,10 +656,10 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                       in_progress, completed, or cancelled). */}
                   {trip.status === "confirmed" && (
                     <button
-                      className={`rounded-lg text-xs gap-1 flex items-center px-2 py-1.5 border transition-colors ${
+                      className={`rounded-lg text-xs gap-1 flex items-center px-2 py-1.5 border font-medium transition-colors ${
                         trip.bookings_open === false
-                          ? "text-amber-700 border-amber-500/40 bg-amber-50 hover:bg-amber-100"
-                          : "text-foreground border-border hover:bg-muted"
+                          ? "text-white bg-red-500 border-red-600 hover:bg-red-600"
+                          : "text-white bg-green-600 border-green-700 hover:bg-green-700"
                       }`}
                       onClick={() => bookingsOpenMutation.mutate({
                         tripId: trip.id,
@@ -671,7 +671,7 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                         : "إيقاف الحجوزات الجديدة"}
                     >
                       <span>{trip.bookings_open === false ? "🔒" : "🔓"}</span>
-                      {trip.bookings_open === false ? "مغلقة" : "الحجز مفتوح"}
+                      {trip.bookings_open === false ? "🔒 الحجز مغلق" : "🟢 الحجز مفتوح"}
                     </button>
                   )}
                   {trip.status !== "completed" && (
