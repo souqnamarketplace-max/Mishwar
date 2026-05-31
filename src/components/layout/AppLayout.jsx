@@ -12,6 +12,8 @@ import PullToRefresh from "../shared/PullToRefresh";
 
 export default function AppLayout() {
   const location = useLocation();
+  const isDashboard = location.pathname.startsWith("/dashboard");
+
   const [isMobile, setIsMobile] = React.useState(
     typeof window !== "undefined" && window.innerWidth < 1024
   );
@@ -85,7 +87,7 @@ export default function AppLayout() {
       >
         تخطّي إلى المحتوى الرئيسي
       </a>
-      <Navbar />
+      {!isDashboard && <Navbar />}
       <main id="main-content" className="flex-1" tabIndex={-1}>
         <PullToRefresh>
           <AnimatePresence mode="wait">
@@ -95,7 +97,7 @@ export default function AppLayout() {
           </AnimatePresence>
         </PullToRefresh>
       </main>
-      <Footer />
+      {!isDashboard && <Footer />}
     </div>
     </>
   );
