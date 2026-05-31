@@ -4,8 +4,8 @@ import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Car, Users, DollarSign, Star, ChevronDown, Plus, X,
-  TrendingUp, CreditCard, CheckCircle, Wallet
+  Car, Users, DollarSign, Star, Plus, X,
+  TrendingUp, CreditCard, Wallet
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -41,60 +41,48 @@ const TABS = [
 ];
 
 // ─── Mobile dropdown tab selector ──────────────────────────────────────────
+// ─── Mobile horizontal scroll tab bar ──────────────────────────────────────
+// Replaces the dropdown selector. All tabs visible in a scrollable row,
+// active tab has primary pill. One tap to switch — no dropdown needed.
+// Tab IDs are UNCHANGED so all notification deep-links keep working.
 function MobileTabSelector({ tabs, active, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  const activeTab = tabs.find(t => t.id === active) || tabs[0];
+  const activeRef = React.useRef(null);
+  const scrollRef = React.useRef(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+  React.useEffect(() => {
+    if (activeRef.current && scrollRef.current) {
+      activeRef.current.scrollIntoView({
+        behavior: "smooth", block: "nearest", inline: "center",
+      });
+    }
+  }, [active]);
 
   return (
-    <div ref={ref} className="relative md:hidden mb-4" dir="rtl">
-      {/* Trigger button */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between gap-3 bg-card border border-border rounded-2xl px-4 py-3.5 text-right shadow-sm"
+    <div className="md:hidden mb-4 -mx-3">
+      <div
+        ref={scrollRef}
+        className="flex gap-2 overflow-x-auto px-3 pb-1"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-xl bg-muted flex items-center justify-center`}>
-            <activeTab.icon className={`w-4 h-4 ${activeTab.color}`} />
-          </div>
-          <span className="font-semibold text-foreground">{activeTab.label}</span>
-        </div>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {/* Dropdown list */}
-      {open && (
-        <div className="absolute top-full right-0 left-0 mt-1.5 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden z-50">
-          {tabs.map((tab, i) => (
+        {tabs.map((tab) => {
+          const isActive = tab.id === active;
+          return (
             <button
               key={tab.id}
-              onClick={() => { onChange(tab.id); setOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3.5 text-right transition-colors ${
-                i < tabs.length - 1 ? "border-b border-border/50" : ""
-              } ${tab.id === active ? "bg-primary/5" : "hover:bg-muted/50"}`}
+              ref={isActive ? activeRef : null}
+              onClick={() => onChange(tab.id)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all shrink-0 min-h-[40px] ${
+                isActive
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted text-muted-foreground"
+              }`}
             >
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                tab.id === active ? "bg-primary/10" : "bg-muted"
-              }`}>
-                <tab.icon className={`w-4 h-4 ${tab.id === active ? tab.color : "text-muted-foreground"}`} />
-              </div>
-              <span className={`font-medium text-sm ${tab.id === active ? "text-foreground" : "text-muted-foreground"}`}>
-                {tab.label}
-              </span>
-              {tab.id === active && (
-                <CheckCircle className="w-4 h-4 text-primary mr-auto" />
-              )}
+              <tab.icon className={`w-3.5 h-3.5 ${isActive ? "text-primary-foreground" : tab.color}`} />
+              {tab.label}
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
