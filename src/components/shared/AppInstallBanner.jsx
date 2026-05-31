@@ -223,11 +223,10 @@ export function MobileAppChip() {
   return (
     <button
       onClick={handleTap}
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-[11px] font-bold sm:hidden"
+      className="sm:hidden flex items-center px-3.5 py-1.5 rounded-full border border-border bg-background text-foreground text-[13px] font-medium shadow-sm active:scale-95 transition-transform whitespace-nowrap"
       aria-label="تحميل تطبيق مشوارو"
     >
-      <Download className="w-3 h-3" />
-      <span>حمّل التطبيق</span>
+      احصل على التطبيق
     </button>
   );
 }
