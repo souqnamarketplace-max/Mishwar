@@ -80,6 +80,25 @@ export default function HeroSection() {
   };
   const today = new Date().toISOString().split("T")[0];
 
+  // Preload the next slide image so there's no grey flash on transition.
+  // Runs whenever slideIdx changes — the browser fetches and caches the
+  // next image before the transition fires, so it's ready instantly.
+  useEffect(() => {
+    if (slides.length <= 1) return;
+    const nextIdx = (slideIdx + 1) % slides.length;
+    const nextSlide = slides[nextIdx];
+    if (!nextSlide?.img) return;
+    // Mobile size preload
+    const mobileUrl = typeof nextSlide.img === "string"
+      ? nextSlide.img.replace("w=1400&h=800", "w=800&h=500")
+      : nextSlide.img;
+    const img = new window.Image();
+    img.src = mobileUrl;
+    // Desktop size preload
+    const desktopImg = new window.Image();
+    desktopImg.src = typeof nextSlide.img === "string" ? nextSlide.img : nextSlide.img;
+  }, [slideIdx, slides]);
+
   // Slide transition variants — Ken Burns + fade
   const variants = {
     enter: (dir) => ({ opacity: 0, scale: 1.06, x: dir > 0 ? 30 : -30 }),
@@ -170,7 +189,7 @@ export default function HeroSection() {
     <>
       {/* ── MOBILE ── */}
       <section className="sm:hidden flex flex-col">
-        <div className="relative h-52 overflow-hidden">
+        <div className="relative h-52 overflow-hidden bg-primary/80">
           <AnimatePresence initial={false} custom={direction} mode="sync">
             <motion.img
               key={slideIdx}
@@ -233,7 +252,7 @@ export default function HeroSection() {
       {/* ── DESKTOP ── */}
       <section className="hidden sm:block relative overflow-hidden" style={{ minHeight: "580px" }}>
         {/* Background slideshow with AnimatePresence */}
-        <div className="absolute inset-0">
+        <div className="absolute inset-0 bg-primary/80">
           <AnimatePresence initial={false} custom={direction} mode="sync">
             <motion.img
               key={slideIdx}
