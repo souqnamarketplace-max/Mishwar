@@ -8,10 +8,11 @@ import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { notifyUser } from "@/lib/notifyUser";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star } from "lucide-react";
+import { MapPin, Clock, Users, ArrowLeft, Trash2, CheckCircle, AlertCircle, Pencil, X, Play, Flag, Star, Share2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { todayISO, isFutureOrToday } from "@/lib/validation";
 import { isTripExpired } from "@/lib/tripScheduling";
+import { buildTripSlug } from "@/lib/slug";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -599,6 +600,40 @@ export default function DriverTripsList({ trips, bookings, loading, onSelectTrip
                     >
                       <Pencil className="w-3.5 h-3.5" />
                       تعديل
+                    </Button>
+                  )}
+
+                  {/* Share trip — only confirmed/future trips worth sharing */}
+                  {(trip.status === "confirmed" || trip.status === "in_progress") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-lg text-xs gap-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                      onClick={async () => {
+                        const slug = buildTripSlug(trip);
+                        const path = slug ? `/trip/${slug}` : `/trip/${trip.id}`;
+                        const url  = `https://www.mishwaro.com${path}`;
+                        const text = `🚗 رحلة من ${trip.from_city} إلى ${trip.to_city} — ${trip.date} الساعة ${trip.time} — ₪${trip.price} للمقعد\nاحجز الآن عبر مشوارو:`;
+
+                        if (navigator.share) {
+                          try {
+                            await navigator.share({ title: "مشوارو — رحلة متاحة", text, url });
+                          } catch (e) {
+                            // User cancelled share — not an error
+                          }
+                        } else {
+                          // Fallback: copy full message + URL to clipboard
+                          try {
+                            await navigator.clipboard.writeText(`${text}\n${url}`);
+                            toast.success("تم نسخ رابط الرحلة 📋");
+                          } catch {
+                            toast.error("لم يتمكن من نسخ الرابط");
+                          }
+                        }
+                      }}
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      مشاركة
                     </Button>
                   )}
 
