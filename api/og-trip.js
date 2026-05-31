@@ -1,142 +1,261 @@
 /**
- * /api/og-trip?from=رام+الله&to=نابلس&price=30&date=الجمعة+5+يونيو&seats=3&driver=خالد
+ * /api/og-trip — Dynamic OG image for trip share cards
  *
- * Generates a 1200×630 PNG OG image on-the-fly for trip share cards.
- * Uses SVG → sharp (available in Vercel Node runtime).
- * WhatsApp, Telegram, iMessage, Twitter all fetch this URL when the
- * trip link is shared — they cache it by URL so params must be stable.
- *
- * No external dependencies beyond sharp (already in node_modules).
+ * Uses @vercel/og (Satori) which handles Arabic text correctly.
+ * Fetches the Noto Sans Arabic font from Google Fonts at cold-start,
+ * then caches it in the module scope for subsequent requests.
  */
 
-export const config = { runtime: "nodejs" };
+export const config = { runtime: "edge" };
 
-function esc(s) {
-  return String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+// Font is fetched once and cached in module scope (survives warm invocations)
+let fontData = null;
+
+async function getFont() {
+  if (fontData) return fontData;
+  // Noto Sans Arabic — good Unicode coverage, RTL support, free
+  const res = await fetch(
+    "https://fonts.gstatic.com/s/notosansarabic/v18/nwpxtLGrOAZMl5nJ_wfgRg3DrWFZWsnVBJ_sS6tlqHHFlhQ5l3sQWIHPqzCfly27.woff"
+  );
+  if (!res.ok) throw new Error("Font fetch failed: " + res.status);
+  fontData = await res.arrayBuffer();
+  return fontData;
 }
 
-function truncate(s, max) {
-  const str = String(s || "");
-  return str.length > max ? str.slice(0, max - 1) + "…" : str;
-}
+export default async function handler(req) {
+  const { ImageResponse } = await import("@vercel/og");
 
-export default async function handler(req, res) {
-  const { from = "", to = "", price = "", date = "", seats = "", driver = "" } = req.query;
+  const { searchParams } = new URL(req.url);
+  const from   = searchParams.get("from")   || "";
+  const to     = searchParams.get("to")     || "";
+  const price  = searchParams.get("price")  || "";
+  const date   = searchParams.get("date")   || "";
+  const seats  = searchParams.get("seats")  || "";
+  const driver = searchParams.get("driver") || "";
 
-  const fromCity  = esc(truncate(from, 20));
-  const toCity    = esc(truncate(to, 20));
-  const priceStr  = price ? `₪${esc(price)} للمقعد` : "";
-  const dateStr   = esc(truncate(date, 30));
-  const seatsStr  = seats ? `${esc(seats)} مقاعد متاحة` : "";
-  const driverStr = driver ? `السائق: ${esc(truncate(driver, 20))}` : "";
+  const truncate = (s, n) => s.length > n ? s.slice(0, n - 1) + "…" : s;
 
-  const svg = `
-<svg width="1200" height="630" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a3d2a"/>
-      <stop offset="100%" style="stop-color:#2d5a3d"/>
-    </linearGradient>
-    <filter id="shadow">
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000" flood-opacity="0.3"/>
-    </filter>
-  </defs>
+  const priceStr  = price  ? `₪${price} للمقعد`               : "";
+  const dateStr   = date   ? `📅 ${truncate(date, 30)}`         : "";
+  const seatsStr  = seats  ? `💺 ${seats} مقاعد متاحة`         : "";
+  const driverStr = driver ? `👤 ${truncate(driver, 20)}`        : "";
 
-  <!-- Background -->
-  <rect width="1200" height="630" fill="url(#bg)"/>
-
-  <!-- Subtle grid pattern -->
-  <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
-    <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#ffffff" stroke-width="0.3" opacity="0.08"/>
-  </pattern>
-  <rect width="1200" height="630" fill="url(#grid)"/>
-
-  <!-- Gold accent bar top -->
-  <rect x="0" y="0" width="1200" height="8" fill="#c9a227"/>
-
-  <!-- Logo area -->
-  <rect x="60" y="50" width="70" height="70" rx="16" fill="#c9a227" filter="url(#shadow)"/>
-  <text x="95" y="100" font-family="Arial, sans-serif" font-size="40" font-weight="900"
-        fill="#1a3d2a" text-anchor="middle" dominant-baseline="middle">م</text>
-
-  <!-- App name -->
-  <text x="148" y="72" font-family="Arial, sans-serif" font-size="22" font-weight="700"
-        fill="#ffffff" text-anchor="start">مشوارو</text>
-  <text x="148" y="98" font-family="Arial, sans-serif" font-size="14"
-        fill="#c9a227" text-anchor="start">رحلتك أسهل، أوفر، وأسرع</text>
-
-  <!-- Palestine flag accent -->
-  <text x="1140" y="85" font-family="Arial, sans-serif" font-size="44"
-        text-anchor="middle" dominant-baseline="middle">🇵🇸</text>
-
-  <!-- Route card -->
-  <rect x="60" y="160" width="1080" height="280" rx="24" fill="#ffffff" fill-opacity="0.08"
-        stroke="#c9a227" stroke-width="1.5" stroke-opacity="0.4"/>
-
-  <!-- From city -->
-  <text x="120" y="230" font-family="Arial, sans-serif" font-size="15"
-        fill="#c9a227" text-anchor="start">من</text>
-  <text x="120" y="290" font-family="Arial, sans-serif" font-size="58" font-weight="800"
-        fill="#ffffff" text-anchor="start">${fromCity}</text>
-
-  <!-- Arrow -->
-  <text x="600" y="290" font-family="Arial, sans-serif" font-size="50"
-        fill="#c9a227" text-anchor="middle" dominant-baseline="middle">←</text>
-
-  <!-- To city -->
-  <text x="1080" y="230" font-family="Arial, sans-serif" font-size="15"
-        fill="#c9a227" text-anchor="end">إلى</text>
-  <text x="1080" y="290" font-family="Arial, sans-serif" font-size="58" font-weight="800"
-        fill="#ffffff" text-anchor="end">${toCity}</text>
-
-  <!-- Divider -->
-  <line x1="120" y1="330" x2="1080" y2="330" stroke="#ffffff" stroke-width="1" stroke-opacity="0.15"/>
-
-  <!-- Trip details row -->
-  ${priceStr ? `
-  <rect x="120" y="355" width="240" height="54" rx="12" fill="#c9a227"/>
-  <text x="240" y="390" font-family="Arial, sans-serif" font-size="22" font-weight="700"
-        fill="#1a3d2a" text-anchor="middle" dominant-baseline="middle">${priceStr}</text>
-  ` : ""}
-
-  ${dateStr ? `
-  <text x="420" y="390" font-family="Arial, sans-serif" font-size="20"
-        fill="#ffffff" text-anchor="start" dominant-baseline="middle" fill-opacity="0.9">📅 ${dateStr}</text>
-  ` : ""}
-
-  ${seatsStr ? `
-  <text x="420" y="418" font-family="Arial, sans-serif" font-size="18"
-        fill="#c9a227" text-anchor="start" dominant-baseline="middle">💺 ${seatsStr}</text>
-  ` : ""}
-
-  ${driverStr ? `
-  <text x="1080" y="390" font-family="Arial, sans-serif" font-size="18"
-        fill="#ffffff" text-anchor="end" dominant-baseline="middle" fill-opacity="0.8">👤 ${driverStr}</text>
-  ` : ""}
-
-  <!-- Bottom CTA -->
-  <rect x="0" y="560" width="1200" height="70" fill="#000000" fill-opacity="0.25"/>
-  <text x="600" y="598" font-family="Arial, sans-serif" font-size="22" font-weight="600"
-        fill="#ffffff" text-anchor="middle" dominant-baseline="middle">احجز الآن على www.mishwaro.com 🚗</text>
-</svg>`;
-
+  let font;
   try {
-    // Try sharp first (available in Vercel)
-    const { default: sharp } = await import("sharp");
-    const png = await sharp(Buffer.from(svg)).png().toBuffer();
-
-    res.setHeader("Content-Type", "image/png");
-    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    return res.status(200).send(png);
+    font = await getFont();
   } catch {
-    // sharp not available (e.g. cold start) — serve SVG
-    res.setHeader("Content-Type", "image/svg+xml");
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    return res.status(200).send(svg);
+    // Font load failed — return a minimal fallback
+    font = null;
   }
+
+  const fonts = font ? [{ name: "NotoArabic", data: font, weight: 700, style: "normal" }] : [];
+
+  return new ImageResponse(
+    {
+      type: "div",
+      props: {
+        style: {
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          background: "linear-gradient(135deg, #1a3d2a 0%, #2d5a3d 100%)",
+          fontFamily: font ? "NotoArabic" : "sans-serif",
+          position: "relative",
+          overflow: "hidden",
+        },
+        children: [
+          // Gold top bar
+          {
+            type: "div",
+            props: {
+              style: { position: "absolute", top: 0, left: 0, right: 0, height: 10, background: "#c9a227" },
+            },
+          },
+
+          // Header row — logo + app name + flag
+          {
+            type: "div",
+            props: {
+              style: {
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "40px 60px 0",
+                direction: "rtl",
+              },
+              children: [
+                // Logo + name
+                {
+                  type: "div",
+                  props: {
+                    style: { display: "flex", flexDirection: "row", alignItems: "center", gap: 16 },
+                    children: [
+                      {
+                        type: "div",
+                        props: {
+                          style: {
+                            width: 72, height: 72, borderRadius: 16,
+                            background: "#c9a227",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 40, fontWeight: 900, color: "#1a3d2a",
+                          },
+                          children: "م",
+                        },
+                      },
+                      {
+                        type: "div",
+                        props: {
+                          style: { display: "flex", flexDirection: "column" },
+                          children: [
+                            { type: "div", props: { style: { color: "#fff", fontSize: 26, fontWeight: 700 }, children: "مشوارو" } },
+                            { type: "div", props: { style: { color: "#c9a227", fontSize: 14 }, children: "رحلتك أسهل، أوفر، وأسرع" } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+                // Palestine flag
+                { type: "div", props: { style: { fontSize: 52 }, children: "🇵🇸" } },
+              ],
+            },
+          },
+
+          // Route card
+          {
+            type: "div",
+            props: {
+              style: {
+                margin: "32px 60px 0",
+                background: "rgba(255,255,255,0.07)",
+                border: "1.5px solid rgba(201,162,39,0.35)",
+                borderRadius: 24,
+                padding: "32px 40px",
+                display: "flex",
+                flexDirection: "column",
+                direction: "rtl",
+              },
+              children: [
+                // Cities row
+                {
+                  type: "div",
+                  props: {
+                    style: {
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 20,
+                    },
+                    children: [
+                      // From
+                      {
+                        type: "div",
+                        props: {
+                          style: { display: "flex", flexDirection: "column" },
+                          children: [
+                            { type: "div", props: { style: { color: "#c9a227", fontSize: 14, marginBottom: 6 }, children: "من" } },
+                            { type: "div", props: { style: { color: "#fff", fontSize: 52, fontWeight: 800, lineHeight: 1 }, children: truncate(from, 14) } },
+                          ],
+                        },
+                      },
+                      // Arrow
+                      { type: "div", props: { style: { color: "#c9a227", fontSize: 44, margin: "0 20px" }, children: "←" } },
+                      // To
+                      {
+                        type: "div",
+                        props: {
+                          style: { display: "flex", flexDirection: "column", alignItems: "flex-end" },
+                          children: [
+                            { type: "div", props: { style: { color: "#c9a227", fontSize: 14, marginBottom: 6 }, children: "إلى" } },
+                            { type: "div", props: { style: { color: "#fff", fontSize: 52, fontWeight: 800, lineHeight: 1 }, children: truncate(to, 14) } },
+                          ],
+                        },
+                      },
+                    ],
+                  },
+                },
+
+                // Divider
+                { type: "div", props: { style: { height: 1, background: "rgba(255,255,255,0.12)", margin: "0 0 20px" } } },
+
+                // Details row
+                {
+                  type: "div",
+                  props: {
+                    style: {
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 16,
+                    },
+                    children: [
+                      // Price pill
+                      priceStr ? {
+                        type: "div",
+                        props: {
+                          style: {
+                            background: "#c9a227",
+                            borderRadius: 12,
+                            padding: "10px 24px",
+                            color: "#1a3d2a",
+                            fontSize: 22,
+                            fontWeight: 700,
+                          },
+                          children: priceStr,
+                        },
+                      } : null,
+                      // Date + seats + driver
+                      {
+                        type: "div",
+                        props: {
+                          style: { display: "flex", flexDirection: "column", gap: 4, flex: 1, alignItems: "flex-start" },
+                          children: [
+                            dateStr   ? { type: "div", props: { style: { color: "rgba(255,255,255,0.85)", fontSize: 18 }, children: dateStr } }   : null,
+                            seatsStr  ? { type: "div", props: { style: { color: "#c9a227", fontSize: 16 }, children: seatsStr } }                  : null,
+                          ].filter(Boolean),
+                        },
+                      },
+                      driverStr ? { type: "div", props: { style: { color: "rgba(255,255,255,0.75)", fontSize: 17 }, children: driverStr } } : null,
+                    ].filter(Boolean),
+                  },
+                },
+              ],
+            },
+          },
+
+          // Bottom CTA
+          {
+            type: "div",
+            props: {
+              style: {
+                position: "absolute",
+                bottom: 0, left: 0, right: 0,
+                background: "rgba(0,0,0,0.28)",
+                padding: "18px 60px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontSize: 22,
+                fontWeight: 600,
+              },
+              children: "احجز الآن على www.mishwaro.com 🚗",
+            },
+          },
+        ],
+      },
+    },
+    {
+      width: 1200,
+      height: 630,
+      fonts,
+      headers: {
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=3600",
+      },
+    }
+  );
 }
