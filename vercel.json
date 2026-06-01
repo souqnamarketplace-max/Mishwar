@@ -36,6 +36,76 @@
   ],
   "redirects": [
     {
+      "source": "/privacy-policy",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/terms-of-service",
+      "destination": "/terms",
+      "permanent": true
+    },
+    {
+      "source": "/about-us",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/help.md",
+      "destination": "/help",
+      "permanent": true
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/privacy",
+      "permanent": true
+    },
+    {
+      "source": "/terms/",
+      "destination": "/terms",
+      "permanent": true
+    },
+    {
+      "source": "/about/",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/help/",
+      "destination": "/help",
+      "permanent": true
+    },
+    {
+      "source": "/search/",
+      "destination": "/search",
+      "permanent": true
+    },
+    {
+      "source": "/blog/",
+      "destination": "/blog",
+      "permanent": true
+    },
+    {
+      "source": "/how-it-works/",
+      "destination": "/how-it-works",
+      "permanent": true
+    },
+    {
+      "source": "/become-driver/",
+      "destination": "/become-driver",
+      "permanent": true
+    },
+    {
+      "source": "/safety/",
+      "destination": "/safety",
+      "permanent": true
+    },
+    {
+      "source": "/community/",
+      "destination": "/community",
+      "permanent": true
+    },
+    {
       "source": "/(.*)",
       "has": [
         {
