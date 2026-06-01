@@ -522,13 +522,13 @@ export default function MyTrips() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-5">
       {/* Header */}
-      <div className="text-center mb-6">
-        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-          <Car className="w-7 h-7 text-primary" />
+      <div className="text-center mb-3">
+        <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-2">
+          <Car className="w-5 h-5 text-primary" />
         </div>
-        <h1 className="text-3xl font-bold text-foreground">رحلاتي</h1>
+        <h1 className="text-2xl font-bold text-foreground">رحلاتي</h1>
         <p className="text-muted-foreground text-sm mt-1">
           {/* Total counts surfaced inline with the page subtitle so users
               know how many rows they have without scrolling. driverTotal
@@ -631,7 +631,7 @@ export default function MyTrips() {
           Only renders when isBoth. Pure passengers/drivers have a
           single-role list and don't need this. */}
       {isBoth && (
-        <div className="mb-6">
+        <div className="mb-3">
           <div className="flex items-center justify-between gap-2 mb-2.5">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               عرض النشاط
@@ -661,7 +661,7 @@ export default function MyTrips() {
                   key={opt.id}
                   type="button"
                   onClick={() => setRoleFilter(opt.id)}
-                  className={`flex flex-col items-center justify-center gap-1 py-3 px-2 rounded-2xl border-2 transition-all min-h-[80px] ${
+                  className={`flex flex-col items-center justify-center gap-1 py-2 px-2 rounded-2xl border-2 transition-all min-h-[64px] ${
                     isActive
                       ? opt.color === "amber"
                         ? "bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20"
@@ -698,7 +698,7 @@ export default function MyTrips() {
       )}
 
       {/* Tabs */}
-      <div className="flex flex-wrap justify-center gap-2 mb-8">
+      <div className="flex flex-wrap justify-center gap-2 mb-4">
         {tabs.map((tab) => (
           <button
             key={tab.id}
