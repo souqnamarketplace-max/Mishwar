@@ -30,7 +30,7 @@ jobs:
         # native libvips binaries unavailable in GitHub Actions CI.
         # sharp is only used in the Node.js fallback of api/og-trip.js;
         # production uses Vercel Edge runtime (@vercel/og directly, no sharp).
-        run: npm ci --omit=optional
+        run: npm ci --ignore-scripts
 
       - name: Lint
         run: npm run lint
