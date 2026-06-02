@@ -201,7 +201,7 @@ export default function AccountHub() {
       </div>
 
       <p className="text-xs text-muted-foreground text-center mt-6">
-        نسخة مشوارو {import.meta.env?.VITE_APP_VERSION || "1.0.3"}
+        نسخة مشوارو {import.meta.env?.VITE_APP_VERSION || "1.0.5"}
       </p>
     </div>
   );
