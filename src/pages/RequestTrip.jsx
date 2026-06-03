@@ -198,18 +198,85 @@ export default function RequestTrip() {
   });
 
   // ─── Validators ─────────────────────────────────────────────
+  // Why this is more than a simple date check:
+  // The server expires a request as soon as its computed `expires_at`
+  // is in the past (see migration 096 — compute_request_expiry). For
+  // morning/afternoon/evening flexibility, those expiries are at
+  // 12:00 / 17:00 / 22:00 Palestine time on the requested date. So
+  // when a user picks "today" + "morning" at 8pm local, the request
+  // is already past its expiry the moment it's created → drivers
+  // never see it, and `expire_stale_requests` flips it to expired
+  // within 30 minutes. Out of 12 historical expirations, 7 fit this
+  // pattern. Block it on the client so the user sees a clear message
+  // ("the slot for today has already passed — pick tomorrow") rather
+  // than discovering their request silently vanished.
+  //
+  // We do the work in Palestine time (Asia/Jerusalem) regardless of
+  // the device clock, so a passenger creating a request from a phone
+  // set to a different timezone still gets the correct check against
+  // the server's reference frame.
+  const palestineNow = useMemo(() => {
+    // Build "now" in Palestine by formatting via Intl and re-parsing.
+    // toLocaleString with the Asia/Jerusalem timezone produces the
+    // wall-clock date+time there; we split it back into parts so we
+    // can compare hour-of-day independent of the device timezone.
+    const fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jerusalem",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+    const parts = Object.fromEntries(
+      fmt.formatToParts(new Date()).map(p => [p.type, p.value])
+    );
+    return {
+      ymd: `${parts.year}-${parts.month}-${parts.day}`,
+      hour: parseInt(parts.hour, 10),
+      minute: parseInt(parts.minute, 10),
+    };
+  }, []);
+
+  // Closing minute-of-day for each flexibility window (Palestine time):
+  //   morning  → 12:00  → 720 minutes from midnight
+  //   afternoon→ 17:00  → 1020
+  //   evening  → 22:00  → 1320
+  //   anytime  → 23:59  → 1439 (entire day still valid)
+  const slotEndMinutes = (flex) => (
+    flex === "morning"   ? 720 :
+    flex === "afternoon" ? 1020 :
+    flex === "evening"   ? 1320 :
+                           1439
+  );
+
   const issues = useMemo(() => {
     const arr = [];
     if (!form.from_city)                 arr.push("اختر مدينة الانطلاق");
     if (!form.to_city)                   arr.push("اختر مدينة الوصول");
     if (form.from_city === form.to_city && form.from_city) arr.push("نقطة الانطلاق والوصول لا يمكن أن تكون نفسها");
     if (!form.requested_date)            arr.push("اختر تاريخ الرحلة");
-    if (form.requested_date < todayISO())arr.push("تاريخ الرحلة في الماضي");
+    if (form.requested_date < palestineNow.ymd) arr.push("تاريخ الرحلة في الماضي");
     if (form.time_flexibility === "exact" && !form.requested_time) arr.push("اختر ساعة الانطلاق");
+
+    // Same-day check — block selections that are already past:
+    //   - exact time earlier than now
+    //   - morning/afternoon/evening slot whose window has already closed
+    if (form.requested_date === palestineNow.ymd) {
+      const nowMin = palestineNow.hour * 60 + palestineNow.minute;
+      if (form.time_flexibility === "exact" && form.requested_time) {
+        const [h, m] = form.requested_time.split(":").map(Number);
+        if (Number.isFinite(h) && Number.isFinite(m) && (h * 60 + m) <= nowMin) {
+          arr.push("الوقت المطلوب اليوم قد مرّ — اختر وقتاً لاحقاً أو يوماً آخر");
+        }
+      } else if (form.time_flexibility && form.time_flexibility !== "anytime") {
+        if (slotEndMinutes(form.time_flexibility) <= nowMin) {
+          arr.push("هذه الفترة من اليوم انتهت — اختر فترة لاحقة أو يوماً آخر");
+        }
+      }
+    }
+
     if (form.seats_needed < 1 || form.seats_needed > 6) arr.push("عدد المقاعد بين 1 و 6");
     if (form.suggested_price < 0 || form.suggested_price > 1000) arr.push("السعر المقترح بين 0 و 1000 شيكل");
     return arr;
-  }, [form]);
+  }, [form, palestineNow]);
 
   const canSubmit = issues.length === 0 && !submit.isPending && activeCount < 3;
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));

@@ -11,26 +11,32 @@ import Pagination from "@/components/dashboard/Pagination";
 // Visual config — keys match server-side `target_type` / activity-log type
 // ────────────────────────────────────────────────────────────────────────────
 const typeConfig = {
-  booking:   { label: "حجز",         icon: CalendarCheck,     color: "text-accent bg-accent/10" },
-  trip:      { label: "رحلة",        icon: Car,               color: "text-primary bg-primary/10" },
-  review:    { label: "تقييم",       icon: Star,              color: "text-yellow-600 bg-yellow-500/10" },
-  user:      { label: "مستخدم",      icon: Users,             color: "text-blue-600 bg-blue-500/10" },
-  feedback:  { label: "اقتراح/شكوى", icon: MessageSquarePlus, color: "text-purple-600 bg-purple-500/10" },
-  report:    { label: "بلاغ",        icon: Flag,              color: "text-red-600 bg-red-500/10" },
+  booking:       { label: "حجز",         icon: CalendarCheck,     color: "text-accent bg-accent/10" },
+  trip:          { label: "رحلة",        icon: Car,               color: "text-primary bg-primary/10" },
+  // Passenger-posted ride requests separated from driver-posted trips so
+  // admins can filter to just "passengers asking for a ride" without
+  // scrolling past every driver-side trip activity. Mapping is server-side
+  // in _map_audit_to_activity_type (migration 122).
+  trip_request:  { label: "طلب رحلة",    icon: MessageSquarePlus, color: "text-accent bg-accent/15" },
+  review:        { label: "تقييم",       icon: Star,              color: "text-yellow-600 bg-yellow-500/10" },
+  user:          { label: "مستخدم",      icon: Users,             color: "text-blue-600 bg-blue-500/10" },
+  feedback:      { label: "اقتراح/شكوى", icon: MessageSquarePlus, color: "text-purple-600 bg-purple-500/10" },
+  report:        { label: "بلاغ",        icon: Flag,              color: "text-red-600 bg-red-500/10" },
   // Admin-trail-only types — surfaced when a row's target_type is one of
   // these. Activity-log doesn't emit these; audit_log_search does.
-  payment:   { label: "دفع",         icon: CalendarCheck,     color: "text-green-700 bg-green-500/10" },
-  system:    { label: "نظام",        icon: Shield,            color: "text-slate-600 bg-slate-500/10" },
+  payment:       { label: "دفع",         icon: CalendarCheck,     color: "text-green-700 bg-green-500/10" },
+  system:        { label: "نظام",        icon: Shield,            color: "text-slate-600 bg-slate-500/10" },
 };
 
 const TYPE_FILTERS = [
-  { id: "all",      label: "الكل" },
-  { id: "booking",  label: "الحجوزات" },
-  { id: "trip",     label: "الرحلات" },
-  { id: "review",   label: "التقييمات" },
-  { id: "user",     label: "المستخدمون" },
-  { id: "feedback", label: "الاقتراحات والشكاوى" },
-  { id: "report",   label: "البلاغات" },
+  { id: "all",          label: "الكل" },
+  { id: "trip",         label: "الرحلات" },
+  { id: "trip_request", label: "طلبات الركاب" },
+  { id: "booking",      label: "الحجوزات" },
+  { id: "review",       label: "التقييمات" },
+  { id: "user",         label: "المستخدمون" },
+  { id: "feedback",     label: "الاقتراحات والشكاوى" },
+  { id: "report",       label: "البلاغات" },
 ];
 
 // Arabic labels for every audit `action` code logged by the app. Source
