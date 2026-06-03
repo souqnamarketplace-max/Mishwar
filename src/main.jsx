@@ -4,6 +4,11 @@ import App from '@/App.jsx'
 import '@/index.css'
 import { initSentry } from '@/lib/sentry'
 import { initNativeShell } from '@/lib/native'
+import { initDebugLog } from '@/lib/debugLog'
+
+// Initialize debug log capture FIRST so we catch boot-time errors.
+// In-memory only, hidden from users unless they open the debug overlay.
+initDebugLog();
 
 // Initialize error tracking (no-op if VITE_SENTRY_DSN not set)
 initSentry();

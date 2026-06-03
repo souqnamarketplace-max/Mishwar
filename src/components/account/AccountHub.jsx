@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import {
@@ -13,6 +13,7 @@ import PassengerPaymentsSection from "./PassengerPaymentsSection";
 import BlockedUsersSection from "./BlockedUsersSection";
 import MyReportsSection from "./MyReportsSection";
 import StrikeStatusSection from "./StrikeStatusSection";
+import DebugOverlay from "@/components/debug/DebugOverlay";
 
 import { useSEO } from "@/hooks/useSEO";
 /**
@@ -26,6 +27,27 @@ export default function AccountHub() {
   const refreshUser = auth?.refreshUser;
   const [searchParams] = useSearchParams();
   const [section, setSection] = useState(searchParams.get("section") || null);
+
+  // Hidden debug overlay — tap the version number 7 times to open.
+  // Tap counter resets if 2s elapse between taps so accidental
+  // double-taps from a curious user don't slowly fill the counter.
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [tapCount, setTapCount] = useState(0);
+  useEffect(() => {
+    if (tapCount === 0) return;
+    const t = setTimeout(() => setTapCount(0), 2000);
+    return () => clearTimeout(t);
+  }, [tapCount]);
+  const handleVersionTap = () => {
+    setTapCount((n) => {
+      const next = n + 1;
+      if (next >= 7) {
+        setDebugOpen(true);
+        return 0;
+      }
+      return next;
+    });
+  };
 
   // Sync section state with URL query param. Previously this only
   // updated when fromUrl was truthy — so a user navigating from
@@ -200,9 +222,14 @@ export default function AccountHub() {
         </Link>
       </div>
 
-      <p className="text-xs text-muted-foreground text-center mt-6">
+      <p
+        className="text-xs text-muted-foreground text-center mt-6 select-none cursor-pointer"
+        onClick={handleVersionTap}
+      >
         نسخة مشوارو {import.meta.env?.VITE_APP_VERSION || "1.0.5"}
       </p>
+
+      <DebugOverlay open={debugOpen} onClose={() => setDebugOpen(false)} />
     </div>
   );
 }
