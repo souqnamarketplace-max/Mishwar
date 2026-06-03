@@ -13,6 +13,7 @@ import ExpiredTripNotifier from "@/components/driver/ExpiredTripNotifier";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useUnreadMessageCount } from "@/lib/useUnreadMessageCount";
 import { toast } from "sonner";
+import DebugOverlay from "@/components/debug/DebugOverlay";
 
 const MOBILE_TABS = [
   { id: "home",      label: "الرئيسية", icon: Home,          path: "/" },
@@ -93,6 +94,30 @@ export default function MobileLayout({ children, user, showHeader = true, header
   // up from the touch target to the nearest y-scrollable ancestor).
   const contentRef = useRef(null);
   const tabHistoryRef = useRef({});
+
+  // Hidden debug overlay — tap the version number 7 times to open.
+  // Available in BOTH the logged-in and anonymous drawers so users
+  // can grab a diagnostic dump regardless of auth state. Tap counter
+  // resets after 2s of inactivity to prevent accidental progression.
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [versionTapCount, setVersionTapCount] = useState(0);
+  useEffect(() => {
+    if (versionTapCount === 0) return;
+    const t = setTimeout(() => setVersionTapCount(0), 2000);
+    return () => clearTimeout(t);
+  }, [versionTapCount]);
+  const handleVersionTap = () => {
+    setVersionTapCount((n) => {
+      const next = n + 1;
+      if (next >= 7) {
+        setDebugOpen(true);
+        setShowMobileMenu(false);
+        return 0;
+      }
+      return next;
+    });
+  };
+  const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.0.5";
   
   // Detect if viewport is mobile. Reactive to resize/orientation so
   // foldables, tablets, and desktop browsers crossing the 1024px
@@ -395,6 +420,11 @@ export default function MobileLayout({ children, user, showHeader = true, header
       <BookingRequestPopup user={user} />
       <ExpiredTripNotifier user={user} />
 
+      {/* Hidden debug overlay — opens when version is tapped 7 times in
+          the drawer footer. Mounted at top level so the drawer can close
+          while the overlay stays open. */}
+      <DebugOverlay open={debugOpen} onClose={() => setDebugOpen(false)} />
+
       {/* Mobile Menu Overlay + Drawer */}
       {showMobileMenu && (
         <>
@@ -632,7 +662,12 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 <LogOut className="w-5 h-5 shrink-0" />
                 <span className="text-sm font-medium">تسجيل الخروج</span>
               </button>
-              <p className="text-center text-[11px] text-muted-foreground pb-2">مشوارو · النسخة 1.0.3</p>
+              <p
+                className="text-center text-[11px] text-muted-foreground pb-2 select-none cursor-pointer"
+                onClick={handleVersionTap}
+              >
+                مشوارو · النسخة {APP_VERSION}
+              </p>
             </div>
               </>
             ) : (
@@ -719,7 +754,12 @@ export default function MobileLayout({ children, user, showHeader = true, header
                 </div>
 
                 <div className="border-t border-border py-2" dir="rtl">
-                  <p className="text-center text-[11px] text-muted-foreground pb-1">مشوارو · النسخة 1.0.3</p>
+                  <p
+                    className="text-center text-[11px] text-muted-foreground pb-1 select-none cursor-pointer"
+                    onClick={handleVersionTap}
+                  >
+                    مشوارو · النسخة {APP_VERSION}
+                  </p>
                 </div>
               </>
             )}
