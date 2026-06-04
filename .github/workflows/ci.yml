@@ -26,11 +26,10 @@ jobs:
           cache: 'npm'
 
       - name: Install
-        # --omit=optional skips sharp (pulled in by @vercel/og) which requires
-        # native libvips binaries unavailable in GitHub Actions CI.
-        # sharp is only used in the Node.js fallback of api/og-trip.js;
-        # production uses Vercel Edge runtime (@vercel/og directly, no sharp).
-        run: npm ci --ignore-scripts
+        # npm install (not npm ci) to handle lockfile drift between local
+        # development commits. --ignore-scripts prevents sharp/native binary
+        # compilation that fails in CI. --omit=optional skips optional deps.
+        run: npm install --ignore-scripts --omit=optional
 
       - name: Lint
         run: npm run lint
