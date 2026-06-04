@@ -100,14 +100,8 @@
       "inLanguage": "ar",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": {
-          "@type": "EntryPoint",
-          "urlTemplate": "https://www.mishwaro.com/search?from={from_city}&to={to_city}"
-        },
-        "query-input": [
-          "required name=from_city",
-          "required name=to_city"
-        ]
+        "target": "https://www.mishwaro.com/search?from={search_term_string}",
+        "query-input": "required name=search_term_string"
       }
     }
     </script>
