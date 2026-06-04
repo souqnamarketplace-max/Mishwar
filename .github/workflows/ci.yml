@@ -46,6 +46,8 @@ jobs:
           # actual values come from Vercel at deploy time.
           VITE_SUPABASE_URL: https://placeholder-for-ci.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder
+          VITE_SITE_URL: https://www.mishwaro.com
+          VITE_APP_URL: https://www.mishwaro.com
 
       - name: Verify console statements stripped from production
         # Audit M-05: vite.config.js drops console/debugger when
