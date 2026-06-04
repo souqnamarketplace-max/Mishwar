@@ -29,7 +29,7 @@ jobs:
         # npm install (not npm ci) to handle lockfile drift between local
         # development commits. --ignore-scripts prevents sharp/native binary
         # compilation that fails in CI. --omit=optional skips optional deps.
-        run: npm install --ignore-scripts --omit=optional
+        run: npm install --ignore-scripts
 
       - name: Lint
         run: npm run lint
