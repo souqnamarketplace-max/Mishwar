@@ -56,7 +56,10 @@ const tips = [
 ];
 
 export default function Safety() {
-  useSEO({ title: "السلامة والأمان", description: "كيف يحمي مشوارو سائقيه ومسافريه" });
+  useSEO({
+    title: "السلامة والأمان في مشوارو — رحلات موثوقة في فلسطين",
+    description: "مشوارو يضمن سلامتك في كل رحلة: سائقون موثّقو الهوية، رخص قيادة سارية، تأمين مركبة، تقييمات حقيقية من الركاب. سافر بأمان مع مشوارو.",
+  });
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10">

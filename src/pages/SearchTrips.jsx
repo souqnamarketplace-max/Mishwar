@@ -19,7 +19,10 @@ import { useFavoriteDrivers } from "@/lib/favoriteDrivers";
 import { useBlockedEmails, filterByBlocks } from "@/lib/blockUtils";
 import { useAuth } from "@/lib/AuthContext";
 export default function SearchTrips() {
-  useSEO({ title: "البحث عن رحلة", description: "ابحث عن رحلات بين المدن الفلسطينية واحجز مقعدك بسهولة" });
+  useSEO({
+    title: "ابحث عن رحلة — مشوارو | رحلات بين مدن فلسطين",
+    description: "ابحث عن رحلات مشتركة بين مدن الضفة الغربية: رام الله، نابلس، الخليل، بيت لحم، جنين، طولكرم، قلقيلية وأريحا. احجز مقعدك الآن بأرخص سعر مع سائق موثّق.",
+  });
 
   const [searchParams] = useSearchParams();
   const [from, setFrom] = useState(searchParams.get("from") || "");

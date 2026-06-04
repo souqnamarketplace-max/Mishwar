@@ -10,7 +10,10 @@ import CTASection from "../components/home/CTASection";
 import AnnouncementBanner from "../components/home/AnnouncementBanner";
 
 export default function Home() {
-  useSEO({ title: "الرئيسية", description: "منصة فلسطينية لمشاركة رحلات السيارة بين المدن. وفر المال وسافر بأمان مع مشوارو." });
+  useSEO({
+    title: "مشوارو — مشاركة الرحلات بين المدن الفلسطينية",
+    description: "أول منصة فلسطينية لمشاركة رحلات السيارة بين المدن. سافر من رام الله، نابلس، الخليل، بيت لحم، جنين، طولكرم وأكثر من 320 مدينة — بنص السعر مع سائقين موثّقين. سجّل مجاناً.",
+  });
 
   return (
     <div>

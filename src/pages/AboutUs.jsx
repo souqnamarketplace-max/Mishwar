@@ -19,7 +19,10 @@ const values = [
 // section hides entirely.
 
 export default function AboutUs() {
-  useSEO({ title: "من نحن", description: "تعرف على مشوارو — منصة فلسطينية لمشاركة الرحلات" });
+  useSEO({
+    title: "من نحن — مشوارو | أول تطبيق كاربول فلسطيني",
+    description: "مشوارو هي أول منصة فلسطينية لمشاركة رحلات السيارة بين مدن الضفة الغربية. نربط الركاب بالسائقين الموثّقين لتوفير المال وتقليل الازدحام. صُنع في فلسطين، لأهل فلسطين.",
+  });
 
   const { data: team = [] } = useQuery({
     queryKey: ["team-members-published"],

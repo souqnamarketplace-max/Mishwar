@@ -71,7 +71,10 @@ const STEPS = [
 const TODAY_ISO = () => new Date().toISOString().split("T")[0];
 
 export default function BecomeDriver() {
-  useSEO({ title: "كن سائقاً في مشوارو", description: "تفعيل حساب السائق في 5 خطوات سهلة" });
+  useSEO({
+    title: "كن سائقاً في مشوارو — اكسب من رحلاتك اليومية في فلسطين",
+    description: "انضم كسائق في مشوارو وابدأ تغطية تكاليف رحلاتك بين مدن الضفة الغربية. اشتراك شهري 30 شيكل، رحلات غير محدودة، ركاب موثّقون. سجّل الآن.",
+  });
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user, refreshUser } = useAuth();
