@@ -20,6 +20,7 @@ export default function DashboardUsers() {
   const PAGE_SIZE = 25;
   const { confirm, dialog: confirmDialog } = useConfirm();
   const [search, setSearch] = useState("");
+  const [showUnconfirmedPanel, setShowUnconfirmedPanel] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [filter, setFilter] = useState("all"); // all, driver, passenger, admin
   const [selectedUser, setSelectedUser] = useState(null);
@@ -291,16 +292,82 @@ export default function DashboardUsers() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <div key={stat.label} className="bg-card rounded-xl border border-border p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs text-muted-foreground">{stat.label}</p>
-              <stat.icon className={`w-4 h-4 ${stat.color}`} />
+        {stats.map((stat) => {
+          const isUnconfirmed = stat.label === "بريد غير مؤكد";
+          return (
+            <div
+              key={stat.label}
+              onClick={isUnconfirmed && stat.value > 0 ? () => setShowUnconfirmedPanel(p => !p) : undefined}
+              className={`bg-card rounded-xl border p-4 transition-all
+                ${isUnconfirmed && stat.value > 0
+                  ? "border-amber-300 dark:border-amber-700 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/20 hover:shadow-sm"
+                  : "border-border"}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+                <div className="flex items-center gap-1">
+                  {isUnconfirmed && stat.value > 0 && (
+                    <span className="text-[10px] text-amber-600 font-medium">
+                      {showUnconfirmedPanel ? "إخفاء ▲" : "عرض ▼"}
+                    </span>
+                  )}
+                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{stat.value}</p>
             </div>
-            <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* Unconfirmed users panel — shown when admin clicks the stat card */}
+      {showUnconfirmedPanel && unconfirmedSummary.count > 0 && (
+        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">⚠️</span>
+              <div>
+                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  {unconfirmedSummary.count} مستخدم لم يؤكد بريده الإلكتروني
+                </p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-400">
+                  انقر على أي مستخدم لتأكيد بريده يدوياً
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowUnconfirmedPanel(false)}
+              className="text-amber-600 hover:text-amber-900 text-lg leading-none"
+            >✕</button>
+          </div>
+          <div className="space-y-2">
+            {(unconfirmedSummary.users || []).map(u => (
+              <div
+                key={u.email}
+                onClick={() => {
+                  const found = users.find(usr => usr.email?.toLowerCase() === u.email?.toLowerCase());
+                  if (found) setSelectedUser(found);
+                }}
+                className="flex items-center justify-between bg-white dark:bg-card border border-amber-100 dark:border-amber-900 rounded-lg px-3 py-2 cursor-pointer hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-base">🔒</span>
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{u.full_name || "—"}</p>
+                    <p className="text-[11px] text-muted-foreground">{u.email}</p>
+                  </div>
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] text-muted-foreground">M-{u.account_number}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString("ar-EG") : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search & Filter */}
       <div className="bg-card rounded-xl border border-border">
