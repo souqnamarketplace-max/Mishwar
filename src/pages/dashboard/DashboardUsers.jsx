@@ -257,11 +257,13 @@ export default function DashboardUsers() {
     return matchSearch && matchFilter;
   });
 
+  const unconfirmedCount = users.filter(u => !isUserConfirmed(u)).length;
+
   const stats = [
     { label: "إجمالي المستخدمين", value: totalUsers, icon: Users, color: "text-primary" },
     { label: "سائقون", value: users.filter(u => u.account_type === "driver" || u.account_type === "both").length, icon: Car, color: "text-accent" },
     { label: "ركاب", value: users.filter(u => u.account_type === "passenger" || u.account_type === "both").length, icon: UserCheck, color: "text-green-600" },
-    { label: "مشرفون", value: users.filter(u => u.role === "admin").length, icon: Shield, color: "text-yellow-600" },
+    { label: "بريد غير مؤكد", value: unconfirmedCount, icon: Shield, color: unconfirmedCount > 0 ? "text-amber-600" : "text-muted-foreground" },
   ];
 
   return (
@@ -622,10 +624,23 @@ export default function DashboardUsers() {
                 </div>
               </div>
 
-              {/* Email confirmation status — only shown if NOT confirmed.
-                  Admin sees this when a user reports they can't log in;
-                  one click marks them confirmed via the migration 016 RPC. */}
-              {!isUserConfirmed(selectedUser) && (
+              {/* Email confirmation status — always shown so admin can
+                  see at a glance whether the user confirmed their email. */}
+              {isUserConfirmed(selectedUser) ? (
+                <div className="col-span-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 rounded-xl p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">✅</span>
+                    <div>
+                      <p className="text-xs font-bold text-green-900 dark:text-green-200">
+                        البريد الإلكتروني مؤكد
+                      </p>
+                      <p className="text-[11px] text-green-800 dark:text-green-300">
+                        المستخدم أكّد بريده وبإمكانه تسجيل الدخول بشكل طبيعي
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
                 <div className="col-span-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3">
                   <div className="flex items-start gap-2">
                     <span className="text-lg">⚠️</span>
