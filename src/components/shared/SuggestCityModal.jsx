@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { notifyAdmin } from "@/lib/notifyAdmin";
 import { logAudit } from "@/lib/adminAudit";
 import { toast } from "sonner";
+import { friendlyError } from "@/lib/errors";
 
 /**
  * SuggestCityModal — shown when a user types a city that isn't in the
@@ -59,12 +60,11 @@ export default function SuggestCityModal({ initialName, onClose }) {
       if (result.error) throw result.error;
       data = result.data;
     } catch (err) {
-      const msg = err?.message || "فشل إرسال الطلب";
       // Most likely cause: user is not authenticated. Be specific.
-      if (/permission|policy|denied|jwt/i.test(msg)) {
+      if (/permission|policy|denied|jwt/i.test(err?.message || "")) {
         toast.error("يرجى تسجيل الدخول لاقتراح إضافة مدينة جديدة");
       } else {
-        toast.error(msg);
+        toast.error(friendlyError(err, "فشل إرسال الطلب"));
       }
       setSubmitting(false);
       return;

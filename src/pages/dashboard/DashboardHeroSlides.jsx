@@ -204,7 +204,7 @@ export default function DashboardHeroSlides() {
       qc.invalidateQueries({ queryKey: ["hero-city-slides-public"] });
       toast.success("✅ تم الحفظ");
     },
-    onError: (e) => toast.error("فشل الحفظ: " + e.message),
+    onError: (e) => toast.error("فشل الحفظ — حاول مجدداً"),
   });
 
   const updateSlide = (idx, field, value) => {
