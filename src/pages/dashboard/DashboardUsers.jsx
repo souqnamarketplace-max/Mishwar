@@ -154,6 +154,21 @@ export default function DashboardUsers() {
     staleTime: 30_000,
   });
 
+  // Global count of ALL unconfirmed users across the entire database —
+  // not just the current page. Used for the stats card so the admin
+  // always sees the real total. Refreshes every 60 seconds and on
+  // any confirmEmailMutation success via invalidateQueries below.
+  const { data: unconfirmedSummary = { count: 0, users: [] } } = useQuery({
+    queryKey: ["unconfirmed-users-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("admin_unconfirmed_users_summary");
+      if (error) return { count: 0, users: [] };
+      return data || { count: 0, users: [] };
+    },
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+
   // Helper — returns true if user is confirmed, true if status unknown
   // (RPC missing). The "show warning" branch only triggers on explicit
   // false, so admins never see false-positive warnings.
@@ -175,6 +190,8 @@ export default function DashboardUsers() {
     }),
     onSuccess: (_, data) => {
       qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
       toast.success("تم تحديث بيانات المستخدم");
       // Fix: data IS editForm, not wrapped in .data
       logAdminAction("admin_update_user", "user", data.id, {
@@ -197,6 +214,8 @@ export default function DashboardUsers() {
     }),
     onSuccess: (_, user) => {
       qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
       logAdminAction(user.is_active ? "admin_deactivate_user" : "admin_activate_user", "user", user.id, { email: user.email });
       toast.success("تم تحديث حالة المستخدم");
     },
@@ -220,6 +239,8 @@ export default function DashboardUsers() {
     },
     onSuccess: (data, user) => {
       qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
       if (data?.already_confirmed) {
         toast.info("بريد المستخدم مؤكد بالفعل");
       } else if (data?.success) {
@@ -257,7 +278,7 @@ export default function DashboardUsers() {
     return matchSearch && matchFilter;
   });
 
-  const unconfirmedCount = users.filter(u => !isUserConfirmed(u)).length;
+  const unconfirmedCount = unconfirmedSummary.count;
 
   const stats = [
     { label: "إجمالي المستخدمين", value: totalUsers, icon: Users, color: "text-primary" },
@@ -341,6 +362,8 @@ export default function DashboardUsers() {
                     if (error) { toast.error("فشل التعطيل"); return; }
                     toast.success(`تم تعطيل ${emails.length} مستخدم ✅`);
                     qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
                     setSelectedIds(new Set());
                     emails.forEach(e => logAdminAction("admin_bulk_deactivate", "user", null, { email: e }));
                   }}>
@@ -774,6 +797,8 @@ export default function DashboardUsers() {
                     const { error } = await supabase.from("profiles").update({ onboarding_completed: false }).eq("id", selectedUser.id);
                     if (error) { toast.error("فشل إعادة التهيئة"); return; }
                     qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
                     toast.success("تم إعادة تعيين خطوات الإعداد ✅");
                     logAdminAction("admin_reset_onboarding", "user", selectedUser.id, { email: selectedUser.email });
                   }}
@@ -798,6 +823,8 @@ export default function DashboardUsers() {
                           .in("status", ["pending", "confirmed"]);
                         if (error) { toast.error("فشل الإلغاء"); return; }
                         qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
                         toast.success("تم إلغاء جميع حجوزاته النشطة");
                         logAdminAction("admin_cancel_user_bookings", "booking", selectedUser.id, { email: selectedUser.email, reason: cancelReason });
                         setCancelReason("");
