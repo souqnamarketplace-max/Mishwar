@@ -170,13 +170,28 @@ export default function DashboardUsers() {
     refetchInterval: 60_000,
   });
 
-  // Helper — returns true if user is confirmed, true if status unknown
-  // (RPC missing). The "show warning" branch only triggers on explicit
-  // false, so admins never see false-positive warnings.
+  // Helper — returns true if user is confirmed.
+  // Two sources of truth, checked in order:
+  //  1. Per-page confirmedByEmail map (from emails_confirmation_status RPC)
+  //     — most accurate, but only loaded for the current page's emails.
+  //  2. Global unconfirmedSummary.users list (from admin_unconfirmed_users_summary)
+  //     — covers ALL users; if the user appears here they are definitely unconfirmed.
+  // This prevents the bug where a user in the unconfirmed panel opens with a
+  // green "confirmed" badge because the per-page map hadn't loaded yet.
   const isUserConfirmed = (user) => {
     if (!user?.email) return true;
-    const v = confirmedByEmail[user.email.toLowerCase()];
-    return v === undefined ? true : v;
+    const email = user.email.toLowerCase();
+
+    // 1. Per-page map — definitive when present
+    const v = confirmedByEmail[email];
+    if (v !== undefined) return v;
+
+    // 2. Global unconfirmed list — if listed here, definitely not confirmed
+    const unconfirmedEmails = (unconfirmedSummary.users || []).map(u => (u.email || "").toLowerCase());
+    if (unconfirmedEmails.includes(email)) return false;
+
+    // Unknown — assume confirmed to avoid false-positive warnings
+    return true;
   };
 
   const updateUserMutation = useMutation({
