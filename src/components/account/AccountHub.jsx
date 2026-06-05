@@ -226,7 +226,7 @@ export default function AccountHub() {
         className="text-xs text-muted-foreground text-center mt-6 select-none cursor-pointer"
         onClick={handleVersionTap}
       >
-        نسخة مشوارو {import.meta.env?.VITE_APP_VERSION || "1.0.5"}
+        نسخة مشوارو {import.meta.env?.VITE_APP_VERSION || "1.0.6"}
       </p>
 
       <DebugOverlay open={debugOpen} onClose={() => setDebugOpen(false)} />

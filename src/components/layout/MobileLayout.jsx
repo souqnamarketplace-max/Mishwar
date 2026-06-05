@@ -117,7 +117,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
       return next;
     });
   };
-  const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.0.5";
+  const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.0.6";
   
   // Detect if viewport is mobile. Reactive to resize/orientation so
   // foldables, tablets, and desktop browsers crossing the 1024px
