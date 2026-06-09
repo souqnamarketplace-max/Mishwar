@@ -1,6 +1,7 @@
 import React from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { supabase } from "@/lib/supabase";
 import SEO from "@/lib/seo/SEO";
 import SeoLandingLayout from "./SeoLandingLayout";
@@ -52,10 +53,18 @@ export default function DynamicSeoPage({ pageType }) {
 
   if (isError || !page) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center" dir="rtl">
-        <h1 className="text-2xl font-bold text-foreground mb-3">الصفحة غير موجودة</h1>
-        <p className="text-muted-foreground">يبدو أن هذه الصفحة لم تعد متاحة. عد إلى الصفحة الرئيسية لاستكشاف الرحلات.</p>
-      </div>
+      <>
+        {/* noindex: no seo_pages row for this slug — prevents Google from
+            indexing thin "page not found" content on /cities/X or /routes/X
+            that don't have a published DB entry yet. */}
+        <Helmet>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
+        <div className="max-w-2xl mx-auto px-4 py-20 text-center" dir="rtl">
+          <h1 className="text-2xl font-bold text-foreground mb-3">الصفحة غير موجودة</h1>
+          <p className="text-muted-foreground">يبدو أن هذه الصفحة لم تعد متاحة. عد إلى الصفحة الرئيسية لاستكشاف الرحلات.</p>
+        </div>
+      </>
     );
   }
 
