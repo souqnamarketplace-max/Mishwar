@@ -33,17 +33,53 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Megaphone, Send, Users, Car, User, MapPin, Smartphone, Mail,
-  AlertTriangle, History, Loader2, X, CheckCircle2,
+  AlertTriangle, History, Loader2, X, CheckCircle2, Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import Pagination from "@/components/dashboard/Pagination";
 
+// ─── Quick reminder templates ──────────────────────────────────────────────
+const QUICK_REMINDERS = [
+  {
+    id: "incomplete_onboarding",
+    icon: "👋",
+    label: "تذكير إكمال التسجيل",
+    desc: "للمستخدمين الذين لم يختاروا دورهم بعد",
+    audience: "incomplete_onboarding",
+    title: "👋 أكمل إعداد حسابك!",
+    message: "حسابك في مشوارو جاهز، لكنك لم تختر دورك بعد. اضغط هنا لإكمال التسجيل والبدء باستخدام التطبيق 🚗",
+    link: "/onboarding",
+  },
+  {
+    id: "new_trips",
+    icon: "🚗",
+    label: "تنبيه رحلات جديدة",
+    desc: "للركاب — لتشجيعهم على البحث عن رحلة",
+    audience: "passengers",
+    title: "🚗 رحلات جديدة متاحة!",
+    message: "تصفّح الرحلات المتاحة الآن وابحث عن أفضل رحلة تناسبك. سائقون موثوقون في انتظارك!",
+    link: "/search",
+  },
+  {
+    id: "driver_signup",
+    icon: "🪪",
+    label: "دعوة سائقين جدد",
+    desc: "للمستخدمين غير الموثقين — لتشجيعهم على القيادة",
+    audience: "passengers",
+    title: "💰 انضم كسائق واربح أكثر!",
+    message: "هل تسافر يومياً؟ شارك رحلتك مع مشوارو واكسب دخلاً إضافياً. التسجيل مجاني وسريع!",
+    link: "/onboarding",
+  },
+];
+
+
 // ─── Audience options (matches admin_send_broadcast RPC) ─────────────────
 const AUDIENCE_OPTIONS = [
-  { value: "all",        label: "جميع المستخدمين",       icon: Users,  desc: "كل من فعّل العروض والتسويق" },
-  { value: "drivers",    label: "السائقون فقط",         icon: Car,    desc: "أصحاب الحسابات السائقة والمزدوجة" },
-  { value: "passengers", label: "الركاب فقط",            icon: User,   desc: "أصحاب حسابات الركاب والمزدوجة" },
-  { value: "by_city",    label: "حسب المدينة",          icon: MapPin, desc: "ضع اسم المدينة كما يُعرض في الملف" },
+  { value: "all",                   label: "جميع المستخدمين",         icon: Users,  desc: "كل من فعّل العروض والتسويق" },
+  { value: "drivers",               label: "السائقون فقط",           icon: Car,    desc: "أصحاب الحسابات السائقة والمزدوجة" },
+  { value: "passengers",            label: "الركاب فقط",             icon: User,   desc: "أصحاب حسابات الركاب والمزدوجة" },
+  { value: "by_city",               label: "حسب المدينة",            icon: MapPin, desc: "ضع اسم المدينة كما يُعرض في الملف" },
+  { value: "incomplete_onboarding", label: "لم يكملوا التسجيل",      icon: Users,  desc: "مستخدمون سجّلوا لكن لم يختاروا دورهم بعد" },
 ];
 
 const AUDIENCE_LABELS = Object.fromEntries(AUDIENCE_OPTIONS.map(o => [o.value, o.label]));
@@ -61,10 +97,25 @@ export default function DashboardBroadcasts() {
   const [link,           setLink]           = useState("/");
   const [confirmOpen,    setConfirmOpen]    = useState(false);
   const [lastSentResult, setLastSentResult] = useState(null);
+  const [quickConfirm,   setQuickConfirm]   = useState(null); // holds quick reminder being confirmed
 
   // ─── History pagination ─────────────────────────────────────────
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
+
+  // ─── Count of incomplete onboarding users ──────────────────────
+  const { data: incompleteCount = 0 } = useQuery({
+    queryKey: ["incomplete-onboarding-count"],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .is("account_type", null)
+        .not("email", "like", "%deleted%");
+      return count || 0;
+    },
+    staleTime: 30_000,
+  });
 
   const { data: history = { rows: [], total: 0, totalPages: 1 }, isLoading: historyLoading } = useQuery({
     queryKey: ["admin-broadcasts", page],
@@ -104,16 +155,39 @@ export default function DashboardBroadcasts() {
       setLastSentResult(data);
       setConfirmOpen(false);
       toast.success(`تم إرسال البث إلى ${data?.recipient_count ?? 0} مستخدم`);
-      // Reset form
-      setTitle("");
-      setMessage("");
-      setAudienceCity("");
-      // Don't reset audience/channels — admin often sends to same audience
+      setTitle(""); setMessage(""); setAudienceCity("");
       qc.invalidateQueries({ queryKey: ["admin-broadcasts"] });
+      qc.invalidateQueries({ queryKey: ["incomplete-onboarding-count"] });
     },
     onError: (err) => {
       setConfirmOpen(false);
       toast.error(err?.message || "فشل إرسال البث");
+    },
+  });
+
+  // ─── Quick reminder send mutation ──────────────────────────────
+  const quickSendMutation = useMutation({
+    mutationFn: async (reminder) => {
+      const { data, error } = await supabase.rpc("admin_send_broadcast", {
+        p_title:         reminder.title,
+        p_message:       reminder.message,
+        p_audience:      reminder.audience,
+        p_channel_push:  true,
+        p_channel_email: false,
+        p_link:          reminder.link,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      setQuickConfirm(null);
+      toast.success(`✅ تم الإرسال إلى ${data?.recipient_count ?? 0} مستخدم`);
+      qc.invalidateQueries({ queryKey: ["admin-broadcasts"] });
+      qc.invalidateQueries({ queryKey: ["incomplete-onboarding-count"] });
+    },
+    onError: (err) => {
+      setQuickConfirm(null);
+      toast.error(err?.message || "فشل الإرسال");
     },
   });
 
@@ -143,6 +217,43 @@ export default function DashboardBroadcasts() {
         <div>
           <h2 className="text-xl font-bold text-foreground">البث والتسويق</h2>
           <p className="text-sm text-muted-foreground">إرسال إشعارات ترويجية لشرائح من المستخدمين</p>
+        </div>
+      </div>
+
+      {/* ─── Quick Reminders ────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Zap className="w-4 h-4 text-amber-500" />
+          <h3 className="font-bold text-sm">تذكيرات سريعة</h3>
+          <span className="text-xs text-muted-foreground mr-auto">إرسال بنقرة واحدة</span>
+        </div>
+        <div className="space-y-3">
+          {QUICK_REMINDERS.map((reminder) => (
+            <div key={reminder.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-xl gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-2xl shrink-0">{reminder.icon}</span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{reminder.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{reminder.desc}</p>
+                  {reminder.id === "incomplete_onboarding" && (
+                    <p className="text-xs font-bold text-amber-600 mt-0.5">
+                      {incompleteCount} مستخدم مؤهّل
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0 gap-1"
+                disabled={quickSendMutation.isPending}
+                onClick={() => setQuickConfirm(reminder)}
+              >
+                <Send className="w-3 h-3" />
+                إرسال
+              </Button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -417,6 +528,60 @@ export default function DashboardBroadcasts() {
               >
                 {sendMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 تأكيد الإرسال
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── Quick reminder confirm modal ─────────────────── */}
+      {quickConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4"
+          onClick={() => !quickSendMutation.isPending && setQuickConfirm(null)}
+        >
+          <div
+            className="bg-card rounded-2xl max-w-sm w-full p-6"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-2xl">{quickConfirm.icon}</span>
+              <h3 className="font-bold">{quickConfirm.label}</h3>
+            </div>
+            <div className="space-y-3 mb-5 text-sm bg-muted/30 rounded-xl p-3">
+              <p className="font-bold">{quickConfirm.title}</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">{quickConfirm.message}</p>
+              <div className="flex gap-2 flex-wrap pt-1">
+                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                  {AUDIENCE_OPTIONS.find(a => a.value === quickConfirm.audience)?.label}
+                </span>
+                {quickConfirm.audience === "incomplete_onboarding" && (
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                    {incompleteCount} مستخدم
+                  </span>
+                )}
+                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Push</span>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={quickSendMutation.isPending}
+                onClick={() => setQuickConfirm(null)}
+              >
+                إلغاء
+              </Button>
+              <Button
+                className="flex-1 gap-2"
+                disabled={quickSendMutation.isPending}
+                onClick={() => quickSendMutation.mutate(quickConfirm)}
+              >
+                {quickSendMutation.isPending
+                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                  : <Send className="w-4 h-4" />
+                }
+                {quickSendMutation.isPending ? "جارٍ الإرسال..." : "تأكيد الإرسال"}
               </Button>
             </div>
           </div>
