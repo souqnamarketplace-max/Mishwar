@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
     const ANON_KEY     = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (!SUPABASE_URL || !ANON_KEY) return;
-    fetch(`${SUPABASE_URL}/rest/v1/app_settings?select=maintenance_mode,allow_registration,subscription_required&limit=1`, {
+    fetch(`${SUPABASE_URL}/rest/v1/app_settings?select=maintenance_mode,allow_registration,subscription_required,require_driver_documents&limit=1`, {
       headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
     })
       .then(r => r.ok ? r.json() : null)

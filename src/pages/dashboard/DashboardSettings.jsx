@@ -45,6 +45,10 @@ const defaultSettings = {
   public_stats_min_users: 100,
   allow_registration: true,
   maintenance_mode: false,
+  // Driver verification toggle — TRUE by default (documents required).
+  // Set FALSE to let drivers onboard instantly without uploading documents.
+  // Flip back to TRUE when you're ready to enforce verification again.
+  require_driver_documents: true,
 };
 
 export default function DashboardSettings() {
@@ -453,6 +457,55 @@ export default function DashboardSettings() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Driver Verification Toggle */}
+      <div className="bg-card rounded-xl border border-border p-5">
+        <h3 className="font-bold text-sm mb-1 flex items-center gap-2">
+          <Settings className="w-4 h-4 text-primary" />
+          التحقق من السائقين
+        </h3>
+        <p className="text-xs text-muted-foreground mb-4">
+          تحكم في ما إذا كان على السائقين رفع وثائقهم (رخصة القيادة، وثائق السيارة) عند التسجيل.
+        </p>
+        <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+          <div className="flex-1 ml-3">
+            <p className="text-sm font-medium">طلب وثائق التحقق من السائقين</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {form.require_driver_documents
+                ? "✅ مفعّل — السائقون يجب أن يرفعوا وثائقهم وينتظروا الموافقة."
+                : "⚡ معطّل — السائقون يُوثَّقون تلقائياً دون رفع وثائق."}
+            </p>
+          </div>
+          <button
+            onClick={async () => {
+              // Turning OFF: warn admin clearly
+              if (form.require_driver_documents) {
+                const ok = await confirm({
+                  title: "تعطيل التحقق من السائقين",
+                  message:
+                    "عند التعطيل، السائقون الجدد سيتم توثيقهم تلقائياً دون رفع أي وثائق. السائقون الحاليون غير متأثرين. هل تريد المتابعة؟",
+                  confirmLabel: "تعطيل",
+                  destructive: true,
+                });
+                if (!ok) return;
+              }
+              update("require_driver_documents", !form.require_driver_documents);
+            }}
+            className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${form.require_driver_documents ? "bg-primary" : "bg-amber-500"}`}
+            aria-label="طلب وثائق التحقق"
+          >
+            <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${form.require_driver_documents ? "right-0.5" : "left-0.5"}`} />
+          </button>
+        </div>
+        {!form.require_driver_documents && (
+          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-xs text-amber-800 font-medium">
+              ⚠️ التحقق معطّل حالياً — السائقون الجدد يُوثَّقون تلقائياً فور إكمال التسجيل.
+              تذكر إعادة التفعيل عندما تكون مستعداً لمراجعة الوثائق.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Toggles */}
