@@ -102,9 +102,11 @@ export default function PassengerRequests() {
   // a stale-across-sessions footgun otherwise.
   const { data: requests = [], isLoading } = useQuery({
     queryKey: ["passenger-requests-feed", user?.email],
-    queryFn: () => api.entities.TripRequest.filter(
-      { status: "open" }, "-created_at", 200
-    ),
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("open_trip_requests_with_verification", { p_limit: 200 });
+      if (error) throw error;
+      return data || [];
+    },
     enabled: !!user?.email && subActive === true,
     staleTime: 30_000,
   });

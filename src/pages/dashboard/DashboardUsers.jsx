@@ -3,7 +3,7 @@ import { logAdminAction } from "@/lib/adminAudit";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Users, Search, Shield, UserCheck, Mail, Trash2, Edit2, Car, Lock, Unlock, Copy, Eye, EyeOff } from "lucide-react";
+import { Users, Search, Shield, UserCheck, Mail, Trash2, Edit2, Car, Lock, Unlock, Copy, Eye, EyeOff, BadgeCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -368,7 +368,13 @@ export default function DashboardUsers() {
                 <div className="flex items-center gap-2">
                   <span className="text-base">🔒</span>
                   <div>
-                    <p className="text-xs font-medium text-foreground">{u.full_name || "—"}</p>
+                    <p className="text-xs font-medium text-foreground flex items-center gap-1">
+                      {u.full_name || "—"}
+                      {u.is_verified
+                        ? <BadgeCheck className="w-3 h-3 text-primary shrink-0" title="موثّق" />
+                        : <span className="text-[9px] text-muted-foreground/50">(غير موثّق)</span>
+                      }
+                    </p>
                     <p className="text-[11px] text-muted-foreground">{u.email}</p>
                   </div>
                 </div>
@@ -502,6 +508,9 @@ export default function DashboardUsers() {
                         <div className="min-w-0">
                           <p className="font-medium truncate flex items-center gap-1">
                             {user.full_name || "—"}
+                            {user.is_verified && (
+                              <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" title="موثّق" />
+                            )}
                             {/* Small ⚠️ next to unconfirmed users so the
                                 admin can spot them at a glance. Title
                                 attribute provides hover context. */}

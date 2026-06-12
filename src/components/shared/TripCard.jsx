@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart, UserPlus, UserCheck, Eye } from "lucide-react";
+import { Star, Clock, Users, AlertCircle, Share2, Zap, Timer, Heart, UserPlus, UserCheck, Eye, BadgeCheck } from "lucide-react";
 import { isLastChance, isBookingClosed, minutesUntilTrip } from "@/lib/tripScheduling";
 import { formatArabicTime } from "@/lib/validation";
 import { api } from "@/api/apiClient";
@@ -211,6 +211,11 @@ function Card({ t, noSeats, urgentSeats }) {
               <p className="text-sm font-semibold text-foreground leading-tight truncate">
                 {t.driver_name || "سائق"}
               </p>
+              {/* Verification badge — data comes from profiles!driver_id join in SearchTrips */}
+              {t.profiles?.is_verified
+                ? <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" title="سائق موثّق" />
+                : <span className="text-[10px] text-muted-foreground/60 shrink-0">غير موثّق</span>
+              }
               {/* Driver-favorite chip — small icon next to the name so
                   it's visually anchored to "this driver" rather than
                   "this trip" (which is the role the trip-heart on the

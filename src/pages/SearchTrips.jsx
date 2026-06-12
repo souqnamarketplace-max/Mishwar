@@ -106,6 +106,7 @@ export default function SearchTrips() {
           "distance",
           "payment_methods",
           "view_count",
+          "profiles!driver_id(is_verified)",
         ].join(","))
         .in("status", ["confirmed", "in_progress"])
         .gte("date", today)

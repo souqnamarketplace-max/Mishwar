@@ -119,26 +119,6 @@ export default function Onboarding() {
     queryFn: () => api.auth.me(),
   });
 
-  // Read require_driver_documents toggle from app_settings
-  // Default TRUE so if DB row missing nothing breaks.
-  // staleTime: 0 — always fetch fresh so admin toggling the setting
-  // takes effect immediately without a page reload.
-  const { data: appSettings } = useQuery({
-    queryKey: ["app_settings_onboarding"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("app_settings")
-        .select("require_driver_documents")
-        .limit(1)
-        .single();
-      if (error) return { require_driver_documents: true }; // safe default
-      return data;
-    },
-    staleTime: 0,
-  });
-
-  const requireDocs = appSettings?.require_driver_documents ?? true;
-
   const save = useMutation({
     mutationFn: async () => {
       // Validate driver-specific fields BEFORE any DB writes. The
@@ -180,10 +160,16 @@ export default function Onboarding() {
         onboarding_completed: true,
       });
 
-      // Create driver license record
       if (accountType === "driver" || accountType === "both") {
-        if (requireDocs) {
-          // Full verification flow — driver uploads docs, admin reviews
+        // Documents are always optional — drivers who upload go through
+        // admin verification and get the موثّق badge. Drivers who skip
+        // join unverified and can upload later from /settings.
+        const hasAnyDoc = form.license_number || form.license_image_url || form.selfie_url;
+        if (hasAnyDoc) {
+          // Partial or full submission — require the minimum (license number + image)
+          if (!form.license_number || !form.license_expiry || !form.license_image_url) {
+            throw new Error("إذا أردت التحقق، يرجى ملء رقم الرخصة وتاريخ الانتهاء وصورتها على الأقل");
+          }
           await api.entities.DriverLicense.create({
             user_id:                      user?.id,
             driver_email:                 user?.email,
@@ -200,29 +186,14 @@ export default function Onboarding() {
             status: "pending",
             submitted_at: new Date().toISOString(),
           });
-
-          // Notify admin to review
           await notifyAdmin({
             title: "🪪 طلب تحقق من رخصة قيادة",
             message: `${user?.full_name || user?.email} قدّم طلب للتحقق من رخصة القيادة`,
             link: "/dashboard?tab=licenses",
           });
-        } else {
-          // Verification bypass — auto-approve instantly, no docs needed
-          await api.entities.DriverLicense.create({
-            user_id:      user?.id,
-            driver_email: user?.email,
-            driver_name:  user?.full_name,
-            license_number:  "—",           // placeholder — no docs collected
-            expiry_date:     "2099-12-31",  // far future — not blocking
-            license_image_url: "",
-            status: "approved",             // auto-approved
-            submitted_at: new Date().toISOString(),
-            reviewed_at:  new Date().toISOString(),
-          });
-
-          // No admin notification needed — auto-approved
         }
+        // If nothing uploaded — driver joins as unverified, no license record created.
+        // They can upload later from /settings.
       }
     },
     onSuccess: async () => {
@@ -255,13 +226,13 @@ export default function Onboarding() {
 
       const isDriver = accountType === "driver" || accountType === "both";
       if (isDriver) {
-        if (requireDocs) {
-          toast.success("مرحباً بك في مشوارو! 🎉 أكمل رفع وثائقك من الإعدادات لتصبح سائقاً موثقاً");
-          navigate("/settings", { replace: true });
+        const didSubmitDocs = form.license_number && form.license_image_url;
+        if (didSubmitDocs) {
+          toast.success("مرحباً بك في مشوارو! 🎉 وثائقك قيد المراجعة — ستصلك إشعار عند الاعتماد");
         } else {
-          toast.success("مرحباً بك في مشوارو! 🎉 تم توثيق حسابك كسائق بنجاح");
-          navigate(safeReturn || "/", { replace: true });
+          toast.success("مرحباً بك في مشوارو! 🎉 يمكنك رفع وثائق التحقق لاحقاً من الإعدادات");
         }
+        navigate(safeReturn || "/", { replace: true });
       } else {
         toast.success("مرحباً بك في مشوارو! 🎉");
         navigate(safeReturn || "/", { replace: true });
@@ -315,11 +286,10 @@ export default function Onboarding() {
   };
 
   const isDriver = accountType === "driver" || accountType === "both";
-  // When docs not required, driver skips the license upload step entirely
-  const STEPS_DRIVER_NO_DOCS = ["اختيار الدور", "معلوماتك", "بيانات السيارة"];
-  const steps = isDriver
-    ? (requireDocs ? STEPS_DRIVER : STEPS_DRIVER_NO_DOCS)
-    : STEPS_PASSENGER;
+  // Documents step is always shown for drivers but always optional.
+  // Drivers who upload get verified (admin reviews); those who skip join unverified.
+  const STEPS_DRIVER_FULL = ["اختيار الدور", "معلوماتك", "بيانات السيارة", "وثائق التحقق (اختياري)"];
+  const steps = isDriver ? STEPS_DRIVER_FULL : STEPS_PASSENGER;
   const totalSteps = steps.length;
 
   const canNext = () => true;
@@ -347,15 +317,18 @@ export default function Onboarding() {
       if (!form.car_color) { toast.error("يرجى إدخال لون السيارة ⚠️"); return false; }
       if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
     }
-    if (step === 3 && isDriver && requireDocs) {
-      if (!form.license_number) { toast.error("يرجى إدخال رقم الرخصة ⚠️"); return false; }
-      // Validate license is alphanumeric (letters + numbers, no special chars except dash/space)
-      if (!/^[a-zA-Z0-9\s\-]+$/.test(form.license_number)) {
-        toast.error("رقم الرخصة يجب أن يحتوي على أحرف وأرقام فقط ⚠️");
-        return false;
+    if (step === 3 && isDriver) {
+      // Docs step is optional — only validate if user started filling it
+      const hasAnyDoc = form.license_number || form.license_image_url || form.selfie_url;
+      if (hasAnyDoc) {
+        if (!form.license_number) { toast.error("يرجى إدخال رقم الرخصة ⚠️"); return false; }
+        if (!/^[a-zA-Z0-9\s\-]+$/.test(form.license_number)) {
+          toast.error("رقم الرخصة يجب أن يحتوي على أحرف وأرقام فقط ⚠️");
+          return false;
+        }
+        if (!form.license_expiry) { toast.error("يرجى تحديد تاريخ انتهاء الرخصة ⚠️"); return false; }
+        if (!form.license_image_url) { toast.error("يرجى رفع صورة الرخصة ⚠️"); return false; }
       }
-      if (!form.license_expiry) { toast.error("يرجى تحديد تاريخ انتهاء الرخصة ⚠️"); return false; }
-      if (!form.license_image_url) { toast.error("يرجى رفع صورة الرخصة ⚠️"); return false; }
     }
     return true;
   };
@@ -673,8 +646,8 @@ export default function Onboarding() {
             <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <div className="bg-card rounded-2xl border border-border p-6 space-y-6">
                 <div>
-                  <h2 className="text-lg font-bold text-foreground mb-1">وثائق السائق</h2>
-                  <p className="text-sm text-muted-foreground">ارفع الوثائق المطلوبة للتحقق من هويتك. الحقول المُعلَّمة بـ * إلزامية.</p>
+                  <h2 className="text-lg font-bold text-foreground mb-1">وثائق التحقق <span className="text-sm font-normal text-muted-foreground">(اختياري)</span></h2>
+                  <p className="text-sm text-muted-foreground">ارفع وثائقك للحصول على شارة <span className="text-primary font-medium">موثّق ✓</span> على ملفك. يمكنك تخطي هذه الخطوة والتوثيق لاحقاً من الإعدادات.</p>
                 </div>
 
                 {/* Helper: reusable upload field */}

@@ -386,10 +386,15 @@ export default function UserProfile() {
               <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
                 {displayName}
               </h1>
-              {isVerified && isDriverProfile && (
+              {isVerified && (
                 <Badge className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/15 rounded-full">
                   <BadgeCheck className="w-3 h-3 ml-1" />
-                  سائق موثّق
+                  {isDriverProfile ? "سائق موثّق" : "راكب موثّق"}
+                </Badge>
+              )}
+              {!isVerified && profile && role !== "admin" && (
+                <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30 rounded-full text-xs">
+                  غير موثّق
                 </Badge>
               )}
               {role === "admin" && (
