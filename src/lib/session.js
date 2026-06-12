@@ -27,7 +27,11 @@ export function readLocalSession() {
   try {
     const ref = getProjectRef();
     if (!ref) return null;
-    const raw = localStorage.getItem(`sb-${ref}-auth-token`);
+    const key = `sb-${ref}-auth-token`;
+    // Check sessionStorage first (set when user logs in with "Remember me OFF"),
+    // then localStorage (default "Remember me ON" path). Mirrors the read order
+    // in supabase.js rememberMeStorage.getItem so both paths are covered.
+    const raw = sessionStorage.getItem(key) ?? localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     // expires_at is a UNIX seconds timestamp
