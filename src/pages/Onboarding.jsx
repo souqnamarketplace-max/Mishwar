@@ -653,14 +653,14 @@ export default function Onboarding() {
                 {/* Helper: reusable upload field */}
                 {/* ── 1) Driver License ── */}
                 <div className="p-4 bg-muted/30 rounded-xl border border-border space-y-3">
-                  <p className="text-sm font-bold flex items-center gap-2">🪪 رخصة القيادة <span className="text-destructive text-xs">*</span></p>
+                  <p className="text-sm font-bold flex items-center gap-2">🪪 رخصة القيادة</p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">رقم الرخصة *</label>
+                      <label className="text-xs text-muted-foreground mb-1 block">رقم الرخصة</label>
                       <Input value={form.license_number} onChange={(e) => setForm({ ...form, license_number: e.target.value })} placeholder="123456789" className="rounded-xl h-10 text-sm" />
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground mb-1 block">تاريخ الانتهاء *</label>
+                      <label className="text-xs text-muted-foreground mb-1 block">تاريخ الانتهاء</label>
                       <DateInput 
                         value={form.license_expiry} 
                         onChange={(e) => setForm({ ...form, license_expiry: e.target.value })} 
@@ -670,7 +670,7 @@ export default function Onboarding() {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">صورة الرخصة *</label>
+                    <label className="text-xs text-muted-foreground mb-1 block">صورة الرخصة</label>
                     <Button
                       variant="outline"
                       className={`rounded-xl gap-2 w-full h-10 text-sm ${form.license_image_url ? "border-green-500 text-green-700 bg-green-50" : ""}`}
