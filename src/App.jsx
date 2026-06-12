@@ -200,6 +200,7 @@ const AuthenticatedApp = () => {
     "/onboarding", "/dashboard",
     "/", "/search", "/how-it-works", "/community", "/help", "/login",
     "/become-driver", "/about", "/about-us", "/safety", "/privacy", "/terms",
+    "/whats-new",
   ]);
   const needsOnboarding = (
     isAuthenticated &&

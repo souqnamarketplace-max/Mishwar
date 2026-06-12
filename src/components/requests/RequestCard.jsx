@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Calendar, Clock, Users, MapPin, Eye, MessageSquare } from "lucide-react";
+import { Calendar, Clock, Users, MapPin, Eye, MessageSquare, BadgeCheck } from "lucide-react";
 import RequestStatusBadge from "./RequestStatusBadge";
 
 /**
@@ -69,8 +69,12 @@ export default function RequestCard({ request, mode = "driver", onClick, action 
             {request.from_city} <span className="text-muted-foreground mx-1">←</span> {request.to_city}
           </p>
           {(mode !== "owner") && (
-            <p className="text-xs text-muted-foreground mt-1 truncate">
+            <p className="text-xs text-muted-foreground mt-1 truncate flex items-center gap-1">
               {request.passenger_name}
+              {request.is_verified
+                ? <BadgeCheck className="w-3 h-3 text-primary shrink-0" title="راكب موثّق" />
+                : <span className="text-[10px] text-muted-foreground/60">(غير موثّق)</span>
+              }
             </p>
           )}
         </div>
