@@ -141,16 +141,16 @@ export default function Onboarding() {
       }
 
       await api.auth.updateMe({
-        account_type: accountType,
+        // account_type and gender are set-once (guard_profile_protected_columns).
+        // On a retry the profile may already have them — re-sending the same
+        // (or a changed) value trips the guard with 42501 → 403. Only include
+        // them when the profile doesn't already have a value.
+        ...((!user?.account_type) ? { account_type: accountType } : {}),
         phone: form.phone,
         city: form.city,
         bio: form.bio,
         avatar_url: avatarUrl,
-        // Gender is collected from every user at step 1 now (not just
-        // drivers), so persist it regardless of account_type. The
-        // migration 040 set-once trigger allows this first NULL→value
-        // transition; any further change is admin-only.
-        gender: form.gender,
+        ...((!user?.gender) ? { gender: form.gender } : {}),
         ...(accountType !== "passenger" ? {
           car_model: form.car_model,
           car_year: form.car_year,

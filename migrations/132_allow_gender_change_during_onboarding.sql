@@ -1,0 +1,14 @@
+-- Migration 132: allow gender + account_type changes during onboarding
+-- (applied to production DB 2026-06-12 via Supabase MCP)
+--
+-- THE REAL ROOT CAUSE of the persistent onboarding 403:
+-- guard_profile_protected_columns() enforced gender + account_type as
+-- set-once unconditionally. A user who picked a gender on an incomplete
+-- onboarding attempt, abandoned, and retried with a different choice hit
+-- 42501 (set-once) → surfaced as 403 Forbidden on the profile PATCH.
+--
+-- Fix: the set-once rule for gender + account_type now only applies AFTER
+-- onboarding_completed = true. During onboarding the user can still freely
+-- change their initial choice. After completion it remains admin-only.
+--
+-- See full SQL in Supabase migration history.
