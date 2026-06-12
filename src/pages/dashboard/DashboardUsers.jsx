@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { logAdminAction } from "@/lib/adminAudit";
 import { api } from "@/api/apiClient";
 import { supabase } from "@/lib/supabase";
@@ -41,8 +41,12 @@ export default function DashboardUsers() {
   // Server-side pagination — only loads 25 users at a time
   const [page, setPage] = useState(1);
 
+  // Reset to page 1 whenever the search term or role filter changes —
+  // otherwise a match on page 1 would be invisible while viewing page 4.
+  useEffect(() => { setPage(1); }, [search, filter]);
+
   const { data: usersData = { rows: [], total: 0, totalPages: 1 }, isLoading } = useQuery({
-    queryKey: ["users", page],
+    queryKey: ["users", page, search, filter],
     queryFn: async () => {
       // Direct supabase to bypass api created_by auto-filter that hid
       // every user the admin didn't create themselves. Note: profiles
@@ -51,11 +55,32 @@ export default function DashboardUsers() {
       // session user, returning at most one row.
       const from = (page - 1) * PAGE_SIZE;
       const to   = from + PAGE_SIZE - 1;
-      const { data, error, count } = await supabase
+
+      let q = supabase
         .from("profiles")
         .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .range(from, to);
+        .order("created_at", { ascending: false });
+
+      // Server-side search across ALL users (name, email, account_number).
+      // Without this the search only matched the 25 rows on the current
+      // page — users on other pages returned "no results".
+      const term = search.trim();
+      if (term) {
+        const acctMatch = term.replace(/^m[-\s]?/i, ""); // 'M-1000' → '1000'
+        const ors = [
+          `full_name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+        ];
+        if (/^\d+$/.test(acctMatch)) ors.push(`account_number.eq.${acctMatch}`);
+        q = q.or(ors.join(","));
+      }
+
+      // Server-side role filter
+      if (filter === "admin") q = q.eq("role", "admin");
+      else if (filter === "driver") q = q.in("account_type", ["driver", "both"]);
+      else if (filter === "passenger") q = q.in("account_type", ["passenger", "both"]);
+
+      const { data, error, count } = await q.range(from, to);
       if (error) throw error;
       return {
         rows:       data || [],
@@ -170,6 +195,21 @@ export default function DashboardUsers() {
     refetchInterval: 60_000,
   });
 
+  // Accurate global driver/passenger counts (not per-page). The stats
+  // cards previously counted only the 25 users on the current page,
+  // producing wrong totals like "5 drivers" for 90 users.
+  const { data: roleCounts = { drivers: 0, passengers: 0 } } = useQuery({
+    queryKey: ["user-role-counts"],
+    queryFn: async () => {
+      const [{ count: drivers }, { count: passengers }] = await Promise.all([
+        supabase.from("profiles").select("id", { count: "exact", head: true }).in("account_type", ["driver", "both"]),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).in("account_type", ["passenger", "both"]),
+      ]);
+      return { drivers: drivers || 0, passengers: passengers || 0 };
+    },
+    staleTime: 60_000,
+  });
+
   // Helper — returns true if user is confirmed.
   // Two sources of truth, checked in order:
   //  1. Per-page confirmedByEmail map (from emails_confirmation_status RPC)
@@ -270,36 +310,18 @@ export default function DashboardUsers() {
     }
   });
 
-  const filtered = users.filter((u) => {
-    // Match by full_name / email substring OR by exact account_number.
-    // The account_number search accepts both raw '1000' and the
-    // user-facing 'M-1000' format (the prefix is stripped before
-    // comparison). Admins can paste exactly what the user reads to
-    // them from the AccountSettings 'معرّف الحساب' field.
-    let matchSearch = !search;
-    if (!matchSearch) {
-      const q = search.toLowerCase().trim();
-      const acctMatch = q.replace(/^m[-\s]?/i, "");  // 'M-1000' / 'm-1000' / 'M 1000' → '1000'
-      matchSearch =
-        u.full_name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q) ||
-        (u.account_number != null && String(u.account_number) === acctMatch);
-    }
-
-    const matchFilter = filter === "all" ||
-      (filter === "admin" && u.role === "admin") ||
-      (filter === "driver" && (u.account_type === "driver" || u.account_type === "both")) ||
-      (filter === "passenger" && (u.account_type === "passenger" || u.account_type === "both"));
-
-    return matchSearch && matchFilter;
-  });
+  // Search + role filtering now happens server-side in the users query
+  // above (across ALL users, not just the current page). This is a
+  // pass-through so the rest of the render code (which references
+  // `filtered`) keeps working unchanged.
+  const filtered = users;
 
   const unconfirmedCount = unconfirmedSummary.count;
 
   const stats = [
     { label: "إجمالي المستخدمين", value: totalUsers, icon: Users, color: "text-primary" },
-    { label: "سائقون", value: users.filter(u => u.account_type === "driver" || u.account_type === "both").length, icon: Car, color: "text-accent" },
-    { label: "ركاب", value: users.filter(u => u.account_type === "passenger" || u.account_type === "both").length, icon: UserCheck, color: "text-green-600" },
+    { label: "سائقون", value: roleCounts.drivers, icon: Car, color: "text-accent" },
+    { label: "ركاب", value: roleCounts.passengers, icon: UserCheck, color: "text-green-600" },
     { label: "بريد غير مؤكد", value: unconfirmedCount, icon: Shield, color: unconfirmedCount > 0 ? "text-amber-600" : "text-muted-foreground" },
   ];
 
