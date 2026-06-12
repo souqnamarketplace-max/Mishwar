@@ -536,10 +536,9 @@ const auth = {
   },
 
   updateMe: async (data) => {
-    // Use supabase.auth.getSession() so expired tokens are auto-refreshed
-    // before the PATCH — same pattern as create(). readLocalSession() returns
-    // null for expired access_tokens even when a valid refresh_token exists,
-    // causing auth.uid()=NULL on the server → 403 Forbidden.
+    // Use supabase client directly for profile PATCH — it handles auth
+    // headers internally so expired tokens, incognito sessions, and
+    // sessionStorage-only sessions all work without manual token passing.
     const { data: authData } = await supabase.auth.getSession();
     const user = authData?.session?.user ?? readLocalSession()?.user;
     if (!user) throw new Error('Not authenticated');
@@ -555,15 +554,13 @@ const auth = {
       if (error) throw error;
     }
 
-    // Profile data — direct REST PATCH (bypasses supabase-js client hang)
+    // Profile data — supabase client handles auth headers internally
     if (Object.keys(profileData).length > 0) {
-      const freshToken = authData?.session?.access_token;
-      await restFetch(`/profiles?id=eq.${encodeURIComponent(user.id)}`, {
-        method: 'PATCH',
-        token: freshToken,
-        headers: { Prefer: 'return=representation' },
-        body: { ...profileData, updated_at: new Date().toISOString() },
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ...profileData, updated_at: new Date().toISOString() })
+        .eq('id', user.id);
+      if (error) throw new Error(error.message);
     }
 
     return auth.me();
