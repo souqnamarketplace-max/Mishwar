@@ -1,0 +1,16 @@
+-- Migration 133: admin_full_reset_onboarding RPC
+-- (applied to production DB 2026-06-12 via Supabase MCP)
+--
+-- Admin-only RPC that fully wipes a user's onboarding data: gender,
+-- account_type, phone, city, bio, avatar_url, and all car_* fields, then
+-- sets onboarding_completed = false so the user restarts the wizard fresh.
+--
+-- Sets mishwar.admin_action so guard_profile_protected_columns allows the
+-- protected-column (gender, account_type) changes. Checks caller role =
+-- admin and raises 42501 otherwise.
+--
+-- Wired into DashboardUsers "🔄 إعادة الإعداد الكامل" button (replaced the
+-- old soft reset that only flipped onboarding_completed). Behind a
+-- destructive confirm dialog.
+--
+-- See full SQL in Supabase migration history.

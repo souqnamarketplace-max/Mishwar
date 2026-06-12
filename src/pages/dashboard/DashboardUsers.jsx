@@ -881,19 +881,26 @@ export default function DashboardUsers() {
                 </div>
               </div>
 
-              {/* Reset onboarding */}
+              {/* Full reset onboarding — wipes ALL onboarding data */}
               <div className="grid grid-cols-2 gap-2">
-                <Button size="sm" variant="outline" className="h-8 text-xs"
+                <Button size="sm" variant="outline" className="h-8 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
                   onClick={async () => {
-                    const { error } = await supabase.from("profiles").update({ onboarding_completed: false }).eq("id", selectedUser.id);
-                    if (error) { toast.error("فشل إعادة التهيئة"); return; }
+                    const ok = await confirm({
+                      title: "إعادة الإعداد الكامل",
+                      message: `سيتم مسح جميع بيانات إعداد ${selectedUser.full_name || selectedUser.email}: الجنس، نوع الحساب، الهاتف، المدينة، النبذة، الصورة، وبيانات السيارة. سيبدأ المستخدم الإعداد من جديد. هذا الإجراء لا يمكن التراجع عنه. هل تريد المتابعة؟`,
+                      confirmLabel: "إعادة تعيين كامل",
+                      destructive: true,
+                    });
+                    if (!ok) return;
+                    const { error } = await supabase.rpc("admin_full_reset_onboarding", { p_user_id: selectedUser.id });
+                    if (error) { toast.error(friendlyError(error, "فشل إعادة التهيئة")); return; }
                     qc.invalidateQueries({ queryKey: ["users"] });
-      qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
-      qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
-                    toast.success("تم إعادة تعيين خطوات الإعداد ✅");
-                    logAdminAction("admin_reset_onboarding", "user", selectedUser.id, { email: selectedUser.email });
+                    qc.invalidateQueries({ queryKey: ["unconfirmed-users-summary"] });
+                    qc.invalidateQueries({ queryKey: ["users-confirmation-status"] });
+                    toast.success("تم مسح بيانات الإعداد بالكامل ✅");
+                    logAdminAction("admin_full_reset_onboarding", "user", selectedUser.id, { email: selectedUser.email });
                   }}
-                >🔄 إعادة الإعداد</Button>
+                >🔄 إعادة الإعداد الكامل</Button>
 
                 {/* Cancel all active bookings */}
                 <div className="col-span-2 bg-muted/30 rounded-xl p-2 space-y-1.5">
