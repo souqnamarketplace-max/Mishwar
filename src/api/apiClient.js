@@ -227,8 +227,25 @@ function createEntityClient(tableName) {
     },
 
     create: async (data) => {
-      // Use direct REST instead of supabase-js (which hangs on writes after token refresh)
-      const email = await getCurrentUserEmail();
+      // Use supabase.auth.getSession() for writes — it triggers auto-refresh
+      // if the access_token is expired but a valid refresh_token exists.
+      // readLocalSession() / getRestHeaders() return null/ANON for expired
+      // tokens, causing every trip INSERT to fire with auth.uid()=NULL and
+      // fail RLS with "permission denied" — which is the "ليس لديك صلاحية"
+      // error all drivers saw. Writes are user-initiated so the await is fine.
+      let writeToken = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      let email = null;
+      try {
+        const { data: authData } = await supabase.auth.getSession();
+        if (authData?.session?.access_token) {
+          writeToken = authData.session.access_token;
+          email = authData.session.user?.email ?? null;
+        }
+      } catch {
+        // getSession failed — fall back to localStorage read so at least
+        // non-expired sessions still work
+        email = await getCurrentUserEmail();
+      }
 
       // Honour recipient notification preferences for the notifications table.
       // Until now `notif_push` / `notif_marketing` toggles in /account were
@@ -283,7 +300,13 @@ function createEntityClient(tableName) {
       };
       const result = await restFetch(`/${tableName}`, {
         method: 'POST',
-        headers: { Prefer: 'return=representation' },
+        // Override Authorization with the freshly-validated token from
+        // supabase.auth.getSession() — ensures auth.uid() is set correctly
+        // in RLS policies even when the localStorage token is expired.
+        headers: {
+          Prefer: 'return=representation',
+          Authorization: `Bearer ${writeToken}`,
+        },
         body: insertData,
       });
       // PostgREST returns an array — single insert returns array of 1
