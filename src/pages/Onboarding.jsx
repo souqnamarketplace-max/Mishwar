@@ -120,9 +120,11 @@ export default function Onboarding() {
   });
 
   // Read require_driver_documents toggle from app_settings
-  // Default TRUE so if DB row missing nothing breaks
+  // Default TRUE so if DB row missing nothing breaks.
+  // staleTime: 0 — always fetch fresh so admin toggling the setting
+  // takes effect immediately without a page reload.
   const { data: appSettings } = useQuery({
-    queryKey: ["app_settings"],
+    queryKey: ["app_settings_onboarding"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("app_settings")
@@ -132,7 +134,7 @@ export default function Onboarding() {
       if (error) return { require_driver_documents: true }; // safe default
       return data;
     },
-    staleTime: 60_000, // cache 1 min — doesn't need to be live
+    staleTime: 0,
   });
 
   const requireDocs = appSettings?.require_driver_documents ?? true;
