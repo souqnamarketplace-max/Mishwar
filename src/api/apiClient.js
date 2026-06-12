@@ -451,38 +451,31 @@ function createEntityClient(tableName) {
 
 const auth = {
   me: async () => {
-    // Read session directly from localStorage (avoids supabase.auth.getSession hang)
-    const session = readLocalSession();
-    const user = session?.user;
+    // Use supabase.auth.getSession() so this works in incognito, with
+    // expired tokens, and with sessionStorage-only sessions. Falls back
+    // to readLocalSession() so non-incognito normal sessions still work.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user ?? readLocalSession()?.user;
     if (!user) throw new Error('Not authenticated');
 
-    // Fetch profile via direct REST (avoids supabase-js client hang)
+    // Fetch profile via supabase client — handles auth headers internally
     let profile = null;
     try {
-      const rows = await restFetch(`/profiles?select=*&id=eq.${encodeURIComponent(user.id)}&limit=1`);
+      const { data: rows } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .limit(1);
       profile = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     } catch (e) {
       console.warn('[auth.me] profile fetch error, using session-only data:', e.message);
     }
 
-    // Fetch payment info via the SECURITY DEFINER RPC. After migration 006
-    // these columns are no longer SELECTable directly from `profiles` —
-    // even by the row owner — so we go through the RPC. If the RPC isn't
-    // deployed yet (migration 006 not applied), the call fails silently
-    // and payment fields remain undefined, matching the pre-migration
-    // behaviour.
+    // Fetch payment info via supabase RPC — handles auth headers internally
     let payment = null;
     try {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_my_payment_info`, {
-        method: 'POST',
-        headers: { ...getRestHeaders(), Prefer: 'return=representation' },
-        body: '{}',
-      });
-      if (r.ok) {
-        const rows = await r.json();
-        payment = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-      }
+      const { data: rows } = await supabase.rpc('get_my_payment_info');
+      payment = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     } catch (e) {
       // RPC not yet deployed or transient error — leave payment as null
     }
@@ -593,32 +586,24 @@ const auth = {
   },
 
   deleteMe: async () => {
-    // Direct localStorage — avoids supabase.auth.getSession hang
-    const session = readLocalSession();
-    const user = session?.user;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData?.session?.user ?? readLocalSession()?.user;
     if (!user) throw new Error('Not authenticated');
 
-    // Call SECURITY DEFINER RPC via direct REST (POST to /rpc/...)
+    // Call SECURITY DEFINER RPC via supabase client
     try {
-      await restFetch('/rpc/delete_user_account', {
-        method: 'POST',
-        body: { user_id_param: user.id },
-        timeout: 10000,
-      });
+      await supabase.rpc('delete_user_account', { user_id_param: user.id });
     } catch (rpcErr) {
-      // Fallback: soft-delete via direct REST
+      // Fallback: soft-delete via supabase client
       captureException(rpcErr, { msg: '[deleteMe] RPC failed, falling back to soft-delete:' });
       try {
-        await restFetch(`/profiles?id=eq.${encodeURIComponent(user.id)}`, {
-          method: 'PATCH',
-          body: {
-            is_active: false,
-            full_name: 'حساب محذوف',
-            phone: null,
-            avatar_url: null,
-            bio: null,
-          },
-        });
+        await supabase.from('profiles').update({
+          is_active: false,
+          full_name: 'حساب محذوف',
+          phone: null,
+          avatar_url: null,
+          bio: null,
+        }).eq('id', user.id);
       } catch (softErr) {
         captureException(softErr, { msg: '[deleteMe] soft-delete also failed:' });
       }
@@ -647,23 +632,23 @@ const integrations = {
       }
 
       // Verify session before upload — use direct localStorage (avoids supabase-js hang)
-      const session = readLocalSession();
-      if (!session) throw new Error('يجب تسجيل الدخول أولاً لرفع الملفات');
-      const userId = session?.user?.id;
-      if (!userId) throw new Error('تعذر التحقق من هويتك. يرجى تسجيل الدخول مرة أخرى');
+      // Use supabase.auth.getSession() so this works in incognito +
+      // expired token sessions where readLocalSession() returns null.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const sessionUser = sessionData?.session?.user ?? readLocalSession()?.user;
+      if (!sessionUser) throw new Error('يجب تسجيل الدخول أولاً لرفع الملفات');
+      const userId = sessionUser.id;
+      const userToken = sessionData?.session?.access_token
+        || readLocalSession()?.access_token
+        || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
       const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
       // Path is namespaced under the user's UUID so storage RLS policies can
       // enforce that user A cannot write/delete in user B's folder.
-      // See migrations/004_storage_hardening.sql for the policy that depends
-      // on this naming convention.
       const filePath = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      // Direct REST upload — bypasses supabase-js client which hangs after token refresh.
-      // Storage REST API: POST /storage/v1/object/{bucket}/{path}
       const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
       const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const userToken = session.access_token || ANON_KEY;
 
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 30000);
@@ -703,23 +688,11 @@ const integrations = {
 
 const functions = {
   processBookingPayment: async (bookingId, confirmedBy = 'driver') => {
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const session = readLocalSession();
-    const token = session?.access_token || ANON_KEY;
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/process_booking_payment`, {
-      method: 'POST',
-      headers: {
-        apikey: ANON_KEY,
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ p_booking_id: bookingId, p_confirmed_by: confirmedBy }),
+    const { data: rows, error } = await supabase.rpc('process_booking_payment', {
+      p_booking_id: bookingId,
+      p_confirmed_by: confirmedBy,
     });
-    if (!r.ok) {
-      const err = await r.text().catch(() => '');
-      throw new Error(`processBookingPayment failed (${r.status}): ${err.slice(0, 200)}`);
-    }
+    if (error) throw new Error(`processBookingPayment failed: ${error.message}`);
     return r.json();
   },
   
