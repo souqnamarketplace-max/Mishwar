@@ -136,6 +136,36 @@ export default function Login() {
     }
   }, [isAuthenticated, recoveryMode, navigate, searchParams]);
 
+  // Detect expired / already-used email verification links.
+  // Supabase redirects to /login#error=...&error_description=... when a
+  // one-time token is invalid. Show a clear Arabic message + auto-switch
+  // to the email-input mode so the user can request a new link.
+  useEffect(() => {
+    const hash = window.location.hash || '';
+    if (!hash.includes('error=')) return;
+
+    const params = new URLSearchParams(hash.replace(/^#/, ''));
+    const errorCode = params.get('error_code') || '';
+    const errorDesc = (params.get('error_description') || '').toLowerCase();
+
+    const isExpired =
+      errorCode === 'otp_expired' ||
+      errorDesc.includes('expired') ||
+      errorDesc.includes('invalid') ||
+      errorDesc.includes('not found');
+
+    if (isExpired) {
+      // Clear the hash so refreshing doesn't re-trigger
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      // Switch to confirm-email mode so user can request a new link
+      setMode('confirm');
+      toast.error(
+        'رابط التحقق منتهي الصلاحية أو تم استخدامه من قبل. أدخل بريدك الإلكتروني وسنرسل لك رابطاً جديداً.',
+        { duration: 6000 }
+      );
+    }
+  }, []); // runs once on mount
+
   const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }));
 
   // Sign-in-with-Google entry point. The actual flow lives in

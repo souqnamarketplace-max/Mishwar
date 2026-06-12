@@ -119,6 +119,24 @@ export default function Onboarding() {
     queryFn: () => api.auth.me(),
   });
 
+  // Read require_driver_documents toggle from app_settings
+  // Default TRUE so if DB row missing nothing breaks
+  const { data: appSettings } = useQuery({
+    queryKey: ["app_settings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("require_driver_documents")
+        .limit(1)
+        .single();
+      if (error) return { require_driver_documents: true }; // safe default
+      return data;
+    },
+    staleTime: 60_000, // cache 1 min — doesn't need to be live
+  });
+
+  const requireDocs = appSettings?.require_driver_documents ?? true;
+
   const save = useMutation({
     mutationFn: async () => {
       // Validate driver-specific fields BEFORE any DB writes. The
@@ -132,8 +150,11 @@ export default function Onboarding() {
       // worked in practice, but the half-baked state surfaced for
       // anyone who closed the tab between the two writes.
       if (accountType === "driver" || accountType === "both") {
-        if (!form.license_number || !form.license_expiry || !form.license_image_url) {
-          throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
+        // Only validate docs if admin requires them
+        if (requireDocs) {
+          if (!form.license_number || !form.license_expiry || !form.license_image_url) {
+            throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
+          }
         }
       }
 
@@ -157,31 +178,49 @@ export default function Onboarding() {
         onboarding_completed: true,
       });
 
-      // Create driver license for drivers (validation moved above)
+      // Create driver license record
       if (accountType === "driver" || accountType === "both") {
-        await api.entities.DriverLicense.create({
-          user_id:                      user?.id,         // Required FK to auth.users
-          driver_email:                 user?.email,
-          driver_name:                  user?.full_name,
-          license_number:               form.license_number,
-          expiry_date:                  form.license_expiry,
-          license_image_url:            form.license_image_url,
-          car_registration_expiry_date: form.car_reg_expiry   || null,
-          car_registration_url:         form.car_reg_url      || null,
-          insurance_expiry_date:        form.insurance_expiry || null,
-          insurance_url:                form.insurance_url    || null,
-          selfie_1_url:                 form.selfie_url       || null,
-          selfie_2_url:                 null,  // Not collected in current onboarding flow
-          status: "pending",
-          submitted_at: new Date().toISOString(),
-        });
+        if (requireDocs) {
+          // Full verification flow — driver uploads docs, admin reviews
+          await api.entities.DriverLicense.create({
+            user_id:                      user?.id,
+            driver_email:                 user?.email,
+            driver_name:                  user?.full_name,
+            license_number:               form.license_number,
+            expiry_date:                  form.license_expiry,
+            license_image_url:            form.license_image_url,
+            car_registration_expiry_date: form.car_reg_expiry   || null,
+            car_registration_url:         form.car_reg_url      || null,
+            insurance_expiry_date:        form.insurance_expiry || null,
+            insurance_url:                form.insurance_url    || null,
+            selfie_1_url:                 form.selfie_url       || null,
+            selfie_2_url:                 null,
+            status: "pending",
+            submitted_at: new Date().toISOString(),
+          });
 
-        // Create notification for admin
-        await notifyAdmin({
-          title: "🪪 طلب تحقق من رخصة قيادة",
-          message: `${user?.full_name || user?.email} قدّم طلب للتحقق من رخصة القيادة`,
-          link: "/dashboard?tab=licenses",
-        });
+          // Notify admin to review
+          await notifyAdmin({
+            title: "🪪 طلب تحقق من رخصة قيادة",
+            message: `${user?.full_name || user?.email} قدّم طلب للتحقق من رخصة القيادة`,
+            link: "/dashboard?tab=licenses",
+          });
+        } else {
+          // Verification bypass — auto-approve instantly, no docs needed
+          await api.entities.DriverLicense.create({
+            user_id:      user?.id,
+            driver_email: user?.email,
+            driver_name:  user?.full_name,
+            license_number:  "—",           // placeholder — no docs collected
+            expiry_date:     "2099-12-31",  // far future — not blocking
+            license_image_url: "",
+            status: "approved",             // auto-approved
+            submitted_at: new Date().toISOString(),
+            reviewed_at:  new Date().toISOString(),
+          });
+
+          // No admin notification needed — auto-approved
+        }
       }
     },
     onSuccess: async () => {
@@ -214,12 +253,13 @@ export default function Onboarding() {
 
       const isDriver = accountType === "driver" || accountType === "both";
       if (isDriver) {
-        toast.success("مرحباً بك في مشوارو! 🎉 أكمل رفع وثائقك من الإعدادات لتصبح سائقاً موثقاً");
-        // Drivers always go to /settings to finish doc uploads
-        // regardless of returnTo — the docs are blocking for becoming
-        // a verified driver, so we don't want them to skip back to a
-        // booking flow and forget about it.
-        navigate("/settings", { replace: true });
+        if (requireDocs) {
+          toast.success("مرحباً بك في مشوارو! 🎉 أكمل رفع وثائقك من الإعدادات لتصبح سائقاً موثقاً");
+          navigate("/settings", { replace: true });
+        } else {
+          toast.success("مرحباً بك في مشوارو! 🎉 تم توثيق حسابك كسائق بنجاح");
+          navigate(safeReturn || "/", { replace: true });
+        }
       } else {
         toast.success("مرحباً بك في مشوارو! 🎉");
         navigate(safeReturn || "/", { replace: true });
@@ -273,7 +313,11 @@ export default function Onboarding() {
   };
 
   const isDriver = accountType === "driver" || accountType === "both";
-  const steps = isDriver ? STEPS_DRIVER : STEPS_PASSENGER;
+  // When docs not required, driver skips the license upload step entirely
+  const STEPS_DRIVER_NO_DOCS = ["اختيار الدور", "معلوماتك", "بيانات السيارة"];
+  const steps = isDriver
+    ? (requireDocs ? STEPS_DRIVER : STEPS_DRIVER_NO_DOCS)
+    : STEPS_PASSENGER;
   const totalSteps = steps.length;
 
   const canNext = () => true;
@@ -301,7 +345,7 @@ export default function Onboarding() {
       if (!form.car_color) { toast.error("يرجى إدخال لون السيارة ⚠️"); return false; }
       if (!form.car_plate) { toast.error("يرجى إدخال رقم اللوحة ⚠️"); return false; }
     }
-    if (step === 3 && isDriver) {
+    if (step === 3 && isDriver && requireDocs) {
       if (!form.license_number) { toast.error("يرجى إدخال رقم الرخصة ⚠️"); return false; }
       // Validate license is alphanumeric (letters + numbers, no special chars except dash/space)
       if (!/^[a-zA-Z0-9\s\-]+$/.test(form.license_number)) {

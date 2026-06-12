@@ -60,6 +60,10 @@ const KNOWN_PATTERNS = [
   [/id_front and selfie photos are required/i,             "صورة الهوية والصورة الشخصية مطلوبتان"],
   [/verification not found/i,                              "طلب التوثيق غير موجود"],
   [/request date is in the past/i,                         "لا يمكن إنشاء طلب لتاريخ ماضٍ"],
+  // Migration 129 — submit_trip_request rejects "born expired" requests
+  // (today + a time slot that already passed in Palestine time). Same
+  // wording as the RequestTrip.jsx client-side validator.
+  [/requested time slot already passed/i,                  "هذه الفترة من اليوم انتهت — اختر فترة لاحقة أو يوماً آخر"],
   [/request not found/i,                                   "الطلب غير موجود"],
   [/request already closed/i,                              "هذا الطلب مغلق بالفعل"],
   [/request not open/i,                                    "هذا الطلب لم يعد مفتوحاً"],
