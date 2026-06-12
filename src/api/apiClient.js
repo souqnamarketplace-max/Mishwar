@@ -75,15 +75,24 @@ function getRestHeaders() {
 
 // Direct REST fetch — avoids supabase-js client which hangs on token refresh.
 // Returns parsed JSON or throws with descriptive error.
+// Pass opts.token to override the session token from localStorage (use this
+// after supabase.auth.getSession() to ensure auto-refreshed tokens are used).
 async function restFetch(pathAndQuery, opts = {}) {
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
   const url = `${SUPABASE_URL}/rest/v1${pathAndQuery}`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 8000);
+  const baseHeaders = opts.token
+    ? {
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${opts.token}`,
+        'Content-Type': 'application/json',
+      }
+    : getRestHeaders();
   try {
     const r = await fetch(url, {
       method: opts.method ?? 'GET',
-      headers: { ...getRestHeaders(), ...(opts.headers || {}) },
+      headers: { ...baseHeaders, ...(opts.headers || {}) },
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: ctrl.signal,
     });
@@ -527,9 +536,12 @@ const auth = {
   },
 
   updateMe: async (data) => {
-    // Direct localStorage — avoids supabase.auth.getSession hang
-    const session = readLocalSession();
-    const user = session?.user;
+    // Use supabase.auth.getSession() so expired tokens are auto-refreshed
+    // before the PATCH — same pattern as create(). readLocalSession() returns
+    // null for expired access_tokens even when a valid refresh_token exists,
+    // causing auth.uid()=NULL on the server → 403 Forbidden.
+    const { data: authData } = await supabase.auth.getSession();
+    const user = authData?.session?.user ?? readLocalSession()?.user;
     if (!user) throw new Error('Not authenticated');
 
     const { email, password, ...profileData } = data;
@@ -545,8 +557,10 @@ const auth = {
 
     // Profile data — direct REST PATCH (bypasses supabase-js client hang)
     if (Object.keys(profileData).length > 0) {
+      const freshToken = authData?.session?.access_token;
       await restFetch(`/profiles?id=eq.${encodeURIComponent(user.id)}`, {
         method: 'PATCH',
+        token: freshToken,
         headers: { Prefer: 'return=representation' },
         body: { ...profileData, updated_at: new Date().toISOString() },
       });
