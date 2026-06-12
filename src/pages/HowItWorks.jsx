@@ -6,7 +6,7 @@ import { Shield, Clock, CreditCard, Headphones, Heart, Users } from "lucide-reac
 import { motion } from "framer-motion";
 
 const features = [
-  { icon: Shield, title: "رحلة آمنة", desc: "جميع السائقين موثقون من قبل فريق الإدارة قبل نشر رحلاتهم" },
+  { icon: Shield, title: "رحلة آمنة", desc: "السائقون الموثّقون يحملون شارة ✓ — يمكنك التحقق من هوية السائق قبل الحجز" },
   // Previously claimed "all transactions through the platform" — that's
   // false. Mishwaro does NOT process payments; passengers pay drivers
   // directly. Replaced with an accurate description of the model.
