@@ -141,14 +141,18 @@ export default function Navbar() {
               </a>
             )}
             {/* Primary CTA — context-aware.
+                - Not onboarded yet      → "أكمل إعداد حسابك" → /onboarding
                 - Drivers / both         → "أنشر رحلة" (their primary action)
                 - Passengers             → "اطلب رحلة" (primary, green)
-                                           + "كن سائقاً" (secondary, outlined)
-                - Anonymous / no account → no CTA (login flow surfaces from header)
-                Previously passengers only saw "كن سائقاً", which forced
-                them to discover the trip-request feature elsewhere — most
-                never did. */}
-            {(user?.account_type === "driver" || user?.account_type === "both") ? (
+                                           + "رفع وثائق التحقق" (secondary, outlined)
+                - Anonymous / no account → no CTA (login flow surfaces from header) */}
+            {user && !user.onboarding_completed ? (
+              <Link to="/onboarding">
+                <Button size="sm" className="hidden sm:flex bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl">
+                  أكمل إعداد حسابك
+                </Button>
+              </Link>
+            ) : (user?.account_type === "driver" || user?.account_type === "both") ? (
               <Link to="/create-trip">
                 <Button size="sm" className="hidden sm:flex bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl">
                   أنشر رحلة
@@ -418,7 +422,13 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {(user?.account_type === "driver" || user?.account_type === "both") ? (
+              {user && !user.onboarding_completed ? (
+                <Link to="/onboarding" onClick={() => setMobileOpen(false)}>
+                  <Button className="w-full mt-2 bg-accent text-accent-foreground rounded-xl">
+                    أكمل إعداد حسابك
+                  </Button>
+                </Link>
+              ) : (user?.account_type === "driver" || user?.account_type === "both") ? (
                 <Link to="/create-trip" onClick={() => setMobileOpen(false)}>
                   <Button className="w-full mt-2 bg-primary text-primary-foreground rounded-xl">
                     أنشر رحلة
