@@ -227,7 +227,7 @@ export default function FeaturedTrips() {
       return map;
     },
     enabled: driverEmails.length > 0,
-    staleTime: 60_000,
+    staleTime: 0, // always fresh — verification status can change any time
   });
 
   const blockedSet = useBlockedEmails();
