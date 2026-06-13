@@ -102,20 +102,16 @@ export default function RequestTrip() {
     staleTime: 30_000,
   });
 
-  // ─── ID Verification gate ───────────────────────────────────────
-  // Calls is_passenger_verified RPC (migration 020). Admins auto-pass.
-  // If not verified, render a redirect-to-verify panel instead of the
-  // form. Server-side, submit_trip_request also rejects with
-  // "passenger not verified" — defense in depth.
-  const { data: isVerified, isLoading: verifyLoading } = useQuery({
+  // Verification is optional (mig 130+134) — fetch only for the badge nudge,
+  // NOT to gate access. Any onboarded user can post requests.
+  const { data: isVerified } = useQuery({
     queryKey: ["is-passenger-verified", user?.email],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("is_passenger_verified", { p_email: user.email });
-      if (error) throw error;
+      const { data } = await supabase.rpc("is_passenger_verified", { p_email: user.email });
       return !!data;
     },
     enabled: !!user?.email && isAuthenticated,
-    staleTime: 30_000,
+    staleTime: 60_000,
   });
 
   // ─── "Both" users: gate passenger features on driver license approval
@@ -393,56 +389,8 @@ export default function RequestTrip() {
   // ─── ID verification gate (rendered AFTER all hooks to keep hook
   // order stable across renders — earlier placement violated rules-
   // of-hooks and crashed when verification status flipped to false).
-  if (!verifyLoading && isVerified === false) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">
-        <Link to="/" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <ArrowLeft className="w-4 h-4 rotate-180" />
-          رجوع
-        </Link>
-
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-6 mb-5">
-          <div className="flex items-center gap-3 mb-3">
-            <ShieldCheck className="w-7 h-7" />
-            <h1 className="text-2xl font-bold">يتطلب توثيق الهوية</h1>
-          </div>
-          <p className="text-sm leading-relaxed opacity-95">
-            لحماية السائقين والمنصة من الطلبات المُسيئة، نطلب توثيق هويتك مرة
-            واحدة قبل أول طلب رحلة. التوثيق سريع وبياناتك تبقى خاصة لا تظهر
-            لأي مستخدم آخر.
-          </p>
-        </div>
-
-        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-          <h3 className="font-bold text-foreground">ما تحتاجه:</h3>
-          <ul className="space-y-2 text-sm text-foreground/80">
-            <li className="flex items-start gap-2">
-              <span className="text-primary shrink-0">✓</span>
-              صورة واضحة لهويتك (الوجه الأمامي)
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary shrink-0">✓</span>
-              صورة شخصية لك مع الهوية في يدك
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary shrink-0">✓</span>
-              الاسم الرباعي كما يظهر على الهوية
-            </li>
-          </ul>
-          <p className="text-xs text-muted-foreground leading-relaxed pt-2 border-t border-border/60">
-            🔒 الصور مخزنة في خوادم خاصة. الإدارة فقط تراها للمراجعة لمدة قصيرة،
-            ولا تظهر لأي مستخدم آخر إطلاقاً.
-          </p>
-          <Link to="/verify-passenger">
-            <Button className="w-full h-12 text-base font-bold gap-2">
-              <ShieldCheck className="w-5 h-5" />
-              ابدأ التوثيق الآن
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // Gate removed — verification is optional. Unverified users see a soft
+  // nudge banner inside the form instead of being blocked entirely.
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-28" dir="rtl">

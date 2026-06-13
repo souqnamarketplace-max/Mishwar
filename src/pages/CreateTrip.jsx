@@ -828,16 +828,16 @@ export default function CreateTrip() {
     navigate("/my-trips");
   };
 
-  // Eligibility-based block: only block if driver truly cannot publish
-  if (!eligibility.allowed) {
+  // Eligibility-based block: since verification is optional (mig 130),
+  // no_docs and first_time_pending no longer block trip posting.
+  // Only block on expired docs (had valid docs before, now expired) or
+  // subscription issues.
+  const hardBlocked = !eligibility.allowed &&
+    eligibility.reason !== "no_docs" &&
+    eligibility.reason !== "first_time_pending";
+
+  if (hardBlocked) {
     const reasonMap = {
-      no_docs: {
-        icon: "📄",
-        title: "لم تقدم وثائق بعد",
-        message: "لرفع وثائق قيادتك ومركبتك، يرجى إكمال الإعداد من صفحة الحساب.",
-        ctaLabel: "تفعيل حساب السائق",
-        ctaPath: "/become-driver",
-      },
       first_time_pending: {
         icon: "⏳",
         title: "وثائقك قيد المراجعة",
@@ -903,6 +903,9 @@ export default function CreateTrip() {
   const showPendingBanner = eligibility.reason === "pending_grace" || eligibility.reason === "valid_with_pending";
   const showExpiringSoonBanner = eligibility.expiringSoon && !showPendingBanner;
   const showSubscriptionGraceBanner = eligibility.reason === "subscription_in_grace";
+  // Soft nudge — driver has no docs or docs pending first review.
+  // They CAN post trips (verification is optional) but we nudge them.
+  const showVerificationNudge = eligibility.reason === "no_docs" || eligibility.reason === "first_time_pending";
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -911,6 +914,24 @@ export default function CreateTrip() {
         <h1 className="text-3xl font-bold text-foreground mb-2">كيف تنشر رحلة ؟</h1>
         <p className="text-muted-foreground">شارك مقاعدك الفارغة وساعد الآخرين على الوصول بأمان وراحة</p>
       </div>
+
+      {/* Soft verification nudge — unverified drivers can still post
+          but are encouraged to upload docs to get the موثّق badge */}
+      {showVerificationNudge && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <span className="text-amber-600 text-lg shrink-0">🪪</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              {eligibility.reason === "first_time_pending" ? "وثائقك قيد المراجعة" : "حسابك غير موثّق"}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {eligibility.reason === "first_time_pending"
+                ? "وثائقك تحت المراجعة — يمكنك نشر رحلات الآن وسيظهر شارة موثّق بعد الموافقة."
+                : "يمكنك نشر رحلات الآن. ارفع وثائقك من الإعدادات للحصول على شارة موثّق ✓ وبناء ثقة أكبر مع الركاب."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Subscription grace banner — driver's subscription expired but
           they're inside the configured grace window. They can still post
