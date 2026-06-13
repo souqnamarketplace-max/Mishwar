@@ -134,16 +134,17 @@ export default function Onboarding() {
       // post-updateMe block validates if the user partially filled docs.
 
       await api.auth.updateMe({
-        // account_type and gender are set-once (guard_profile_protected_columns).
-        // On a retry the profile may already have them — re-sending the same
-        // (or a changed) value trips the guard with 42501 → 403. Only include
-        // them when the profile doesn't already have a value.
-        ...((!user?.account_type) ? { account_type: accountType } : {}),
+        // Always send account_type from local state — the React Query
+        // cache for 'user' can be stale at mutation time (especially on
+        // first registration), causing account_type to be skipped.
+        // The guard_profile_protected_columns trigger allows changes
+        // while onboarding_completed=false (mig 132).
+        account_type: accountType,
         phone: form.phone,
         city: form.city,
         bio: form.bio,
         avatar_url: avatarUrl,
-        ...((!user?.gender) ? { gender: form.gender } : {}),
+        gender: form.gender,
         ...(accountType !== "passenger" ? {
           car_model: form.car_model,
           car_year: form.car_year,
