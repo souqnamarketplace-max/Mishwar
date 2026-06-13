@@ -212,7 +212,7 @@ function Card({ t, noSeats, urgentSeats }) {
                 {t.driver_name || "سائق"}
               </p>
               {/* Verification badge — data comes from profiles!driver_id join in SearchTrips */}
-              {t.profiles?.is_verified
+              {t.is_verified
                 ? <BadgeCheck className="w-3.5 h-3.5 text-primary shrink-0" title="سائق موثّق" />
                 : <span className="text-[10px] text-muted-foreground/60 shrink-0">غير موثّق</span>
               }

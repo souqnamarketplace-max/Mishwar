@@ -106,14 +106,26 @@ export default function SearchTrips() {
           "distance",
           "payment_methods",
           "view_count",
-          "profiles!driver_id(is_verified)",
         ].join(","))
         .in("status", ["confirmed", "in_progress"])
         .gte("date", today)
         .order("date", { ascending: true })
         .limit(500);
       if (error) throw new Error(error.message);
-      return data || [];
+      const trips = data || [];
+      if (trips.length === 0) return [];
+
+      // Enrich with driver is_verified — no FK on trips.driver_id so
+      // PostgREST join syntax fails. Fetch profiles in one bulk query
+      // by the unique set of driver emails and merge back.
+      const driverEmails = [...new Set(trips.map(t => t.driver_email).filter(Boolean))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("email, is_verified")
+        .in("email", driverEmails);
+      const verifiedMap = {};
+      for (const p of profiles || []) verifiedMap[p.email] = p.is_verified;
+      return trips.map(t => ({ ...t, is_verified: verifiedMap[t.driver_email] ?? false }));
     },
     retry: 1,
     staleTime: 30000,  // 30s — refresh in background, don't refetch on every mount
