@@ -163,7 +163,7 @@ export default function Navbar() {
                 </Link>
                 <Link to="/become-driver">
                   <Button size="sm" variant="outline" className="hidden md:flex border-primary/30 text-primary hover:bg-primary/5 rounded-xl">
-                    كن سائقاً
+                    رفع وثائق التحقق
                   </Button>
                 </Link>
               </>
@@ -314,7 +314,7 @@ export default function Navbar() {
                         className="flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors border-b border-border"
                       >
                         <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">توثيق الهوية</span>
+                        <span className="text-sm font-medium">توثيق الهوية (اختياري)</span>
                       </Link>
                     )}
 
@@ -433,7 +433,7 @@ export default function Navbar() {
                   </Link>
                   <Link to="/become-driver" onClick={() => setMobileOpen(false)}>
                     <Button variant="outline" className="w-full mt-2 border-primary/30 text-primary rounded-xl">
-                      كن سائقاً
+                      رفع وثائق التحقق
                     </Button>
                   </Link>
                 </>

@@ -42,8 +42,8 @@ const BUCKET = "uploads-private";
 
 export default function PassengerVerification() {
   useSEO({
-    title: "توثيق هوية الراكب",
-    description: "وثّق هويتك لتتمكن من نشر طلبات الرحلات في مشوارو",
+    title: "توثيق الهوية (اختياري) — مشوارو",
+    description: "وثّق هويتك اختيارياً للحصول على شارة موثّق ✓ في مشوارو.",
   });
 
   const navigate = useNavigate();
@@ -222,11 +222,10 @@ export default function PassengerVerification() {
       <div className="bg-gradient-to-br from-primary to-primary/70 text-primary-foreground rounded-2xl p-5 mb-5">
         <div className="flex items-center gap-3 mb-2">
           <ShieldCheck className="w-7 h-7" />
-          <h1 className="text-2xl font-bold">توثيق الهوية</h1>
+          <h1 className="text-2xl font-bold">توثيق الهوية <span className="text-base font-normal text-muted-foreground">(اختياري)</span></h1>
         </div>
         <p className="text-sm opacity-95 leading-relaxed">
-          نطلب توثيق هويتك لحماية السائقين والمنصة من البلاغات الكاذبة. التوثيق
-          مطلوب مرة واحدة فقط، وتبقى صورك خاصة لا تظهر لأي مستخدم آخر.
+          ارفع صورة هويتك للحصول على شارة موثّق ✓ على ملفك — تُظهر للسائقين أنك راكب موثوق. اختياري تماماً، وبياناتك تبقى خاصة.
         </p>
       </div>
 

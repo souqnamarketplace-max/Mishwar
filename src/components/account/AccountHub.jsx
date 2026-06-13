@@ -152,7 +152,7 @@ export default function AccountHub() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-bold text-primary-foreground">كن سائقاً في مشوارو</p>
-              <p className="text-xs text-primary-foreground/80 mt-0.5">اربح من مقاعدك الفارغة — التسجيل 5 دقائق</p>
+              <p className="text-xs text-primary-foreground/80 mt-0.5">انشر رحلاتك وارفع وثائقك اختيارياً للحصول على شارة موثّق ✓</p>
             </div>
             <ChevronLeft className="w-4 h-4 text-primary-foreground/70 shrink-0" />
           </div>
@@ -212,7 +212,7 @@ export default function AccountHub() {
           <AccountHubItem
             icon={ShieldCheck}
             label="توثيق الهوية"
-            sublabel="مطلوب لنشر طلبات الرحلات"
+            sublabel={isVerified ? "تم التحقق ✓ — موثّق" : "اختياري — احصل على شارة موثّق ✓"}
             onClick={() => {}}
           />
         </Link>
