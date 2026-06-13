@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/api/apiClient";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 
 // ── City colour palette ────────────────────────────────────────────────────────
 const CITY_COLORS = {
@@ -204,12 +205,29 @@ export default function FeaturedTrips() {
   // even before the cron has run.
   const { data: trips_unfiltered = [] } = useQuery({
     queryKey: ["featured-trips"],
-    // Sort by soonest departure date so upcoming trips always appear
-    // regardless of when they were posted. Previously sorted by -created_at
-    // which meant a single driver with 20+ recurring trips would fill the
-    // entire fetch window, leaving no room for other drivers' trips.
-    // Limit raised to 60 to survive one driver with many recurring trips.
     queryFn: () => api.entities.Trip.filter({ status: "confirmed" }, "date", 60),
+  });
+
+  // Enrich trips with driver is_verified — single bulk profile query
+  // by unique driver emails. Same pattern as SearchTrips.jsx.
+  const driverEmails = useMemo(
+    () => [...new Set(trips_unfiltered.map(t => t.driver_email).filter(Boolean))],
+    [trips_unfiltered]
+  );
+  const { data: verifiedMap = {} } = useQuery({
+    queryKey: ["driver-verified-map", driverEmails.join(",")],
+    queryFn: async () => {
+      if (driverEmails.length === 0) return {};
+      const { data } = await supabase
+        .from("profiles")
+        .select("email, is_verified")
+        .in("email", driverEmails);
+      const map = {};
+      for (const p of data || []) map[p.email] = p.is_verified;
+      return map;
+    },
+    enabled: driverEmails.length > 0,
+    staleTime: 60_000,
   });
 
   const blockedSet = useBlockedEmails();
@@ -218,7 +236,8 @@ export default function FeaturedTrips() {
     () => {
       const filtered = filterByBlocks(trips_unfiltered, blockedSet, "driver_email")
         .filter((t) => !isTripExpired(t))
-        .filter((t) => !user?.email || t.driver_email !== user.email);
+        .filter((t) => !user?.email || t.driver_email !== user.email)
+        .map((t) => ({ ...t, is_verified: verifiedMap[t.driver_email] ?? false }));
 
       // De-dup by (from_city, to_city, date). Live data has shown a single
       // driver posting the same route 6+ times for the same day, which used
