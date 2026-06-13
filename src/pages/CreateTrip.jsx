@@ -326,9 +326,15 @@ export default function CreateTrip() {
       if (!prev.car_year  && user.car_year)   patch.car_year   = user.car_year;
       if (!prev.car_color && user.car_color)  patch.car_color  = user.car_color;
       if (!prev.car_plate && user.car_plate)  patch.car_plate  = user.car_plate;
+      // Clamp available_seats to vehicle_capacity — the default (3) can
+      // exceed a small car's capacity (e.g. 2), causing silent validation
+      // failure when the driver clicks التالي on step 2.
+      if (user.vehicle_capacity && prev.available_seats > user.vehicle_capacity) {
+        patch.available_seats = user.vehicle_capacity;
+      }
       return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
-  }, [user?.car_model, user?.car_year, user?.car_color, user?.car_plate]);
+  }, [user?.car_model, user?.car_year, user?.car_color, user?.car_plate, user?.vehicle_capacity]);
 
   // ── Real-time driver-conflict pre-flight check ─────────────────────
   // Mig 087 relaxed the same-day rule to a 1-hour-overlap rule. To give
@@ -514,18 +520,20 @@ export default function CreateTrip() {
       // Step 2 (seats + price) had NO validation before. Users could
       // submit zero/negative prices, zero seats, or empty values.
       const seats = parseInt(form.available_seats, 10);
-      if (isNaN(seats) || seats < 1) { toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️"); return false; }
-      
-      // Validate seats against vehicle capacity
-      if (user?.vehicle_capacity && seats > user.vehicle_capacity) { 
-        toast.error(`عدد المقاعد لا يمكن أن يتجاوز ${user.vehicle_capacity} (سعة سيارتك) ⚠️`); 
-        return false; 
+      if (isNaN(seats) || seats < 1) {
+        toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️");
+        document.getElementById("seats-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
       }
-      
-      // Fallback max for drivers who haven't set capacity yet (shouldn't happen with step 1 gate)
-      if (!user?.vehicle_capacity && seats > 8) { 
-        toast.error("الحد الأقصى للمقاعد هو 8 ⚠️"); 
-        return false; 
+      if (user?.vehicle_capacity && seats > user.vehicle_capacity) {
+        toast.error(`عدد المقاعد لا يمكن أن يتجاوز ${user.vehicle_capacity} (سعة سيارتك) ⚠️`);
+        document.getElementById("seats-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+      if (!user?.vehicle_capacity && seats > 8) {
+        toast.error("الحد الأقصى للمقاعد هو 8 ⚠️");
+        document.getElementById("seats-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
       }
       
       const price = parseFloat(form.price);
@@ -1271,22 +1279,31 @@ export default function CreateTrip() {
             </h3>
             <div>
               <Label>عدد المقاعد المتاحة</Label>
-              <div className="flex items-center gap-4 mt-2">
+              <div id="seats-section" className="flex items-center gap-4 mt-2">
                 <Button variant="outline" size="icon" className="rounded-xl"
                   onClick={() => updateField("available_seats", Math.max(1, form.available_seats - 1))}>
                   -
                 </Button>
-                <span className="text-2xl font-bold w-10 text-center">{form.available_seats}</span>
-                <Button variant="outline" size="icon" className="rounded-xl"
-                  onClick={() => updateField("available_seats", Math.min(maxSeats, form.available_seats + 1))}>
+                <span className={`text-2xl font-bold w-10 text-center ${form.available_seats > maxSeats ? "text-destructive" : ""}`}>
+                  {form.available_seats}
+                </span>
+                <Button variant="outline" size="icon"
+                  className={`rounded-xl ${form.available_seats >= maxSeats ? "opacity-40 cursor-not-allowed" : ""}`}
+                  onClick={() => {
+                    if (form.available_seats >= maxSeats) {
+                      toast.error(`الحد الأقصى ${maxSeats} مقاعد حسب سعة سيارتك ⚠️`);
+                      return;
+                    }
+                    updateField("available_seats", form.available_seats + 1);
+                  }}>
                   +
                 </Button>
               </div>
-              {user?.vehicle_capacity && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  الحد الأقصى: {maxSeats} مقاعد (حسب سعة سيارتك)
-                </p>
-              )}
+              {/* Always show capacity hint, highlight red if over limit */}
+              <p className={`text-xs mt-2 ${form.available_seats > maxSeats ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                الحد الأقصى: {maxSeats} مقاعد (حسب سعة سيارتك)
+                {form.available_seats > maxSeats && " — يرجى تخفيض العدد"}
+              </p>
             </div>
             <div>
               <Label>السعر للمقعد الواحد (₪)</Label>
