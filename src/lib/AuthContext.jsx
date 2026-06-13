@@ -7,6 +7,7 @@ import { invalidateBlockCache } from "@/lib/blockUtils";
 import { api } from '@/api/apiClient';
 import { readLocalSession, readSessionToken } from "@/lib/session";
 import { registerNativePush, unregisterNativePush } from "@/lib/pushNotifications";
+import { App as CapacitorApp } from "@capacitor/app";
 
 // Historical alias — the context referenced the function under this name.
 // Both old and new names resolve to the same helper so any in-flight
@@ -195,12 +196,21 @@ export const AuthProvider = ({ children }) => {
   // No-op on web (Capacitor.isNativePlatform() is false → early return).
   useEffect(() => {
     if (isAuthenticated) {
-      registerNativePush().catch(() => {
-        // Errors are captured to Sentry inside registerNativePush.
-        // Swallow here so a push registration failure doesn't crash
-        // the auth flow.
-      });
+      registerNativePush().catch(() => {});
     }
+  }, [isAuthenticated]);
+
+  // Retry push token registration when the app comes back to foreground.
+  // Handles the case where the user was already authenticated but the
+  // initial registration failed (e.g. token arrived before supabase
+  // client had a valid session, or network was unavailable).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let handle;
+    CapacitorApp.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) registerNativePush().catch(() => {});
+    }).then(h => { handle = h; }).catch(() => {});
+    return () => { try { handle?.remove(); } catch {} };
   }, [isAuthenticated]);
 
   const loadUserProfile = async (authUser) => {

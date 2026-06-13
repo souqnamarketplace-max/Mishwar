@@ -326,9 +326,15 @@ export default function CreateTrip() {
       if (!prev.car_year  && user.car_year)   patch.car_year   = user.car_year;
       if (!prev.car_color && user.car_color)  patch.car_color  = user.car_color;
       if (!prev.car_plate && user.car_plate)  patch.car_plate  = user.car_plate;
+      // Clamp available_seats to vehicle_capacity — the default (3) can
+      // exceed a small car's capacity (e.g. 2), causing silent validation
+      // failure when the driver clicks التالي on step 2.
+      if (user.vehicle_capacity && prev.available_seats > user.vehicle_capacity) {
+        patch.available_seats = user.vehicle_capacity;
+      }
       return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
-  }, [user?.car_model, user?.car_year, user?.car_color, user?.car_plate]);
+  }, [user?.car_model, user?.car_year, user?.car_color, user?.car_plate, user?.vehicle_capacity]);
 
   // ── Real-time driver-conflict pre-flight check ─────────────────────
   // Mig 087 relaxed the same-day rule to a 1-hour-overlap rule. To give
@@ -403,10 +409,10 @@ export default function CreateTrip() {
         </div>
         <h2 className="text-xl font-bold text-foreground mb-2">حسابك راكب فقط</h2>
         <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-          لنشر الرحلات تحتاج لتفعيل حساب السائق وإكمال التحقق من الوثائق.
+          لنشر الرحلات يرجى إكمال إعداد حسابك كسائق.
         </p>
         <Link to="/become-driver" className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm">
-          تفعيل حساب السائق
+          إكمال الإعداد
         </Link>
       </div>
     );
@@ -514,18 +520,20 @@ export default function CreateTrip() {
       // Step 2 (seats + price) had NO validation before. Users could
       // submit zero/negative prices, zero seats, or empty values.
       const seats = parseInt(form.available_seats, 10);
-      if (isNaN(seats) || seats < 1) { toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️"); return false; }
-      
-      // Validate seats against vehicle capacity
-      if (user?.vehicle_capacity && seats > user.vehicle_capacity) { 
-        toast.error(`عدد المقاعد لا يمكن أن يتجاوز ${user.vehicle_capacity} (سعة سيارتك) ⚠️`); 
-        return false; 
+      if (isNaN(seats) || seats < 1) {
+        toast.error("عدد المقاعد يجب أن يكون 1 على الأقل ⚠️");
+        document.getElementById("seats-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
       }
-      
-      // Fallback max for drivers who haven't set capacity yet (shouldn't happen with step 1 gate)
-      if (!user?.vehicle_capacity && seats > 8) { 
-        toast.error("الحد الأقصى للمقاعد هو 8 ⚠️"); 
-        return false; 
+      if (user?.vehicle_capacity && seats > user.vehicle_capacity) {
+        toast.error(`عدد المقاعد لا يمكن أن يتجاوز ${user.vehicle_capacity} (سعة سيارتك) ⚠️`);
+        document.getElementById("seats-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
+      }
+      if (!user?.vehicle_capacity && seats > 8) {
+        toast.error("الحد الأقصى للمقاعد هو 8 ⚠️");
+        document.getElementById("seats-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return false;
       }
       
       const price = parseFloat(form.price);
@@ -828,16 +836,16 @@ export default function CreateTrip() {
     navigate("/my-trips");
   };
 
-  // Eligibility-based block: only block if driver truly cannot publish
-  if (!eligibility.allowed) {
+  // Eligibility-based block: since verification is optional (mig 130),
+  // no_docs and first_time_pending no longer block trip posting.
+  // Only block on expired docs (had valid docs before, now expired) or
+  // subscription issues.
+  const hardBlocked = !eligibility.allowed &&
+    eligibility.reason !== "no_docs" &&
+    eligibility.reason !== "first_time_pending";
+
+  if (hardBlocked) {
     const reasonMap = {
-      no_docs: {
-        icon: "📄",
-        title: "لم تقدم وثائق بعد",
-        message: "لرفع وثائق قيادتك ومركبتك، يرجى إكمال الإعداد من صفحة الحساب.",
-        ctaLabel: "تفعيل حساب السائق",
-        ctaPath: "/become-driver",
-      },
       first_time_pending: {
         icon: "⏳",
         title: "وثائقك قيد المراجعة",
@@ -903,6 +911,9 @@ export default function CreateTrip() {
   const showPendingBanner = eligibility.reason === "pending_grace" || eligibility.reason === "valid_with_pending";
   const showExpiringSoonBanner = eligibility.expiringSoon && !showPendingBanner;
   const showSubscriptionGraceBanner = eligibility.reason === "subscription_in_grace";
+  // Soft nudge — driver has no docs or docs pending first review.
+  // They CAN post trips (verification is optional) but we nudge them.
+  const showVerificationNudge = eligibility.reason === "no_docs" || eligibility.reason === "first_time_pending";
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -911,6 +922,24 @@ export default function CreateTrip() {
         <h1 className="text-3xl font-bold text-foreground mb-2">كيف تنشر رحلة ؟</h1>
         <p className="text-muted-foreground">شارك مقاعدك الفارغة وساعد الآخرين على الوصول بأمان وراحة</p>
       </div>
+
+      {/* Soft verification nudge — unverified drivers can still post
+          but are encouraged to upload docs to get the موثّق badge */}
+      {showVerificationNudge && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+          <span className="text-amber-600 text-lg shrink-0">🪪</span>
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              {eligibility.reason === "first_time_pending" ? "وثائقك قيد المراجعة" : "حسابك غير موثّق"}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {eligibility.reason === "first_time_pending"
+                ? "وثائقك تحت المراجعة — يمكنك نشر رحلات الآن وسيظهر شارة موثّق بعد الموافقة."
+                : "يمكنك نشر رحلات الآن. ارفع وثائقك من الإعدادات للحصول على شارة موثّق ✓ وبناء ثقة أكبر مع الركاب."}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Subscription grace banner — driver's subscription expired but
           they're inside the configured grace window. They can still post
@@ -1250,22 +1279,31 @@ export default function CreateTrip() {
             </h3>
             <div>
               <Label>عدد المقاعد المتاحة</Label>
-              <div className="flex items-center gap-4 mt-2">
+              <div id="seats-section" className="flex items-center gap-4 mt-2">
                 <Button variant="outline" size="icon" className="rounded-xl"
                   onClick={() => updateField("available_seats", Math.max(1, form.available_seats - 1))}>
                   -
                 </Button>
-                <span className="text-2xl font-bold w-10 text-center">{form.available_seats}</span>
-                <Button variant="outline" size="icon" className="rounded-xl"
-                  onClick={() => updateField("available_seats", Math.min(maxSeats, form.available_seats + 1))}>
+                <span className={`text-2xl font-bold w-10 text-center ${form.available_seats > maxSeats ? "text-destructive" : ""}`}>
+                  {form.available_seats}
+                </span>
+                <Button variant="outline" size="icon"
+                  className={`rounded-xl ${form.available_seats >= maxSeats ? "opacity-40 cursor-not-allowed" : ""}`}
+                  onClick={() => {
+                    if (form.available_seats >= maxSeats) {
+                      toast.error(`الحد الأقصى ${maxSeats} مقاعد حسب سعة سيارتك ⚠️`);
+                      return;
+                    }
+                    updateField("available_seats", form.available_seats + 1);
+                  }}>
                   +
                 </Button>
               </div>
-              {user?.vehicle_capacity && (
-                <p className="text-xs text-muted-foreground mt-2">
-                  الحد الأقصى: {maxSeats} مقاعد (حسب سعة سيارتك)
-                </p>
-              )}
+              {/* Always show capacity hint, highlight red if over limit */}
+              <p className={`text-xs mt-2 ${form.available_seats > maxSeats ? "text-destructive font-medium" : "text-muted-foreground"}`}>
+                الحد الأقصى: {maxSeats} مقاعد (حسب سعة سيارتك)
+                {form.available_seats > maxSeats && " — يرجى تخفيض العدد"}
+              </p>
             </div>
             <div>
               <Label>السعر للمقعد الواحد (₪)</Label>

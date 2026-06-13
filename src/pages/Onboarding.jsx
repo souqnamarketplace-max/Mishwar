@@ -244,8 +244,7 @@ export default function Onboarding() {
   // Apple 5.1.1 compliance - must allow account deletion without barriers
   const deleteAccount = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc("delete_account");
-      if (error) throw error;
+      await api.auth.deleteMe();
     },
     onSuccess: async () => {
       toast.success("تم حذف حسابك بنجاح");

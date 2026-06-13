@@ -41,7 +41,7 @@ const PAGE_TITLES = {
   "/request-trip":         "اطلب رحلة",
   "/my-requests":          "طلباتي",
   "/passenger-requests":   "طلبات الركاب",
-  "/verify-passenger":     "توثيق الهوية",
+  "/verify-passenger":     "توثيق الهوية (اختياري)",
   "/driver":               "لوحة السائق",
   "/how-it-works":         "كيف يعمل مشوارو؟",
   "/about":                "عن مشوارو",
@@ -117,7 +117,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
       return next;
     });
   };
-  const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.0.6";
+  const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.0.7";
   
   // Detect if viewport is mobile. Reactive to resize/orientation so
   // foldables, tablets, and desktop browsers crossing the 1024px
@@ -493,7 +493,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   // doesn't render meaningful content for them.
                   {
                     icon: ShieldCheck,
-                    label: "توثيق الهوية",
+                    label: "توثيق الهوية (اختياري)",
                     path: (user?.account_type === "driver" || user?.account_type === "both")
                       ? "/account-settings?section=verification"
                       : "/verify-passenger",
@@ -520,7 +520,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
                   // a mobile passenger has no obvious in-app path into
                   // the upgrade wizard from the side drawer.
                   ...(user && user.account_type === "passenger"
-                    ? [{ icon: Car, label: "كن سائقاً في مشوارو", path: "/become-driver" }]
+                    ? [{ icon: Car, label: "رفع وثائق التحقق (اختياري)", path: "/become-driver" }]
                     : []
                   ),
                   // Trip-requests feature surfaces — without these, users
