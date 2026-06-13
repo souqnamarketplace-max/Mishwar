@@ -348,14 +348,15 @@ export default function MobileLayout({ children, user, showHeader = true, header
             const href = resolvedTab.path;
             // Center FAB inserted between the 2nd and 3rd tabs (visually
             // sits in the middle of the 5-tab strip). Role-aware:
-            //   - Pure driver    → "نشر رحلة" → /create-trip      (direct)
-            //   - Pure passenger → "اطلب رحلة" → /request-trip     (direct)
-            //   - Both accounts  → opens chooser sheet so the user picks
-            //                       what they want (post or request)
-            //   - Anonymous users → no FAB (must log in)
-            const centerInsert = (isDriver || isPassenger) && idx === 2;
-            const fabHref  = isPassenger && !isDriver ? "/request-trip" : "/create-trip";
-            const fabLabel = isBoth ? "إنشاء" : (isPassenger && !isDriver ? "اطلب رحلة" : "نشر رحلة");
+            //   - Not onboarded yet  → "إعداد" → /onboarding
+            //   - Pure driver        → "نشر رحلة" → /create-trip
+            //   - Pure passenger     → "اطلب رحلة" → /request-trip
+            //   - Both accounts      → opens chooser sheet
+            //   - Anonymous users    → no FAB (must log in)
+            const notOnboarded = user && !user.onboarding_completed;
+            const centerInsert = (notOnboarded || isDriver || isPassenger) && idx === 2;
+            const fabHref  = notOnboarded ? "/onboarding" : (isPassenger && !isDriver ? "/request-trip" : "/create-trip");
+            const fabLabel = notOnboarded ? "إعداد" : (isBoth ? "إنشاء" : (isPassenger && !isDriver ? "اطلب رحلة" : "نشر رحلة"));
 
             const handleTabClick = (e) => {
               if (isActive && location.pathname !== resolvedTab.path.split("?")[0]) {
@@ -368,7 +369,7 @@ export default function MobileLayout({ children, user, showHeader = true, header
             return (
               <React.Fragment key={tab.id}>
                 {centerInsert && (
-                  isBoth ? (
+                  isBoth && !notOnboarded ? (
                     <button type="button"
                       onClick={() => { setShowFabChooser(true); setShowMobileMenu(false); }}
                       className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5">
@@ -381,10 +382,10 @@ export default function MobileLayout({ children, user, showHeader = true, header
                     <RouterLink to={fabHref}
                       className="flex flex-col items-center justify-end flex-1 pb-1 -mt-5"
                       onClick={() => setShowMobileMenu(false)}>
-                      <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5">
+                      <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-card active:scale-95 transition-transform mb-0.5 ${notOnboarded ? "bg-accent" : "bg-primary"}`}>
                         <Plus className="w-7 h-7 text-primary-foreground" strokeWidth={2.5} />
                       </div>
-                      <span className="text-[10px] font-bold text-primary">{fabLabel}</span>
+                      <span className={`text-[10px] font-bold ${notOnboarded ? "text-accent" : "text-primary"}`}>{fabLabel}</span>
                     </RouterLink>
                   )
                 )}
