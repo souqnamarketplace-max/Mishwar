@@ -924,21 +924,25 @@ export default function CreateTrip() {
       </div>
 
       {/* Soft verification nudge — unverified drivers can still post
-          but are encouraged to upload docs to get the موثّق badge */}
+          but are encouraged to upload docs to get the موثّق badge.
+          Entire banner is clickable → /become-driver for doc upload. */}
       {showVerificationNudge && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
-          <span className="text-amber-600 text-lg shrink-0">🪪</span>
-          <div>
-            <p className="text-sm font-semibold text-amber-800">
-              {eligibility.reason === "first_time_pending" ? "وثائقك قيد المراجعة" : "حسابك غير موثّق"}
-            </p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              {eligibility.reason === "first_time_pending"
-                ? "وثائقك تحت المراجعة — يمكنك نشر رحلات الآن وسيظهر شارة موثّق بعد الموافقة."
-                : "يمكنك نشر رحلات الآن. ارفع وثائقك من الإعدادات للحصول على شارة موثّق ✓ وبناء ثقة أكبر مع الركاب."}
-            </p>
+        <Link to="/become-driver" className="block mb-6">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3 hover:bg-amber-500/20 transition-colors cursor-pointer">
+            <span className="text-amber-600 text-lg shrink-0">🪪</span>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                {eligibility.reason === "first_time_pending" ? "وثائقك قيد المراجعة" : "حسابك غير موثّق"}
+                <span className="text-[10px] font-normal text-amber-600 underline">اضغط للتوثيق →</span>
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {eligibility.reason === "first_time_pending"
+                  ? "وثائقك تحت المراجعة — يمكنك نشر رحلات الآن وسيظهر شارة موثّق بعد الموافقة."
+                  : "يمكنك نشر رحلات الآن. ارفع وثائقك للحصول على شارة موثّق ✓ وبناء ثقة أكبر مع الركاب."}
+              </p>
+            </div>
           </div>
-        </div>
+        </Link>
       )}
 
       {/* Subscription grace banner — driver's subscription expired but

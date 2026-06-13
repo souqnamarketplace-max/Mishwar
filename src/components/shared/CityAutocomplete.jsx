@@ -90,7 +90,29 @@ export default function CityAutocomplete({
     } else if (e.key === "Escape") setOpen(false);
   };
 
-  const handleMapPick = (city) => { if (city) handleSelect(city); setMapOpen(false); };
+  // Auto-select on blur — if the user typed a city name and clicked away
+  // without picking from the dropdown, try to match what they typed.
+  // Prevents the city field appearing filled but actually being empty.
+  const handleBlur = () => {
+    setTimeout(() => {
+      // Small delay so click on dropdown item fires before blur clears
+      const trimmed = query.trim();
+      if (!trimmed) return;
+      // Already selected correctly
+      if (trimmed === value) return;
+      // Exact match in city list
+      if (ALL_CITIES.includes(trimmed)) { handleSelect(trimmed); return; }
+      // Case/diacritic-insensitive match
+      const norm = normalizeArabic(trimmed);
+      const exact = ALL_CITIES.find(c => normalizeArabic(c) === norm);
+      if (exact) { handleSelect(exact); return; }
+      // Only one filtered result — auto-pick it
+      if (filtered.length === 1) { handleSelect(filtered[0]); return; }
+      // No match — clear so validation catches it, don't leave ghost text
+      if (!value) { setQuery(""); }
+      else { setQuery(value); } // revert to last valid value
+    }, 150);
+  };
   const iconCls = iconColor === "accent" ? "text-accent" : "text-primary";
 
   return (
@@ -104,7 +126,7 @@ export default function CityAutocomplete({
           <input
             ref={inputRef} type="text" value={query}
             onChange={e => { setQuery(e.target.value); setActiveIndex(-1); setOpen(true); }}
-            onFocus={() => setOpen(true)} onKeyDown={handleKeyDown}
+            onFocus={() => setOpen(true)} onKeyDown={handleKeyDown} onBlur={handleBlur}
             placeholder={placeholder} autoComplete="off" spellCheck={false}
             className={cn(
               "w-full h-12 rounded-xl bg-transparent border-0 text-sm text-foreground",
