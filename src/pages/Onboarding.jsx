@@ -59,9 +59,8 @@ function isAllowedUpload(file, { imageOnly }) {
 }
 
 async function uploadToSupabase(file, { bucket = 'uploads' } = {}) {
-  // Resolve the user UUID via the centralized session helper so the path
-  // matches the ownership policy in migrations/004_storage_hardening.sql.
-  const userId = readSessionUserId();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData?.session?.user?.id || readSessionUserId();
   if (!userId) throw new Error("يجب تسجيل الدخول لرفع الملفات");
 
   const ext = file.name.split('.').pop() || 'jpg';
@@ -131,14 +130,8 @@ export default function Onboarding() {
       // Resubmitting the form redoes updateMe (idempotent) so it
       // worked in practice, but the half-baked state surfaced for
       // anyone who closed the tab between the two writes.
-      if (accountType === "driver" || accountType === "both") {
-        // Only validate docs if admin requires them
-        if (requireDocs) {
-          if (!form.license_number || !form.license_expiry || !form.license_image_url) {
-            throw new Error("يرجى ملء جميع بيانات رخصة القيادة");
-          }
-        }
-      }
+      // Documents are optional. No pre-validation needed here — the
+      // post-updateMe block validates if the user partially filled docs.
 
       await api.auth.updateMe({
         // account_type and gender are set-once (guard_profile_protected_columns).
@@ -170,7 +163,8 @@ export default function Onboarding() {
           if (!form.license_number || !form.license_expiry || !form.license_image_url) {
             throw new Error("إذا أردت التحقق، يرجى ملء رقم الرخصة وتاريخ الانتهاء وصورتها على الأقل");
           }
-          await api.entities.DriverLicense.create({
+          const { data: authData } = await supabase.auth.getSession();
+          const { error: licError } = await supabase.from("driver_licenses").insert({
             user_id:                      user?.id,
             driver_email:                 user?.email,
             driver_name:                  user?.full_name,
@@ -183,9 +177,11 @@ export default function Onboarding() {
             insurance_url:                form.insurance_url    || null,
             selfie_1_url:                 form.selfie_url       || null,
             selfie_2_url:                 null,
-            status: "pending",
-            submitted_at: new Date().toISOString(),
+            status:                       "pending",
+            submitted_at:                 new Date().toISOString(),
+            created_by:                   user?.email,
           });
+          if (licError) throw new Error(licError.message);
           await notifyAdmin({
             title: "🪪 طلب تحقق من رخصة قيادة",
             message: `${user?.full_name || user?.email} قدّم طلب للتحقق من رخصة القيادة`,
