@@ -272,6 +272,11 @@ export async function registerNativePush() {
         const platform = Capacitor.getPlatform();  // 'ios' | 'android' | 'web'
         if (platform !== "ios" && platform !== "android") return;
 
+        // Ensure supabase client has a valid session before calling the
+        // RPC — auth.email() on the server side needs a valid JWT.
+        // getSession() auto-refreshes expired tokens.
+        await supabase.auth.getSession();
+
         const appVersion = (typeof import.meta.env !== "undefined" && import.meta.env.VITE_APP_VERSION) || null;
 
         const { error } = await supabase.rpc("upsert_device_token", {
