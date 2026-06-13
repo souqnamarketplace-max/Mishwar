@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Star, Clock, Users, ArrowLeft, Zap, MapPin, Share2, Eye } from "lucide-react";
 import { motion } from "framer-motion";
 import { api } from "@/api/apiClient";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
 // ── City colour palette ────────────────────────────────────────────────────────
